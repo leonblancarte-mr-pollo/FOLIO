@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(Start-Sleep -Seconds 5)",
+      "Bash(Get-Content \"C:\\\\Users\\\\leons\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-leons-OneDrive-Escritorio-FOLIO-FINAL\\\\90f73125-0dbc-4afc-a1d3-b1a7e01b3941\\\\tasks\\\\bpcwlxpvy.output\")",
+      "Bash(not exist *)"
+    ]
+  }
+}
