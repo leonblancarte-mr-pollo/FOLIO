@@ -1,3 +1,211 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes heartPop {
+  0%   { transform: scale(0.5); opacity: 1; }
+  45%  { transform: scale(1.25); opacity: 0.95; }
+  80%  { transform: scale(1);   opacity: 0.75; }
+  100% { transform: scale(1);   opacity: 0; }
+}
+.heart-pop-anim {
+  animation: heartPop 0.65s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.popover-anim {
+  transform-origin: bottom center;
+  animation: fadeInScale 150ms ease-out forwards;
+}
+
+/* #2 + #3: LikeButton — micro-press bounce con curva fuerte */
+@keyframes likeBounce {
+  0%   { transform: scale(1); }
+  20%  { transform: scale(0.88); }
+  55%  { transform: scale(1.35); }
+  80%  { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+.like-bounce {
+  animation: likeBounce 320ms cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+/* #8 + #9: Press state para botones táctiles */
+.btn-press {
+  transition: transform 120ms ease-out;
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* #14: Pulso para indicador "online" de amigos */
+@keyframes onlinePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.5); }
+}
+.pulse-dot {
+  animation: onlinePulse 2.5s ease 3;
+}
+
+/* Feed container fade-in (reemplaza el stagger por card) */
+@keyframes feedFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* #10: Entrada escalonada de cards del feed */
+@keyframes feedCardIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.feed-card-enter {
+  animation: feedCardIn 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* #7: Entrada del panel de composición de post */
+@keyframes composeIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.post-compose-enter {
+  animation: composeIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* #11: Entrada de la sección de comentarios */
+@keyframes commentsIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.comments-enter {
+  animation: commentsIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* #12: Hover en card de libro — solo en dispositivos con puntero fino */
+.book-card-hover {
+  transition: opacity 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .book-card-hover:hover { opacity: 0.82; }
+}
+
+/* #15: Press state para botones del strip de amigos */
+.friend-strip-btn {
+  transition: transform 120ms ease-out;
+}
+.friend-strip-btn:active {
+  transform: scale(0.94);
+}
+
+/* #16: Entrada animada del ícono de logro */
+@keyframes achieveIconIn {
+  from { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.achieve-icon-enter {
+  animation: achieveIconIn 350ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ─── Exit animations ───────────────────────────────────────────── */
+@keyframes slideDown {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+@keyframes backdropOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ─── Hover CSS classes (replace JS onMouseEnter/Leave) ─────────── */
+.hover-bg-soft {
+  transition: background-color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .hover-bg-soft:hover { background-color: #EBE3D2; }
+}
+
+.hover-shadow-stat {
+  /* element must already have transition: box-shadow in inline style */
+}
+@media (hover: hover) and (pointer: fine) {
+  .hover-shadow-stat:hover { box-shadow: 0 4px 12px rgba(42,31,26,0.1); }
+}
+
+.quiz-pill-press {
+  transition: transform 120ms ease-out;
+}
+.quiz-pill-press:active { transform: scale(0.95); }
+@media (hover: hover) and (pointer: fine) {
+  .quiz-pill-press:hover { transform: scale(0.97); }
+}
+
+.timer-book-hover {
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .timer-book-hover:hover {
+    border-color: #7A2E2E;
+    background-color: rgba(122, 46, 46, 0.04);
+  }
+}
+
+/* ─── 1. prefers-reduced-motion (WCAG 2.1 accessibility) ─────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Modal backdrop fade */
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* BookCard — hover + press en CSS, sin JS */
+.book-list-card {
+  transition: box-shadow 200ms ease, transform 150ms ease;
+}
+.book-list-card:active {
+  transform: scale(0.98);
+}
+@media (hover: hover) and (pointer: fine) {
+  .book-list-card:hover {
+    box-shadow: 0 4px 16px rgba(122, 46, 46, 0.12);
+    transform: translateY(-2px);
+  }
+}
+
+/* Tab transitions — fade-up al cambiar de sección */
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.tab-view-enter {
+  animation: tabIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* BottomNav Add button press state */
+.nav-add-btn:active {
+  transform: scale(0.93);
+}
+.nav-add-btn {
+  transition: transform 120ms ease-out;
+}
+
+/* AppHeader bell press state */
+.bell-btn {
+  transition: transform 120ms ease-out;
+}
+.bell-btn:active {
+  transform: scale(0.82);
+}

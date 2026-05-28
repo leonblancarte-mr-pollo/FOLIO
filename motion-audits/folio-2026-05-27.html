@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>folio motion audit — 2026-05-27</title>
+  <style>
+    /* ─── Demo Shell Tokens ─────────────────────────────────────── */
+    :root {
+      --bg: #ffffff;
+      --fg: #111111;
+      --border: #e5e5e5;
+      --accent: #7A2E2E;
+      --loop-dim: rgba(0,0,0,0.42);
+      --card-radius: 12px;
+      --card-padding: 20px;
+      --gap: 12px;
+      --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a1a;
+        --fg: #f0f0f0;
+        --border: #333333;
+        --accent: #c47a7a;
+        --loop-dim: rgba(240,240,240,0.42);
+      }
+    }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--sans);
+      margin: 0;
+      padding: 48px 24px;
+      max-width: 960px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .demo-card {
+      position: relative;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: var(--card-padding);
+      max-width: 360px;
+      min-width: 280px;
+      font-family: var(--sans);
+      outline: none;
+      flex-shrink: 0;
+    }
+    .demo-card__header {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--fg);
+      margin-bottom: 4px;
+      padding-right: 72px;
+    }
+    .demo-card__subhead {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--loop-dim);
+      margin-bottom: var(--gap);
+    }
+    .demo-card__stage {
+      background: #F4EDE010;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .demo-card__loop-indicator {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--loop-dim);
+      letter-spacing: 0.02em;
+      user-select: none;
+    }
+
+    /* ─── prefers-reduced-motion guard ─────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .demo-card__loop-indicator { display: none; }
+      [class*="__motion-target"] {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+
+    /* ─── Report Layout ─────────────────────────────────────────── */
+    .report-hero { margin-bottom: 32px; }
+    .report-hero h1 { font-size: 1.75rem; margin: 0 0 4px; }
+    .report-hero__date { font-family: var(--mono); color: var(--loop-dim); font-size: 0.875rem; margin: 0 0 16px; }
+    .report-hero__counts { font-size: 1rem; margin: 0 0 8px; }
+    .report-hero__counts a { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--border); }
+    .report-hero__counts a:hover { border-bottom-style: solid; }
+    .report-hero__primary { font-family: var(--mono); color: var(--loop-dim); font-size: 0.875rem; margin: 0; }
+    .report-assessment { margin: 32px 0; font-size: 1.05rem; line-height: 1.6; border-left: 3px solid var(--accent); padding-left: 16px; }
+    .perspective-section { margin: 48px 0; padding-top: 24px; border-top: 2px solid var(--border); }
+    .perspective-section h2 { font-size: 1.25rem; margin: 0 0 16px; }
+    .perspective-section h3 { font-size: 1rem; margin: 24px 0 8px; color: var(--loop-dim); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8rem; }
+    .perspective-section ul { margin: 0; padding-left: 20px; line-height: 1.7; }
+    .perspective-section__quote { margin-top: 24px; padding: 12px 16px; background: var(--bg); border-left: 3px solid var(--accent); font-size: 0.95rem; }
+    .perspective-section__empty { font-style: italic; color: var(--loop-dim); padding: 12px 0; }
+    .finding-row {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 24px;
+      align-items: start;
+      margin: 28px 0;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+    @media (max-width: 768px) {
+      .finding-row { grid-template-columns: 1fr; }
+      .demo-card { max-width: 100%; }
+    }
+    .finding-row__severity { font-family: var(--mono); font-size: 0.8rem; font-weight: 700; margin: 0 0 6px; }
+    .finding-row h4 { font-size: 1rem; margin: 0 0 8px; }
+    .finding-row p { margin: 0 0 8px; font-size: 0.9rem; line-height: 1.55; }
+    .finding-row__location { font-family: var(--mono); font-size: 0.8rem; color: var(--loop-dim); }
+    .recommendations { margin: 48px 0; }
+    .recommendations h2 { font-size: 1.15rem; margin: 0 0 12px; }
+    .recommendations table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .recommendations th, .recommendations td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .recommendations th { font-weight: 600; }
+    code { font-family: var(--mono); font-size: 0.82em; background: rgba(128,128,128,0.1); padding: 1px 4px; border-radius: 3px; }
+    .reference-summary { margin: 48px 0; padding: 24px; border: 1px solid var(--border); border-radius: 10px; }
+    .reference-summary h2 { margin: 0 0 16px; }
+    .badge-critical { color: #cc0000; }
+    .badge-important { color: #b36a00; }
+    .badge-opportunity { color: #2a7a2a; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       PER-FINDING MOTION CODE
+       finding-1  prefers-reduced-motion missing (Critical)
+       finding-2  no exit animations (Critical)
+       finding-3  JS hover mutations (Critical)
+       finding-4  transition:all (Important)
+       finding-5  pulsing indicators (Important)
+       finding-6  height animation layout-thrash (Important)
+       finding-7  hover-scale scattered (Important)
+       finding-8  icon swap missing blur (Important)
+    ═══════════════════════════════════════════════════════════════ */
+
+    /* ── Finding 1: prefers-reduced-motion ─────────────────────── */
+    @keyframes motion-1-fire-slop {
+      0%   { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(200,132,43,0.5)); }
+      33%  { transform: scale(1.18); filter: drop-shadow(0 0 14px rgba(200,132,43,0.95)); }
+      66%  { transform: scale(1.18); filter: drop-shadow(0 0 14px rgba(200,132,43,0.95)); }
+      100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(200,132,43,0.5)); }
+    }
+    .demo-card-1__motion-target {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-direction: column;
+    }
+    .demo-card-1__motion-target .flame {
+      font-size: 2.2rem;
+      animation: motion-1-fire-slop 3s ease-in-out infinite;
+      display: inline-block;
+    }
+    .demo-card-1__motion-target .label {
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      color: #cc4400;
+      text-align: center;
+    }
+    .demo-card-1__motion-target .warn {
+      font-size: 0.72rem;
+      font-family: var(--mono);
+      color: var(--loop-dim);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* ── Finding 2: no exit animations ─────────────────────────── */
+    @keyframes motion-2-sheet-in {
+      0%   { transform: translateY(100%); opacity: 0; }
+      33%  { transform: translateY(0);    opacity: 1; }
+      66%  { transform: translateY(0);    opacity: 1; }
+      100% { transform: translateY(100%); opacity: 0; }
+    }
+    @keyframes motion-2-backdrop-in {
+      0%   { opacity: 0; }
+      33%  { opacity: 1; }
+      66%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .demo-card-2__motion-target {
+      position: relative;
+      width: 200px;
+      height: 100px;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+    .demo-card-2__motion-target .backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(42,31,26,0.45);
+      border-radius: 8px;
+      animation: motion-2-backdrop-in 3s ease-out infinite;
+    }
+    .demo-card-2__motion-target .sheet {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 60px;
+      background: #F4EDE0;
+      border-radius: 10px 10px 0 0;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      animation: motion-2-sheet-in 3s cubic-bezier(0.32,0.72,0,1) infinite;
+    }
+    .demo-card-2__motion-target .sheet-pill {
+      width: 32px; height: 4px;
+      border-radius: 2px;
+      background: #D4C9B5;
+      position: absolute;
+      top: 8px; left: 50%; transform: translateX(-50%);
+    }
+    .demo-card-2__motion-target .sheet-line {
+      height: 8px; border-radius: 4px;
+      background: #D4C9B5;
+    }
+
+    /* ── Finding 3: JS hover mutations bypass transitions ────────── */
+    @keyframes motion-3-hover-demo {
+      0%   { background-color: #F4EDE0; }
+      33%  { background-color: #EBE3D2; }
+      66%  { background-color: #EBE3D2; }
+      100% { background-color: #F4EDE0; }
+    }
+    .demo-card-3__motion-target {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+    .demo-card-3__motion-target .row-instant {
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #F4EDE0;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #D4C9B5;
+      animation: motion-3-hover-demo 3s step-start infinite;
+    }
+    .demo-card-3__motion-target .row-smooth {
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: #F4EDE0;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #D4C9B5;
+      animation: motion-3-hover-demo 3s ease-out infinite;
+    }
+    .demo-card-3__motion-target .tag {
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      color: var(--loop-dim);
+    }
+    .demo-card-3__motion-target .tag.bad { color: #cc4400; }
+    .demo-card-3__motion-target .tag.good { color: #2a7a2a; }
+
+    /* ── Finding 4: transition:all ──────────────────────────────── */
+    @keyframes motion-4-pill-swap {
+      0%   { background-color: #FBF6EB; color: #5C4A3F; border-color: #D4C9B5; }
+      33%  { background-color: #7A2E2E; color: #FBF6EB; border-color: #7A2E2E; }
+      66%  { background-color: #7A2E2E; color: #FBF6EB; border-color: #7A2E2E; }
+      100% { background-color: #FBF6EB; color: #5C4A3F; border-color: #D4C9B5; }
+    }
+    .demo-card-4__motion-target {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+    .demo-card-4__motion-target .pill {
+      padding: 7px 20px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      border: 1.5px solid;
+      animation: motion-4-pill-swap 3s infinite;
+    }
+    .demo-card-4__motion-target .pill-all {
+      animation-timing-function: linear;
+    }
+    .demo-card-4__motion-target .pill-specific {
+      animation-timing-function: cubic-bezier(0.23,1,0.32,1);
+    }
+    .demo-card-4__motion-target .label {
+      font-size: 0.68rem;
+      font-family: var(--mono);
+      color: var(--loop-dim);
+    }
+    .demo-card-4__motion-target .label.bad { color: #cc4400; }
+    .demo-card-4__motion-target .label.good { color: #2a7a2a; }
+
+    /* ── Finding 5: pulsing indicators ─────────────────────────── */
+    @keyframes motion-5-slop-pulse {
+      0%   { transform: scale(1);   opacity: 1; }
+      33%  { transform: scale(1.5); opacity: 0.5; }
+      66%  { transform: scale(1.5); opacity: 0.5; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+    .demo-card-5__motion-target {
+      display: flex;
+      gap: 28px;
+      align-items: center;
+    }
+    .demo-card-5__motion-target .group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .demo-card-5__motion-target .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #4CAF50;
+    }
+    .demo-card-5__motion-target .dot-pulsing {
+      animation: motion-5-slop-pulse 3s ease-in-out infinite;
+    }
+    .demo-card-5__motion-target .flame {
+      font-size: 1.5rem;
+      animation: motion-5-slop-pulse 3s ease-in-out infinite;
+      display: inline-block;
+    }
+    .demo-card-5__motion-target .label {
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      color: var(--loop-dim);
+      text-align: center;
+    }
+    .demo-card-5__motion-target .label.bad { color: #cc4400; }
+
+    /* ── Finding 6: height animation layout-thrash ──────────────── */
+    @keyframes motion-6-height-grow {
+      0%   { height: 8px; }
+      33%  { height: 56px; }
+      66%  { height: 56px; }
+      100% { height: 8px; }
+    }
+    @keyframes motion-6-scale-grow {
+      0%   { transform: scaleY(0.14); }
+      33%  { transform: scaleY(1); }
+      66%  { transform: scaleY(1); }
+      100% { transform: scaleY(0.14); }
+    }
+    .demo-card-6__motion-target {
+      display: flex;
+      gap: 24px;
+      align-items: flex-end;
+    }
+    .demo-card-6__motion-target .col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .demo-card-6__motion-target .bar-wrap {
+      height: 56px;
+      display: flex;
+      align-items: flex-end;
+    }
+    .demo-card-6__motion-target .bar-height {
+      width: 32px;
+      background: #7A2E2E;
+      border-radius: 4px 4px 0 0;
+      height: 8px;
+      animation: motion-6-height-grow 3s ease 0s infinite;
+    }
+    .demo-card-6__motion-target .bar-scale {
+      width: 32px;
+      height: 56px;
+      background: #3D8B37;
+      border-radius: 4px 4px 0 0;
+      transform-origin: bottom;
+      transform: scaleY(0.14);
+      animation: motion-6-scale-grow 3s ease 0s infinite;
+    }
+    .demo-card-6__motion-target .label {
+      font-size: 0.65rem;
+      font-family: var(--mono);
+      color: var(--loop-dim);
+    }
+    .demo-card-6__motion-target .label.bad { color: #cc4400; }
+    .demo-card-6__motion-target .label.good { color: #2a7a2a; }
+
+    /* ── Finding 7: hover-scale scattered ──────────────────────── */
+    @keyframes motion-7-scales {
+      0%   { transform: scale(1); }
+      20%  { transform: scale(1.05); }
+      40%  { transform: scale(1.01); }
+      60%  { transform: scale(1.02); }
+      80%  { transform: scale(0.995); }
+      100% { transform: scale(1); }
+    }
+    .demo-card-7__motion-target {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+    }
+    .demo-card-7__motion-target .item {
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      background: #F4EDE0;
+      border: 1px solid #D4C9B5;
+      display: flex;
+      justify-content: space-between;
+      animation: motion-7-scales 3s ease-in-out infinite;
+    }
+    .demo-card-7__motion-target .item:nth-child(2) { animation-delay: 0.4s; animation-timing-function: linear; }
+    .demo-card-7__motion-target .item:nth-child(3) { animation-delay: 0.8s; animation-timing-function: ease-out; }
+    .demo-card-7__motion-target .scale-tag {
+      font-family: var(--mono);
+      font-size: 0.65rem;
+      color: #cc4400;
+    }
+
+    /* ── Finding 8: icon swap missing blur ──────────────────────── */
+    @keyframes motion-8-heart-no-blur {
+      0%   { opacity: 1; }
+      33%  { opacity: 0; }
+      66%  { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    @keyframes motion-8-heart-blur {
+      0%   { opacity: 1; filter: blur(0); }
+      33%  { opacity: 0; filter: blur(3px); }
+      66%  { opacity: 0; filter: blur(3px); }
+      100% { opacity: 1; filter: blur(0); }
+    }
+    @keyframes motion-8-heart-filled-no {
+      0%   { opacity: 0; }
+      33%  { opacity: 1; }
+      66%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    @keyframes motion-8-heart-filled-blur {
+      0%   { opacity: 0; filter: blur(3px); }
+      33%  { opacity: 1; filter: blur(0); }
+      66%  { opacity: 1; filter: blur(0); }
+      100% { opacity: 0; filter: blur(3px); }
+    }
+    .demo-card-8__motion-target {
+      display: flex;
+      gap: 32px;
+      align-items: center;
+    }
+    .demo-card-8__motion-target .icon-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .demo-card-8__motion-target .icon-stage {
+      position: relative;
+      width: 28px;
+      height: 28px;
+    }
+    .demo-card-8__motion-target .heart-outline {
+      position: absolute;
+      inset: 0;
+      font-size: 1.5rem;
+      line-height: 1;
+      text-align: center;
+      color: #8A7B6E;
+    }
+    .demo-card-8__motion-target .heart-filled {
+      position: absolute;
+      inset: 0;
+      font-size: 1.5rem;
+      line-height: 1;
+      text-align: center;
+      color: #E74C3C;
+    }
+    .demo-card-8__motion-target .without .heart-outline {
+      animation: motion-8-heart-no-blur 3s ease infinite;
+    }
+    .demo-card-8__motion-target .without .heart-filled {
+      animation: motion-8-heart-filled-no 3s ease infinite;
+    }
+    .demo-card-8__motion-target .with .heart-outline {
+      animation: motion-8-heart-blur 3s ease infinite;
+    }
+    .demo-card-8__motion-target .with .heart-filled {
+      animation: motion-8-heart-filled-blur 3s ease infinite;
+    }
+    .demo-card-8__motion-target .label {
+      font-size: 0.68rem;
+      font-family: var(--mono);
+      color: var(--loop-dim);
+      text-align: center;
+    }
+    .demo-card-8__motion-target .label.bad { color: #cc4400; }
+    .demo-card-8__motion-target .label.good { color: #2a7a2a; }
+  </style>
+</head>
+<body>
+
+<!-- ─── Hero ─────────────────────────────────────────────────────── -->
+<header class="report-hero">
+  <h1>folio motion audit</h1>
+  <p class="report-hero__date">2026-05-27</p>
+  <p class="report-hero__counts">
+    <a href="#critical-findings">🔴 Critical: 3</a> ·
+    <a href="#important-findings">🟡 Important: 5</a> ·
+    <a href="#opportunity-findings">🟢 Opportunities: 6</a>
+  </p>
+  <p class="report-hero__primary">Primary: Jakub Krehel — Production Polish &nbsp;|&nbsp; Secondary: Emil Kowalski — Restraint &amp; Speed &nbsp;|&nbsp; Selective: Jhey Tompkins — Delight</p>
+</header>
+
+<!-- ─── Overall Assessment ────────────────────────────────────────── -->
+<section class="report-assessment">
+  Folio has received several rounds of intentional polish — the drawer easing curve, the LikeButton micro-press, the BottomNav pill indicator, and the feed skeleton all signal real care. The foundations are solid. However, three systemic gaps undercut everything else: <strong>zero <code>prefers-reduced-motion</code> support</strong> (the entire animation surface is inaccessible to ~30% of users who need it), <strong>no exit animations anywhere</strong> (every modal disappears instantly, breaking spatial continuity), and <strong>~12 JS-driven hover mutations that bypass CSS transitions</strong> entirely. Fix those three and the app immediately crosses a threshold from "polished demo" to "polished product." The existing pulsing indicators (flame, online dot, sparkles) are the clearest AI-slop tells in the codebase — they loop infinitely, serve no functional purpose, and would irritate daily users after the second week.
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     JAKUB KREHEL — Production Polish (PRIMARY)
+══════════════════════════════════════════════════════════════════ -->
+<section class="perspective-section" id="perspective-jakub">
+  <h2>🎯 Jakub Krehel — Production Polish</h2>
+
+  <div class="perspective-section__working-well">
+    <h3>What's Working Well</h3>
+    <ul>
+      <li>✓ <strong>Drawer easing upgraded</strong> — <code>cubic-bezier(0.32, 0.72, 0, 1)</code> on all 10 sheet instances matches iOS's native curve. This is the single highest-quality motion signal in the codebase. — <code>App.jsx:4177, 8636</code></li>
+      <li>✓ <strong>Backdrop fade-in on primary modals</strong> — <code>backdropIn 200ms</code> on 6 overlays prevents the jarring instant-dark. — <code>App.jsx:3040, 4172, 6680, 8135, 8292, 8632</code></li>
+      <li>✓ <strong>FeedSkeleton shimmer</strong> — Replaces blank screen during load with perceived-performance motion. Pattern is correct (offset-shift shimmer). — <code>App.jsx:8706</code></li>
+      <li>✓ <strong>LikeButton dual-icon opacity swap</strong> — Two absolute-positioned hearts controlled by <code>opacity</code> instead of <code>fill</code>. GPU-compositable, correct. — <code>App.jsx:7907</code></li>
+      <li>✓ <strong>Tab transition fade-up</strong> — <code>tabIn 200ms</code> on every tab change gives content orientation. — <code>index.css:tab-view-enter</code></li>
+      <li>✓ <strong>Comments enter animation</strong> — <code>commentsIn 200ms</code> signals new content appearing in context. — <code>index.css:comments-enter</code></li>
+    </ul>
+  </div>
+
+  <div class="perspective-section__issues">
+    <h3>Issues to Address</h3>
+
+    <!-- Finding 2 -->
+    <div class="finding-row" id="finding-2">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-critical">🔴 Critical</p>
+        <h4>Zero exit animations — every modal and sheet vanishes instantly</h4>
+        <p>Every conditional render in Folio — <code>BookDetailModal</code>, <code>NotificationsSheet</code>, <code>PostComments</code>, <code>FeedSkeleton→FeedView</code>, <code>previewPost</code>, <code>shareSession</code>, and 57 more — unmounts with no exit transition. The sheet slides in gracefully (iOS curve, 320ms) then disappears in a single frame. This breaks the spatial model Jakub describes: exits orient users about where content "went."</p>
+        <p class="finding-row__location">All 63 conditional renders in <code>App.jsx</code> — key instances: <code>App.jsx:10776</code> (BookDetailModal), <code>App.jsx:10765</code> (NotificationsSheet), <code>App.jsx:9438</code> (PostComments)</p>
+        <p><strong>Fix:</strong> Add <code>@keyframes slideDown</code> and a dismissing CSS class triggered on close (before unmount), or introduce Framer Motion <code>AnimatePresence</code> + <code>exit</code> prop on primary sheets.</p>
+        <p>The sheet demo shows: enter → hold → exit should match the enter curve but reversed at subtler scale.</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">Sheet enter + exit — matched easing</div>
+        <div class="demo-card__subhead">320ms · cubic-bezier(0.32, 0.72, 0, 1) in / 240ms · ease-in out</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-2__motion-target">
+            <div class="backdrop"></div>
+            <div class="sheet">
+              <div class="sheet-pill"></div>
+              <div class="sheet-line" style="width:60px"></div>
+              <div class="sheet-line" style="width:90px"></div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Finding 3 -->
+    <div class="finding-row" id="finding-3">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-critical">🔴 Critical</p>
+        <h4>12 JS hover mutations bypass CSS transitions — instant visual snaps</h4>
+        <p><code>onMouseEnter/onMouseLeave</code> handlers directly mutate <code>element.style.backgroundColor</code>, <code>element.style.transform</code>, and <code>element.style.boxShadow</code> with no <code>transition</code> on the element. These snap instantaneously. Jakub's rule: even 150ms transitions feel dramatically more polished than instant changes. The pattern is also unmaintainable — state lives in DOM, not CSS.</p>
+        <p class="finding-row__location"><code>App.jsx:2383</code>, <code>3659–3662</code>, <code>4269–4270</code>, <code>6335–6336</code>, <code>7304–7305</code>, <code>7351–7352</code>, <code>7476–7477</code>, <code>8334–8335</code>, <code>8424–8425</code>, <code>8488–8489</code></p>
+        <p><strong>Fix:</strong> Move each to a CSS class with <code>transition: background-color 150ms ease</code>. Apply via <code>className</code> toggle or CSS <code>:hover</code> behind <code>@media (hover: hover) and (pointer: fine)</code>.</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">CSS transition vs. JS style mutation</div>
+        <div class="demo-card__subhead">150ms · ease — vs — 0ms · step-start</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-3__motion-target">
+            <div class="row-instant">
+              <span>Mi libro</span>
+              <span class="tag bad">JS instant</span>
+            </div>
+            <div class="row-smooth">
+              <span>Mi libro</span>
+              <span class="tag good">CSS 150ms</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Finding 8 -->
+    <div class="finding-row" id="finding-8">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-important">🟡 Important</p>
+        <h4>Icon swaps lack blur — state transitions read as snaps</h4>
+        <p>The LikeButton correctly uses dual-opacity for the heart swap, but skips <code>filter: blur()</code> during the crossfade. Per Jakub: "Blur bridges the visual gap by blending two states together, tricking the eye into perceiving a single smooth transformation." The same issue applies to the share button's "Compartir → ¡Publicado! ✓" state swap (line 8682) which changes text content instantly with only <code>transition: background 0.2s</code>.</p>
+        <p class="finding-row__location"><code>App.jsx:7907–7914</code> (LikeButton hearts), <code>App.jsx:8682</code> (share button text)</p>
+        <p><strong>Fix:</strong> Add <code>filter: blur(3px)</code> at the midpoint of the opacity transition. For LikeButton: <code>style={{ transition: "opacity 120ms ease, filter 120ms ease" }}</code> with <code>filter: blur(3px)</code> at 0.5 opacity.</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">Icon swap with + without blur bridge</div>
+        <div class="demo-card__subhead">120ms · ease — opacity + filter: blur(3px)</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-8__motion-target">
+            <div class="icon-wrap">
+              <div class="icon-stage without">
+                <div class="heart-outline">♡</div>
+                <div class="heart-filled">♥</div>
+              </div>
+              <div class="label bad">no blur</div>
+            </div>
+            <div class="icon-wrap">
+              <div class="icon-stage with">
+                <div class="heart-outline">♡</div>
+                <div class="heart-filled">♥</div>
+              </div>
+              <div class="label good">blur bridge</div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+  </div>
+
+  <div class="perspective-section__opportunities">
+    <h3>Opportunities</h3>
+    <ul>
+      <li>💡 <strong>FeedSkeleton needs an exit</strong> — When <code>isReady</code> flips <code>true</code>, the skeleton unmounts and the feed appears. No exit on the skeleton means a flash of empty space. Add <code>opacity: 0; transition: opacity 150ms</code> to the skeleton before its parent unmounts. — <code>App.jsx:8701–8723</code></li>
+      <li>💡 <strong>Notification list items could stagger on first mount</strong> — The <code>NotificationsSheet</code> renders all items simultaneously. A 30ms stagger between items would give the list a sense of depth and arrival without slowing it down. — <code>App.jsx:7508</code></li>
+    </ul>
+  </div>
+
+  <p class="perspective-section__quote"><strong>Through Jakub's lens:</strong> The sheet easing is production-quality and shows the team knows how motion should feel. The missing exits are the gap that keeps this from feeling polished — enter without exit is like a door that swings open but teleports closed. Fix exits and the JS hover mutations and Folio will feel genuinely production-ready.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     EMIL KOWALSKI — Restraint & Speed (SECONDARY)
+══════════════════════════════════════════════════════════════════ -->
+<section class="perspective-section" id="perspective-emil">
+  <h2>⚡ Emil Kowalski — Restraint &amp; Speed</h2>
+
+  <div class="perspective-section__working-well">
+    <h3>What's Working Well</h3>
+    <ul>
+      <li>✓ <strong>LikeButton micro-press bounce</strong> — <code>likeBounce</code> with <code>scale(0.88) → scale(1.35)</code> via CSS keyframe, triggered on tap. Sub-320ms. Correct. — <code>index.css:likeBounce</code></li>
+      <li>✓ <strong>BottomNav pill transition</strong> — <code>background-color 200ms ease</code> on tab switch. Fast, non-distracting. — <code>App.jsx:1662</code></li>
+      <li>✓ <strong>Feed skeleton replaces spinner</strong> — Skeleton avoids the infinite loading spin that would otherwise run on every feed load. Good restraint. — <code>App.jsx:8701</code></li>
+      <li>✓ <strong>feedFadeIn 200ms on container</strong> — Single opacity fade instead of per-card stagger. The previous stagger was correctly removed. — <code>App.jsx:9165</code></li>
+      <li>✓ <strong>btn-press active states</strong> — <code>scale(0.97)</code> on "Tengo 5 minutos" and "+ Más páginas" give immediate tactile feedback under 120ms. — <code>index.css:btn-press</code></li>
+    </ul>
+  </div>
+
+  <div class="perspective-section__issues">
+    <h3>Issues to Address</h3>
+
+    <!-- Finding 1 -->
+    <div class="finding-row" id="finding-1">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-critical">🔴 Critical</p>
+        <h4>Zero <code>prefers-reduced-motion</code> support — entire animation surface is inaccessible</h4>
+        <p>Not a single <code>@media (prefers-reduced-motion: reduce)</code> rule exists anywhere in the codebase — neither in <code>src/index.css</code> nor in the inline <code>&lt;style&gt;</code> blocks. Four animations loop infinitely without any pause mechanism: <code>fire-pulse-anim</code> (streak flame, 1.4s), <code>onlinePulse</code> (friend dot, 2.5s), <code>shimmer</code> (skeleton, 1.5s), <code>sparkle-pulse</code> (Sparkles icon, 2.2s). This is a WCAG 2.1 Level AAA violation (Success Criterion 2.3.3). Approximately 30% of users have some motion sensitivity; the flame icon loops on the most prominent element of the primary screen.</p>
+        <p class="finding-row__location"><code>src/index.css</code> (all keyframes), <code>App.jsx:10705–10749</code> (inline keyframes incl. fire-pulse-anim, sparkle-pulse)</p>
+        <p><strong>Fix:</strong> Add a single block at the end of <code>src/index.css</code>:<br><code>@media (prefers-reduced-motion: reduce) &#123; *, *::before, *::after &#123; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; &#125; &#125;</code></p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">fire-pulse-anim — currently unguarded</div>
+        <div class="demo-card__subhead">1.4s · ease-in-out · infinite — no reduced-motion guard</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-1__motion-target">
+            <span class="flame">🔥</span>
+            <span class="label">runs infinitely for all users</span>
+            <span class="warn">Enable reduced-motion in<br>your OS to see this should stop.</span>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Finding 4 -->
+    <div class="finding-row" id="finding-4">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-important">🟡 Important</p>
+        <h4><code>transition: "all"</code> remains in 15+ locations</h4>
+        <p>Previous rounds of Emil's fixes cleaned the most visible instances, but 15+ remain. <code>transition: all</code> forces the browser to monitor every animatable CSS property — including expensive layout-triggering ones like <code>padding</code>, <code>margin</code>, <code>height</code>, <code>width</code>, and <code>border-width</code> — on every frame. On a mobile device scrolling through a feed, this compounds. The desktop nav buttons (line 1600), status pill buttons (line 2305), friend search items (line 5486, 5523), and notification list items (line 7163) are the worst offenders since they're triggered repeatedly.</p>
+        <p class="finding-row__location"><code>App.jsx:1600</code>, <code>2305</code>, <code>3615</code>, <code>3878</code>, <code>5486</code>, <code>5523</code>, <code>7163</code> — plus Tailwind <code>transition-all</code> on 9 buttons</p>
+        <p><strong>Fix:</strong> Replace each with specific properties. Nav buttons: <code>transition: "background-color 150ms ease, color 150ms ease"</code>. Status pills: <code>transition: "background-color 120ms ease, color 120ms ease, border-color 120ms ease"</code>.</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">Status pill — specific props vs. all</div>
+        <div class="demo-card__subhead">120ms · cubic-bezier(0.23,1,0.32,1) — targeted</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-4__motion-target">
+            <div class="pill pill-all">Leyendo</div>
+            <div class="label bad">transition: all — recalcs everything</div>
+            <div class="pill pill-specific">Leyendo</div>
+            <div class="label good">transition: background-color, color — targeted</div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+  </div>
+
+  <div class="perspective-section__opportunities">
+    <h3>Opportunities</h3>
+    <ul>
+      <li>💡 <strong>PostComments should use CSS transitions, not keyframes</strong> — <code>commentsIn</code> uses a keyframe, which can't retarget mid-flight if the user toggles comments rapidly. A CSS <code>max-height + opacity</code> transition would be interruptible. — <code>index.css:commentsIn</code></li>
+      <li>💡 <strong>Star rating hover is JS state</strong> — <code>setHoveredRating</code> triggers a React re-render on every star hover. Could be pure CSS using <code>:has()</code> and sibling selectors with zero JS, eliminating 5 re-renders per rating interaction. — <code>App.jsx:10180–10181</code></li>
+    </ul>
+  </div>
+
+  <p class="perspective-section__quote"><strong>Through Emil's lens:</strong> The team has adopted the right instincts — the LikeButton bounce and the drawer curve show Emil's philosophy landing. The remaining work is systematic cleanup: one <code>prefers-reduced-motion</code> block fixes the accessibility crisis, and sweeping <code>transition: all</code> with targeted properties fixes the performance drain. Both are one-hour fixes with outsized impact.</p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     JHEY TOMPKINS — Experimentation & Delight (SELECTIVE)
+══════════════════════════════════════════════════════════════════ -->
+<section class="perspective-section" id="perspective-jhey">
+  <h2>✨ Jhey Tompkins — Experimentation &amp; Delight</h2>
+
+  <div class="perspective-section__working-well">
+    <h3>What's Working Well</h3>
+    <ul>
+      <li>✓ <strong>Achievement icon entrance</strong> — <code>achieveIconIn</code> with <code>scale(0.5) rotate(-10deg) → scale(1) rotate(0)</code> and spring overshoot <code>cubic-bezier(0.34, 1.56, 0.64, 1)</code>. The rotation + spring is the right amount of delight for a rare, celebratory moment. — <code>index.css:achieveIconIn</code></li>
+      <li>✓ <strong>Celebration book animation</strong> — <code>bookAppear → bookClosing → bookClosed</code> three-phase sequence. The rotation and scale chain reads as physical. — <code>App.jsx:10129–10131</code></li>
+      <li>✓ <strong>Confetti on book finish</strong> — <code>canvas-confetti</code> at the right moment (rare event). Correct frequency judgment. — <code>package.json dependency</code></li>
+      <li>✓ <strong>Double-tap heart pop</strong> — <code>heartPop</code> with <code>scale(0.5) → scale(1.25) → fade</code>. Fun, fast, reads as playful without being distracting. — <code>index.css:heartPop</code></li>
+    </ul>
+  </div>
+
+  <div class="perspective-section__issues">
+    <h3>Issues to Address</h3>
+
+    <!-- Finding 5 -->
+    <div class="finding-row" id="finding-5">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-important">🟡 Important</p>
+        <h4>Three infinite pulsing indicators — AI-slop anti-pattern</h4>
+        <p>The codebase has three separate infinite looping scale/opacity animations on UI indicators: <code>fire-pulse-anim</code> on the streak flame (1.4s, every feed load), <code>onlinePulse</code> on friend avatar dots (2.5s, infinite), and <code>sparkle-pulse</code> on Sparkles icons (2.2s, infinite). The anti-checklist flags this: "Pulsing indicators are almost always slop — the only exception is a single brand element with explicit design rationale." Having three separate pulse animations is the tell. Daily users will notice these by week two and find them distracting.</p>
+        <p class="finding-row__location"><code>App.jsx:10709–10712</code> (fire-pulse-anim), <code>index.css:onlinePulse</code>, <code>App.jsx:10744–10748</code> (sparkle-pulse)</p>
+        <p><strong>Fix:</strong> Remove all three. The flame icon communicates streaks through its shape — no pulse needed. The green dot communicates "online" through color alone. Sparkles communicate AI through the icon itself. These are all redundant, non-functional loops.</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">Three pulsers — all redundant</div>
+        <div class="demo-card__subhead">1.4s–2.5s · ease-in-out · infinite × 3</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-5__motion-target">
+            <div class="group">
+              <span class="flame">🔥</span>
+              <div class="label bad">streak</div>
+            </div>
+            <div class="group">
+              <div class="dot dot-pulsing"></div>
+              <div class="label bad">online</div>
+            </div>
+            <div class="group">
+              <span class="flame" style="font-size:1.2rem;animation-delay:0.3s">✦</span>
+              <div class="label bad">AI</div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Finding 6 -->
+    <div class="finding-row" id="finding-6">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-important">🟡 Important</p>
+        <h4>Progress bars animate <code>height</code> / <code>width</code> — triggers layout on every frame</h4>
+        <p>Four progress bars across the app (reading score, friend comparison bars, session history bars) use <code>transition: "width 0.4s ease"</code> or <code>transition: "height 0.4s ease"</code>. Animating <code>height</code> and <code>width</code> forces browser layout recalculation on every animation frame — the most expensive path in the rendering pipeline. On a mid-range Android device scrolling through profile stats, this can drop frames. The fix is <code>transform: scaleY()</code> + <code>transform-origin: bottom</code>, which runs entirely on the GPU compositor thread.</p>
+        <p class="finding-row__location"><code>App.jsx:5706, 5710</code> (reading comparison bars), <code>App.jsx:5838–5839</code> (session history chart), <code>App.jsx:6099</code> (reading score bar), <code>App.jsx:4242</code> (achievement progress)</p>
+        <p><strong>Fix:</strong> Replace <code>width: \`${pct}%\`</code> with <code>transform: \`scaleX(${pct / 100})\`</code> and <code>transformOrigin: "left center"</code>. For vertical bars: <code>scaleY</code> + <code>transformOrigin: "bottom"</code>.</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">scaleY vs. height — GPU compositor vs. layout</div>
+        <div class="demo-card__subhead">400ms · ease — transform only, no layout cost</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-6__motion-target">
+            <div class="col">
+              <div class="bar-wrap">
+                <div class="bar-height"></div>
+              </div>
+              <div class="label bad">height</div>
+            </div>
+            <div class="col">
+              <div class="bar-wrap">
+                <div class="bar-scale"></div>
+              </div>
+              <div class="label good">scaleY</div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <!-- Finding 7 -->
+    <div class="finding-row" id="finding-7">
+      <div class="finding-row__prose">
+        <p class="finding-row__severity badge-important">🟡 Important</p>
+        <h4>Inconsistent hover-scale across 5+ elements — borderline scatter slop</h4>
+        <p>Five different scale values are used for hover across the app: <code>hover:scale-105</code> (add button), <code>hover:scale-[1.02]</code> (friend accept), <code>hover:scale-[1.01]</code> (form submit buttons), <code>hover:-translate-y-0.5</code> (mode cards), <code>hover:scale-110</code> (star rating). None are gated with <code>@media (hover: hover) and (pointer: fine)</code>, so touch users get false hover activations on tap. There's no consistent system — each component made an independent choice. Per Jhey: building diverse demos trains you to switch contexts, but a production app needs a system, not experiments.</p>
+        <p class="finding-row__location"><code>App.jsx:1431</code> (star, scale-110), <code>1504</code> (scale-[1.02]), <code>1814</code> (scale-105), <code>2704, 2798</code> (scale-[1.01]), <code>2539, 2544</code> (translate-y-0.5)</p>
+        <p><strong>Fix:</strong> Standardize to one hover scale value (<code>scale(1.02)</code>) for interactive cards, guard with <code>@media (hover: hover) and (pointer: fine)</code>, and remove <code>hover:scale-110</code> from the star rating entirely (use opacity instead).</p>
+      </div>
+      <article class="demo-card" tabindex="-1">
+        <div class="demo-card__loop-indicator">↻ looping</div>
+        <div class="demo-card__header">5 different hover-scale values — no system</div>
+        <div class="demo-card__subhead">scale(1.01) / (1.02) / (1.05) / (1.10) / translateY(-2px) scattered</div>
+        <div class="demo-card__stage">
+          <div class="demo-card-7__motion-target">
+            <div class="item">Agregar libro <span class="scale-tag">scale(1.05)</span></div>
+            <div class="item">Aceptar amigo <span class="scale-tag">scale(1.02)</span></div>
+            <div class="item">Guardar libro <span class="scale-tag">scale(1.01)</span></div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+  </div>
+
+  <div class="perspective-section__opportunities">
+    <h3>Opportunities</h3>
+    <ul>
+      <li>💡 <strong>Celebration modal — clip-path book reveal</strong> — The <code>bookAppear</code> animation scales and rotates the cover. A <code>clip-path: inset()</code> reveal from top-to-bottom would feel more like unwrapping — more cinematic for a rare, celebratory moment. Uses GPU-compositor-only path. — <code>App.jsx:10129</code></li>
+      <li>💡 <strong>Progress bars — <code>@property</code> + <code>linear()</code> spring fill</strong> — Register a CSS <code>@property</code> for the progress value and animate it with <code>linear()</code> for a physics-based fill that doesn't require JS. Eliminates the layout-cost issue in Finding 6 and adds personality. — <code>App.jsx:4242, 6099</code></li>
+      <li>💡 <strong>BottomNav active pill — <code>@property</code> position animation</strong> — The current pill uses <code>background-color</code> transition. An absolutely-positioned pill that physically moves between tabs (using <code>@property</code> or a shared layout element) would feel more physical, like a real selection indicator. — <code>App.jsx:1644–1674</code></li>
+      <li>💡 <strong>Streak milestone — burst particle moment</strong> — When a user logs their first day of a new streak (or hits day 7/30), a brief <code>clip-path</code> burst or confetti pop would feel appropriate. Rare event, high emotional resonance. — <code>App.jsx:8181</code></li>
+    </ul>
+  </div>
+
+  <p class="perspective-section__quote"><strong>Through Jhey's lens:</strong> The celebration animations (bookAppear, achieveIconIn, heartPop, confetti) show a team that understands delight has a place in Folio — and they've placed it correctly, at rare moments. The three infinite pulsing indicators are the main creative misstep: they're attempting delight at the wrong frequency (infinite) and the wrong scale (tiny status dots). Remove those, invest that energy in the celebration moments, and Folio's motion personality becomes coherent.</p>
+</section>
+
+<!-- ─── Combined Recommendations ──────────────────────────────────── -->
+<section class="recommendations" id="critical-findings">
+  <h2>🔴 Critical (Must Fix)</h2>
+  <table>
+    <thead><tr><th>Issue</th><th>File</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Zero <code>prefers-reduced-motion</code> support — all animations run regardless of OS settings. 4 infinite loops have no pause.</td>
+        <td><code>index.css (all keyframes)</code><br><code>App.jsx:10705–10749</code></td>
+        <td>Add <code>@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; ... } }</code> to <code>index.css</code></td>
+      </tr>
+      <tr>
+        <td>No exit animations on any modal/sheet — all 63 conditional renders unmount with no transition. Spatial model breaks every time a sheet closes.</td>
+        <td><code>App.jsx:10776</code> (BookDetailModal)<br><code>App.jsx:10765</code> (NotificationsSheet)<br>+ 61 more</td>
+        <td>Add <code>@keyframes slideDown</code> triggered before unmount, or add Framer Motion <code>AnimatePresence</code> + <code>exit</code> prop to primary sheets.</td>
+      </tr>
+      <tr>
+        <td>12 JS <code>onMouseEnter/onMouseLeave</code> handlers mutate element styles directly with no CSS <code>transition</code> — all changes snap instantly.</td>
+        <td><code>App.jsx:2383, 3659–3662, 4269–4270, 6335–6336, 7304, 7351, 7476, 8334, 8424, 8488</code></td>
+        <td>Move each to a CSS class with <code>transition: background-color 150ms ease</code> gated by <code>@media (hover: hover) and (pointer: fine)</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="recommendations" id="important-findings">
+  <h2>🟡 Important (Should Fix)</h2>
+  <table>
+    <thead><tr><th>Issue</th><th>File</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>transition: "all"</code> in 15+ locations — animates every CSS property including layout-triggering ones on every frame.</td>
+        <td><code>App.jsx:1600, 2305, 3615, 3878, 5486, 5523, 7163</code> + 9 Tailwind <code>transition-all</code></td>
+        <td>Replace with specific properties: <code>transition: "background-color 150ms ease, color 150ms ease"</code></td>
+      </tr>
+      <tr>
+        <td>Three infinite pulsing indicators (<code>fire-pulse-anim</code>, <code>onlinePulse</code>, <code>sparkle-pulse</code>) — AI-slop anti-pattern. All are redundant to the static icon/color. No pause mechanism.</td>
+        <td><code>App.jsx:10709–10712</code><br><code>index.css:onlinePulse</code><br><code>App.jsx:10744–10748</code></td>
+        <td>Remove all three animation definitions. Icons communicate status through shape/color without movement.</td>
+      </tr>
+      <tr>
+        <td>Progress bars animate <code>height</code>/<code>width</code> — triggers browser layout recalculation on every animation frame. GPU compositor path not used.</td>
+        <td><code>App.jsx:5706, 5710, 5838–5839, 6099, 4242</code></td>
+        <td>Replace <code>width: \`${pct}%\`</code> with <code>transform: \`scaleX(${pct/100})\`</code> + <code>transformOrigin: "left center"</code>. Vertical bars: <code>scaleY</code> + <code>transformOrigin: "bottom"</code>.</td>
+      </tr>
+      <tr>
+        <td>5 different hover-scale values across the app with no system and no touch guard. Touch users get false hover activations.</td>
+        <td><code>App.jsx:1431, 1504, 1814, 2704, 2798, 2539, 2544</code></td>
+        <td>Standardize to <code>scale(1.02)</code> for cards, gate all hover transforms with <code>@media (hover: hover) and (pointer: fine)</code>.</td>
+      </tr>
+      <tr>
+        <td>LikeButton icon swap and share button text change lack blur bridge — state transitions read as visual snaps rather than smooth morphs.</td>
+        <td><code>App.jsx:7907–7914</code> (LikeButton)<br><code>App.jsx:8682</code> (share button)</td>
+        <td>Add <code>filter: blur(3px)</code> at opacity midpoint: <code>transition: "opacity 120ms ease, filter 120ms ease"</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="recommendations" id="opportunity-findings">
+  <h2>🟢 Opportunities (Could Enhance)</h2>
+  <table>
+    <thead><tr><th>Enhancement</th><th>Where</th><th>Impact</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>💡 FeedSkeleton exit animation — add opacity fade before unmount to prevent flash on <code>isReady</code> flip</td>
+        <td><code>App.jsx:8701–8723</code></td>
+        <td>Eliminates white flash between skeleton and feed appearing</td>
+      </tr>
+      <tr>
+        <td>💡 Notification list item stagger (30ms) on first mount</td>
+        <td><code>App.jsx:7508</code></td>
+        <td>Gives list sense of depth and arrival</td>
+      </tr>
+      <tr>
+        <td>💡 <code>PostComments</code> use CSS <code>max-height + opacity</code> transition instead of keyframe for interruptibility</td>
+        <td><code>index.css:commentsIn</code></td>
+        <td>Allows smooth reversal if user toggles comments rapidly</td>
+      </tr>
+      <tr>
+        <td>💡 Star rating — pure CSS hover with <code>:has()</code> and sibling selectors, eliminating 5 JS re-renders per rating interaction</td>
+        <td><code>App.jsx:10180–10181</code></td>
+        <td>Removes React state from presentation logic; smoother hover</td>
+      </tr>
+      <tr>
+        <td>💡 Progress bars — <code>@property</code> + <code>linear()</code> spring fill for physics-based animation without JS</td>
+        <td><code>App.jsx:4242, 6099</code></td>
+        <td>Fixes layout cost (Finding 6) and adds organic personality</td>
+      </tr>
+      <tr>
+        <td>💡 Celebration modal — clip-path book-cover reveal instead of scale+rotate entrance</td>
+        <td><code>App.jsx:10129</code></td>
+        <td>More cinematic for rare book-finish moment; GPU-only path</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ─── Lens Reference Summary ────────────────────────────────────── -->
+<section class="reference-summary">
+  <h2>Lens Reference Summary</h2>
+  <p><strong>Which lens was referenced most:</strong> Jakub Krehel — Production Polish</p>
+  <p><strong>Why:</strong> Folio is a shipped consumer mobile app (PWA, Gen Z social) where users interact daily. The primary test is Jakub's: does this feel polished enough that users don't notice the motion, only the smoothness? The missing exits are the clearest Jakub gap.</p>
+  <p><strong>If you want to lean differently:</strong></p>
+  <ul>
+    <li>To follow <strong>Emil</strong> more strictly: Remove the three pulsing indicators entirely, replace <code>transition: all</code> systematically, add the <code>prefers-reduced-motion</code> block immediately. These are the fastest, highest-leverage Emil fixes.</li>
+    <li>To follow <strong>Jakub</strong> more strictly: Prioritize exit animations (Finding 2) and the JS hover migrations (Finding 3). Then add blur bridges to icon swaps (Finding 8). This unlocks the "feels like a real product" threshold.</li>
+    <li>To follow <strong>Jhey</strong> more strictly: Invest in the celebration moments — clip-path book reveal, streak milestone burst, <code>@property</code>-animated progress bars. These are the moments where Folio can develop a motion identity distinct from generic React apps.</li>
+  </ul>
+</section>
+
+</body>
+</html>
