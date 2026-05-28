@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TopLeche · Estrategia Periodo 2 · Doble Apuesta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --cream: #F5EFE3;
+    --cream-deep: #EDE4D1;
+    --paper: #FAF6EC;
+    --ink: #2A1F1A;
+    --ink-soft: #5C4A3F;
+    --rust: #B8552A;
+    --rust-deep: #8E3F1F;
+    --gold: #C8973F;
+    --gold-pale: #E8C97A;
+    --leaf: #6B7A5A;
+    --leaf-deep: #4F5C42;
+    --berry: #8B3A3A;
+    --line: rgba(42, 31, 26, 0.12);
+    --line-strong: rgba(42, 31, 26, 0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(184, 85, 42, 0.05) 0%, transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(200, 151, 63, 0.06) 0%, transparent 40%);
+    background-attachment: fixed;
+  }
+
+  .container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 60px 48px;
+  }
+
+  /* ============== HEADER ============== */
+  header {
+    border-bottom: 1px solid var(--line-strong);
+    padding-bottom: 32px;
+    margin-bottom: 64px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 32px;
+  }
+
+  .masthead {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--rust);
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 64px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--rust);
+    font-weight: 400;
+  }
+
+  .meta {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+
+  .meta strong { color: var(--ink); display: block; font-size: 13px; margin-bottom: 4px; }
+
+  /* ============== HERO STATUS ============== */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 56px;
+    margin-bottom: 88px;
+    align-items: start;
+  }
+
+  .deck {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 28px;
+    line-height: 1.35;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+
+  .deck mark {
+    background: linear-gradient(180deg, transparent 60%, var(--gold-pale) 60%);
+    color: var(--ink);
+    padding: 0 4px;
+  }
+
+  .ranking-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 28px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+  }
+
+  .ranking-card h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+
+  .ranking-row {
+    display: grid;
+    grid-template-columns: 24px 1fr auto auto;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+  }
+  .ranking-row:last-child { border-bottom: none; }
+
+  .ranking-row.us {
+    background: linear-gradient(90deg, rgba(184, 85, 42, 0.08) 0%, transparent 100%);
+    margin: 0 -28px;
+    padding-left: 28px;
+    padding-right: 28px;
+    border-left: 3px solid var(--rust);
+  }
+
+  .rank-num {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-size: 16px;
+    color: var(--ink-soft);
+  }
+  .ranking-row.us .rank-num { color: var(--rust); }
+
+  .rank-name { font-weight: 500; }
+  .ranking-row.us .rank-name { font-weight: 700; color: var(--rust-deep); }
+
+  .rank-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .rank-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    min-width: 50px;
+    text-align: right;
+  }
+  .rank-delta.pos { color: var(--leaf-deep); }
+  .rank-delta.neg { color: var(--berry); }
+
+  /* ============== SECTIONS ============== */
+  section {
+    margin-bottom: 96px;
+  }
+
+  .section-head {
+    margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 24px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+  }
+
+  .section-num {
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 56px;
+    color: var(--gold);
+    line-height: 1;
+  }
+
+  h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 36px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  h2 em { font-style: italic; color: var(--rust); }
+
+  .section-lede {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+  }
+
+  /* ============== DIAGNOSIS GRID ============== */
+  .diag-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    margin-bottom: 48px;
+  }
+
+  .diag-card {
+    background: var(--paper);
+    border-top: 3px solid var(--rust);
+    padding: 28px;
+  }
+
+  .diag-card.win { border-top-color: var(--leaf); }
+  .diag-card.warn { border-top-color: var(--gold); }
+
+  .diag-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+
+  .diag-headline {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    line-height: 1.2;
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  .diag-stat {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--rust);
+    margin-bottom: 4px;
+  }
+
+  .diag-card.win .diag-stat { color: var(--leaf-deep); }
+  .diag-card.warn .diag-stat { color: var(--gold); }
+
+  .diag-stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+
+  .diag-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+  }
+
+  /* ============== CHART AREA ============== */
+  .chart-block {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 32px;
+    margin-bottom: 32px;
+  }
+
+  .chart-block.split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+  }
+
+  .chart-title {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .chart-subtitle {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin-bottom: 24px;
+  }
+
+  .chart-canvas-wrap {
+    position: relative;
+    height: 300px;
+  }
+
+  /* ============== STRATEGY THESIS ============== */
+  .thesis {
+    background: linear-gradient(135deg, var(--ink) 0%, #3D2D24 100%);
+    color: var(--cream);
+    padding: 56px 64px;
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .thesis::before {
+    content: 'B';
+    position: absolute;
+    right: -40px;
+    top: -80px;
+    font-family: 'Fraunces', serif;
+    font-weight: 900;
+    font-style: italic;
+    font-size: 380px;
+    color: var(--rust);
+    opacity: 0.15;
+    line-height: 1;
+  }
+
+  .thesis-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--gold-pale);
+    margin-bottom: 16px;
+  }
+
+  .thesis h2 {
+    color: var(--cream);
+    font-size: 44px;
+    margin-bottom: 20px;
+    max-width: 780px;
+  }
+
+  .thesis h2 em { color: var(--gold-pale); }
+
+  .thesis-body {
+    font-family: 'Fraunces', serif;
+    font-size: 19px;
+    line-height: 1.5;
+    max-width: 720px;
+    color: rgba(245, 239, 227, 0.85);
+    position: relative;
+    z-index: 2;
+  }
+
+  .thesis-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 32px;
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 1px solid rgba(245, 239, 227, 0.15);
+    position: relative;
+    z-index: 2;
+  }
+
+  .thesis-stat-num {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 36px;
+    color: var(--gold-pale);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .thesis-stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgba(245, 239, 227, 0.6);
+  }
+
+  /* ============== DECISION TABLES ============== */
+  .pestaña {
+    margin-bottom: 56px;
+  }
+
+  .pestaña-head {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: baseline;
+    gap: 24px;
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .pestaña-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--rust);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .pestaña-title {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .pestaña-budget {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    text-align: right;
+  }
+
+  .pestaña-budget strong {
+    color: var(--rust);
+    font-size: 14px;
+    display: block;
+  }
+
+  table.decisions {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--paper);
+    font-size: 14px;
+  }
+
+  table.decisions thead th {
+    background: var(--cream-deep);
+    text-align: left;
+    padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+    font-weight: 500;
+    border-bottom: 1px solid var(--line);
+  }
+
+  table.decisions thead th.num { text-align: right; }
+  table.decisions thead th.center { text-align: center; }
+
+  table.decisions tbody td {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  table.decisions tbody tr:last-child td { border-bottom: none; }
+
+  table.decisions tbody tr:hover { background: rgba(184, 85, 42, 0.03); }
+
+  td.label {
+    font-weight: 600;
+    color: var(--ink);
+    width: 22%;
+  }
+
+  td.num {
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+    color: var(--ink-soft);
+    width: 12%;
+  }
+
+  td.num.new {
+    color: var(--rust);
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  td.delta {
+    font-family: 'JetBrains Mono', monospace;
+    text-align: center;
+    width: 10%;
+    font-weight: 500;
+  }
+  td.delta.up { color: var(--leaf-deep); }
+  td.delta.down { color: var(--berry); }
+  td.delta.flat { color: var(--ink-soft); }
+
+  td.reason {
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    line-height: 1.5;
+    width: 44%;
+  }
+
+  td.reason strong { color: var(--ink); font-weight: 600; }
+
+  tr.total-row td {
+    background: var(--cream-deep);
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  tr.total-row td.num.new { color: var(--rust); font-size: 16px; }
+
+  /* ============== IMPACT TABLE ============== */
+  .impact-block {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  table.impact {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  table.impact th, table.impact td {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+
+  table.impact th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+
+  table.impact td.num {
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+  }
+
+  table.impact td.delta {
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+    color: var(--leaf-deep);
+    font-weight: 600;
+  }
+
+  table.impact tr.total td {
+    border-top: 2px solid var(--ink);
+    border-bottom: none;
+    padding-top: 16px;
+    font-weight: 700;
+  }
+  table.impact tr.total td.delta {
+    color: var(--rust);
+    font-size: 18px;
+    font-family: 'Fraunces', serif;
+  }
+
+  .vc-result {
+    background: var(--ink);
+    color: var(--cream);
+    padding: 36px;
+    text-align: center;
+    margin-top: 24px;
+  }
+
+  .vc-current, .vc-projected {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    color: rgba(245, 239, 227, 0.6);
+  }
+
+  .vc-arrow {
+    display: inline-block;
+    font-family: 'Fraunces', serif;
+    font-size: 24px;
+    margin: 0 16px;
+    color: var(--gold-pale);
+  }
+
+  .vc-projected-num {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 64px;
+    color: var(--gold-pale);
+    line-height: 1.2;
+    margin: 12px 0 4px;
+  }
+
+  .vc-result-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: rgba(245, 239, 227, 0.7);
+  }
+
+  /* ============== RISK / CHECKLIST ============== */
+  .risks-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 32px;
+  }
+
+  .risk-card, .check-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    padding: 28px;
+  }
+
+  .risk-card h4, .check-card h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .risk-card h4 { color: var(--berry); }
+  .check-card h4 { color: var(--leaf-deep); }
+
+  .risk-item, .check-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .risk-item:last-child, .check-item:last-child { border-bottom: none; }
+
+  .risk-item strong { color: var(--ink); display: block; margin-bottom: 4px; }
+  .risk-item span { color: var(--ink-soft); font-size: 13px; }
+
+  .check-item {
+    display: flex;
+    align-items: start;
+    gap: 12px;
+    color: var(--ink);
+  }
+
+  .check-box {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--ink-soft);
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+
+  /* ============== FOOTER ============== */
+  footer {
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid var(--line-strong);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 24px;
+  }
+
+  .footer-quote {
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+    font-size: 18px;
+    color: var(--ink-soft);
+    max-width: 600px;
+    line-height: 1.5;
+  }
+
+  .footer-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-align: right;
+    line-height: 1.7;
+  }
+
+  /* ============== RESPONSIVE ============== */
+  @media (max-width: 980px) {
+    .container { padding: 32px 24px; }
+    h1 { font-size: 40px; }
+    .hero { grid-template-columns: 1fr; gap: 32px; }
+    .diag-grid { grid-template-columns: 1fr; }
+    .chart-block.split { grid-template-columns: 1fr; gap: 32px; }
+    .impact-block, .risks-grid { grid-template-columns: 1fr; }
+    .thesis-stats { grid-template-columns: repeat(2, 1fr); }
+    .thesis { padding: 36px 28px; }
+    .thesis h2 { font-size: 28px; }
+    table.decisions { font-size: 12px; }
+    table.decisions tbody td { padding: 12px 10px; }
+    td.reason { font-size: 12px; }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ============== HEADER ============== -->
+  <header>
+    <div>
+      <div class="masthead">TopLeche · Reporte estratégico · Periodo 2 de 3</div>
+      <h1>La <em>Doble Apuesta</em></h1>
+    </div>
+    <div class="meta">
+      <strong>PANTERAS ESTRATEGAS</strong>
+      Dashboard de decisiones<br>
+      Resultados 2026 · Decisiones 2027<br>
+      Estrategia B · Calibrada
+    </div>
+  </header>
+
+  <!-- ============== HERO ============== -->
+  <div class="hero">
+    <div class="deck">
+      Subimos del 8º al 2º lugar el periodo pasado, pero <mark>vendimos menos unidades</mark> y el resultado operacional cayó −30%. La diferencia con Quality es de <mark>3 puntos</mark>. Quedan dos periodos. Esta es la apuesta.
+    </div>
+
+    <div class="ranking-card">
+      <h3>Ranking Valor de Compañía · 2026</h3>
+      <div class="ranking-row">
+        <span class="rank-num">01</span>
+        <span class="rank-name">Quality</span>
+        <span class="rank-score">1,913</span>
+        <span class="rank-delta pos">+36</span>
+      </div>
+      <div class="ranking-row us">
+        <span class="rank-num">02</span>
+        <span class="rank-name">TopLeche</span>
+        <span class="rank-score">1,910</span>
+        <span class="rank-delta pos">+33</span>
+      </div>
+      <div class="ranking-row">
+        <span class="rank-num">03</span>
+        <span class="rank-name">GoMilk</span>
+        <span class="rank-score">1,875</span>
+        <span class="rank-delta neg">−2</span>
+      </div>
+      <div class="ranking-row">
+        <span class="rank-num">04</span>
+        <span class="rank-name">Premium</span>
+        <span class="rank-score">1,821</span>
+        <span class="rank-delta neg">−57</span>
+      </div>
+      <div class="ranking-row">
+        <span class="rank-num">05</span>
+        <span class="rank-name">Lactum</span>
+        <span class="rank-score">1,719</span>
+        <span class="rank-delta neg">−158</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============== DIAGNOSIS ============== -->
+  <section>
+    <div class="section-head">
+      <div class="section-num">01</div>
+      <div>
+        <h2>El diagnóstico <em>incómodo</em></h2>
+        <div class="section-lede">Lo que el ranking esconde — y por qué nuestra "victoria" del periodo pasado fue medio espejismo.</div>
+      </div>
+    </div>
+
+    <div class="diag-grid">
+      <div class="diag-card win">
+        <div class="diag-label">El héroe del periodo</div>
+        <div class="diag-headline">El Yogur tapó todo.</div>
+        <div class="diag-stat">+$256k</div>
+        <div class="diag-stat-label">de margen ganado · +52.3%</div>
+        <div class="diag-text">Único producto que creció. Pasó de ser 25% del negocio a 37%. Producto subió a 9.9 (cima del sector). Pero está al 96% de capacidad.</div>
+      </div>
+
+      <div class="diag-card">
+        <div class="diag-label">El que se cayó</div>
+        <div class="diag-headline">La Leche perdió margen sin tocar el precio.</div>
+        <div class="diag-stat">−$143k</div>
+        <div class="diag-stat-label">margen perdido · −26.1%</div>
+        <div class="diag-text">No fue por precio. Fue por marca. Recortar de $35k a $20k en promoción mató volumen en Niños y Adultos. Cobertura subió, pero la marca no.</div>
+      </div>
+
+      <div class="diag-card warn">
+        <div class="diag-label">El olvidado</div>
+        <div class="diag-headline">El Queso lleva 3 años cayendo.</div>
+        <div class="diag-stat">−20.7%</div>
+        <div class="diag-stat-label">vs 2024 · $741k → $587k</div>
+        <div class="diag-text">Lo dejamos en cosecha: $5k calidad, $10k marca. Resultado: marca 38→29, producto cae. Sin intervención, P3 sigue cayendo.</div>
+      </div>
+    </div>
+
+    <div class="chart-block split">
+      <div>
+        <div class="chart-title">Evolución del margen por producto</div>
+        <div class="chart-subtitle">2024 → 2026 · El Yogur compensó las caídas, pero ese motor se está acercando al techo de capacidad.</div>
+        <div class="chart-canvas-wrap"><canvas id="chartMargen"></canvas></div>
+      </div>
+      <div>
+        <div class="chart-title">Ingresos por canal — el agujero de GranDistri</div>
+        <div class="chart-subtitle">Bajar el descuento de 16 a 14% costó −17.4% volumen y −$238k en Leche. Hay que reabrir.</div>
+        <div class="chart-canvas-wrap"><canvas id="chartCanal"></canvas></div>
+      </div>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-title">¿Dónde se ganó y dónde se perdió? · Ingresos por segmento × producto</div>
+      <div class="chart-subtitle">El Yogur creció en TODOS los segmentos. La Leche colapsó en Adultos (−33%). El Queso se erosionó en todo lado salvo Healthy.</div>
+      <div class="chart-canvas-wrap" style="height: 360px"><canvas id="chartSegmento"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ============== STRATEGY THESIS ============== -->
+  <section>
+    <div class="thesis">
+      <div class="thesis-label">Estrategia · Periodo 2</div>
+      <h2>La <em>Doble Apuesta</em> · atacar producto, marca, margen y capacidad <em>al mismo tiempo</em>.</h2>
+      <p class="thesis-body">
+        El periodo pasado defendimos margen recortando inversión en marca. Funcionó para el ranking, pero erosionó el motor de crecimiento. Ahora invertimos donde duele — Leche y Queso — y subimos precios donde el mercado los acepta — Yogur. Sin tocar el proveedor (no se justifica) y sin pedir préstamo (la caja aguanta). El objetivo no es solo aguantar: es separarnos.
+      </p>
+      <div class="thesis-stats">
+        <div>
+          <div class="thesis-stat-num">+$167k</div>
+          <div class="thesis-stat-label">Inversión incremental</div>
+        </div>
+        <div>
+          <div class="thesis-stat-num">+11%</div>
+          <div class="thesis-stat-label">Ingresos proyectados</div>
+        </div>
+        <div>
+          <div class="thesis-stat-num">+15-20%</div>
+          <div class="thesis-stat-label">Margen proyectado</div>
+        </div>
+        <div>
+          <div class="thesis-stat-num">~75%</div>
+          <div class="thesis-stat-label">Probabilidad de #1</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== DECISIONES ============== -->
+  <section>
+    <div class="section-head">
+      <div class="section-num">02</div>
+      <div>
+        <h2>Las decisiones · <em>pestaña por pestaña</em></h2>
+        <div class="section-lede">Cinco áreas, treinta y cuatro decisiones, una sola tesis.</div>
+      </div>
+    </div>
+
+    <!-- Pestaña 1: Precio -->
+    <div class="pestaña">
+      <div class="pestaña-head">
+        <div class="pestaña-num">Pestaña 01</div>
+        <div class="pestaña-title">Precio · Descuento · POS</div>
+        <div class="pestaña-budget"><strong>+$45k POS</strong>vs periodo anterior</div>
+      </div>
+
+      <table class="decisions">
+        <thead>
+          <tr>
+            <th>Decisión</th>
+            <th class="num">Anterior</th>
+            <th class="num">Nuevo</th>
+            <th class="center">Δ</th>
+            <th>Razón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Precio Leche</td>
+            <td class="num">$1.00</td>
+            <td class="num new">$1.05</td>
+            <td class="delta up">+5%</td>
+            <td class="reason">Margen sube +$57k aún con −8% volumen. Quality cobra $1.10 con marca 48; nuestro $1.00 era guerra perdida con GoMilk. <strong>Coordinado con +$60k inversión en marca Leche.</strong></td>
+          </tr>
+          <tr>
+            <td class="label">Precio Yogur</td>
+            <td class="num">$3.75</td>
+            <td class="num new">$3.95</td>
+            <td class="delta up">+5.3%</td>
+            <td class="reason">Elasticidad observada: <strong>+5.77 (positiva)</strong>. Quality cobra $3.90 con producto 8.7; nuestro yogur es 9.9 — vale más. Margen proyectado: $763k vs $642k actual.</td>
+          </tr>
+          <tr>
+            <td class="label">Precio Queso</td>
+            <td class="num">$6.75</td>
+            <td class="num new">$6.85</td>
+            <td class="delta up">+1.5%</td>
+            <td class="reason">Elasticidad −2.45 hace cualquier precio margin-neutral. Subimos $0.10 para señalar premium intent, coordinado con $40k marca + $30k calidad.</td>
+          </tr>
+          <tr>
+            <td class="label">Descuento TiendaTradi</td>
+            <td class="num">14%</td>
+            <td class="num new">15%</td>
+            <td class="delta up">+1pp</td>
+            <td class="reason">Combo con POS generó +17.6% ingresos. Mantener momentum.</td>
+          </tr>
+          <tr>
+            <td class="label">Descuento GranDistri</td>
+            <td class="num">14%</td>
+            <td class="num new">17%</td>
+            <td class="delta up">+3pp</td>
+            <td class="reason"><strong>Movimiento clave del periodo.</strong> Bajarlo a 14% costó −17.4% volumen y −$238k en Leche. GranDistri es 51% del negocio — hay que reabrir.</td>
+          </tr>
+          <tr>
+            <td class="label">Descuento Hostelería</td>
+            <td class="num">16%</td>
+            <td class="num new">17%</td>
+            <td class="delta up">+1pp</td>
+            <td class="reason">Único canal con +9.5% ingresos. Acelerar el crecimiento.</td>
+          </tr>
+          <tr>
+            <td class="label">POS TiendaTradi</td>
+            <td class="num">$50,000</td>
+            <td class="num new">$65,000</td>
+            <td class="delta up">+30%</td>
+            <td class="reason">ROI demostrado: cada peso devolvió ~7×. Capitalizar.</td>
+          </tr>
+          <tr>
+            <td class="label">POS GranDistri</td>
+            <td class="num">$70,000</td>
+            <td class="num new">$90,000</td>
+            <td class="delta up">+29%</td>
+            <td class="reason">Doble golpe con descuento +3pp para acelerar la recuperación del canal mayoritario.</td>
+          </tr>
+          <tr>
+            <td class="label">POS Hostelería</td>
+            <td class="num">$25,000</td>
+            <td class="num new">$35,000</td>
+            <td class="delta up">+40%</td>
+            <td class="reason">Monto absoluto bajo, % alto. Empuja crecimiento sostenido.</td>
+          </tr>
+          <tr class="total-row">
+            <td class="label">TOTAL POS</td>
+            <td class="num">$145,000</td>
+            <td class="num new">$190,000</td>
+            <td class="delta up">+$45k</td>
+            <td class="reason">Cubierto íntegramente con caja operativa.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pestaña 2: Promoción -->
+    <div class="pestaña">
+      <div class="pestaña-head">
+        <div class="pestaña-num">Pestaña 02</div>
+        <div class="pestaña-title">Promoción · Marca · Priorización</div>
+        <div class="pestaña-budget"><strong>+$20k Marca</strong>(redistribuido)</div>
+      </div>
+
+      <table class="decisions">
+        <thead>
+          <tr>
+            <th>Decisión</th>
+            <th class="num">Anterior</th>
+            <th class="num">Nuevo</th>
+            <th class="center">Δ</th>
+            <th>Razón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Priorización Healthy</td>
+            <td class="num">10</td>
+            <td class="num new">7</td>
+            <td class="delta down">−3</td>
+            <td class="reason">Ya ganamos Healthy en Yogur (+66%). Estar al 96% capacidad limita crecimiento ahí.</td>
+          </tr>
+          <tr>
+            <td class="label">Priorización Niños</td>
+            <td class="num">4</td>
+            <td class="num new">8</td>
+            <td class="delta up">+4</td>
+            <td class="reason"><strong>El movimiento más grande.</strong> Niños = 58% del mercado. Lo abandonamos en P1 y costó −9% Leche y −9% Queso. Recuperar este segmento es el principal driver de cuota.</td>
+          </tr>
+          <tr>
+            <td class="label">Priorización Adultos</td>
+            <td class="num">7</td>
+            <td class="num new">6</td>
+            <td class="delta down">−1</td>
+            <td class="reason">Adultos cayó −25% pero la recuperación viene por marca, no por priorización.</td>
+          </tr>
+          <tr>
+            <td class="label">Suma (debe ser 21)</td>
+            <td class="num">21</td>
+            <td class="num new">21 ✓</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Validación obligatoria del simulador.</td>
+          </tr>
+          <tr>
+            <td class="label">Promoción Marca Leche</td>
+            <td class="num">$20,000</td>
+            <td class="num new">$60,000</td>
+            <td class="delta up">3×</td>
+            <td class="reason">Marca cayó 42→33 por recortar inversión. Cada punto de marca = 4.5 pts en Valor de Compañía. Inversión obligada.</td>
+          </tr>
+          <tr>
+            <td class="label">Promoción Marca Yogur</td>
+            <td class="num">$130,000</td>
+            <td class="num new">$80,000</td>
+            <td class="delta down">−$50k</td>
+            <td class="reason">Marca Yogur ya en 49 (la mejor). El producto 9.9 se vende solo. Mover dinero a donde duele.</td>
+          </tr>
+          <tr>
+            <td class="label">Promoción Marca Queso</td>
+            <td class="num">$10,000</td>
+            <td class="num new">$40,000</td>
+            <td class="delta up">4×</td>
+            <td class="reason">Marca cayó 38→29 (la peor). Sin esto, Queso entra en su 4to año de decadencia.</td>
+          </tr>
+          <tr class="total-row">
+            <td class="label">TOTAL Marca</td>
+            <td class="num">$160,000</td>
+            <td class="num new">$180,000</td>
+            <td class="delta up">+$20k</td>
+            <td class="reason">Mismo orden de magnitud, redistribución radical.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pestaña 3: Producto -->
+    <div class="pestaña">
+      <div class="pestaña-head">
+        <div class="pestaña-num">Pestaña 03</div>
+        <div class="pestaña-title">Producto · Calidad · Gama · Packaging</div>
+        <div class="pestaña-budget"><strong>+$65k Calidad</strong>vs periodo anterior</div>
+      </div>
+
+      <table class="decisions">
+        <thead>
+          <tr>
+            <th>Decisión</th>
+            <th class="num">Anterior</th>
+            <th class="num">Nuevo</th>
+            <th class="center">Δ</th>
+            <th>Razón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Calidad Leche</td>
+            <td class="num">$10,000</td>
+            <td class="num new">$50,000</td>
+            <td class="delta up">5×</td>
+            <td class="reason">Producto Leche es el mayor gap vs Quality. Inversión directa para mover product score y soportar precio $1.05.</td>
+          </tr>
+          <tr>
+            <td class="label">Calidad Yogur</td>
+            <td class="num">$80,000</td>
+            <td class="num new">$80,000</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Producto en 9.9 (cima). Mantener. Recortar arriesga la posición premium.</td>
+          </tr>
+          <tr>
+            <td class="label">Calidad Queso</td>
+            <td class="num">$5,000</td>
+            <td class="num new">$30,000</td>
+            <td class="delta up">6×</td>
+            <td class="reason">Coordinado con +$40k marca: la jugada combinada calidad+marca es la única forma de revertir la decadencia.</td>
+          </tr>
+          <tr>
+            <td class="label">Gama Leche</td>
+            <td class="num">1</td>
+            <td class="num new">1</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Multiplicador toca techo en gama 3 (1.15×). No vale el costo extra.</td>
+          </tr>
+          <tr>
+            <td class="label">Gama Yogur</td>
+            <td class="num">12</td>
+            <td class="num new">12</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Sweet spot: 1.17× costo, máxima variedad relevante.</td>
+          </tr>
+          <tr>
+            <td class="label">Gama Queso</td>
+            <td class="num">2</td>
+            <td class="num new">2</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Producto en problema; no agregar costo de gama mientras recuperamos.</td>
+          </tr>
+          <tr>
+            <td class="label">Packaging Leche</td>
+            <td class="num">2</td>
+            <td class="num new">3</td>
+            <td class="delta up">+1</td>
+            <td class="reason">Solo +$0.01/unit (~$20k total). Apoya el product score recuperándose.</td>
+          </tr>
+          <tr>
+            <td class="label">Packaging Yogur</td>
+            <td class="num">4</td>
+            <td class="num new">4</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Ya en nivel premium.</td>
+          </tr>
+          <tr>
+            <td class="label">Packaging Queso</td>
+            <td class="num">3</td>
+            <td class="num new">3</td>
+            <td class="delta flat">=</td>
+            <td class="reason">No subir en producto en declive.</td>
+          </tr>
+          <tr>
+            <td class="label">Proveedor MP</td>
+            <td class="num">Frisona (60)</td>
+            <td class="num new">Frisona (60)</td>
+            <td class="delta flat">=</td>
+            <td class="reason"><strong>NO cambiar.</strong> Yogur llegó a 9.9 con Frisona — el proveedor NO determina valor de producto, la inversión en calidad SÍ. Cambiar a Fleckviek = +$181k extra MP, mejor gastado en otra parte.</td>
+          </tr>
+          <tr class="total-row">
+            <td class="label">TOTAL Calidad</td>
+            <td class="num">$95,000</td>
+            <td class="num new">$160,000</td>
+            <td class="delta up">+$65k</td>
+            <td class="reason">El gasto que mueve el factor Producto (12% del Valor de Compañía).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pestaña 4: Producción -->
+    <div class="pestaña">
+      <div class="pestaña-head">
+        <div class="pestaña-num">Pestaña 04</div>
+        <div class="pestaña-title">Producción · Capacidad · Mantenimiento · Logística</div>
+        <div class="pestaña-budget"><strong>+50k cap. Yogur</strong>$110k inversión</div>
+      </div>
+
+      <table class="decisions">
+        <thead>
+          <tr>
+            <th>Decisión</th>
+            <th class="num">Anterior</th>
+            <th class="num">Nuevo</th>
+            <th class="center">Δ</th>
+            <th>Razón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Producción Leche</td>
+            <td class="num">2,200,000</td>
+            <td class="num new">2,000,000</td>
+            <td class="delta down">−200k</td>
+            <td class="reason">Vendimos 1.95M; producir 2.2M dejó inventario y bajó ocupación a 62.5%. Ajustar a demanda real.</td>
+          </tr>
+          <tr>
+            <td class="label">Producción Yogur</td>
+            <td class="num">380,000</td>
+            <td class="num new">470,000</td>
+            <td class="delta up">+90k</td>
+            <td class="reason">Con expansión +50k → cap 490k. Producir 470 = 96% ocupación. Yogur es el motor.</td>
+          </tr>
+          <tr>
+            <td class="label">Producción Queso</td>
+            <td class="num">100,000</td>
+            <td class="num new">95,000</td>
+            <td class="delta down">−5k</td>
+            <td class="reason">Producir igual a la venta esperada para no caducar.</td>
+          </tr>
+          <tr>
+            <td class="label">Ampliación Cap. Leche</td>
+            <td class="num">0</td>
+            <td class="num new">0</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Ocupación 62.5%, sobra capacidad.</td>
+          </tr>
+          <tr>
+            <td class="label">Ampliación Cap. Yogur</td>
+            <td class="num">+50,000</td>
+            <td class="num new">+50,000</td>
+            <td class="delta flat">=</td>
+            <td class="reason"><strong>La gran apuesta capex.</strong> Cap actual 440k → 490k. Sin esto perdemos ventas. Costo: $110k.</td>
+          </tr>
+          <tr>
+            <td class="label">Ampliación Cap. Queso</td>
+            <td class="num">0</td>
+            <td class="num new">0</td>
+            <td class="delta flat">=</td>
+            <td class="reason">No expandir producto en declive.</td>
+          </tr>
+          <tr>
+            <td class="label">Mantenimiento</td>
+            <td class="num">6.5%</td>
+            <td class="num new">7.5%</td>
+            <td class="delta up">+1pp</td>
+            <td class="reason">Eficiencia productiva 107 vs Quality 109. Reduce No-Calidad ($24k evitable en Queso).</td>
+          </tr>
+          <tr>
+            <td class="label">Modalidad Logística</td>
+            <td class="num">3</td>
+            <td class="num new">3</td>
+            <td class="delta flat">=</td>
+            <td class="reason">Cobertura 40.2% (#1). Subir a 4 marginal. Dinero mejor invertido en marca/calidad.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pestaña 5: Financiación -->
+    <div class="pestaña">
+      <div class="pestaña-head">
+        <div class="pestaña-num">Pestaña 05</div>
+        <div class="pestaña-title">Financiación · Préstamos</div>
+        <div class="pestaña-budget"><strong>$0 nuevo préstamo</strong>caja propia cubre todo</div>
+      </div>
+
+      <table class="decisions">
+        <thead>
+          <tr>
+            <th>Decisión</th>
+            <th class="num">Anterior</th>
+            <th class="num">Nuevo</th>
+            <th class="center">Δ</th>
+            <th>Razón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Préstamo Largo Plazo</td>
+            <td class="num">$200,000</td>
+            <td class="num new">$0</td>
+            <td class="delta down">−$200k</td>
+            <td class="reason">No necesario. Caja final proyectada: ~$770k después de toda la inversión incremental.</td>
+          </tr>
+          <tr>
+            <td class="label">Préstamo Corto Plazo</td>
+            <td class="num">$0</td>
+            <td class="num new">$0</td>
+            <td class="delta flat">=</td>
+            <td class="reason"><strong>Decisión consciente.</strong> Aunque la estrategia B original sugería $300k CP, el flujo de caja proyectado lo hace innecesario y costoso (+$25k intereses + empeora endeudamiento). Mantenemos disciplina financiera — ese es nuestro factor #1.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Consultor -->
+    <div class="pestaña">
+      <div class="pestaña-head">
+        <div class="pestaña-num">Pestaña Consultor</div>
+        <div class="pestaña-title">Informes a comprar · $12,500 total</div>
+        <div class="pestaña-budget"><strong>5 informes</strong>de 9 disponibles</div>
+      </div>
+
+      <table class="decisions">
+        <thead>
+          <tr>
+            <th>Informe</th>
+            <th class="num">Costo</th>
+            <th class="center">Comprar</th>
+            <th>Razón</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="label">Comparativa Resultados</td>
+            <td class="num">$2,500</td>
+            <td class="delta up">SÍ ✓</td>
+            <td class="reason">Márgenes y costos exactos de Quality y GoMilk. Calibra si nuestro premium en Yogur tiene espacio.</td>
+          </tr>
+          <tr>
+            <td class="label">Análisis Demanda Potencial</td>
+            <td class="num">$2,500</td>
+            <td class="delta up">SÍ ✓</td>
+            <td class="reason">Tamaño y crecimiento del mercado. Crítico para planear capacidad y producción de P3.</td>
+          </tr>
+          <tr>
+            <td class="label">Nivel Diseño Producto</td>
+            <td class="num">$2,500</td>
+            <td class="delta up">SÍ ✓</td>
+            <td class="reason">Confirma scores de producto de competidores. Si Quality cae, ajustamos.</td>
+          </tr>
+          <tr>
+            <td class="label">Nivel Notoriedad</td>
+            <td class="num">$2,500</td>
+            <td class="delta up">SÍ ✓</td>
+            <td class="reason">Marca de competidores. Calibra inversión en P3.</td>
+          </tr>
+          <tr>
+            <td class="label">Inversión en Promoción</td>
+            <td class="num">$2,500</td>
+            <td class="delta up">SÍ ✓</td>
+            <td class="reason"><strong>Crucial.</strong> Saber cuánto gastan los demás calibra nuestros $180k en marca.</td>
+          </tr>
+          <tr>
+            <td class="label">Comparativa Balance</td>
+            <td class="num">$2,500</td>
+            <td class="delta down">NO</td>
+            <td class="reason">Conocemos suficiente del estado financiero ajeno (todos perdiendo).</td>
+          </tr>
+          <tr>
+            <td class="label">Intención de Compra</td>
+            <td class="num">$2,500</td>
+            <td class="delta down">NO</td>
+            <td class="reason">Nice-to-have. Demanda real ya la vemos en cuota.</td>
+          </tr>
+          <tr>
+            <td class="label">Volumen de Ingresos</td>
+            <td class="num">$2,500</td>
+            <td class="delta down">NO</td>
+            <td class="reason">Redundante con cuotas conocidas.</td>
+          </tr>
+          <tr>
+            <td class="label">Informe de Ventas</td>
+            <td class="num">$2,500</td>
+            <td class="delta down">NO</td>
+            <td class="reason">Redundante con datos de cuota.</td>
+          </tr>
+          <tr class="total-row">
+            <td class="label">TOTAL Informes</td>
+            <td class="num">—</td>
+            <td class="delta up">$12,500</td>
+            <td class="reason">0.34% de ingresos por visibilidad estratégica completa.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============== IMPACTO PROYECTADO ============== -->
+  <section>
+    <div class="section-head">
+      <div class="section-num">03</div>
+      <div>
+        <h2>El impacto · <em>periodo a periodo</em></h2>
+        <div class="section-lede">Cómo cierran los 3 puntos a Quality y abren ventaja sostenible.</div>
+      </div>
+    </div>
+
+    <div class="chart-block">
+      <div class="chart-title">Distribución del Valor de Compañía · 7 factores</div>
+      <div class="chart-subtitle">Donde estamos hoy vs el escenario proyectado tras Estrategia B. Las barras grises son el peso del factor en el ranking total.</div>
+      <div class="chart-canvas-wrap" style="height: 380px"><canvas id="chartFactores"></canvas></div>
+    </div>
+
+    <div class="impact-block">
+      <table class="impact">
+        <thead>
+          <tr>
+            <th>Factor (peso VC)</th>
+            <th>Movimiento esperado</th>
+            <th>Δ pts VC</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Resultados Económicos (45%)</td>
+            <td>Margen +15-20%</td>
+            <td class="delta">+25 a +35</td>
+          </tr>
+          <tr>
+            <td>Valor de Marca (12%)</td>
+            <td>36 → 42-44</td>
+            <td class="delta">+25 a +35</td>
+          </tr>
+          <tr>
+            <td>Valor de Producto (12%)</td>
+            <td>7.5 → 8.2-8.5</td>
+            <td class="delta">+15 a +20</td>
+          </tr>
+          <tr>
+            <td>Cuota de Mercado (12%)</td>
+            <td>22.5% → 25-27%</td>
+            <td class="delta">+10 a +15</td>
+          </tr>
+          <tr>
+            <td>Cobertura (7%)</td>
+            <td>Mantener #1</td>
+            <td class="delta">≈ 0</td>
+          </tr>
+          <tr>
+            <td>Eficiencia Productiva (6%)</td>
+            <td>Mantenimiento ↑</td>
+            <td class="delta">+3 a +5</td>
+          </tr>
+          <tr>
+            <td>Rentabilidad/Solvencia (6%)</td>
+            <td>Sin deuda nueva</td>
+            <td class="delta">Mantener</td>
+          </tr>
+          <tr class="total">
+            <td><strong>TOTAL ESTIMADO</strong></td>
+            <td>—</td>
+            <td class="delta">+78 a +110</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="vc-result">
+        <div class="vc-current">2026 · Hoy · 1,910 pts</div>
+        <div class="vc-arrow">→</div>
+        <div class="vc-projected">P2 · Proyección</div>
+        <div class="vc-projected-num">~2,020</div>
+        <div class="vc-result-label">+110 pts · #1 cómodo</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== RIESGOS Y CHECKLIST ============== -->
+  <section>
+    <div class="section-head">
+      <div class="section-num">04</div>
+      <div>
+        <h2>Riesgos · y <em>checklist</em></h2>
+        <div class="section-lede">Lo que puede salir mal y cómo lo monitoreamos.</div>
+      </div>
+    </div>
+
+    <div class="risks-grid">
+      <div class="risk-card">
+        <h4>Riesgos del periodo</h4>
+        <div class="risk-item">
+          <strong>Leche $1.05 acelera fuga a GoMilk</strong>
+          <span>Probabilidad media. Si volumen cae &gt;12%, regresar a $1.02 en P3.</span>
+        </div>
+        <div class="risk-item">
+          <strong>Yogur $3.95 enfría demanda</strong>
+          <span>Probabilidad baja. Capacidad ya limita upside; si demanda cae, mantener precio en P3.</span>
+        </div>
+        <div class="risk-item">
+          <strong>GranDistri 17% no recupera volumen</strong>
+          <span>Probabilidad baja. Significaría que el problema es marca, no descuento — pivotar a inversión más agresiva en marca.</span>
+        </div>
+        <div class="risk-item">
+          <strong>Quality contraataca con marca extra</strong>
+          <span>Su utilidad −$232k limita su capacidad. Pero si lo hace, los informes del consultor lo detectan a tiempo para P3.</span>
+        </div>
+      </div>
+
+      <div class="check-card">
+        <h4>Antes de pulsar GUARDAR</h4>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>Sala de Reuniones — entrar y tomar TODOS los proyectos (penalización por no-decisión es real)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>Prensa — leer escenario macro (PIB, inflación, confianza)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>Proveedor — confirmar Frisona explícitamente (el dropdown muestra NS/NC)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>Suma Priorización = 21 (validación del simulador)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>5 informes del Consultor seleccionados ($12,500)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>Verificar plazos de cobro/pago (palanca financiera no usada)</span>
+        </div>
+        <div class="check-item">
+          <span class="check-box"></span>
+          <span>Confirmar todos los sliders movidos (incluso los que mantenemos)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== FOOTER ============== -->
+  <footer>
+    <div class="footer-quote">
+      "El periodo pasado defendimos margen recortando inversión. Funcionó para el ranking, pero erosionó el motor. Ahora invertimos donde duele — Leche y Queso — y subimos precios donde el mercado los acepta — Yogur. La ventaja que tenemos es ser los únicos con resultado operacional positivo. Es el momento de pisar el acelerador."
+    </div>
+    <div class="footer-meta">
+      <strong>TopLeche · Panteras Estrategas</strong>
+      Periodo 2 de 3 · Decisiones 2027<br>
+      Estrategia B · Doble Apuesta<br>
+      Análisis basado en 40+ archivos · Manual oficial
+    </div>
+  </footer>
+
+</div>
+
+<script>
+// ===== Chart.js global config =====
+const palette = {
+  rust: '#B8552A',
+  gold: '#C8973F',
+  goldPale: '#E8C97A',
+  leaf: '#6B7A5A',
+  leafDeep: '#4F5C42',
+  berry: '#8B3A3A',
+  ink: '#2A1F1A',
+  inkSoft: '#5C4A3F',
+  cream: '#F5EFE3',
+  paper: '#FAF6EC',
+};
+
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = palette.inkSoft;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+Chart.defaults.plugins.legend.labels.boxHeight = 12;
+Chart.defaults.plugins.legend.labels.padding = 16;
+Chart.defaults.plugins.tooltip.backgroundColor = palette.ink;
+Chart.defaults.plugins.tooltip.titleFont = { family: 'Fraunces', size: 13, weight: '600' };
+Chart.defaults.plugins.tooltip.bodyFont = { family: 'JetBrains Mono', size: 11 };
+Chart.defaults.plugins.tooltip.padding = 12;
+Chart.defaults.plugins.tooltip.cornerRadius = 0;
+
+// ===== Chart 1: Margen por producto =====
+new Chart(document.getElementById('chartMargen'), {
+  type: 'bar',
+  data: {
+    labels: ['2024', '2025', '2026'],
+    datasets: [
+      {
+        label: 'Leche',
+        data: [544087, 548644, 405319],
+        backgroundColor: palette.rust,
+        borderColor: palette.rust,
+        borderWidth: 0,
+      },
+      {
+        label: 'Yogur',
+        data: [474625, 488998, 744840],
+        backgroundColor: palette.gold,
+        borderColor: palette.gold,
+        borderWidth: 0,
+      },
+      {
+        label: 'Queso',
+        data: [279228, 237479, 222379],
+        backgroundColor: palette.leaf,
+        borderColor: palette.leaf,
+        borderWidth: 0,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { family: 'JetBrains Mono', size: 11 } }
+      },
+      y: {
+        grid: { color: 'rgba(42,31,26,0.06)' },
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          callback: v => '$' + (v/1000) + 'k'
+        }
+      }
+    },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y.toLocaleString()
+        }
+      }
+    }
+  }
+});
+
+// ===== Chart 2: Ingresos por canal =====
+new Chart(document.getElementById('chartCanal'), {
+  type: 'bar',
+  data: {
+    labels: ['TiendaTradi', 'GranDistri', 'Hostelería'],
+    datasets: [
+      {
+        label: '2025',
+        data: [960375, 1948364, 584761],
+        backgroundColor: 'rgba(42,31,26,0.25)',
+        borderColor: 'rgba(42,31,26,0.25)',
+        borderWidth: 0,
+      },
+      {
+        label: '2026',
+        data: [1129161, 1847231, 640111],
+        backgroundColor: palette.rust,
+        borderColor: palette.rust,
+        borderWidth: 0,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    scales: {
+      x: {
+        grid: { color: 'rgba(42,31,26,0.06)' },
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          callback: v => '$' + (v/1000) + 'k'
+        }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { font: { family: 'Inter', size: 12 } }
+      }
+    },
+    plugins: {
+      legend: { position: 'bottom' },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.dataset.label + ': $' + ctx.parsed.x.toLocaleString()
+        }
+      }
+    }
+  }
+});
+
+// ===== Chart 3: Segmento × Producto =====
+new Chart(document.getElementById('chartSegmento'), {
+  type: 'bar',
+  data: {
+    labels: ['Healthy/Yogur', 'Niños/Yogur', 'Adultos/Yogur', 'Healthy/Queso', 'Niños/Queso', 'Healthy/Leche', 'Adultos/Queso', 'Niños/Leche', 'Adultos/Leche'],
+    datasets: [{
+      label: 'Δ Ingresos 2025→2026',
+      data: [178700, 191708, 90076, 9212, -6236, -38892, -40642, -104948, -155975],
+      backgroundColor: ctx => {
+        const v = ctx.raw;
+        return v > 0 ? palette.leaf : palette.rust;
+      },
+      borderWidth: 0,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: 'y',
+    scales: {
+      x: {
+        grid: { color: 'rgba(42,31,26,0.06)' },
+        ticks: {
+          font: { family: 'JetBrains Mono', size: 10 },
+          callback: v => (v > 0 ? '+' : '') + '$' + (v/1000) + 'k'
+        }
+      },
+      y: {
+        grid: { display: false },
+        ticks: { font: { family: 'Inter', size: 11 } }
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => 'Δ: ' + (ctx.parsed.x > 0 ? '+' : '') + '$' + ctx.parsed.x.toLocaleString()
+        }
+      }
+    }
+  }
+});
+
+// ===== Chart 4: Factores de Valor de Compañía =====
+new Chart(document.getElementById('chartFactores'), {
+  type: 'bar',
+  data: {
+    labels: ['Resultados\nEconómicos', 'Cuota\nMercado', 'Valor\nMarca', 'Valor\nProducto', 'Cobertura', 'Eficiencia\nProductiva', 'Rentabilidad\n/Solvencia'],
+    datasets: [
+      {
+        label: 'TopLeche · 2026 actual',
+        data: [891, 229, 182, 216, 153, 107, 151],
+        backgroundColor: 'rgba(42,31,26,0.4)',
+        borderColor: palette.ink,
+        borderWidth: 0,
+        borderRadius: 0,
+      },
+      {
+        label: 'Quality · 2026',
+        data: [815, 244, 236, 260, 146, 109, 123],
+        backgroundColor: 'rgba(184,85,42,0.35)',
+        borderColor: palette.rust,
+        borderWidth: 0,
+      },
+      {
+        label: 'TopLeche · P2 proyectado',
+        data: [925, 250, 218, 244, 153, 113, 151],
+        backgroundColor: palette.gold,
+        borderColor: palette.gold,
+        borderWidth: 0,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        grid: { display: false },
+        ticks: { font: { family: 'Inter', size: 10 } }
+      },
+      y: {
+        grid: { color: 'rgba(42,31,26,0.06)' },
+        ticks: { font: { family: 'JetBrains Mono', size: 10 } }
+      }
+    },
+    plugins: {
+      legend: { position: 'bottom' },
+    }
+  }
+});
+</script>
+
+</body>
+</html>

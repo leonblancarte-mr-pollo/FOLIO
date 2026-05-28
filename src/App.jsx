@@ -4159,7 +4159,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
 }
 
 function AchievementDetailModal({ def, unlockedAt, onClose }) {
-  const [isClosing, setIsClosing] = React.useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
   const IconComp = ACHIEVEMENT_ICON_MAP[def.key] || Award;
   const isUnlocked = !!unlockedAt;
@@ -8191,60 +8191,154 @@ function BookPreviewModal({ post, onClose, onAdd }) {
 }
 
 function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog }) {
-  const hasStreak = streak?.current_streak > 0;
-  const STREAK_GRADIENT = "linear-gradient(90deg, #3D8B37 0%, #5CAE4A 100%)";
-  const STREAK_SHADOW = "0 4px 16px rgba(61, 139, 55, 0.3)";
+  const days = streak?.current_streak || 0;
+  const hasStreak = days > 0;
+
+  // Phase: 0=sin racha, 1=1-3d, 2=4-7d, 3=8+d
+  const phase = days >= 8 ? 3 : days >= 4 ? 2 : days >= 1 ? 1 : 0;
+
+  const PHASES = [
+    { g0: "#E8A82B", g1: "#F4C430", rgb: "232,168,43",  border: "#E8A82B" },
+    { g0: "#E8A82B", g1: "#F4C430", rgb: "232,168,43",  border: "#E8A82B" },
+    { g0: "#5CAE4A", g1: "#B8D44A", rgb: "92,174,74",   border: "#5CAE4A" },
+    { g0: "#C84B8A", g1: "#7A2E5E", rgb: "200,75,138",  border: "#C84B8A" },
+  ];
+  const cfg = PHASES[phase];
+
+  // Danger: racha activa, sin leer hoy, hora nocturna
+  const hour = new Date().getHours();
+  const isDanger = hasStreak && !hasLoggedToday && hour >= 20;
+
+  // Glow
+  const glowOpacity = hasLoggedToday ? "0.65" : "0.38";
+  const glowSize   = hasLoggedToday ? "30px" : "20px";
+  const bannerShadow = `0 0 ${glowSize} rgba(${cfg.rgb},${glowOpacity}), 0 6px 24px rgba(0,0,0,0.18)`;
+
+  // Progress bar — meta diaria: 20 páginas
+  const DAILY_GOAL = 20;
+  const pct = pagesLoggedToday > 0 ? Math.min(100, Math.round((pagesLoggedToday / DAILY_GOAL) * 100)) : 0;
+  const goalReached = pagesLoggedToday >= DAILY_GOAL;
+
+  // Confeti al alcanzar meta (una sola vez)
+  const prevGoalRef = useRef(false);
+  useEffect(() => {
+    if (goalReached && !prevGoalRef.current && typeof confetti === "function") {
+      confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: ["#FFD700", "#FFA500", "#fff", cfg.g0] });
+      setTimeout(() => confetti({ particleCount: 35, spread: 55, origin: { y: 0.28 } }), 650);
+    }
+    prevGoalRef.current = goalReached;
+  }, [goalReached]);
+
+  // Fire size por fase
+  const FIRE_SIZES = [22, 28, 36, 44];
+  const fireSize = FIRE_SIZES[phase];
 
   return (
     <div
       onClick={hasLoggedToday ? undefined : onLog}
+      className={`streak-banner-enter${isDanger ? " streak-danger" : ""}`}
       style={{
         position: "relative", overflow: "hidden",
-        borderRadius: "16px", padding: "16px 20px", marginBottom: "1.25rem",
-        background: STREAK_GRADIENT,
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem",
-        boxShadow: STREAK_SHADOW,
+        borderRadius: "20px",
+        border: `2px solid ${cfg.border}99`,
+        background: `linear-gradient(135deg, ${cfg.g0} 0%, ${cfg.g1} 100%)`,
+        boxShadow: isDanger ? undefined : bannerShadow,
+        marginBottom: "1.25rem",
         cursor: hasLoggedToday ? "default" : "pointer",
+        transition: "box-shadow 500ms ease-out",
       }}
     >
-      {/* Decorative circles */}
-      <div style={{ position: "absolute", top: -40, right: -40, width: 130, height: 130, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.07)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: -30, left: -20, width: 90, height: 90, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.07)", pointerEvents: "none" }} />
+      {/* Glassmorphism sheen */}
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 100%)", pointerEvents: "none", borderRadius: "18px" }} />
 
-      <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
-        {/* Single row: flame + number + "días de racha" */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "0.2rem" }}>
-          <Flame size={20} color="#fff" strokeWidth={2} style={{ flexShrink: 0 }} />
-          {hasStreak && (
-            <span style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "28px", color: "#fff", lineHeight: 1 }}>
-              {streak.current_streak}
-            </span>
-          )}
-          <span style={{ fontFamily: "'EB Garamond', serif", fontSize: "15px", color: "rgba(255,255,255,0.9)", lineHeight: 1 }}>
-            {hasStreak ? "días de racha" : (hasLoggedToday ? "¡Leíste hoy!" : "¿Leíste hoy?")}
-          </span>
+      {/* Decorative orbs */}
+      <div style={{ position: "absolute", top: -50, right: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.1)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -25, left: -15, width: 90, height: 90, borderRadius: "50%", background: "rgba(0,0,0,0.07)", pointerEvents: "none" }} />
+
+      {/* Main content */}
+      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "18px 20px 14px" }}>
+
+        {/* Left: fuego + número + label */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
+
+          {/* Fuego (evoluciona por fase) */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <Flame
+              size={fireSize}
+              color="#fff"
+              strokeWidth={phase >= 2 ? 1.5 : 2}
+              style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.28))", display: "block" }}
+            />
+            {phase === 3 && (
+              <>
+                <span className="sparkle-orbit" style={{ position: "absolute", top: -10, right: -8, fontSize: 13, color: "#FFD700", lineHeight: 1 }}>✦</span>
+                <span className="sparkle-orbit" style={{ position: "absolute", bottom: -4, left: -10, fontSize: 10, color: "#FFD700", lineHeight: 1 }}>✦</span>
+                <span className="sparkle-orbit" style={{ position: "absolute", top: 2, left: -12, fontSize: 9, color: "#FFE066", lineHeight: 1, opacity: 0.8 }}>✦</span>
+              </>
+            )}
+            {phase === 2 && (
+              <span style={{ position: "absolute", top: -6, right: -6, fontSize: 10, color: "rgba(255,255,255,0.8)", lineHeight: 1 }}>✦</span>
+            )}
+          </div>
+
+          {/* Texto */}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "7px", flexWrap: "wrap" }}>
+              {hasStreak && (
+                <span style={{
+                  fontFamily: "Fraunces, serif", fontWeight: 800,
+                  fontSize: "clamp(32px, 8vw, 44px)",
+                  color: "#fff", lineHeight: 0.9,
+                  textShadow: "0 2px 10px rgba(0,0,0,0.22)",
+                  letterSpacing: "-1.5px",
+                }}>
+                  {days}
+                </span>
+              )}
+              <span style={{ fontFamily: "'EB Garamond', serif", fontSize: "16px", color: "rgba(255,255,255,0.92)", lineHeight: 1.2, fontStyle: hasStreak ? "normal" : "italic" }}>
+                {hasStreak ? "días de racha" : hasLoggedToday ? "¡Leíste hoy!" : "¿Leíste hoy?"}
+              </span>
+            </div>
+            {pagesLoggedToday > 0 && (
+              <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "13px", color: "rgba(255,255,255,0.72)", margin: "3px 0 0", lineHeight: 1 }}>
+                {pagesLoggedToday} {pagesLoggedToday === 1 ? "página" : "páginas"} hoy
+              </p>
+            )}
+          </div>
         </div>
-        {pagesLoggedToday > 0 && (
-          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "13px", color: "rgba(255,255,255,0.75)", margin: 0 }}>
-            {pagesLoggedToday} páginas registradas hoy
-          </p>
-        )}
+
+        {/* Botón */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onLog(); }}
+          className="btn-press"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.18)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+            color: "#fff",
+            border: "1.5px solid rgba(255,255,255,0.7)",
+            borderRadius: "22px",
+            padding: "10px 18px",
+            fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "14px",
+            flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer",
+          }}
+        >
+          + Páginas
+        </button>
       </div>
 
-      <button
-        onClick={(e) => { e.stopPropagation(); onLog(); }}
-        className="btn-press"
-        style={{
-          backgroundColor: "transparent", color: "#fff",
-          border: "1.5px solid rgba(255,255,255,0.8)", borderRadius: "20px",
-          padding: "10px 18px",
-          fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "14px",
-          flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer",
-          position: "relative",
-        }}
-      >
-        + Más páginas
-      </button>
+      {/* Barra de progreso diario */}
+      <div style={{ height: "3px", background: "rgba(0,0,0,0.18)", margin: "0 2px" }}>
+        {pct > 0 && (
+          <div style={{
+            height: "100%",
+            width: `${pct}%`,
+            background: goalReached ? "#FFD700" : "rgba(255,255,255,0.62)",
+            boxShadow: goalReached ? "0 0 8px rgba(255,215,0,0.75)" : "none",
+            transition: "width 600ms ease-out, background 400ms ease, box-shadow 400ms ease",
+          }} />
+        )}
+      </div>
     </div>
   );
 }
@@ -8733,7 +8827,6 @@ function FeedSkeleton() {
 
 function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone }) {
   const [posts, setPosts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState("");
   const [showNewPost, setShowNewPost] = useState(false);
   const [newPostText, setNewPostText] = useState("");
@@ -8756,20 +8849,30 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [doubleTapPost, setDoubleTapPost] = useState(null);
   const lastTapRef = useRef({});
+  const abortRef = useRef(false);
   const [loggedYesterday, setLoggedYesterday] = useState(true);
   const [friendsReading, setFriendsReading] = useState([]);
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [openPopover, setOpenPopover] = useState(null);
   const [timerMinutes, setTimerMinutes] = useState(null);
   const [shareSession, setShareSession] = useState(null);
-  const [isReady, setIsReady] = useState(false);
+  const [feedState, setFeedState] = useState('loading');
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 13 ? "Buenos días" : greetingHour < 20 ? "Buenas tardes" : "Buenas noches";
 
   useEffect(() => {
-    if (isOnline) { loadFeed(); loadFriendsReading(); }
+    abortRef.current = false;
+    if (!isOnline) {
+      setFeedState('offline');
+      loadStreakInfo();
+      return () => { abortRef.current = true; };
+    }
+    setFeedState('loading');
+    loadFeed();
+    loadFriendsReading();
     loadStreakInfo();
+    return () => { abortRef.current = true; };
   }, [isOnline]);
 
   useEffect(() => {
@@ -8825,11 +8928,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }
 
   async function loadFeed() {
-    setLoading(true);
-    setIsReady(false);
     setFeedError("");
     try {
       const feedPosts = await fetchFeed(user.id);
+      if (abortRef.current) return;
       setPosts(feedPosts);
       if (feedPosts.length > 0) {
         const postIds = feedPosts.map((p) => p.id);
@@ -8840,6 +8942,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", user.id),
           ]).catch(() => [{ data: null }, { data: null }]),
         ]);
+        if (abortRef.current) return;
         const cm = {};
         (countData || []).forEach((c) => { cm[c.post_id] = (cm[c.post_id] || 0) + 1; });
         setCommentCounts(cm);
@@ -8849,12 +8952,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         setLikeCounts(lc);
         setLikedPosts(new Set((myLikes || []).map(l => l.post_id)));
       }
-    }
-    catch (err) {
+      setFeedState(feedPosts.length > 0 ? 'ready' : 'empty');
+    } catch (err) {
+      if (abortRef.current) return;
       console.error("Error cargando feed:", err);
       setFeedError(err?.message || "No se pudo cargar el feed. ¿Existen las tablas posts y comments en Supabase?");
+      setFeedState('error');
     }
-    finally { setLoading(false); setIsReady(true); }
   }
 
   async function handleCreateTextPost() {
@@ -8875,6 +8979,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       }
       await createFeedPost({ userId: user.id, type: "text", content: newPostText.trim() || null, imageUrl });
       setNewPostText(""); setShowNewPost(false); setPostImageFile(null); setPostImagePreview(null);
+      abortRef.current = false;
+      setFeedState('loading');
       await loadFeed();
     } catch (err) {
       console.error("Error creando post:", err);
@@ -8928,7 +9034,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     setCommentCounts((prev) => ({ ...prev, [postId]: count }));
   }
 
-  if (!isReady) return <FeedSkeleton />;
+  if (feedState === 'loading') return <FeedSkeleton />;
 
   // ── Motivational phrase ──
   const readingBooks = books.filter(b => b.status === "reading");
@@ -9079,13 +9185,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         </button>
       )}
 
-      {/* Error de carga del feed */}
-      {feedError && (
-        <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1rem", color: "#991b1b", ...body, fontSize: "0.88rem" }}>
-          ⚠️ {feedError}
-        </div>
-      )}
-
       {/* Crear post */}
       <div style={{ marginBottom: "2rem" }}>
         {!showNewPost ? (
@@ -9157,13 +9256,17 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       </div>
 
       {/* Lista de posts */}
-      {!isOnline ? (
+      {feedState === 'error' ? (
+        <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1rem", color: "#991b1b", ...body, fontSize: "0.88rem" }}>
+          ⚠️ {feedError}
+        </div>
+      ) : feedState === 'offline' ? (
         <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
           <WifiOff size={28} color={palette.border} style={{ margin: "0 auto 0.75rem", display: "block" }} />
           <p style={{ ...display, fontSize: "1.15rem", fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.4rem" }}>Sin conexión</p>
           <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Necesitas conexión para ver el feed de tus amigos.</p>
         </div>
-      ) : posts.length === 0 && !feedError ? (
+      ) : feedState === 'empty' ? (
         <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
           <p style={{ ...display, fontSize: "1.3rem", fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.5rem" }}>El feed está vacío</p>
           <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Añade amigos para ver sus lecturas, o empieza a leer un libro para publicar tu progreso.</p>
