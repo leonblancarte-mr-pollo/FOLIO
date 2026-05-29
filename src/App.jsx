@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Component } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
   BookOpen,
@@ -11628,6 +11628,26 @@ async function resolveRefProfile(username) {
   return data || null;
 }
 
+class ErrorBoundary extends Component {
+  state = { hasError: false, error: null };
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, errorInfo) { console.error('App crashed:', error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
+          <h2 style={{ marginBottom: 12 }}>Algo se rompió</h2>
+          <p style={{ color: '#991b1b', marginBottom: 20, fontSize: 14 }}>{this.state.error?.message}</p>
+          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: '#7A2E2E', color: '#fff', cursor: 'pointer', fontSize: 15 }}>
+            Recargar
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoaded, setAuthLoaded] = useState(false);
@@ -11699,5 +11719,5 @@ export default function App() {
 
   if (!user) return <AuthView onLogin={handleLogin} />;
   if (showOnboarding) return <NewUserOnboarding user={user} onComplete={() => setShowOnboarding(false)} />;
-  return <MainApp user={user} onLogout={handleLogout} initialRefUser={refUser} onRefUserConsumed={() => setRefUser(null)} />;
+  return <ErrorBoundary><MainApp user={user} onLogout={handleLogout} initialRefUser={refUser} onRefUserConsumed={() => setRefUser(null)} /></ErrorBoundary>;
 }
