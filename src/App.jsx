@@ -525,18 +525,11 @@ function useOnlineStatus() {
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
     const goOffline = () => setIsOnline(false);
-    // iOS dispara offline/online al backgroundear — leer el estado real
-    // solo cuando el usuario vuelve a la app, no en cada evento espurio
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') setIsOnline(navigator.onLine);
-    };
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
-    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
   return isOnline;
@@ -8877,15 +8870,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     loadFeed();
     loadFriendsReading();
     loadStreakInfo();
-    return () => { runIdRef.current++; };
-  }, [isOnline]);
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && isOnline) loadFeed();
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [isOnline]);
 
   useEffect(() => {
@@ -8948,36 +8932,34 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     const thisRun = ++runIdRef.current;
     setFeedState('loading');
 
-    const timeoutPromise = new Promise((resolve) =>
-      setTimeout(() => resolve({ data: null, timedOut: true }), 5000)
-    );
-    const fetchPromise = supabase
-      .from('posts')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(20)
-      .then(result => ({ ...result, timedOut: false }));
+    try {
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(() => resolve({ data: null, error: null, timedOut: true }), 6000)
+      );
+      const fetchPromise = supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(r => ({ ...r, timedOut: false }));
 
-    const result = await Promise.race([fetchPromise, timeoutPromise]);
+      const result = await Promise.race([fetchPromise, timeoutPromise]);
 
-    if (thisRun !== runIdRef.current) return;
+      if (thisRun !== runIdRef.current) return;
 
-    if (result.timedOut) {
-      console.error('TIMEOUT — Supabase no respondió en 5s');
-      setFeedError("La carga tardó demasiado. ¿Tienes buena conexión?");
+      if (result.timedOut || result.error) {
+        console.error('Feed error:', result.error || 'timeout');
+        setFeedState('error');
+        return;
+      }
+
+      setPosts(result.data || []);
+      setFeedState(result.data?.length > 0 ? 'ready' : 'empty');
+    } catch (err) {
+      if (thisRun !== runIdRef.current) return;
+      console.error('Feed error:', err);
       setFeedState('error');
-      return;
     }
-
-    if (result.error) {
-      console.error('ERROR —', result.error.message);
-      setFeedError(result.error.message);
-      setFeedState('error');
-      return;
-    }
-
-    setPosts(result.data || []);
-    setFeedState(result.data?.length > 0 ? 'ready' : 'empty');
   }
 
   async function handleCreateTextPost() {
