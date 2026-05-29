@@ -8849,7 +8849,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [doubleTapPost, setDoubleTapPost] = useState(null);
   const lastTapRef = useRef({});
-  const abortRef = useRef(false);
+  const runIdRef = useRef(0);
   const [loggedYesterday, setLoggedYesterday] = useState(true);
   const [friendsReading, setFriendsReading] = useState([]);
   const [showTimerModal, setShowTimerModal] = useState(false);
@@ -8862,17 +8862,15 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const greeting = greetingHour < 13 ? "Buenos días" : greetingHour < 20 ? "Buenas tardes" : "Buenas noches";
 
   useEffect(() => {
-    abortRef.current = false;
     if (!isOnline) {
       setFeedState('offline');
       loadStreakInfo();
-      return () => { abortRef.current = true; };
+      return;
     }
-    setFeedState('loading');
     loadFeed();
     loadFriendsReading();
     loadStreakInfo();
-    return () => { abortRef.current = true; };
+    return () => { runIdRef.current++; };
   }, [isOnline]);
 
   useEffect(() => {
@@ -8928,13 +8926,15 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }
 
   async function loadFeed() {
+    const thisRun = ++runIdRef.current;
     setFeedError("");
+    setFeedState('loading');
     try {
       const feedPosts = await Promise.race([
         fetchFeed(user.id),
         new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
       ]);
-      if (abortRef.current) return;
+      if (thisRun !== runIdRef.current) return;
       setPosts(feedPosts);
       if (feedPosts.length > 0) {
         const postIds = feedPosts.map((p) => p.id);
@@ -8945,7 +8945,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", user.id),
           ]).catch(() => [{ data: null }, { data: null }]),
         ]);
-        if (abortRef.current) return;
+        if (thisRun !== runIdRef.current) return;
         const cm = {};
         (countData || []).forEach((c) => { cm[c.post_id] = (cm[c.post_id] || 0) + 1; });
         setCommentCounts(cm);
@@ -8957,7 +8957,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       }
       setFeedState(feedPosts.length > 0 ? 'ready' : 'empty');
     } catch (err) {
-      if (abortRef.current) return;
+      if (thisRun !== runIdRef.current) return;
       console.error("Error cargando feed:", err);
       setFeedError(err?.message === 'timeout'
         ? "La carga tardó demasiado. ¿Tienes buena conexión?"
@@ -8984,8 +8984,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       }
       await createFeedPost({ userId: user.id, type: "text", content: newPostText.trim() || null, imageUrl });
       setNewPostText(""); setShowNewPost(false); setPostImageFile(null); setPostImagePreview(null);
-      abortRef.current = false;
-      setFeedState('loading');
       await loadFeed();
     } catch (err) {
       console.error("Error creando post:", err);
