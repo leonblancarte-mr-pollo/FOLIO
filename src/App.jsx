@@ -521,15 +521,22 @@ function bookToDb(book, userId) {
 
 // ============ ONLINE STATUS HOOK ============
 function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(true);
   useEffect(() => {
     const goOnline = () => setIsOnline(true);
     const goOffline = () => setIsOnline(false);
+    // iOS dispara offline/online al backgroundear — leer el estado real
+    // solo cuando el usuario vuelve a la app, no en cada evento espurio
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') setIsOnline(navigator.onLine);
+    };
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("online", goOnline);
       window.removeEventListener("offline", goOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
   return isOnline;
@@ -8871,6 +8878,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     loadFriendsReading();
     loadStreakInfo();
     return () => { runIdRef.current++; };
+  }, [isOnline]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && isOnline) loadFeed();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [isOnline]);
 
   useEffect(() => {
