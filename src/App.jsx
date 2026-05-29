@@ -7476,14 +7476,14 @@ function NotificationsPanel({ user, onNotifsRead }) {
                 data-read={n.read ? "1" : "0"}
               >
                 <div style={{ position: "relative", flexShrink: 0 }}>
-                  <FriendAvatar profile={{ ...n.actor, nombre: n.actor.nombre }} size={34} />
+                  <FriendAvatar profile={{ ...n.actor, nombre: n.actor?.nombre || 'Usuario' }} size={34} />
                   <span style={{ position: "absolute", bottom: -2, right: -2, backgroundColor: "#E74C3C", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <Heart size={8} color="#fff" fill="#fff" />
                   </span>
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...body, fontSize: "0.85rem", color: palette.ink, lineHeight: 1.4, marginBottom: "0.15rem" }}>
-                    <span style={{ fontWeight: 700 }}>{n.actor.nombre}</span>{" "}
+                    <span style={{ fontWeight: 700 }}>{n.actor?.nombre || 'Usuario'}</span>{" "}
                     <span style={{ color: palette.inkSoft }}>{label}</span>
                   </p>
                   {previewText && (
@@ -8028,7 +8028,7 @@ function PostComments({ postId, user, onCountChange }) {
                 <Avatar author={c.author} size={26} />
                 <div style={{ flex: 1 }}>
                   <div style={{ backgroundColor: palette.bg, borderRadius: "10px", padding: "0.4rem 0.7rem" }}>
-                    <span style={{ ...display, fontWeight: 600, fontSize: "0.8rem", color: palette.ink }}>{c.author.nombre} </span>
+                    <span style={{ ...display, fontWeight: 600, fontSize: "0.8rem", color: palette.ink }}>{c.author?.nombre || 'Usuario'} </span>
                     <span style={{ ...body, fontSize: "0.85rem", color: palette.inkSoft }}>{c.content}</span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.05rem" }}>
@@ -8050,7 +8050,7 @@ function PostComments({ postId, user, onCountChange }) {
                     <div key={r.id} style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start" }}>
                       <Avatar author={r.author} size={22} />
                       <div style={{ backgroundColor: palette.bg, borderRadius: "8px", padding: "0.32rem 0.6rem", flex: 1 }}>
-                        <span style={{ ...display, fontWeight: 600, fontSize: "0.76rem", color: palette.ink }}>{r.author.nombre} </span>
+                        <span style={{ ...display, fontWeight: 600, fontSize: "0.76rem", color: palette.ink }}>{r.author?.nombre || 'Usuario'} </span>
                         <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft }}>{r.content}</span>
                       </div>
                     </div>
@@ -8931,33 +8931,37 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   async function loadFeed() {
     const thisRun = ++runIdRef.current;
     setFeedState('loading');
-
     try {
-      const timeoutPromise = new Promise((resolve) =>
-        setTimeout(() => resolve({ data: null, error: null, timedOut: true }), 6000)
-      );
-      const fetchPromise = supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20)
-        .then(r => ({ ...r, timedOut: false }));
-
-      const result = await Promise.race([fetchPromise, timeoutPromise]);
-
+      const feedPosts = await Promise.race([
+        fetchFeed(user.id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ]);
       if (thisRun !== runIdRef.current) return;
-
-      if (result.timedOut || result.error) {
-        console.error('Feed error:', result.error || 'timeout');
-        setFeedState('error');
-        return;
+      setPosts(feedPosts);
+      if (feedPosts.length > 0) {
+        const postIds = feedPosts.map((p) => p.id);
+        const [{ data: countData }, likeResults] = await Promise.all([
+          supabase.from("comments").select("post_id").in("post_id", postIds),
+          Promise.all([
+            supabase.from("post_likes").select("post_id").in("post_id", postIds),
+            supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", user.id),
+          ]).catch(() => [{ data: null }, { data: null }]),
+        ]);
+        if (thisRun !== runIdRef.current) return;
+        const cm = {};
+        (countData || []).forEach((c) => { cm[c.post_id] = (cm[c.post_id] || 0) + 1; });
+        setCommentCounts(cm);
+        const [{ data: allLikes }, { data: myLikes }] = likeResults;
+        const lc = {};
+        (allLikes || []).forEach(l => { lc[l.post_id] = (lc[l.post_id] || 0) + 1; });
+        setLikeCounts(lc);
+        setLikedPosts(new Set((myLikes || []).map(l => l.post_id)));
       }
-
-      setPosts(result.data || []);
-      setFeedState(result.data?.length > 0 ? 'ready' : 'empty');
+      setFeedState(feedPosts.length > 0 ? 'ready' : 'empty');
     } catch (err) {
       if (thisRun !== runIdRef.current) return;
       console.error('Feed error:', err);
+      setFeedError(err?.message === 'timeout' ? 'La carga tardó demasiado. ¿Tienes buena conexión?' : err?.message || 'No se pudo cargar el feed.');
       setFeedState('error');
     }
   }
@@ -9307,13 +9311,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {/* Header: autor + "desbloqueó un logro" */}
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
                     {post.user_id !== user.id ? (
-                      <button onClick={() => setProfileModalAuthor({ ...post.author, name: post.author.nombre })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                      <button onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
                         <Avatar author={post.author} size={36} />
                       </button>
                     ) : <Avatar author={post.author} size={36} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: "0.3rem", flexWrap: "wrap" }}>
-                        <span style={{ ...display, fontWeight: 700, fontSize: "14px", color: palette.ink }}>{post.author.nombre}</span>
+                        <span style={{ ...display, fontWeight: 700, fontSize: "14px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
                         <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, fontStyle: "italic" }}>desbloqueó un logro</span>
                       </div>
                       <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
@@ -9381,17 +9385,17 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {/* Header */}
                   <div style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start", marginBottom: "0.75rem" }}>
                     {post.user_id !== user.id ? (
-                      <button onClick={() => setProfileModalAuthor({ ...post.author, name: post.author.nombre })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+                      <button onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
                         <Avatar author={post.author} size={42} />
                       </button>
                     ) : <Avatar author={post.author} size={42} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: "0.3rem", flexWrap: "wrap" }}>
                         {post.user_id !== user.id ? (
-                          <button onClick={() => setProfileModalAuthor({ ...post.author, name: post.author.nombre })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                            <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author.nombre}</span>
+                          <button onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                            <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
                           </button>
-                        ) : <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author.nombre}</span>}
+                        ) : <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>}
                         <span style={{ ...body, fontSize: "0.85rem", color: palette.inkSoft, fontStyle: "italic" }}>leyó hoy</span>
                       </div>
                       <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
@@ -9482,7 +9486,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 <div style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start", marginBottom: "0.75rem" }}>
                   {post.user_id !== user.id ? (
                     <button
-                      onClick={() => setProfileModalAuthor({ ...post.author, name: post.author.nombre })}
+                      onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })}
                       style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}
                     >
                       <Avatar author={post.author} size={42} />
@@ -9494,13 +9498,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
                       {post.user_id !== user.id ? (
                         <button
-                          onClick={() => setProfileModalAuthor({ ...post.author, name: post.author.nombre })}
+                          onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })}
                           style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
                         >
-                          <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author.nombre}</span>
+                          <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
                         </button>
                       ) : (
-                        <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author.nombre}</span>
+                        <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
                       )}
                       {post.type === "book_update" && (
                         <span style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, fontStyle: "italic" }}>
