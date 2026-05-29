@@ -8930,7 +8930,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   async function loadFeed() {
     setFeedError("");
     try {
-      const feedPosts = await fetchFeed(user.id);
+      const feedPosts = await Promise.race([
+        fetchFeed(user.id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
+      ]);
       if (abortRef.current) return;
       setPosts(feedPosts);
       if (feedPosts.length > 0) {
@@ -8956,7 +8959,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     } catch (err) {
       if (abortRef.current) return;
       console.error("Error cargando feed:", err);
-      setFeedError(err?.message || "No se pudo cargar el feed. ¿Existen las tablas posts y comments en Supabase?");
+      setFeedError(err?.message === 'timeout'
+        ? "La carga tardó demasiado. ¿Tienes buena conexión?"
+        : err?.message || "No se pudo cargar el feed.");
       setFeedState('error');
     }
   }
@@ -9257,8 +9262,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
       {/* Lista de posts */}
       {feedState === 'error' ? (
-        <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "10px", padding: "0.75rem 1rem", marginBottom: "1rem", color: "#991b1b", ...body, fontSize: "0.88rem" }}>
-          ⚠️ {feedError}
+        <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "12px", padding: "1rem 1.25rem", marginBottom: "1rem", color: "#991b1b", ...body, fontSize: "0.88rem" }}>
+          <p style={{ marginBottom: "0.75rem" }}>⚠️ {feedError || "No se pudo cargar el feed."}</p>
+          <button
+            onClick={() => { setFeedState('loading'); loadFeed(); }}
+            style={{ backgroundColor: "#991b1b", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", ...body, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
+          >
+            Reintentar
+          </button>
         </div>
       ) : feedState === 'offline' ? (
         <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
