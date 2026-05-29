@@ -523,8 +523,8 @@ function bookToDb(book, userId) {
 function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   useEffect(() => {
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
+    const goOnline = () => { console.log('[Online/Offline] → online'); setIsOnline(true); };
+    const goOffline = () => { console.log('[Online/Offline] → offline'); setIsOnline(false); };
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
     return () => {
@@ -8849,7 +8849,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [likedPosts, setLikedPosts] = useState(new Set());
   const [doubleTapPost, setDoubleTapPost] = useState(null);
   const lastTapRef = useRef({});
-  const abortRef = useRef(false);
+  const runRef = useRef(0);
   const [loggedYesterday, setLoggedYesterday] = useState(true);
   const [friendsReading, setFriendsReading] = useState([]);
   const [showTimerModal, setShowTimerModal] = useState(false);
@@ -8862,18 +8862,22 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const greeting = greetingHour < 13 ? "Buenos días" : greetingHour < 20 ? "Buenas tardes" : "Buenas noches";
 
   useEffect(() => {
-    abortRef.current = false;
+    const runId = ++runRef.current;
+    console.log('[IsOnline]', isOnline, '— run #' + runId);
     if (!isOnline) {
       setFeedState('offline');
       loadStreakInfo();
-      return () => { abortRef.current = true; };
+      return;
     }
     setFeedState('loading');
-    loadFeed();
+    loadFeed(runId);
     loadFriendsReading();
     loadStreakInfo();
-    return () => { abortRef.current = true; };
   }, [isOnline]);
+
+  useEffect(() => {
+    console.log('[FeedState]', feedState);
+  }, [feedState]);
 
   useEffect(() => {
     if (!pendingNavigation) return;
@@ -8927,11 +8931,15 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     } catch (e) { console.error("[friendsReading] error:", e); }
   }
 
-  async function loadFeed() {
+  async function loadFeed(runId) {
+    console.log('[Fetch request] Starting fetch — run #' + runId);
     setFeedError("");
     try {
-      const feedPosts = await fetchFeed(user.id);
-      if (abortRef.current) return;
+      const feedPosts = await Promise.race([
+        fetchFeed(user.id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Feed request timeout (8s)')), 8000)),
+      ]);
+      if (runRef.current !== runId) return;
       setPosts(feedPosts);
       if (feedPosts.length > 0) {
         const postIds = feedPosts.map((p) => p.id);
@@ -8942,7 +8950,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", user.id),
           ]).catch(() => [{ data: null }, { data: null }]),
         ]);
-        if (abortRef.current) return;
+        if (runRef.current !== runId) return;
         const cm = {};
         (countData || []).forEach((c) => { cm[c.post_id] = (cm[c.post_id] || 0) + 1; });
         setCommentCounts(cm);
@@ -8954,8 +8962,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       }
       setFeedState(feedPosts.length > 0 ? 'ready' : 'empty');
     } catch (err) {
-      if (abortRef.current) return;
-      console.error("Error cargando feed:", err);
+      if (runRef.current !== runId) return;
+      console.error('[Fetch error]', err);
       setFeedError(err?.message || "No se pudo cargar el feed. ¿Existen las tablas posts y comments en Supabase?");
       setFeedState('error');
     }
@@ -8979,9 +8987,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       }
       await createFeedPost({ userId: user.id, type: "text", content: newPostText.trim() || null, imageUrl });
       setNewPostText(""); setShowNewPost(false); setPostImageFile(null); setPostImagePreview(null);
-      abortRef.current = false;
+      const runId = ++runRef.current;
       setFeedState('loading');
-      await loadFeed();
+      await loadFeed(runId);
     } catch (err) {
       console.error("Error creando post:", err);
       setPostError(err?.message || "Error al publicar. Revisa la consola.");
