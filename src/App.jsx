@@ -8889,7 +8889,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }, [isOnline]);
 
   useEffect(() => {
-    alert('feedState: ' + feedState);
+    console.log('feedState:', feedState);
   }, [feedState]);
 
   useEffect(() => {
@@ -8963,14 +8963,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     if (thisRun !== runIdRef.current) return;
 
     if (result.timedOut) {
-      alert('TIMEOUT — Supabase no respondió en 5s');
+      console.error('TIMEOUT — Supabase no respondió en 5s');
       setFeedError("La carga tardó demasiado. ¿Tienes buena conexión?");
       setFeedState('error');
       return;
     }
 
     if (result.error) {
-      alert('ERROR — ' + result.error.message);
+      console.error('ERROR —', result.error.message);
       setFeedError(result.error.message);
       setFeedState('error');
       return;
