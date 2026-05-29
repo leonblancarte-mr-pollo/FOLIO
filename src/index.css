@@ -60,7 +60,7 @@
 /* #10: Entrada escalonada de cards del feed */
 @keyframes feedCardIn {
   from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .feed-card-enter {
   animation: feedCardIn 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -69,7 +69,7 @@
 /* #7: Entrada del panel de composición de post */
 @keyframes composeIn {
   from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .post-compose-enter {
   animation: composeIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -78,7 +78,7 @@
 /* #11: Entrada de la sección de comentarios */
 @keyframes commentsIn {
   from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .comments-enter {
   animation: commentsIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
@@ -217,7 +217,7 @@
 /* Tab transitions — fade-up al cambiar de sección */
 @keyframes tabIn {
   from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .tab-view-enter {
   animation: tabIn 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
