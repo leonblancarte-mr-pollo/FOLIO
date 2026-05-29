@@ -8889,6 +8889,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }, [isOnline]);
 
   useEffect(() => {
+    alert('feedState: ' + feedState);
+  }, [feedState]);
+
+  useEffect(() => {
     if (!pendingNavigation) return;
     const { postId, openComments: shouldOpenComments } = pendingNavigation;
     setTimeout(() => {
