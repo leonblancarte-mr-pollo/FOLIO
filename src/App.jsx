@@ -8946,43 +8946,38 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
   async function loadFeed() {
     const thisRun = ++runIdRef.current;
-    setFeedError("");
     setFeedState('loading');
-    try {
-      const feedPosts = await Promise.race([
-        fetchFeed(user.id),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000)),
-      ]);
-      if (thisRun !== runIdRef.current) return;
-      setPosts(feedPosts);
-      if (feedPosts.length > 0) {
-        const postIds = feedPosts.map((p) => p.id);
-        const [{ data: countData }, likeResults] = await Promise.all([
-          supabase.from("comments").select("post_id").in("post_id", postIds),
-          Promise.all([
-            supabase.from("post_likes").select("post_id").in("post_id", postIds),
-            supabase.from("post_likes").select("post_id").in("post_id", postIds).eq("user_id", user.id),
-          ]).catch(() => [{ data: null }, { data: null }]),
-        ]);
-        if (thisRun !== runIdRef.current) return;
-        const cm = {};
-        (countData || []).forEach((c) => { cm[c.post_id] = (cm[c.post_id] || 0) + 1; });
-        setCommentCounts(cm);
-        const [{ data: allLikes }, { data: myLikes }] = likeResults;
-        const lc = {};
-        (allLikes || []).forEach(l => { lc[l.post_id] = (lc[l.post_id] || 0) + 1; });
-        setLikeCounts(lc);
-        setLikedPosts(new Set((myLikes || []).map(l => l.post_id)));
-      }
-      setFeedState(feedPosts.length > 0 ? 'ready' : 'empty');
-    } catch (err) {
-      if (thisRun !== runIdRef.current) return;
-      console.error("Error cargando feed:", err);
-      setFeedError(err?.message === 'timeout'
-        ? "La carga tardó demasiado. ¿Tienes buena conexión?"
-        : err?.message || "No se pudo cargar el feed.");
+
+    const timeoutPromise = new Promise((resolve) =>
+      setTimeout(() => resolve({ data: null, timedOut: true }), 5000)
+    );
+    const fetchPromise = supabase
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(result => ({ ...result, timedOut: false }));
+
+    const result = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (thisRun !== runIdRef.current) return;
+
+    if (result.timedOut) {
+      alert('TIMEOUT — Supabase no respondió en 5s');
+      setFeedError("La carga tardó demasiado. ¿Tienes buena conexión?");
       setFeedState('error');
+      return;
     }
+
+    if (result.error) {
+      alert('ERROR — ' + result.error.message);
+      setFeedError(result.error.message);
+      setFeedState('error');
+      return;
+    }
+
+    setPosts(result.data || []);
+    setFeedState(result.data?.length > 0 ? 'ready' : 'empty');
   }
 
   async function handleCreateTextPost() {
