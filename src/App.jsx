@@ -68,6 +68,7 @@ function getZxingReader() {
   return _zxingReader;
 }
 import confetti from "canvas-confetti";
+import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
 
 // ============ STYLES ============
 const FONT_LINK = `
@@ -6765,6 +6766,193 @@ function InviteShareModal({ message, url, onClose }) {
   );
 }
 
+function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
+  const containerRef = useRef(null);
+  const [scrollPct, setScrollPct] = useState(0);
+  const [finished, setFinished] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [rating, setRating] = useState(null);
+  const [addedToLibrary, setAddedToLibrary] = useState(false);
+  const [shareStatus, setShareStatus] = useState("");
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  function handleScroll() {
+    const el = containerRef.current;
+    if (!el) return;
+    const pct = el.scrollHeight <= el.clientHeight
+      ? 1
+      : el.scrollTop / (el.scrollHeight - el.clientHeight);
+    setScrollPct(pct);
+    if (pct >= 0.95 && !finished) {
+      setFinished(true);
+      setTimeout(() => setShowModal(true), 400);
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.4 }, colors: ["#7A2E2E", "#C8924A", "#F4EDE0"] });
+      logReadingSession({ userId: user.id, bookId: null, pagesRead: 1, mood: null }).catch(() => {});
+    }
+  }
+
+  async function handleShare() {
+    const msg = `Acabo de leer "${cuento.titulo}" de ${cuento.autor} en Folio 📚`;
+    const url = "https://folio-final.vercel.app";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: cuento.titulo, text: msg, url });
+      } else {
+        await navigator.clipboard.writeText(`${msg}\n${url}`);
+        setShareStatus("¡Copiado! ✓");
+        setTimeout(() => setShareStatus(""), 2500);
+      }
+    } catch {}
+  }
+
+  function handleAddToLibrary() {
+    if (addedToLibrary) return;
+    onAddToLibrary?.({
+      id: crypto.randomUUID(),
+      title: cuento.titulo,
+      author: cuento.autor,
+      status: "read",
+      genre: cuento.generos?.[0] || "",
+      summary: cuento.desc || "",
+      rating: 0,
+      review: "",
+      coverUrl: null,
+      moodTags: [],
+      addedAt: Date.now(),
+      finishedAt: Date.now(),
+    });
+    setAddedToLibrary(true);
+  }
+
+  const pct = Math.min(100, Math.round(scrollPct * 100));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "#F5EFE3", display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.75rem",
+        padding: "0.65rem 1rem",
+        backgroundColor: "#F5EFE3",
+        borderBottom: "1px solid rgba(42,31,26,0.1)",
+        flexShrink: 0,
+      }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.4rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
+          <ChevronLeft size={22} color={palette.ink} />
+        </button>
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <p style={{ ...display, fontSize: "0.88rem", color: palette.ink, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {cuento.titulo}
+          </p>
+          <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, margin: 0 }}>{cuento.autor}</p>
+        </div>
+        <span style={{ ...body, fontSize: "0.75rem", color: pct >= 95 ? "#5C6B3D" : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
+          {pct >= 95 ? "✓ Leído" : `${pct}%`}
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 3, backgroundColor: "rgba(42,31,26,0.08)", flexShrink: 0 }}>
+        <div style={{ height: "100%", width: `${pct}%`, backgroundColor: pct >= 95 ? "#5C6B3D" : palette.accent, transition: "width 0.2s, background-color 0.4s" }} />
+      </div>
+
+      {/* Story content */}
+      <div ref={containerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "2rem 1.5rem 5rem", WebkitOverflowScrolling: "touch" }}>
+        <h1 style={{ fontFamily: "'EB Garamond', serif", fontSize: "1.7rem", fontStyle: "italic", color: "#2A1F1A", marginBottom: "0.3rem", lineHeight: 1.25 }}>
+          {cuento.titulo}
+        </h1>
+        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: "#7A6A5A", marginBottom: "2.5rem" }}>
+          {cuento.autor} · {cuento.duracion}
+        </p>
+
+        {cuento.texto.split(/\n\n+/).filter(p => p.trim()).map((para, i) => (
+          <p key={i} style={{ fontFamily: "'EB Garamond', serif", fontSize: "18px", lineHeight: 1.85, color: "#2A1F1A", marginBottom: "1.3rem", textAlign: "justify" }}>
+            {para.trim()}
+          </p>
+        ))}
+
+        {finished && (
+          <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: "#9A8A7A", textAlign: "center", padding: "1.5rem 0 0.5rem" }}>
+            Fin.
+          </p>
+        )}
+      </div>
+
+      {/* Completion sheet */}
+      {showModal && (
+        <div
+          style={{ position: "absolute", inset: 0, backgroundColor: "rgba(42,31,26,0.5)", display: "flex", alignItems: "flex-end", justifyContent: "center", animation: "backdropIn 200ms ease-out", zIndex: 10 }}
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 480, backgroundColor: "#F5EFE3", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.75rem 1.5rem 2.25rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.18)", animation: "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
+          >
+            <div style={{ width: 36, height: 4, backgroundColor: "rgba(42,31,26,0.18)", borderRadius: 999, margin: "0 auto 1.5rem" }} />
+            <p style={{ ...display, fontSize: "1.3rem", fontStyle: "italic", color: palette.ink, textAlign: "center", marginBottom: "0.25rem" }}>¿Qué te pareció?</p>
+            <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, textAlign: "center", marginBottom: "1.25rem" }}>{cuento.titulo} · {cuento.autor}</p>
+
+            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+              {[
+                { key: "loved", label: "Me encantó", emoji: "🤩" },
+                { key: "ok", label: "Estuvo bien", emoji: "👍" },
+                { key: "meh", label: "No era para mí", emoji: "😐" },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setRating(opt.key)}
+                  style={{
+                    flex: 1, padding: "0.65rem 0.25rem", borderRadius: "10px",
+                    border: `1.5px solid ${rating === opt.key ? palette.accent : palette.border}`,
+                    backgroundColor: rating === opt.key ? "rgba(122,46,46,0.08)" : "transparent",
+                    cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: "0.2rem",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <span style={{ fontSize: "1.4rem" }}>{opt.emoji}</span>
+                  <span style={{ ...body, fontSize: "0.7rem", color: rating === opt.key ? palette.accent : palette.inkSoft, fontWeight: rating === opt.key ? 600 : 400 }}>{opt.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={handleAddToLibrary}
+              disabled={addedToLibrary}
+              style={{
+                width: "100%", padding: "0.82rem", borderRadius: "10px",
+                backgroundColor: addedToLibrary ? "transparent" : palette.ink,
+                color: addedToLibrary ? palette.inkFaint : "#fff",
+                border: addedToLibrary ? `1px solid ${palette.border}` : "none",
+                ...body, fontSize: "0.92rem", fontWeight: 600, cursor: addedToLibrary ? "default" : "pointer",
+                marginBottom: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+              }}
+            >
+              {addedToLibrary ? "✓ Agregado a tu biblioteca" : "+ Agregar a mi biblioteca"}
+            </button>
+
+            <button
+              onClick={handleShare}
+              style={{
+                width: "100%", padding: "0.75rem", borderRadius: "10px", backgroundColor: "transparent",
+                border: `1px solid ${palette.border}`, color: palette.inkSoft,
+                ...body, fontSize: "0.88rem", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+              }}
+            >
+              <Share2 size={15} />
+              {shareStatus || "Compartir que lo leí"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -9087,12 +9275,20 @@ function getEditorialStories(books) {
   });
 }
 
-function FeedEditorialContent({ books, onAdd, onInvite }) {
+const CUENTO_TITLE_MAP = Object.fromEntries(
+  CUENTOS.map(c => [c.titulo.toLowerCase(), c])
+);
+
+function FeedEditorialContent({ books, onAdd, onInvite, onRead }) {
   const [addedIds, setAddedIds] = useState(new Set());
   const stories = getEditorialStories(books);
 
   function isInLibrary(story) {
     return addedIds.has(story.id) || books.some(b => b.title.toLowerCase() === story.title.toLowerCase());
+  }
+
+  function getCuento(story) {
+    return CUENTO_TITLE_MAP[story.title.toLowerCase()] || null;
   }
 
   function handleAdd(story) {
@@ -9153,10 +9349,17 @@ function FeedEditorialContent({ books, onAdd, onInvite }) {
               </span>
               <div style={{ display: "flex", gap: "0.45rem", marginTop: "auto", paddingTop: "0.65rem" }}>
                 <button
-                  onClick={() => window.open(story.url, "_blank", "noopener,noreferrer")}
-                  style={{ ...body, flex: 1, fontSize: "0.8rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 0", cursor: "pointer" }}
+                  onClick={() => {
+                    const cuento = getCuento(story);
+                    if (cuento && onRead) {
+                      onRead(cuento);
+                    } else {
+                      window.open(story.url, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                  style={{ ...body, flex: 1, fontSize: "0.8rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem" }}
                 >
-                  Leer ahora →
+                  {getCuento(story) ? "Leer en Folio →" : "Leer ahora →"}
                 </button>
                 <button
                   onClick={() => handleAdd(story)}
@@ -9213,6 +9416,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [postImageFile, setPostImageFile] = useState(null);
   const [postImagePreview, setPostImagePreview] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [activeReader, setActiveReader] = useState(null);
   const imageInputRef = useRef(null);
   const [likeCounts, setLikeCounts] = useState({});
   const [likedPosts, setLikedPosts] = useState(new Set());
@@ -10065,7 +10269,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       {/* Cuentos curados — siempre al final del feed */}
       {(feedState === 'ready' || feedState === 'empty') && (
         <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: `1px solid ${palette.borderSoft}` }}>
-          <FeedEditorialContent books={books} onAdd={onAdd} onInvite={handleInvite} />
+          <FeedEditorialContent books={books} onAdd={onAdd} onInvite={handleInvite} onRead={setActiveReader} />
         </div>
       )}
 
@@ -10132,6 +10336,16 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             style={{ maxWidth: "100%", maxHeight: "90vh", objectFit: "contain", borderRadius: 12 }}
           />
         </div>
+      )}
+
+      {/* Lector interno de cuentos */}
+      {activeReader && (
+        <ReaderView
+          cuento={activeReader}
+          user={user}
+          onClose={() => setActiveReader(null)}
+          onAddToLibrary={(bookData) => { onAdd(bookData); }}
+        />
       )}
     </div>
   );
