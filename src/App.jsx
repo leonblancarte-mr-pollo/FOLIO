@@ -947,6 +947,14 @@ const achievementBus = {
   },
 };
 
+function canShowInviteCard() {
+  const last = localStorage.getItem("folio_invite_peak_date");
+  return last !== new Date().toISOString().slice(0, 10);
+}
+function markInviteCardShown() {
+  localStorage.setItem("folio_invite_peak_date", new Date().toISOString().slice(0, 10));
+}
+
 const FEED_WORTHY_ACHIEVEMENTS = new Set([
   "streak_7", "streak_30", "streak_90", "speed_reader",
   "top_reader", "pages_1000", "pages_10000", "friends_5",
@@ -4046,9 +4054,19 @@ function AuthView({ onLogin }) {
 
 // ============ ACHIEVEMENT COMPONENTS ============
 
-function AchievementCelebration({ achievementKey, onClose, userName, userUsername }) {
+function AchievementCelebration({ achievementKey, onClose, userName, userUsername, userId }) {
   const def = ACHIEVEMENT_DEFS.find((a) => a.key === achievementKey);
   const [achInviteOpen, setAchInviteOpen] = useState(false);
+  const [friendCount, setFriendCount] = useState(-1);
+  const [showPeakInvite, setShowPeakInvite] = useState(true);
+
+  const isStreakAch = ["streak_7", "streak_30", "streak_90"].includes(achievementKey);
+  const streakDays = achievementKey === "streak_7" ? 7 : achievementKey === "streak_30" ? 30 : 90;
+  const ref = userUsername || userName || "folio";
+  const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(ref)}`;
+  const peakMsg = isStreakAch
+    ? `Llevo ${streakDays} días leyendo seguido en Folio 🔥 ¿Puedes superarme? https://folio-final.vercel.app`
+    : `Acabo de desbloquear '${def?.name}' en Folio 🏆 ¿Te animas a leer conmigo? https://folio-final.vercel.app`;
 
   useEffect(() => {
     if (!def) return;
@@ -4059,11 +4077,16 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
       confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 }, colors });
       if (Date.now() < end) requestAnimationFrame(frame);
     })();
+    if (userId) {
+      supabase.from("friendships")
+        .select("id", { count: "exact", head: true })
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+        .eq("status", "accepted")
+        .then(({ count: fc }) => setFriendCount(fc ?? 0));
+    }
   }, [achievementKey]);
 
   async function handleAchievementShare() {
-    const ref = userUsername || userName || "folio";
-    const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(ref)}`;
     const msg = `Acabo de desbloquear '${def.name}' en Folio. ¿Te animas a leer más este año? Únete aquí 👇`;
     try {
       if (navigator.share) {
@@ -4074,6 +4097,20 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
     } catch (e) {
       if (e.name !== "AbortError") setAchInviteOpen(true);
     }
+  }
+
+  async function handlePeakInvite() {
+    markInviteCardShown();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Folio — Tu biblioteca personal", text: peakMsg, url: refUrl });
+      } else {
+        setAchInviteOpen(true);
+      }
+    } catch (e) {
+      if (e.name !== "AbortError") setAchInviteOpen(true);
+    }
+    setShowPeakInvite(false);
   }
 
   if (!def) return null;
@@ -4117,27 +4154,67 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
         >
           ¡A seguir leyendo!
         </button>
-        <button
-          onClick={handleAchievementShare}
-          style={{
-            ...display, fontWeight: 500, fontSize: "0.86rem",
-            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
-            backgroundColor: "transparent", color: palette.inkSoft,
-            border: `1px solid ${palette.border}`, borderRadius: "999px",
-            padding: "0.6rem 1.5rem", cursor: "pointer", width: "100%",
-          }}
-        >
-          <Share2 size={14} strokeWidth={2} />
-          Comparte tu logro e invita a un amigo
-        </button>
+        {showPeakInvite && friendCount >= 0 && friendCount < 5 && canShowInviteCard() ? (
+          <div style={{ textAlign: "center", borderTop: `1px solid ${palette.border}`, paddingTop: "1rem" }}>
+            <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, marginBottom: "0.7rem" }}>
+              {isStreakAch ? "Reta a un amigo a mantener tu racha" : "Comparte este momento con alguien"}
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", gap: "0.4rem", marginBottom: "0.75rem" }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", ...display, fontSize: "0.9rem", fontWeight: 700, flexShrink: 0,
+              }}>
+                {(userName || "?")[0].toUpperCase()}
+              </div>
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                border: `2px dashed ${palette.border}`, display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+              }}>
+                <Plus size={16} strokeWidth={2} color={palette.inkFaint} />
+              </div>
+            </div>
+            <button
+              onClick={handlePeakInvite}
+              style={{
+                ...display, fontWeight: 600, fontSize: "0.9rem",
+                backgroundColor: palette.accent, color: "#fff",
+                border: "none", borderRadius: "999px",
+                padding: "0.65rem 0", width: "100%",
+                cursor: "pointer", marginBottom: "0.4rem",
+                boxShadow: "0 4px 14px rgba(122,46,46,0.3)",
+              }}
+            >
+              Invitar amigo
+            </button>
+            <button
+              onClick={() => setShowPeakInvite(false)}
+              style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.8rem", color: palette.inkFaint }}
+            >
+              Ahora no
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleAchievementShare}
+            style={{
+              ...display, fontWeight: 500, fontSize: "0.86rem",
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
+              backgroundColor: "transparent", color: palette.inkSoft,
+              border: `1px solid ${palette.border}`, borderRadius: "999px",
+              padding: "0.6rem 1.5rem", cursor: "pointer", width: "100%",
+            }}
+          >
+            <Share2 size={14} strokeWidth={2} />
+            Comparte tu logro e invita a un amigo
+          </button>
+        )}
       </div>
     </div>
-    {achInviteOpen && (() => {
-      const ref = userUsername || userName || "folio";
-      const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(ref)}`;
-      const msg = `Acabo de desbloquear '${def.name}' en Folio. ¿Te animas a leer más este año? Únete aquí 👇`;
-      return <InviteShareModal message={msg} url={refUrl} onClose={() => setAchInviteOpen(false)} />;
-    })()}
+    {achInviteOpen && (
+      <InviteShareModal message={peakMsg} url={refUrl} onClose={() => setAchInviteOpen(false)} />
+    )}
     </>
   );
 }
@@ -6685,6 +6762,88 @@ function InviteShareModal({ message, url, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
+  const [inviteOpen, setInviteOpen] = useState(false);
+
+  async function handleInvite() {
+    markInviteCardShown();
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Folio — Tu biblioteca personal", text: message, url });
+        onClose();
+      } else {
+        setInviteOpen(true);
+      }
+    } catch (e) {
+      if (e.name !== "AbortError") setInviteOpen(true);
+      else onClose();
+    }
+  }
+
+  const ink = dark ? "#F4EDE0" : palette.ink;
+  const inkFaint = dark ? "rgba(244,237,224,0.4)" : palette.inkFaint;
+  const bg = dark ? "rgba(244,237,224,0.06)" : palette.bgCard;
+  const borderColor = dark ? "rgba(122,46,46,0.5)" : "rgba(122,46,46,0.22)";
+
+  return (
+    <>
+      <div style={{
+        backgroundColor: bg,
+        border: `1.5px solid ${borderColor}`,
+        borderRadius: "18px",
+        padding: "1.35rem 1.25rem 1rem",
+        marginTop: "0.75rem",
+        animation: "slideUp 380ms cubic-bezier(0.32, 0.72, 0, 1)",
+        textAlign: "center",
+      }}>
+        <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: ink, lineHeight: 1.3, marginBottom: "1rem" }}>
+          Folio es mejor<br />con alguien más
+        </p>
+        <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginBottom: "1rem" }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: "50%",
+            backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", ...display, fontSize: "1.1rem", fontWeight: 700, flexShrink: 0,
+          }}>
+            {(userInitial || "?").toString().toUpperCase()}
+          </div>
+          <div style={{
+            width: 44, height: 44, borderRadius: "50%",
+            border: `2px dashed ${inkFaint}`, display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <Plus size={18} strokeWidth={2} color={inkFaint} />
+          </div>
+        </div>
+        <button
+          onClick={handleInvite}
+          style={{
+            ...display, fontSize: "0.95rem", fontWeight: 600,
+            backgroundColor: palette.accent, color: "#fff",
+            border: "none", borderRadius: "999px",
+            padding: "0.7rem 0", width: "100%",
+            cursor: "pointer", marginBottom: "0.45rem",
+            boxShadow: "0 4px 14px rgba(122,46,46,0.3)",
+          }}
+        >
+          Invitar amigo
+        </button>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            ...body, fontSize: "0.82rem", color: inkFaint,
+            padding: "0.35rem",
+          }}
+        >
+          Ahora no
+        </button>
+      </div>
+      {inviteOpen && <InviteShareModal message={message} url={url} onClose={() => { setInviteOpen(false); onClose(); }} />}
+    </>
   );
 }
 
@@ -10707,6 +10866,8 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
   const [newAchievements, setNewAchievements] = useState([]);
   const [booksThisMonth, setBooksThisMonth] = useState(0);
   const [showShareCard, setShowShareCard] = useState(false);
+  const [friendCount, setFriendCount] = useState(-1);
+  const [showPeakInvite, setShowPeakInvite] = useState(true);
 
   const wantCount = allBooks.filter(b => b.status === "want_to_read" || b.status === "wish").length;
   const currentYear = new Date().getFullYear();
@@ -10734,14 +10895,16 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
     const monthStart = new Date();
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
     const monthStr = monthStart.toISOString();
-    const [{ data: streakData }, { count: monthCount }, achievedKeys] = await Promise.all([
+    const [{ data: streakData }, { count: monthCount }, achievedKeys, { count: fc }] = await Promise.all([
       supabase.from("user_streaks").select("current_streak,longest_streak").eq("user_id", user.id).maybeSingle(),
       supabase.from("books").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "read").gte("finished_at", monthStr),
       checkAchievements(user.id, user.name, { silent: true }),
+      supabase.from("friendships").select("id", { count: "exact", head: true }).or(`user_id.eq.${user.id},friend_id.eq.${user.id}`).eq("status", "accepted"),
     ]);
     setStreak(streakData);
     setBooksThisMonth(monthCount || 0);
     setNewAchievements((achievedKeys || []).map(k => ACHIEVEMENT_DEFS.find(a => a.key === k)).filter(Boolean));
+    setFriendCount(fc ?? 0);
   }
 
   async function handleSaveRating() {
@@ -11011,6 +11174,16 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
           >
             Volver a mi biblioteca
           </button>
+
+          {showPeakInvite && friendCount >= 0 && friendCount < 5 && canShowInviteCard() && (
+            <PeakInviteCard
+              message={`Acabo de terminar "${book.title}" en Folio 📚 Es una app para llevar tu biblioteca personal y ver qué leen tus amigos. Únete: https://folio-final.vercel.app`}
+              url="https://folio-final.vercel.app"
+              userInitial={(user.name || "?")[0]}
+              onClose={() => setShowPeakInvite(false)}
+              dark
+            />
+          )}
         </div>
       )}
 
@@ -11469,6 +11642,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
           onClose={() => setAchievementQueue((prev) => prev.slice(1))}
           userName={user.name}
           userUsername={mainUsername}
+          userId={user.id}
         />
       )}
       {celebrationBook && (
