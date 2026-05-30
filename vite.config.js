@@ -1,3 +1,4 @@
+// cache-bust: v3
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -6,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'logo.png'],
       manifest: {
         name: 'Folio',
@@ -23,8 +24,10 @@ export default defineConfig({
         ],
       },
       workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
+        skipWaiting: false,
+        importScripts: ['/sw-notifications.js'],
+        clientsClaim: false,
+        cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//],
@@ -33,9 +36,8 @@ export default defineConfig({
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'navigation-v3',
+              cacheName: 'html-cache',
               networkTimeoutSeconds: 3,
-              expiration: { maxEntries: 10 },
             },
           },
           {

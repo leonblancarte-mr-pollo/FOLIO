@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, Component } from "react";
+import { createPortal } from "react-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
   BookOpen,
@@ -56,6 +57,8 @@ import {
   UserPlus,
   Link as LinkIcon,
   WifiOff,
+  Download,
+  Snowflake,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
 import { BrowserMultiFormatReader } from "@zxing/browser";
@@ -879,7 +882,10 @@ async function logReadingSession({ userId, bookId, pagesRead, mood }) {
     const diffDays = existing.last_log_date
       ? daysBetweenLocalDates(today, existing.last_log_date)
       : 999;
-    const newStreak = diffDays === 1
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const freezeProtected = diffDays === 2 && existing.streak_freeze_used_at === localDateStr(yesterday);
+    const newStreak = (diffDays === 1 || freezeProtected)
       ? existing.current_streak + 1
       : diffDays === 0 ? existing.current_streak : 1;
     const newLongest = Math.max(existing.longest_streak, newStreak);
@@ -1225,10 +1231,12 @@ async function searchGoogleBooks(query) {
   if (!query.trim()) return [];
   const key = query.trim().toLowerCase();
   const cached = _gbSearchCache.get(key);
-  if (cached && Date.now() - cached.ts < GB_CACHE_TTL) return cached.results;
+  if (cached && Date.now() - cached.ts < GB_CACHE_TTL) { console.log('[books] cache hit', key, cached.results.length); return cached.results; }
 
   const q = encodeURIComponent(query.trim());
+  console.log('[books] fetch /api/books?q=', q);
   const d = await gbFetch(`/api/books?q=${q}`);
+  console.log('[books] raw response:', JSON.stringify(d).slice(0, 300));
   const items = d.items || [];
 
   const processed = items.map(mapGBItem);
@@ -2249,12 +2257,15 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
   useEffect(() => {
     if (!query.trim() || query.trim().length < 2) { setResults([]); setLoading(false); return; }
+    console.log('[SearchBookModal] buscando:', query.trim());
     setLoading(true); setError("");
     const timer = setTimeout(async () => {
       try {
         const res = await searchGoogleBooks(query.trim());
+        console.log('[SearchBookModal] resultados:', res?.length, res);
         setResults(res);
-      } catch {
+      } catch (err) {
+        console.error('[SearchBookModal] error:', err);
         setError("No se puede conectar a la búsqueda. Intenta de nuevo.");
       } finally { setLoading(false); }
     }, 300);
@@ -2275,11 +2286,13 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
   if (!isOpen) return null;
 
-  // Phase 2 — Status picker
+  console.log('[SearchBookModal] render: query=', query, 'loading=', loading, 'results=', results.length);
+
+  // Phase 2 — Status picker (portal to body)
   if (selectedBook) {
-    return (
+    return createPortal(
       <div
-        style={{ position: "fixed", inset: 0, zIndex: 300, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        style={{ position: "fixed", inset: 0, zIndex: 99999, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
         onClick={(e) => e.target === e.currentTarget && setSelectedBook(null)}
       >
         <div className="scrollbar-hide" style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.25rem 2.5rem", width: "100%", maxWidth: 480 }}>
@@ -2314,15 +2327,16 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
             Volver a resultados
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
-  // Phase 1 — Search
-  return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, backgroundColor: palette.bg, display: "flex", flexDirection: "column" }}>
+  // Phase 1 — Search (portal to body, escaping all stacking contexts)
+  return createPortal(
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, backgroundColor: "#F5EFE3", display: "flex", flexDirection: "column", paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
       {/* Search header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", padding: "0.85rem 1rem", borderBottom: `1px solid ${palette.borderSoft}`, paddingTop: "calc(0.85rem + env(safe-area-inset-top))" }}>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.65rem", padding: "12px 16px", borderBottom: `1px solid ${palette.borderSoft}`, backgroundColor: "#F5EFE3" }}>
         <button onClick={() => onClose()} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.25rem", flexShrink: 0 }}>
           <X size={20} color={palette.inkSoft} />
         </button>
@@ -2330,11 +2344,13 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
           <Search size={15} color={palette.inkFaint} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
           <input
             ref={inputRef}
+            autoFocus
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { console.log('[input] onChange:', e.target.value); setQuery(e.target.value); }}
+            onInput={(e) => console.log('[input] onInput:', e.currentTarget.value)}
             placeholder="Busca por título, autor o ISBN..."
-            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "999px", fontFamily: "'EB Garamond', serif", fontSize: "15px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
+            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: "#EDE7D9", border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "'EB Garamond', serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
           />
           {query && (
             <button onClick={() => setQuery("")} style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "0.1rem", display: "flex" }}>
@@ -2345,7 +2361,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
       </div>
 
       {/* Scrollable content */}
-      <div className="scrollbar-hide" style={{ flex: 1, overflowY: "auto" }}>
+      <div className="scrollbar-hide" style={{ flex: 1, overflowY: "auto", paddingBottom: "100px" }}>
         {loading && (
           <div style={{ display: "flex", justifyContent: "center", padding: "2.5rem 0" }}>
             <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
@@ -2418,7 +2434,8 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -2428,6 +2445,10 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
   const [detectedIsbn, setDetectedIsbn] = useState("");
   const [error, setError] = useState("");
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
   const [form, setForm] = useState({
     title: "",
     author: "",
@@ -2479,51 +2500,14 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
     setTab("perfil");
   }
 
-  // Search modal (primary mode — shown as fullscreen overlay)
+  // Search modal (primary mode — fullscreen overlay above header)
   if (mode === "search") {
     return (
-      <>
-        <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto">
-          <h2 style={{ ...ts.h1, color: palette.ink, marginBottom: "0.35rem" }}>Agregar libro</h2>
-          {!isOnline && (
-            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", padding: "0.6rem 0.85rem", backgroundColor: "#FDF3DC", border: "1px solid #E8C97A", borderRadius: "8px", marginBottom: "1rem" }}>
-              <WifiOff size={14} color={palette.amber} strokeWidth={2} />
-              <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", color: "#8A6A1A" }}>La búsqueda de libros requiere conexión</span>
-            </div>
-          )}
-          <p style={{ ...ts.body15, color: palette.inkSoft, marginBottom: "1.5rem" }}>Busca por título o autor para encontrarlo.</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <button
-              onClick={() => {}}
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", width: "100%", padding: "1rem 1.1rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "12px", cursor: "text", textAlign: "left" }}
-            >
-              <Search size={18} color={palette.inkFaint} strokeWidth={1.8} />
-              <span style={{ ...ts.body15, color: palette.inkFaint }}>Busca por título, autor o ISBN...</span>
-            </button>
-            <div style={{ display: "flex", gap: "0.6rem" }}>
-              <button
-                onClick={() => { setIsbnStage("scanning"); setMode("isbn"); }}
-                style={{ flex: 1, display: "flex", alignItems: "center", gap: "0.55rem", padding: "0.7rem 0.9rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", cursor: "pointer" }}
-              >
-                <Barcode size={16} color={palette.inkFaint} strokeWidth={1.8} />
-                <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", color: palette.inkSoft }}>Código de barras</span>
-              </button>
-              <button
-                onClick={() => setMode("manual")}
-                style={{ flex: 1, display: "flex", alignItems: "center", gap: "0.55rem", padding: "0.7rem 0.9rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", cursor: "pointer" }}
-              >
-                <Pencil size={16} color={palette.inkFaint} strokeWidth={1.8} />
-                <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", color: palette.inkSoft }}>Manual</span>
-              </button>
-            </div>
-          </div>
-        </div>
-        <SearchBookModal
-          isOpen={true}
-          onClose={(fallback) => fallback === "isbn" ? (setIsbnStage("scanning"), setMode("isbn")) : setMode(null)}
-          onSelect={handleSearchSelect}
-        />
-      </>
+      <SearchBookModal
+        isOpen={true}
+        onClose={(fallback) => fallback === "isbn" ? (setIsbnStage("scanning"), setMode("isbn")) : setMode(null)}
+        onSelect={handleSearchSelect}
+      />
     );
   }
 
@@ -2675,7 +2659,7 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
                     fontWeight: 600,
                   }}
                 >
-                  📚 Encontrado en Open Library
+                  Encontrado en Open Library
                 </p>
                 <h2
                   style={{
@@ -4986,29 +4970,6 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout }) {
             </div>
           )}
 
-          {yearEntries.length > 0 && (
-            <div style={{ marginBottom: "1.75rem" }}>
-              <p style={{ ...ts.h2, color: palette.ink, marginBottom: "0.75rem" }}>
-                Libros por año
-              </p>
-              <div style={{ display: "flex", alignItems: "flex-end", gap: "0.4rem", height: 80 }}>
-                {yearEntries.map(([yr, count]) => (
-                  <div key={yr} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem" }}>
-                    <span style={{ ...body, fontSize: "0.7rem", color: palette.inkFaint }}>{count}</span>
-                    <div
-                      style={{
-                        width: "100%",
-                        backgroundColor: palette.accent,
-                        borderRadius: "3px 3px 0 0",
-                        height: `${Math.max(6, (count / maxYearCount) * 52)}px`,
-                      }}
-                    />
-                    <span style={{ ...body, fontSize: "0.65rem", color: palette.inkFaint }}>{yr}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {topGenres.length > 0 && (
             <div style={{ marginBottom: "1.75rem" }}>
@@ -7582,7 +7543,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
             <div style={{ textAlign: "center", padding: 40, color: palette.inkFaint }}>Cargando...</div>
           ) : notifications.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60%", gap: 12 }}>
-              <span style={{ fontSize: 32 }}>🔔</span>
+              <Bell size={32} color={palette.border} strokeWidth={1.5} />
               <span style={{ fontSize: 14, color: palette.inkFaint }}>Sin notificaciones por ahora</span>
             </div>
           ) : (
@@ -7863,7 +7824,10 @@ function PostDraftModal({ pendingPost, user, onPublish, onSkip }) {
     <div style={{ position: "fixed", inset: 0, zIndex: 70, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
       <div style={{ backgroundColor: palette.bgCard, borderRadius: "14px", padding: "1.5rem", maxWidth: 440, width: "100%", border: `1px solid ${palette.border}`, boxShadow: "0 8px 32px rgba(42,31,26,0.2)" }}>
         <p style={{ ...display, fontSize: "1.05rem", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem" }}>
-          {pendingPost.action === "started" ? "📖" : "✅"} Compartir con amigos
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+            {pendingPost.action === "started" ? <BookOpen size={16} strokeWidth={1.8} /> : <BookmarkCheck size={16} strokeWidth={1.8} />}
+            Compartir con amigos
+          </span>
         </p>
         <p style={{ ...body, color: palette.inkSoft, fontSize: "0.9rem", marginBottom: "1rem", lineHeight: 1.5 }}>
           {user.name.split(" ")[0]} {actionLabel}{" "}
@@ -8144,6 +8108,8 @@ function BookPreviewModal({ post, onClose, onAdd }) {
           padding: "1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))",
           width: "100%",
           maxWidth: 480,
+          maxHeight: "70vh",
+          overflowY: "auto",
           boxShadow: "0 -8px 40px rgba(42,31,26,0.18)",
           animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)",
         }}
@@ -8190,9 +8156,12 @@ function BookPreviewModal({ post, onClose, onAdd }) {
   );
 }
 
-function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog }) {
+function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, onFreeze }) {
+  const [showFreezeModal, setShowFreezeModal] = useState(false);
   const days = streak?.current_streak || 0;
   const hasStreak = days > 0;
+  const freezesRemaining = streak?.streak_freezes_remaining ?? 1;
+  const canFreeze = hasStreak && !hasLoggedToday && freezesRemaining > 0 && streak?.streak_freeze_used_at !== localDateStr();
 
   // Phase: 0=sin racha, 1=1-3d, 2=4-7d, 3=8+d
   const phase = days >= 8 ? 3 : days >= 4 ? 2 : days >= 1 ? 1 : 0;
@@ -8234,6 +8203,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog })
   const fireSize = FIRE_SIZES[phase];
 
   return (
+    <>
     <div
       onClick={hasLoggedToday ? undefined : onLog}
       className={`streak-banner-enter${isDanger ? " streak-danger" : ""}`}
@@ -8254,6 +8224,23 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog })
       {/* Decorative orbs */}
       <div style={{ position: "absolute", top: -50, right: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.1)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -25, left: -15, width: 90, height: 90, borderRadius: "50%", background: "rgba(0,0,0,0.07)", pointerEvents: "none" }} />
+
+      {/* Freeze button */}
+      {canFreeze && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
+          style={{
+            position: "absolute", top: "10px", right: "12px", zIndex: 5,
+            background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.4)",
+            borderRadius: "50%", width: "30px", height: "30px",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer",
+          }}
+          title="Congelar racha"
+        >
+          <Snowflake size={14} color="rgba(255,255,255,0.9)" strokeWidth={2} />
+        </button>
+      )}
 
       {/* Main content */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "18px 20px 14px" }}>
@@ -8340,6 +8327,41 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog })
         )}
       </div>
     </div>
+
+    {/* Freeze modal */}
+    {showFreezeModal && (
+      <div
+        style={{ position: "fixed", inset: 0, zIndex: 1000, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        onClick={() => setShowFreezeModal(false)}
+      >
+        <div
+          style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.25rem 2.5rem", width: "100%", maxWidth: 480 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, marginBottom: "0.5rem" }}>
+            ¿Congelar tu racha hoy?
+          </p>
+          <p style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "1.5rem", lineHeight: 1.55 }}>
+            Tienes 1 congelador este mes. Tu racha de <strong style={{ color: palette.ink }}>{days} {days === 1 ? "día" : "días"}</strong> estará protegida aunque no leas hoy.
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <button
+              onClick={() => setShowFreezeModal(false)}
+              style={{ ...body, flex: 1, fontSize: "0.9rem", backgroundColor: palette.bgSoft, color: palette.inkSoft, border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => { onFreeze?.(); setShowFreezeModal(false); }}
+              style={{ ...body, flex: 1, fontSize: "0.9rem", fontWeight: 700, backgroundColor: "#3A8FD6", color: "#fff", border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
+            >
+              <Snowflake size={14} style={{ marginRight: "0.35rem" }} /> Congelar
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -8362,10 +8384,10 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
   function motivational(p) {
     const n = parseInt(p) || 0;
     if (n <= 0) return "";
-    if (n <= 10) return "¡Cada página cuenta! 💪";
-    if (n <= 50) return "¡Buen ritmo! 📚";
-    if (n <= 100) return "¡Estás en llamas! 🔥";
-    return "¡Eres una máquina lectora! 🚀";
+    if (n <= 10) return "¡Cada página cuenta!";
+    if (n <= 50) return "¡Buen ritmo!";
+    if (n <= 100) return "¡Estás en llamas!";
+    return "¡Eres una máquina lectora!";
   }
 
   async function handleMoodSelect(mood) {
@@ -8386,19 +8408,21 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
 
   return (
     <div
-      onClick={(e) => e.target === e.currentTarget && handleClose()}
-      style={{ position: "fixed", inset: 0, zIndex: 80, backgroundColor: "rgba(42,31,26,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
+      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, height: "100vh", backgroundColor: "#F5EFE3", zIndex: 9999, display: "flex", flexDirection: "column", overflowY: "auto", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0",
-          padding: "1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))",
-          width: "100%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto",
-          animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)",
+          backgroundColor: "#F5EFE3",
+          padding: "1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom))",
+          paddingTop: "calc(1.25rem + env(safe-area-inset-top))",
+          width: "100%", maxWidth: 480, margin: "0 auto", flex: 1,
         }}
       >
-        <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.border, margin: "0 auto 1.25rem" }} />
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "0.75rem" }}>
+          <button onClick={handleClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.25rem" }}>
+            <X size={20} color={palette.inkSoft} />
+          </button>
+        </div>
 
         {/* Paso 1: ¿Qué libro? */}
         {step === 1 && (
@@ -8411,7 +8435,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
               </div>
             ) : readingBooks.length === 0 ? (
               <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
-                <p style={{ ...body, fontSize: "1.1rem", marginBottom: "0.5rem" }}>📚</p>
+                <BookOpen size={32} color={palette.border} strokeWidth={1.5} style={{ margin: "0 auto 0.5rem", display: "block" }} />
                 <p style={{ ...body, color: palette.inkSoft, marginBottom: "1.25rem", lineHeight: 1.5 }}>
                   Primero agrega un libro como "Leyendo"
                 </p>
@@ -8485,7 +8509,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
             </div>
             <button
               onClick={() => setStep(3)}
-              style={{ ...display, width: "100%", padding: "0.85rem", borderRadius: "12px", fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.bg, border: "none", cursor: "pointer" }}
+              style={{ ...display, width: "100%", padding: "0.85rem", borderRadius: "12px", fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.bg, border: "none", cursor: "pointer", marginTop: "20px" }}
             >
               Continuar →
             </button>
@@ -8502,7 +8526,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "1.5rem" }}>
               Paso 3 de 3 · <em style={{ color: palette.inkSoft }}>{selectedBook?.title}</em>
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "20px" }}>
               {[
                 { mood: "easy", emoji: "😤", label: "Costó trabajo" },
                 { mood: "good", emoji: "😊", label: "Bien" },
@@ -8572,61 +8596,61 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
   const coverStyle = { width: 120, height: 180, borderRadius: 8, objectFit: "cover", boxShadow: "0 8px 24px rgba(42,31,26,0.28)", display: "block" };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9000, backgroundColor: palette.bgSoft, display: "flex", flexDirection: "column", alignItems: "center", overflowY: "auto", animation: isClosing ? "fadeOut 200ms ease-out forwards" : undefined }}>
-      <div style={{ width: "100%", maxWidth: 420, padding: "2rem 1.5rem", display: "flex", flexDirection: "column", alignItems: "center", minHeight: "100vh", justifyContent: "center", gap: 0 }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, height: "100vh", backgroundColor: "#F5EFE3", zIndex: 9999, display: "flex", flexDirection: "column", overflowY: "auto", animation: isClosing ? "fadeOut 200ms ease-out forwards" : undefined }}>
 
-        {/* Phase: choose book */}
-        {phase === "choose" && (
-          <>
-            <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "1.5rem" }}>¿Cuál abrimos?</p>
-            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1.5rem" }}>
-              {books.map(b => (
-                <button
-                  key={b.id}
-                  onClick={() => { setSelectedBook(b); setPhase("setup"); }}
-                  className="timer-book-hover"
-                  style={{ display: "flex", alignItems: "center", gap: "0.85rem", backgroundColor: palette.bgCard, border: `1.5px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.75rem", textAlign: "left", cursor: "pointer", width: "100%" }}
-                >
-                  {b.coverUrl ? (
-                    <img src={b.coverUrl} alt="" style={{ width: 48, height: 70, objectFit: "cover", borderRadius: 4, flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.18)" }} />
-                  ) : (
-                    <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
-                      {(b.title || "?")[0]}
+      {/* Scrollable content */}
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "calc(24px + env(safe-area-inset-top))" }}>
+        <div style={{ width: "100%", maxWidth: 420, padding: "0 1.5rem 1rem", display: "flex", flexDirection: "column", alignItems: "center" }}>
+
+          {/* Phase: choose book */}
+          {phase === "choose" && (
+            <>
+              <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "1.5rem" }}>¿Cuál abrimos?</p>
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+                {books.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => { setSelectedBook(b); setPhase("setup"); }}
+                    className="timer-book-hover"
+                    style={{ display: "flex", alignItems: "center", gap: "0.85rem", backgroundColor: palette.bgCard, border: `1.5px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.75rem", textAlign: "left", cursor: "pointer", width: "100%" }}
+                  >
+                    {b.coverUrl ? (
+                      <img src={b.coverUrl} alt="" style={{ width: 48, height: 70, objectFit: "cover", borderRadius: 4, flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.18)" }} />
+                    ) : (
+                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
+                        {(b.title || "?")[0]}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ ...display, fontSize: "0.94rem", fontWeight: 700, color: palette.ink, marginBottom: "0.15rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
+                      <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft }}>{b.author}</p>
                     </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ ...display, fontSize: "0.94rem", fontWeight: 700, color: palette.ink, marginBottom: "0.15rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
-                    <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft }}>{b.author}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Book cover + info — shown in setup/running/done */}
+          {phase !== "choose" && selectedBook && (
+            <>
+              <div style={{ marginBottom: "1.25rem" }}>
+                {selectedBook.coverUrl ? (
+                  <img src={selectedBook.coverUrl} alt="" style={coverStyle} />
+                ) : (
+                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: "#fff", fontFamily: "Fraunces, serif", fontSize: 36, fontWeight: 700 }}>
+                    {(selectedBook.title || "?")[0]}
                   </div>
-                </button>
-              ))}
-            </div>
-            <button onClick={handleClose} style={{ background: "none", border: "none", ...body, fontSize: "0.8rem", color: palette.inkFaint, cursor: "pointer", padding: "0.5rem" }}>
-              Cerrar
-            </button>
-          </>
-        )}
+                )}
+              </div>
+              <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "0.35rem", lineHeight: 1.25 }}>{selectedBook.title}</p>
+              <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, textAlign: "center", marginBottom: "1.5rem" }}>{selectedBook.author}</p>
+            </>
+          )}
 
-        {/* Book cover + info — shown in setup/running/done */}
-        {phase !== "choose" && selectedBook && (
-          <>
-            <div style={{ marginBottom: "1.25rem" }}>
-              {selectedBook.coverUrl ? (
-                <img src={selectedBook.coverUrl} alt="" style={coverStyle} />
-              ) : (
-                <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: "#fff", fontFamily: "Fraunces, serif", fontSize: 36, fontWeight: 700 }}>
-                  {(selectedBook.title || "?")[0]}
-                </div>
-              )}
-            </div>
-            <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "0.35rem", lineHeight: 1.25 }}>{selectedBook.title}</p>
-            <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, textAlign: "center", marginBottom: "2rem" }}>{selectedBook.author}</p>
-          </>
-        )}
-
-        {phase === "setup" && (
-          <>
-            <div style={{ display: "flex", gap: "0.6rem", marginBottom: "2rem" }}>
+          {/* Phase: setup — time picker */}
+          {phase === "setup" && (
+            <div style={{ display: "flex", gap: "0.6rem" }}>
               {[5, 10, 15].map(m => (
                 <button
                   key={m}
@@ -8637,47 +8661,68 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
                 </button>
               ))}
             </div>
+          )}
+
+          {/* Phase: running */}
+          {phase === "running" && (
+            <>
+              <p style={{ ...display, fontWeight: 700, fontSize: "3.5rem", color: palette.accent, lineHeight: 1, marginBottom: "0.75rem" }}>
+                {fmt(secondsLeft)}
+              </p>
+              <p style={{ ...body, fontStyle: "italic", fontSize: "0.9rem", color: palette.inkSoft }}>Sigue leyendo...</p>
+            </>
+          )}
+
+          {/* Phase: done */}
+          {phase === "done" && (
+            <>
+              <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.5rem", color: palette.ink, marginBottom: "0.5rem", textAlign: "center" }}>¡Tiempo!</p>
+              <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, textAlign: "center" }}>¿Cuántas páginas leíste?</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Buttons always visible at bottom */}
+      <div style={{ flexShrink: 0, width: "100%", maxWidth: 420, alignSelf: "center", padding: "12px 24px", paddingBottom: "calc(32px + env(safe-area-inset-bottom))", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        {phase === "choose" && (
+          <button onClick={handleClose} style={{ background: "none", border: "none", ...body, fontSize: "0.8rem", color: palette.inkFaint, cursor: "pointer", padding: "0.5rem", textAlign: "center" }}>
+            Cerrar
+          </button>
+        )}
+        {phase === "setup" && (
+          <>
             <button
               onClick={startTimer}
-              style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: "#fff", border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer", marginBottom: "1rem" }}
+              style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: "#fff", border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
             >
               Empezar a leer →
             </button>
-            <button onClick={handleClose} style={{ background: "none", border: "none", ...body, fontSize: "0.8rem", color: palette.inkFaint, cursor: "pointer", padding: "0.5rem" }}>
+            <button onClick={handleClose} style={{ background: "none", border: "none", ...body, fontSize: "0.8rem", color: palette.inkFaint, cursor: "pointer", padding: "0.5rem", textAlign: "center" }}>
               Cerrar
             </button>
           </>
         )}
-
         {phase === "running" && (
           <>
-            <p style={{ ...display, fontWeight: 700, fontSize: "3.5rem", color: palette.accent, lineHeight: 1, marginBottom: "0.75rem" }}>
-              {fmt(secondsLeft)}
-            </p>
-            <p style={{ ...body, fontStyle: "italic", fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "2.5rem" }}>Sigue leyendo...</p>
             <button
               onClick={() => { clearInterval(timerRef.current); onGoToLog(minutes); }}
-              style={{ background: "none", border: "none", ...body, fontSize: "1rem", color: palette.accent, cursor: "pointer", marginBottom: "0.75rem", fontWeight: 600 }}
+              style={{ background: "none", border: "none", ...body, fontSize: "1rem", color: palette.accent, cursor: "pointer", fontWeight: 600, textAlign: "center" }}
             >
               Ya terminé — registrar páginas
             </button>
-            <button onClick={() => { clearInterval(timerRef.current); onClose(); }} style={{ background: "none", border: "none", ...body, fontSize: "0.78rem", color: palette.inkFaint, cursor: "pointer" }}>
+            <button onClick={() => { clearInterval(timerRef.current); onClose(); }} style={{ background: "none", border: "none", ...body, fontSize: "0.78rem", color: palette.inkFaint, cursor: "pointer", textAlign: "center" }}>
               Cerrar
             </button>
           </>
         )}
-
         {phase === "done" && (
-          <>
-            <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.5rem", color: palette.ink, marginBottom: "0.5rem", textAlign: "center" }}>¡Tiempo!</p>
-            <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "2rem", textAlign: "center" }}>¿Cuántas páginas leíste?</p>
-            <button
-              onClick={() => onGoToLog(minutes)}
-              style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: "#fff", border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer", marginBottom: "1rem" }}
-            >
-              Registrar páginas
-            </button>
-          </>
+          <button
+            onClick={() => onGoToLog(minutes)}
+            style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: "#fff", border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
+          >
+            Registrar páginas
+          </button>
         )}
       </div>
     </div>
@@ -8734,7 +8779,7 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))", width: "100%", maxWidth: 480, animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
+        style={{ backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))", width: "100%", maxWidth: 480, maxHeight: "70vh", overflowY: "auto", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
       >
         <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.border, margin: "0 auto 1.5rem" }} />
 
@@ -8825,6 +8870,171 @@ function FeedSkeleton() {
   );
 }
 
+const GENRE_CATEGORIES = [
+  { key: "ciencia-ficcion", label: "Ciencia Ficción", emoji: "🚀", keywords: ["ciencia ficcion", "ciencia ficción", "distopia", "distopía", "sci-fi", "ficción científica", "ciencia-ficción"] },
+  { key: "terror", label: "Terror", emoji: "👁️", keywords: ["terror", "horror", "suspenso", "thriller psicologico", "thriller psicológico"] },
+  { key: "romance", label: "Romance", emoji: "💙", keywords: ["romance", "romantico", "romántico", "drama"] },
+  { key: "filosofia", label: "Filosofía", emoji: "🌀", keywords: ["filosofia", "filosofía", "reflexion", "reflexión", "ensayo"] },
+  { key: "aventura", label: "Aventura", emoji: "⚔️", keywords: ["aventura", "accion", "acción", "thriller"] },
+  { key: "negocios", label: "Negocios", emoji: "💡", keywords: ["negocios", "desarrollo personal", "autoayuda", "emprendimiento", "finanzas"] },
+];
+
+const EDITORIAL_STORIES = {
+  "ciencia-ficcion": [
+    { id: "sc1", title: "La pata de mono", author: "W.W. Jacobs", url: "https://ciudadseva.com/texto/la-pata-de-mono/", minutes: 12, genre: "Distopía", desc: "Cuidado con lo que deseas." },
+    { id: "sc2", title: "El ruido del trueno", author: "Ray Bradbury", url: "https://ciudadseva.com/texto/un-sonido-de-trueno/", minutes: 10, genre: "Ciencia Ficción", desc: "Un viaje en el tiempo y una decisión que lo cambia todo." },
+    { id: "sc3", title: "El hombre ilustrado (prólogo)", author: "Ray Bradbury", url: "https://ciudadseva.com/texto/el-hombre-ilustrado/", minutes: 8, genre: "Ciencia Ficción", desc: "Tatuajes que cobran vida cuando anochece." },
+  ],
+  "terror": [
+    { id: "te1", title: "No tengo boca y debo gritar", author: "Harlan Ellison", url: "https://ciudadseva.com/texto/no-tengo-boca-y-debo-gritar/", minutes: 20, genre: "Terror", desc: "El cuento de ciencia ficción más perturbador jamás escrito." },
+    { id: "te2", title: "El almohadón de plumas", author: "Horacio Quiroga", url: "https://ciudadseva.com/texto/el-almohadon-de-plumas/", minutes: 8, genre: "Terror", desc: "Una historia de amor con un secreto perturbador." },
+    { id: "te3", title: "La señal", author: "Amparo Dávila", url: "https://ciudadseva.com/texto/la-senal/", minutes: 10, genre: "Terror", desc: "La autora mexicana del terror que deberías conocer." },
+  ],
+  "romance": [
+    { id: "ro1", title: "La noche de los feos", author: "Mario Benedetti", url: "https://ciudadseva.com/texto/la-noche-de-los-feos/", minutes: 5, genre: "Romance", desc: "El cuento de amor más honesto que vas a leer." },
+    { id: "ro2", title: "Continuidad de los parques", author: "Julio Cortázar", url: "https://ciudadseva.com/texto/continuidad-de-los-parques/", minutes: 3, genre: "Drama", desc: "El lector que no sabe que es el personaje." },
+    { id: "ro3", title: "El otro círculo", author: "Mario Benedetti", url: "https://ciudadseva.com/texto/el-otro-circulo/", minutes: 8, genre: "Drama", desc: "Algunas decisiones no tienen vuelta atrás." },
+  ],
+  "filosofia": [
+    { id: "fi1", title: "La noche boca arriba", author: "Julio Cortázar", url: "https://ciudadseva.com/texto/la-noche-boca-arriba/", minutes: 15, genre: "Filosofía", desc: "¿Cuál de las dos realidades es el sueño?" },
+    { id: "fi2", title: "Las babas del diablo", author: "Julio Cortázar", url: "https://ciudadseva.com/texto/las-babas-del-diablo/", minutes: 15, genre: "Filosofía", desc: "Una foto que esconde algo que nadie debería ver." },
+    { id: "fi3", title: "El guardagujas", author: "Juan José Arreola", url: "https://ciudadseva.com/texto/el-guardagujas/", minutes: 10, genre: "Reflexión", desc: "El mexicano que reinventó el cuento latinoamericano." },
+  ],
+  "aventura": [
+    { id: "av1", title: "Los asesinos", author: "Ernest Hemingway", url: "https://ciudadseva.com/texto/los-asesinos/", minutes: 10, genre: "Aventura", desc: "Puro diálogo. Pura tensión. Como una película." },
+    { id: "av2", title: "En el bosque", author: "Ryūnosuke Akutagawa", url: "https://ciudadseva.com/texto/en-el-bosque/", minutes: 12, genre: "Aventura", desc: "La misma historia contada por 7 personas distintas." },
+    { id: "av3", title: "El Sur", author: "Jorge Luis Borges", url: "https://ciudadseva.com/texto/el-sur/", minutes: 15, genre: "Aventura", desc: "Un hombre que viaja al pasado sin saberlo." },
+  ],
+  "negocios": [
+    { id: "ne1", title: "Hábitos Atómicos (cap. 1)", author: "James Clear", url: "https://www.amazon.com.mx/Habitos-atomicos/dp/6075694536", minutes: 10, genre: "Negocios", desc: "El libro de no-ficción más vendido de los últimos años." },
+    { id: "ne2", title: "El hombre más rico de Babilonia (cap. 1)", author: "George Clason", url: "https://ciudadseva.com/texto/el-hombre-mas-rico-de-babilonia/", minutes: 12, genre: "Negocios", desc: "Finanzas personales contadas como fábula." },
+    { id: "ne3", title: "El monje que vendió su Ferrari (cap. 1)", author: "Robin Sharma", url: "https://www.amazon.com.mx/monje-vendio-su-Ferrari/dp/8401379", minutes: 10, genre: "Negocios", desc: "El libro que cambió la vida de millones." },
+  ],
+};
+
+function getEditorialStories(books) {
+  const userGenres = [...new Set(books.map(b => (b.genre || "").toLowerCase()).filter(Boolean))];
+  const matchedKeys = new Set();
+  for (const cat of GENRE_CATEGORIES) {
+    if (userGenres.some(g => cat.keywords.some(k => g.includes(k) || k.includes(g)))) {
+      matchedKeys.add(cat.key);
+    }
+  }
+  const defaultKeys = ["ciencia-ficcion", "romance", "filosofia"];
+  const keys = matchedKeys.size > 0 ? [...matchedKeys] : defaultKeys;
+  return keys.flatMap(k => {
+    const cat = GENRE_CATEGORIES.find(c => c.key === k);
+    return (EDITORIAL_STORIES[k] || []).map(s => ({ ...s, catEmoji: cat?.emoji || "📖" }));
+  });
+}
+
+function FeedEditorialContent({ books, onAdd, onInvite }) {
+  const [addedIds, setAddedIds] = useState(new Set());
+  const stories = getEditorialStories(books);
+
+  function isInLibrary(story) {
+    return addedIds.has(story.id) || books.some(b => b.title.toLowerCase() === story.title.toLowerCase());
+  }
+
+  function handleAdd(story) {
+    if (isInLibrary(story)) return;
+    setAddedIds(prev => new Set([...prev, story.id]));
+    onAdd({
+      id: crypto.randomUUID(),
+      title: story.title,
+      author: story.author,
+      status: "reading",
+      genre: story.genre,
+      summary: "",
+      rating: 0,
+      review: "",
+      coverUrl: null,
+      moodTags: [],
+      addedAt: Date.now(),
+      finishedAt: null,
+    });
+  }
+
+  const timeLabel = (s) => s.time ? s.time : `~${s.minutes} min`;
+
+  return (
+    <div>
+      <p style={{ ...display, fontSize: "1.05rem", color: palette.ink, marginBottom: "0.9rem", fontWeight: 600 }}>
+        Para empezar a leer hoy
+      </p>
+      <div style={{ display: "flex", gap: "0.85rem", overflowX: "auto", paddingBottom: "0.75rem", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+        {stories.map((story) => {
+          const added = isInLibrary(story);
+          return (
+            <div key={story.id} style={{
+              flexShrink: 0, width: "280px",
+              backgroundColor: palette.bgCard,
+              border: `1px solid ${palette.border}`,
+              borderRadius: "14px",
+              padding: "1.1rem",
+              display: "flex", flexDirection: "column", gap: "0.4rem",
+            }}>
+              <span style={{ fontSize: "1.6rem", lineHeight: 1, marginBottom: "0.1rem" }}>{story.catEmoji}</span>
+              <p style={{ ...display, fontSize: "1rem", color: palette.ink, fontWeight: 700, lineHeight: 1.25, margin: 0 }}>
+                {story.title}
+              </p>
+              <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.85rem", color: palette.inkSoft, margin: 0 }}>
+                {story.author}
+              </p>
+              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, margin: 0, lineHeight: 1.4 }}>
+                {story.desc}
+              </p>
+              <span style={{
+                ...body, fontSize: "0.72rem", fontWeight: 600,
+                backgroundColor: palette.bgSoft, color: palette.inkSoft,
+                borderRadius: "20px", padding: "0.2rem 0.6rem",
+                alignSelf: "flex-start", marginTop: "0.15rem",
+              }}>
+                {timeLabel(story)}
+              </span>
+              <div style={{ display: "flex", gap: "0.45rem", marginTop: "auto", paddingTop: "0.65rem" }}>
+                <button
+                  onClick={() => window.open(story.url, "_blank", "noopener,noreferrer")}
+                  style={{ ...body, flex: 1, fontSize: "0.8rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 0", cursor: "pointer" }}
+                >
+                  Leer ahora →
+                </button>
+                <button
+                  onClick={() => handleAdd(story)}
+                  disabled={added}
+                  style={{ ...body, flex: 1, fontSize: "0.78rem", fontWeight: 600, backgroundColor: "transparent", color: added ? palette.inkFaint : palette.ink, border: `1px solid ${added ? palette.border : palette.ink}`, borderRadius: "8px", padding: "0.5rem 0", cursor: added ? "default" : "pointer", transition: "color 150ms, border-color 150ms" }}
+                >
+                  {added ? "✓ Agregado" : "+ Biblioteca"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{
+        marginTop: "1.1rem",
+        backgroundColor: palette.bgCard,
+        border: `1px solid ${palette.border}`,
+        borderRadius: "14px",
+        padding: "1.1rem 1.25rem",
+      }}>
+        <p style={{ ...display, fontSize: "1rem", color: palette.ink, margin: "0 0 0.2rem" }}>
+          Invita a un amigo y lean juntos
+        </p>
+        <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>
+          Comparte tu link personal de Folio
+        </p>
+        <button
+          onClick={onInvite}
+          style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}
+        >
+          Invitar amigo
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone }) {
   const [posts, setPosts] = useState([]);
   const [feedError, setFeedError] = useState("");
@@ -8857,6 +9067,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [timerMinutes, setTimerMinutes] = useState(null);
   const [shareSession, setShareSession] = useState(null);
   const [feedState, setFeedState] = useState('loading');
+  const [hasFriends, setHasFriends] = useState(null);
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 13 ? "Buenos días" : greetingHour < 20 ? "Buenas tardes" : "Buenas noches";
@@ -8874,6 +9086,24 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
   useEffect(() => {
     console.log('feedState:', feedState);
+  }, [feedState]);
+
+  useEffect(() => {
+    // Deep link: ?action=log opens the reading log modal
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'log') {
+      window.history.replaceState({}, '', '/');
+      setShowLogModal(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (feedState !== 'ready' && feedState !== 'empty') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') { scheduleNotifSW(); return; }
+    if (Notification.permission !== 'default' || localStorage.getItem('folio_notif_asked')) return;
+    const t = setTimeout(() => setShowNotifPrompt(true), 2500);
+    return () => clearTimeout(t);
   }, [feedState]);
 
   useEffect(() => {
@@ -8895,6 +9125,16 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
   async function loadStreakInfo() {
     const { streak: s, hasLoggedToday: logged, pagesLoggedToday: pages } = await fetchStreakData(user.id);
+    // Monthly freeze reset
+    if (s) {
+      const currentMonth = new Date().getMonth() + 1;
+      const needsReset = s.last_freeze_reset_month !== currentMonth && (s.streak_freezes_remaining ?? 1) < 1;
+      if (needsReset) {
+        await supabase.from("user_streaks").update({ streak_freezes_remaining: 1, last_freeze_reset_month: currentMonth }).eq("user_id", user.id);
+        s.streak_freezes_remaining = 1;
+        s.last_freeze_reset_month = currentMonth;
+      }
+    }
     setStreak(s);
     setHasLoggedToday(logged);
     setPagesLoggedToday(pages);
@@ -8907,11 +9147,41 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     } catch {}
   }
 
+  async function applyFreeze() {
+    const today = localDateStr();
+    const currentMonth = new Date().getMonth() + 1;
+    await supabase.from("user_streaks").update({
+      streak_freeze_used_at: today,
+      streak_freezes_remaining: 0,
+      last_freeze_reset_month: currentMonth,
+    }).eq("user_id", user.id);
+    setStreak(prev => prev ? { ...prev, streak_freeze_used_at: today, streak_freezes_remaining: 0, last_freeze_reset_month: currentMonth } : prev);
+  }
+
+  function scheduleNotifSW() {
+    navigator.serviceWorker?.ready.then(reg => reg.active?.postMessage({ type: 'FOLIO_SCHEDULE_NOTIF' }));
+  }
+
+  async function requestNotifPermission() {
+    localStorage.setItem('folio_notif_asked', '1');
+    setShowNotifPrompt(false);
+    try {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') scheduleNotifSW();
+    } catch (e) { console.error("Notification permission:", e); }
+  }
+
+  function dismissNotifPrompt() {
+    localStorage.setItem('folio_notif_asked', '1');
+    setShowNotifPrompt(false);
+  }
+
   async function loadFriendsReading() {
     try {
       const { data: fs, error: fsErr } = await supabase.from("friendships").select("user_id, friend_id").eq("status", "accepted").or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
       if (fsErr) throw fsErr;
-      if (!fs || fs.length === 0) { console.log("[friendsReading] no friendships"); return; }
+      if (!fs || fs.length === 0) { console.log("[friendsReading] no friendships"); setHasFriends(false); return; }
+      setHasFriends(true);
       const friendIds = [...new Set(fs.map(f => f.user_id === user.id ? f.friend_id : f.user_id))];
       console.log("[friendsReading] friendIds:", friendIds);
       const [{ data: rbooks, error: bErr }, { data: profiles }] = await Promise.all([
@@ -9037,6 +9307,15 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     setCommentCounts((prev) => ({ ...prev, [postId]: count }));
   }
 
+  async function handleInvite() {
+    const username = user.username || user.name || "Alguien";
+    const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
+    const msg = `${user.name || username} te invita a Folio. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Folio — Tu biblioteca personal", text: msg, url: refUrl });
+    } catch (e) { /* user cancelled */ }
+  }
+
   if (feedState === 'loading') return <FeedSkeleton />;
 
   // ── Motivational phrase ──
@@ -9067,6 +9346,43 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-xl mx-auto">
+      {/* Notification opt-in prompt */}
+      {showNotifPrompt && (
+        <div style={{
+          backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`,
+          borderRadius: "14px", padding: "1rem 1.1rem", marginBottom: "1.25rem",
+          animation: "feedFadeIn 300ms ease-out",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ ...display, fontSize: "0.95rem", fontWeight: 700, color: palette.ink, marginBottom: "0.2rem" }}>
+                ¿Quieres recordatorios de lectura?
+              </p>
+              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "0.85rem" }}>
+                Una notificación motivacional cada día a las 8pm. Sin spam.
+              </p>
+            </div>
+            <button onClick={dismissNotifPrompt} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.1rem", color: palette.inkFaint, flexShrink: 0 }}>
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: "0.6rem" }}>
+            <button
+              onClick={dismissNotifPrompt}
+              style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, background: "none", border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.45rem 0.9rem", cursor: "pointer" }}
+            >
+              Ahora no
+            </button>
+            <button
+              onClick={requestNotifPermission}
+              style={{ ...body, fontSize: "0.82rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.45rem 1rem", cursor: "pointer" }}
+            >
+              Activar notificaciones
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Greeting banner */}
       <div style={{ marginBottom: "1.75rem" }}>
         <p style={{ ...ts.caption, marginBottom: "0.15rem" }}>{greeting},</p>
@@ -9084,6 +9400,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         hasLoggedToday={hasLoggedToday}
         pagesLoggedToday={pagesLoggedToday}
         onLog={() => setShowLogModal(true)}
+        onFreeze={applyFreeze}
       />
 
       {/* Strip: Leyendo ahora */}
@@ -9276,10 +9593,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Necesitas conexión para ver el feed de tus amigos.</p>
         </div>
       ) : feedState === 'empty' ? (
-        <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-          <p style={{ ...display, fontSize: "1.3rem", fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.5rem" }}>El feed está vacío</p>
-          <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Añade amigos para ver sus lecturas, o empieza a leer un libro para publicar tu progreso.</p>
-        </div>
+        null
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem", animation: "feedFadeIn 200ms ease-out" }}>
           {posts.forEach(p => { if (p.type === 'reading_session') { console.log('READING SESSION POST COMPLETO:', JSON.stringify(p)); } }) || null}
@@ -9422,7 +9736,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   )}
                   {/* Stats pills */}
                   {(sesPages > 0 || sesMinutes > 0) && (
-                    <div style={{ display: "flex", gap: "8px", marginTop: "10px", marginBottom: post.content ? "10px" : "0", flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "10px", marginBottom: "12px", flexWrap: "wrap" }}>
                       {sesPages > 0 && (
                         <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#E8F0E3", color: "#3D6B28", borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
                           📖 {sesPages} {sesPages === 1 ? "página" : "páginas"}
@@ -9439,7 +9753,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     <p style={{ ...body, fontSize: "0.92rem", color: palette.ink, lineHeight: 1.55, marginBottom: "0.9rem" }}>{post.content}</p>
                   )}
                   {/* Footer */}
-                  <div style={{ borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.65rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <div style={{ borderTop: `1px solid ${palette.borderSoft}`, marginTop: "8px", paddingTop: "0.65rem", display: "flex", alignItems: "center", gap: "1rem" }}>
                     <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={16} />
                     <button onClick={() => toggleComments(post.id)} style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
                       <MessageCircle size={14} strokeWidth={2} />
@@ -9476,9 +9790,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 {/* Celebración para libros terminados */}
                 {isFinished && (
                   <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.6rem" }}>
-                    <span style={{ fontSize: "0.82rem" }}>✨</span>
+                    <BookmarkCheck size={12} color={palette.accent} strokeWidth={2} />
                     <span style={{ ...display, fontSize: "0.7rem", fontWeight: 700, color: palette.accent, letterSpacing: "0.08em", textTransform: "uppercase" }}>libro terminado</span>
-                    <span style={{ fontSize: "0.82rem" }}>🎉</span>
                   </div>
                 )}
 
@@ -9587,6 +9900,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Cuentos curados — siempre al final del feed */}
+      {(feedState === 'ready' || feedState === 'empty') && (
+        <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: `1px solid ${palette.borderSoft}` }}>
+          <FeedEditorialContent books={books} onAdd={onAdd} onInvite={handleInvite} />
         </div>
       )}
 
@@ -10183,6 +10503,198 @@ function WrappedModal({ wrap, userName, onClose, onRegenerate }) {
   );
 }
 
+// ============ BOOK SHARE CARD ============
+function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef }) {
+  const year = new Date().getFullYear();
+  const reviewSnippet = review ? review.slice(0, 90) + (review.length > 90 ? "…" : "") : null;
+
+  return (
+    <div ref={cardRef} style={{
+      width: "320px",
+      background: "linear-gradient(160deg, #F5EFE3 0%, #C9976A 52%, #7A2E2E 100%)",
+      borderRadius: "20px",
+      padding: "1.75rem 1.5rem 1.25rem",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      gap: "0.7rem",
+      position: "relative", overflow: "hidden",
+    }}>
+      {/* Decorative orb */}
+      <div style={{ position: "absolute", top: -70, right: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.1)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -40, left: -40, width: 130, height: 130, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
+
+      {/* Logo */}
+      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>FOLIO</p>
+
+      {/* Book cover */}
+      <div style={{ position: "relative", marginTop: "0.25rem", marginBottom: "0.25rem" }}>
+        {book.coverUrl
+          ? <img src={book.coverUrl} crossOrigin="anonymous" alt="" style={{ width: 140, height: 196, objectFit: "cover", borderRadius: "8px", boxShadow: "0 10px 32px rgba(42,31,26,0.45)", display: "block" }} />
+          : <div style={{ width: 140, height: 196, borderRadius: "8px", background: "rgba(122,46,46,0.7)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 10px 32px rgba(42,31,26,0.45)" }}>
+              <BookOpen size={48} color="rgba(244,237,224,0.8)" />
+            </div>
+        }
+      </div>
+
+      {/* Caption */}
+      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.72rem", color: "rgba(42,31,26,0.55)", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>Terminé de leer</p>
+
+      {/* Title */}
+      <p style={{ fontFamily: "Fraunces, serif", fontSize: "1.3rem", fontWeight: 800, color: "#2A1F1A", textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
+        {book.title}
+      </p>
+
+      {/* Author */}
+      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.88rem", color: "rgba(42,31,26,0.65)", margin: 0 }}>
+        de {book.author}
+      </p>
+
+      {/* Rating */}
+      {rating > 0 && (
+        <div style={{ display: "flex", gap: "3px", margin: "0.05rem 0" }}>
+          {Array.from({ length: rating }, (_, i) => (
+            <Star key={i} size={15} fill="#C8924A" color="#C8924A" strokeWidth={0} />
+          ))}
+        </div>
+      )}
+
+      {/* Review snippet */}
+      {reviewSnippet && (
+        <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.84rem", color: "rgba(42,31,26,0.6)", textAlign: "center", lineHeight: 1.5, maxWidth: "88%", margin: "0.1rem 0" }}>
+          "{reviewSnippet}"
+        </p>
+      )}
+
+      {/* Stats */}
+      <div style={{ width: "100%", borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem", marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+          <BookOpen size={13} color="#2A1F1A" strokeWidth={1.8} style={{ flexShrink: 0 }} />
+          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: "#2A1F1A", margin: 0 }}>
+            Libro #{booksThisYear} de {year}
+          </p>
+        </div>
+        {streak?.current_streak > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+            <Flame size={13} color="#2A1F1A" strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: "#2A1F1A", margin: 0 }}>
+              {streak.current_streak} {streak.current_streak === 1 ? "día" : "días"} de racha
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* CTA */}
+      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.67rem", color: "rgba(42,31,26,0.42)", letterSpacing: "0.06em", marginTop: "0.15rem" }}>
+        folio-final.vercel.app
+      </p>
+    </div>
+  );
+}
+
+function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }) {
+  const cardRef = useRef(null);
+  const [generating, setGenerating] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  async function getCanvas() {
+    const { default: html2canvas } = await import("html2canvas");
+    return html2canvas(cardRef.current, { scale: 2.5, useCORS: true, backgroundColor: null, logging: false });
+  }
+
+  async function handleShare() {
+    if (generating) return;
+    setGenerating(true);
+    try {
+      const canvas = await getCanvas();
+      await new Promise((resolve) => {
+        canvas.toBlob(async (blob) => {
+          try {
+            const file = new File([blob], "folio-logro.png", { type: "image/png" });
+            if (navigator.canShare?.({ files: [file] })) {
+              await navigator.share({ files: [file], title: `Terminé "${book.title}" en Folio` });
+              setShared(true);
+            } else {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url; a.download = "folio-logro.png"; a.click();
+              URL.revokeObjectURL(url);
+            }
+          } catch (e) { /* cancelled */ }
+          resolve();
+        }, "image/png");
+      });
+    } catch (err) { console.error("Share error:", err); }
+    setGenerating(false);
+  }
+
+  async function handleDownload() {
+    if (generating) return;
+    setGenerating(true);
+    try {
+      const canvas = await getCanvas();
+      const link = document.createElement("a");
+      link.download = `folio-${book.title.slice(0, 30).replace(/\s+/g, "-")}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (err) { console.error("Download error:", err); }
+    setGenerating(false);
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1200,
+      backgroundColor: "rgba(8,4,0,0.97)",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "flex-start",
+      padding: "1.5rem 1rem 2rem",
+      overflowY: "auto",
+    }}>
+      <div style={{ width: "100%", maxWidth: 400 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+          <h2 style={{ ...display, fontSize: "1.1rem", color: palette.bg, fontStyle: "italic" }}>¡Comparte tu logro!</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9A8A7A", padding: "0.25rem" }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
+          <BookShareCard book={book} rating={rating} review={review} streak={streak} booksThisYear={booksThisYear} cardRef={cardRef} />
+        </div>
+
+        <div style={{ display: "flex", gap: "0.65rem" }}>
+          <button
+            onClick={handleShare}
+            disabled={generating}
+            style={{
+              flex: 1, padding: "0.85rem", borderRadius: 12,
+              backgroundColor: palette.accent, color: palette.bg,
+              border: "none", cursor: "pointer",
+              ...display, fontSize: "0.95rem",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
+            }}
+          >
+            {generating ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={15} />}
+            {shared ? "¡Compartido!" : "Compartir"}
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={generating}
+            style={{
+              flex: 1, padding: "0.85rem", borderRadius: 12,
+              backgroundColor: "rgba(255,255,255,0.08)", color: "#D8CCBC",
+              border: "1.5px solid rgba(255,255,255,0.12)", cursor: "pointer",
+              ...body, fontSize: "0.9rem",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
+            }}
+          >
+            <Download size={15} />
+            Guardar imagen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============ BOOK FINISHED CELEBRATION ============
 function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer, onSaveRating }) {
   const [step, setStep] = useState(1);
@@ -10194,8 +10706,11 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
   const [streak, setStreak] = useState(null);
   const [newAchievements, setNewAchievements] = useState([]);
   const [booksThisMonth, setBooksThisMonth] = useState(0);
+  const [showShareCard, setShowShareCard] = useState(false);
 
   const wantCount = allBooks.filter(b => b.status === "want_to_read" || b.status === "wish").length;
+  const currentYear = new Date().getFullYear();
+  const booksThisYear = allBooks.filter(b => b.status === "read" && b.finishedAt && new Date(b.finishedAt).getFullYear() === currentYear).length;
 
   const ratingTexts = {
     1: "No fue para ti... y está bien",
@@ -10382,7 +10897,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
                 <div style={{ ...body, fontSize: "0.82rem", color: "#9A8A7A" }}>
                   {streak.longest_streak > (streak.current_streak || 0)
                     ? `Mejor racha: ${streak.longest_streak} días`
-                    : "¡Nueva mejor racha! 🎉"}
+                    : "¡Nueva mejor racha!"}
                 </div>
               </div>
             </div>
@@ -10426,13 +10941,29 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
           )}
 
           <button
+            onClick={() => setShowShareCard(true)}
+            style={{
+              width: "100%", padding: "0.85rem", borderRadius: "12px",
+              background: "linear-gradient(135deg, rgba(122,46,46,0.18) 0%, rgba(200,146,74,0.18) 100%)",
+              border: "1.5px solid rgba(200,146,74,0.35)",
+              color: "#C8924A", cursor: "pointer",
+              ...display, fontSize: "1rem",
+              marginTop: "0.5rem",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+            }}
+          >
+            <Camera size={17} />
+            Compartir en stories
+          </button>
+
+          <button
             onClick={() => setStep(4)}
             style={{
               width: "100%", padding: "0.9rem", borderRadius: "12px",
               backgroundColor: palette.accent, color: palette.bg,
               border: "none", cursor: "pointer",
               ...display, fontSize: "1.05rem",
-              marginTop: "0.5rem",
+              marginTop: "0.65rem",
             }}
           >
             Continuar →
@@ -10481,6 +11012,17 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
             Volver a mi biblioteca
           </button>
         </div>
+      )}
+
+      {showShareCard && (
+        <BookShareModal
+          book={book}
+          rating={rating}
+          review={review}
+          streak={streak}
+          booksThisYear={booksThisYear}
+          onClose={() => setShowShareCard(false)}
+        />
       )}
     </div>
   );
@@ -10804,8 +11346,8 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
           overflow: hidden;
         }
         @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(4px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes gradientShift {
@@ -11641,7 +12183,10 @@ class ErrorBoundary extends Component {
       return (
         <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
           <h2 style={{ marginBottom: 12 }}>Algo se rompió</h2>
-          <p style={{ color: '#991b1b', marginBottom: 20, fontSize: 14 }}>{this.state.error?.message}</p>
+          <p style={{ color: '#991b1b', marginBottom: 12, fontSize: 14 }}>{this.state.error?.message}</p>
+          <pre style={{ fontSize: 11, textAlign: 'left', overflow: 'auto', maxHeight: '40vh', background: '#fee2e2', padding: 12, borderRadius: 4, marginBottom: 16 }}>
+            {this.state.error?.stack}
+          </pre>
           <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: '#7A2E2E', color: '#fff', cursor: 'pointer', fontSize: 15 }}>
             Recargar
           </button>
@@ -11668,7 +12213,9 @@ export default function App() {
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((reg) => reg.unregister());
+        regs.forEach((reg) => {
+          if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        });
       });
     }
     getStoredUser().then(async (u) => {
