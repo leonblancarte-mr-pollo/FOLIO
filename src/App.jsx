@@ -971,16 +971,25 @@ async function initUserGems(userId) {
 }
 
 async function loadGems(userId) {
-  const { data } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
-  return data?.balance ?? 0;
+  try {
+    const { data, error } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
+    if (error) { console.error("Load gems error:", error); return 0; }
+    return data?.balance ?? 0;
+  } catch (err) {
+    console.error("Gems fetch failed:", err);
+    return 0;
+  }
 }
 
 async function addGemsDB(userId, amount) {
-  const { data } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
-  const current = data?.balance ?? 0;
-  const newBalance = current + amount;
-  await supabase.from("user_gems").upsert({ user_id: userId, balance: newBalance }, { onConflict: "user_id" });
-  return newBalance;
+  try {
+    const { data, error } = await supabase.rpc("add_gems", { p_user_id: userId, p_amount: amount });
+    if (error) { console.error("Error adding gems:", error); return null; }
+    return data?.new_balance ?? 0;
+  } catch (err) {
+    console.error("Gems transaction failed:", err);
+    return null;
+  }
 }
 
 async function claimDailyGems(userId) {
@@ -6816,6 +6825,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
   async function sendRequest(toId) {
     setActionLoading((p) => ({ ...p, [toId]: true }));
     await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
+    await supabase.from("notifications").insert({ user_id: toId, actor_id: user.id, type: "friend_request", related_id: user.id, read: false });
     setSentRequestIds((prev) => new Set([...prev, toId]));
     setActionLoading((p) => ({ ...p, [toId]: false }));
     checkAchievements(user.id, user.name);
