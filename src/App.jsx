@@ -1642,7 +1642,7 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
           }}
         >f</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem 0.28rem 0.5rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
+          <div data-tutorial="gems" style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem 0.28rem 0.5rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
             <img src="/gema.png" alt="gemas" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0 }} />
             <span key={gemBalance} style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 700, color: palette.amber, lineHeight: 1, animation: "gemBalancePop 400ms cubic-bezier(0.34,1.56,0.64,1)" }}>
               {(gemBalance || 0).toLocaleString("es-MX")}
@@ -1724,6 +1724,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs }) 
         return (
           <button
             key={t.id}
+            data-tutorial={`nav-${t.id}`}
             onClick={() => { haptic(HAPTIC.NAV); setTab(t.id); }}
             className={`flex-1 flex flex-col items-center justify-center py-1.5${isAdd ? " nav-add-btn" : ""}`}
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
@@ -8856,7 +8857,7 @@ function SnacksHero({ onRead }) {
   if (!cuento) return null;
 
   return (
-    <div style={{
+    <div data-tutorial="snacks-hero" style={{
       background: isDark
         ? `linear-gradient(135deg, ${palette.bgCard} 0%, rgba(200,79,79,0.08) 100%)`
         : "linear-gradient(135deg, rgba(164,75,63,0.07) 0%, rgba(200,146,74,0.06) 100%)",
@@ -11658,7 +11659,7 @@ function resolveTheme(pref) {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
+function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutorial }) {
   const [tab, setTab] = useState("feed");
   const [books, setBooks] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
@@ -11674,6 +11675,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   const [toastMessage, setToastMessage] = useState(null);
   const [gemBalance, setGemBalance] = useState(0);
   const [gemToast, setGemToast] = useState(null);
+  const [tutorialActive, setTutorialActive] = useState(() => showTutorial && !localStorage.getItem('folio_firstLoginTutorial'));
 
   function showGemToast(amount, label) {
     setGemToast({ amount, label, id: Date.now() });
@@ -12345,7 +12347,102 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
           onClose={() => { setRefModalUser(null); localStorage.removeItem("folio_ref"); onRefUserConsumed?.(); }}
         />
       )}
+      {tutorialActive && <TutorialOverlay onDone={() => setTutorialActive(false)} />}
     </div>
+  );
+}
+
+// ============ FIRST-LOGIN TUTORIAL ============
+function TutorialOverlay({ onDone }) {
+  const STEPS = [
+    { key: 'nav-add',     text: 'Aquí agregas libros a tu biblioteca',        dir: 'above' },
+    { key: 'nav-feed',    text: 'Tu feed de amigos + cuentos curados',         dir: 'above' },
+    { key: 'snacks-hero', text: 'Lee un cuento en 5 min. ¡Empieza tu racha!', dir: 'below' },
+    { key: 'gems',        text: 'Gana gemas leyendo. Cada acción cuenta',      dir: 'below' },
+    { key: 'nav-perfil',  text: 'Tu biblioteca, logros y estadísticas',        dir: 'above' },
+  ];
+  const [step, setStep] = useState(0);
+  const [rect, setRect] = useState(null);
+  const PAD = 10;
+  const TW = 240;
+  const current = STEPS[step];
+  const isLast = step === STEPS.length - 1;
+
+  useEffect(() => {
+    const el = document.querySelector(`[data-tutorial="${current.key}"]`);
+    if (el) {
+      setRect(el.getBoundingClientRect());
+    } else if (!isLast) {
+      setStep(s => s + 1);
+    } else {
+      done();
+    }
+  }, [step]);
+
+  function done() {
+    localStorage.setItem('folio_firstLoginTutorial', '1');
+    onDone();
+  }
+
+  function advance() {
+    if (isLast) { done(); return; }
+    let next = step + 1;
+    const nextEl = document.querySelector(`[data-tutorial="${STEPS[next].key}"]`);
+    if (!nextEl && next < STEPS.length - 1) next++;
+    setStep(next);
+  }
+
+  if (!rect) return null;
+
+  const hl = { top: rect.top - PAD, left: rect.left - PAD, width: rect.width + PAD * 2, height: rect.height + PAD * 2 };
+  const tipLeft = Math.max(12, Math.min(window.innerWidth - TW - 12, rect.left + rect.width / 2 - TW / 2));
+  const isAbove = current.dir === 'above';
+  const arrowLeft = Math.max(8, Math.min(TW - 20, rect.left + rect.width / 2 - tipLeft - 6));
+
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 1998 }} />
+      <div key={`ring-${step}`} style={{
+        position: 'fixed', top: hl.top, left: hl.left, width: hl.width, height: hl.height,
+        borderRadius: 16, zIndex: 1999, pointerEvents: 'none',
+        boxShadow: '0 0 0 9999px rgba(42,31,26,0.75), 0 0 0 2.5px rgba(200,146,74,0.75)',
+        animation: 'tutRingIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both',
+      }} />
+      <div key={`tip-${step}`} style={{
+        position: 'fixed', zIndex: 2000, width: TW, left: tipLeft,
+        ...(isAbove
+          ? { bottom: window.innerHeight - hl.top + 12 }
+          : { top: hl.top + hl.height + 12 }),
+        backgroundColor: '#7A2E2E', color: '#F5EDE0', borderRadius: 14,
+        padding: '0.9rem 1rem 0.85rem',
+        boxShadow: '0 8px 32px rgba(42,31,26,0.5)',
+        animation: isAbove
+          ? 'tutTipAbove 0.28s cubic-bezier(0.22,1,0.36,1) both'
+          : 'tutTipBelow 0.28s cubic-bezier(0.22,1,0.36,1) both',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+      }}>
+        <div style={{ position: 'absolute', width: 10, height: 10, backgroundColor: '#7A2E2E', left: arrowLeft, transform: 'rotate(45deg)', ...(isAbove ? { bottom: -5 } : { top: -5 }) }} />
+        <div style={{ display: 'flex', gap: 4, marginBottom: '0.65rem' }}>
+          {STEPS.map((_, i) => (
+            <div key={i} style={{ height: 3, flex: 1, borderRadius: 999, backgroundColor: i <= step ? 'rgba(245,237,224,0.9)' : 'rgba(245,237,224,0.22)', transition: 'background-color 0.25s' }} />
+          ))}
+        </div>
+        <p style={{ fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.45, margin: '0 0 0.85rem', color: '#F5EDE0' }}>{current.text}</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button onClick={done} style={{ fontSize: '0.75rem', color: 'rgba(245,237,224,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+            Saltar
+          </button>
+          <button onClick={advance} style={{ fontSize: '0.8rem', fontWeight: 600, backgroundColor: '#F5EDE0', color: '#7A2E2E', border: 'none', borderRadius: 999, padding: '0.38rem 1rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+            {isLast ? '¡Entendido!' : 'Siguiente →'}
+          </button>
+        </div>
+      </div>
+      <style>{`
+        @keyframes tutRingIn { from { opacity:0; transform:scale(0.94) } to { opacity:1; transform:scale(1) } }
+        @keyframes tutTipAbove { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
+        @keyframes tutTipBelow { from { opacity:0; transform:translateY(-8px) } to { opacity:1; transform:translateY(0) } }
+      `}</style>
+    </>
   );
 }
 
@@ -13159,6 +13256,7 @@ export default function App() {
   const [authLoaded, setAuthLoaded] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [refUser, setRefUser] = useState(null);
+  const [justCompletedOnboarding, setJustCompletedOnboarding] = useState(false);
 
   useEffect(() => {
     // Capture referral param from URL
@@ -13231,6 +13329,6 @@ export default function App() {
   }
 
   if (!user) return <AuthView onLogin={handleLogin} />;
-  if (showOnboarding) return <NewUserOnboarding user={user} onComplete={() => setShowOnboarding(false)} />;
-  return <ErrorBoundary><MainApp user={user} onLogout={handleLogout} initialRefUser={refUser} onRefUserConsumed={() => setRefUser(null)} /></ErrorBoundary>;
+  if (showOnboarding) return <NewUserOnboarding user={user} onComplete={() => { setShowOnboarding(false); setJustCompletedOnboarding(true); }} />;
+  return <ErrorBoundary><MainApp user={user} onLogout={handleLogout} initialRefUser={refUser} onRefUserConsumed={() => setRefUser(null)} showTutorial={justCompletedOnboarding} /></ErrorBoundary>;
 }
