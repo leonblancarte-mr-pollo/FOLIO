@@ -2105,7 +2105,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
             onChange={(e) => { console.log('[input] onChange:', e.target.value); setQuery(e.target.value); }}
             onInput={(e) => console.log('[input] onInput:', e.currentTarget.value)}
             placeholder="Busca por título, autor o ISBN..."
-            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: "#EDE7D9", border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "'EB Garamond', serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
+            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "'EB Garamond', serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
           />
           {query && (
             <button onClick={() => setQuery("")} style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "0.1rem", display: "flex" }}>
@@ -8079,8 +8079,8 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   const pct = pagesLoggedToday > 0 ? Math.min(100, Math.round((pagesLoggedToday / DAILY_GOAL) * 100)) : 0;
   const goalReached = pagesLoggedToday >= DAILY_GOAL;
 
-  // Confeti al alcanzar meta (una sola vez)
-  const prevGoalRef = useRef(false);
+  // Confeti al alcanzar meta (solo en la transición, nunca al montar)
+  const prevGoalRef = useRef(goalReached);
   useEffect(() => {
     if (goalReached && !prevGoalRef.current && typeof confetti === "function") {
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: ["#FFD700", "#FFA500", "#fff", cfg.g0] });
