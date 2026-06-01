@@ -58,12 +58,16 @@ import {
   WifiOff,
   Download,
   Snowflake,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
 import confetti from "canvas-confetti";
 import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
 import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
 import { haptic, HAPTIC } from "./haptics.js";
+
+// ============ AFFILIATE ============
+const AMAZON_AFFILIATE_ID = import.meta.env.VITE_AMAZON_AFFILIATE_ID || "TU_AFFILIATE_ID";
 
 // ============ STYLES ============
 const FONT_LINK = `
@@ -2765,6 +2769,35 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete }) {
                   }}
                 />
               </div>
+              {book.isbn && (
+                <div style={{ marginTop: "1rem" }}>
+                  <a
+                    href={`https://amazon.com.mx/dp/${book.isbn}?tag=${AMAZON_AFFILIATE_ID}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.4rem",
+                      width: "100%",
+                      padding: "0.65rem 1rem",
+                      borderRadius: "8px",
+                      border: `1px solid ${palette.border}`,
+                      backgroundColor: palette.bgCard,
+                      color: palette.inkSoft,
+                      textDecoration: "none",
+                      ...body,
+                      fontSize: "0.88rem",
+                      fontWeight: 500,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    <ExternalLink size={14} />
+                    Comprar en Amazon
+                  </a>
+                </div>
+              )}
             </>
           )}
         </div>
