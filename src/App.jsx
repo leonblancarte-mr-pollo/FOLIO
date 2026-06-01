@@ -11673,7 +11673,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   const [refModalUser, setRefModalUser] = useState(initialRefUser || null);
   const isOnline = useOnlineStatus();
 
-  const [themePref, setThemePref] = useState(() => localStorage.getItem('folio_theme') || 'system');
+  const [themePref, setThemePref] = useState(() => localStorage.getItem('folio_theme') || 'light');
   const [, forceThemeUpdate] = useState(0);
 
   // Sync palette synchronously on every render
@@ -11911,6 +11911,8 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
     } catch (err) {
       console.error("Error guardando libro:", err);
       setBooks((prev) => prev.filter((b) => b.id !== withFinished.id));
+      setToastMessage(`No se pudo guardar el libro: ${err?.message || "error desconocido"}`);
+      setTimeout(() => setToastMessage(null), 5000);
     }
   }
 
@@ -12402,41 +12404,62 @@ function OnboardingStep1({ selectedGenres, setSelectedGenres, onNext }) {
 }
 
 function OnboardingStep2({ user, onNext, onBack, onSkip }) {
-  const [mode, setMode] = useState(null);
+  const [mode, setMode] = useState("search"); // "search" | "manual"
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState(null); // selected book from search
+  const [pickedStatus, setPickedStatus] = useState("reading");
   const [form, setForm] = useState({ title: "", author: "", status: "reading" });
   const [adding, setAdding] = useState(false);
+  const [addErr, setAddErr] = useState("");
+  const debounceRef = useRef(null);
+  const inputRef = useRef(null);
 
-  async function handleAdd(bookData) {
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 180);
+  }, [mode]);
+
+  useEffect(() => {
+    clearTimeout(debounceRef.current);
+    if (!query.trim() || query.trim().length < 2) { setResults([]); setSearching(false); return; }
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await searchGoogleBooks(query.trim());
+        setResults(res);
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 320);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
+
+  async function saveBook(bookData) {
     setAdding(true);
+    setAddErr("");
     try {
-      const enriched = await enrichBook(bookData.title, bookData.author).catch(() => null);
+      const enriched = bookData.coverUrl ? null : await enrichBook(bookData.title, bookData.author).catch(() => null);
       const book = {
         id: crypto.randomUUID(),
-        title: bookData.title, author: bookData.author,
+        title: bookData.title,
+        author: bookData.author,
         status: bookData.status || "reading",
         coverUrl: bookData.coverUrl || "",
-        genre: enriched?.genre || "",
-        summary: enriched?.summary || "",
+        genre: enriched?.genre || bookData.genre || "",
+        summary: enriched?.summary || bookData.summary || "",
         moodTags: enriched?.moodTags || [],
         rating: 0, review: "",
+        addedAt: Date.now(),
         finishedAt: bookData.status === "read" ? Date.now() : null,
       };
       await insertBook(book, user.id);
       onNext();
     } catch (err) {
       console.error("Error adding book in onboarding:", err);
+      setAddErr(err?.message || "No se pudo guardar. Intenta de nuevo.");
       setAdding(false);
     }
   }
-
-  const cardBtn = {
-    width: "100%", padding: "1rem", borderRadius: 12,
-    border: `1.5px solid ${palette.border}`, cursor: "pointer",
-    backgroundColor: palette.bgCard,
-    display: "flex", alignItems: "center", gap: "0.85rem",
-    transition: "border-color 0.18s",
-    textAlign: "left",
-  };
 
   const inputStyle = {
     width: "100%", padding: "0.75rem", borderRadius: 10,
@@ -12445,88 +12468,175 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
     outline: "none", boxSizing: "border-box",
   };
 
+  const statusBtns = [
+    { val: "reading", label: "Lo estoy leyendo" },
+    { val: "want_to_read", label: "Lo quiero leer" },
+  ];
+
+  // ── Manual entry mode ──
+  if (mode === "manual") {
+    return (
+      <div style={{ padding: "0 1.25rem 2.5rem", maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+        <button onClick={() => { setMode("search"); setAddErr(""); }} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
+          <ChevronLeft size={16} />Volver al buscador
+        </button>
+        <h2 style={{ ...display, fontSize: "1.6rem", fontStyle: "italic", color: palette.ink, marginBottom: "1.25rem" }}>Agregar manualmente</h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          <div>
+            <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Título *</label>
+            <input ref={inputRef} value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="El nombre del viento..." style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Autor *</label>
+            <input value={form.author} onChange={e => setForm(p => ({ ...p, author: e.target.value }))} placeholder="Patrick Rothfuss..." style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.5rem" }}>¿Cómo lo agregas?</label>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              {statusBtns.map(({ val, label }) => (
+                <button key={val} onClick={() => setForm(p => ({ ...p, status: val }))} style={{
+                  flex: 1, padding: "0.65rem 0.5rem", borderRadius: 10,
+                  border: `1.5px solid ${form.status === val ? palette.accent : palette.border}`,
+                  backgroundColor: form.status === val ? `${palette.accent}12` : palette.bgCard,
+                  cursor: "pointer", ...body, fontSize: "0.82rem",
+                  color: form.status === val ? palette.accent : palette.ink,
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
+          {addErr && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", margin: 0 }}>{addErr}</p>}
+          <button
+            onClick={() => saveBook(form)}
+            disabled={!form.title.trim() || !form.author.trim() || adding}
+            style={{
+              width: "100%", padding: "0.9rem", borderRadius: 12, border: "none",
+              backgroundColor: form.title.trim() && form.author.trim() ? palette.accent : palette.border,
+              color: form.title.trim() && form.author.trim() ? palette.bg : palette.inkFaint,
+              cursor: form.title.trim() && form.author.trim() && !adding ? "pointer" : "default",
+              ...display, fontSize: "1.05rem", marginTop: "0.25rem",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+            }}
+          >
+            {adding && <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />}
+            {adding ? "Guardando..." : "Agregar libro"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Search mode (default) ──
   return (
     <div style={{ padding: "0 1.25rem 2.5rem", maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      {/* Back button */}
-      <button
-        onClick={mode !== null ? () => setMode(null) : onBack}
-        style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}
-      >
-        <ChevronLeft size={16} />{mode !== null ? "Cambiar método" : "Atrás"}
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
+        <ChevronLeft size={16} />Atrás
       </button>
+      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.15 }}>
+        Tu primer libro
+      </h1>
+      <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, marginBottom: "1.25rem", lineHeight: 1.5 }}>
+        Busca el libro que estás leyendo
+      </p>
 
-      {mode === null && (
-        <>
-          <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
-            Tu primer libro
-          </h1>
-          <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "1.75rem", lineHeight: 1.55 }}>
-            Agrega el libro que estás leyendo o que quieres leer
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "2rem" }}>
-            <button style={cardBtn} onClick={() => setMode("manual")}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: `${palette.accent}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <PenLine size={22} color={palette.accent} />
-              </div>
-              <div>
-                <div style={{ ...display, fontSize: "0.97rem", fontWeight: 600, color: palette.ink }}>Escribir título y autor</div>
-                <div style={{ ...body, fontSize: "0.78rem", color: palette.inkSoft }}>Busca por nombre del libro</div>
-              </div>
-            </button>
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <button onClick={onSkip} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.85rem", color: palette.inkFaint }}>
-              Omitir por ahora
-            </button>
-          </div>
-        </>
-      )}
+      {/* Search input */}
+      <div style={{ position: "relative", marginBottom: "0.85rem" }}>
+        <Search size={16} color={palette.inkSoft} style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => { setQuery(e.target.value); setPicked(null); }}
+          placeholder="Busca por título o autor…"
+          style={{ ...inputStyle, paddingLeft: "2.4rem" }}
+        />
+        {searching && <Loader2 size={15} color={palette.inkFaint} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", animation: "spin 1s linear infinite" }} />}
+      </div>
 
-      {mode === "manual" && (
-        <div>
-          <h2 style={{ ...display, fontSize: "1.6rem", fontStyle: "italic", color: palette.ink, marginBottom: "1.25rem" }}>Agregar libro</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
-            <div>
-              <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Título *</label>
-              <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="El nombre del viento..." style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Autor *</label>
-              <input value={form.author} onChange={e => setForm(p => ({ ...p, author: e.target.value }))} placeholder="Patrick Rothfuss..." style={inputStyle} />
-            </div>
-            <div>
-              <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.5rem" }}>¿Cómo lo agregas?</label>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                {[{ val: "reading", label: "Lo estoy leyendo" }, { val: "want_to_read", label: "Lo quiero leer" }].map(({ val, label }) => (
-                  <button key={val} onClick={() => setForm(p => ({ ...p, status: val }))} style={{
-                    flex: 1, padding: "0.65rem 0.5rem", borderRadius: 10,
-                    border: `1.5px solid ${form.status === val ? palette.accent : palette.border}`,
-                    backgroundColor: form.status === val ? `${palette.accent}12` : palette.bgCard,
-                    cursor: "pointer", ...body, fontSize: "0.82rem",
-                    color: form.status === val ? palette.accent : palette.ink,
-                  }}>{label}</button>
-                ))}
+      {/* Results */}
+      {results.length > 0 && !picked && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem", maxHeight: "52vh", overflowY: "auto" }}>
+          {results.map((book, i) => (
+            <button key={i} onClick={() => { setPicked(book); setPickedStatus("reading"); }} style={{
+              display: "flex", alignItems: "center", gap: "0.75rem",
+              padding: "0.65rem 0.75rem", borderRadius: 12,
+              backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`,
+              cursor: "pointer", textAlign: "left", transition: "border-color 0.15s",
+            }}>
+              {book.coverUrl
+                ? <img src={book.coverUrl} alt="" style={{ width: 38, height: 56, objectFit: "cover", borderRadius: 4, flexShrink: 0, backgroundColor: palette.bgSoft }} />
+                : <div style={{ width: 38, height: 56, borderRadius: 4, backgroundColor: `${palette.accent}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><BookOpen size={16} color={palette.accent} /></div>
+              }
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ ...display, fontSize: "0.88rem", fontWeight: 600, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "0.15rem" }}>{book.title}</p>
+                <p style={{ ...body, fontSize: "0.76rem", color: palette.inkSoft, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.author}{book.year ? ` · ${book.year}` : ""}</p>
               </div>
-            </div>
-            <button
-              onClick={() => handleAdd(form)}
-              disabled={!form.title.trim() || !form.author.trim() || adding}
-              style={{
-                width: "100%", padding: "0.9rem", borderRadius: 12, border: "none",
-                backgroundColor: form.title.trim() && form.author.trim() ? palette.accent : palette.border,
-                color: form.title.trim() && form.author.trim() ? palette.bg : palette.inkFaint,
-                cursor: form.title.trim() && form.author.trim() ? "pointer" : "default",
-                ...display, fontSize: "1.05rem", marginTop: "0.25rem",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
-              }}
-            >
-              {adding && <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />}
-              {adding ? "Guardando..." : "Agregar libro"}
+              <ChevronRight size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />
             </button>
-          </div>
+          ))}
         </div>
       )}
 
+      {/* Empty state */}
+      {!searching && query.trim().length >= 2 && results.length === 0 && !picked && (
+        <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, textAlign: "center", fontStyle: "italic", marginBottom: "1rem" }}>
+          No encontramos "{query}". Prueba con otro título.
+        </p>
+      )}
+
+      {/* Status picker after selecting a search result */}
+      {picked && (
+        <div style={{ backgroundColor: palette.bgCard, border: `1.5px solid ${palette.accent}44`, borderRadius: 14, padding: "1rem", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "0.85rem" }}>
+            {picked.coverUrl
+              ? <img src={picked.coverUrl} alt="" style={{ width: 42, height: 62, objectFit: "cover", borderRadius: 5, flexShrink: 0 }} />
+              : <div style={{ width: 42, height: 62, borderRadius: 5, backgroundColor: `${palette.accent}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><BookOpen size={18} color={palette.accent} /></div>
+            }
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ ...display, fontSize: "0.9rem", fontWeight: 700, color: palette.ink, lineHeight: 1.25, marginBottom: "0.2rem" }}>{picked.title}</p>
+              <p style={{ ...body, fontSize: "0.78rem", color: palette.inkSoft }}>{picked.author}</p>
+            </div>
+            <button onClick={() => setPicked(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, color: palette.inkFaint }}>
+              <X size={16} />
+            </button>
+          </div>
+          <p style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, marginBottom: "0.5rem" }}>¿Cómo lo agregas?</p>
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.85rem" }}>
+            {statusBtns.map(({ val, label }) => (
+              <button key={val} onClick={() => setPickedStatus(val)} style={{
+                flex: 1, padding: "0.6rem 0.4rem", borderRadius: 10,
+                border: `1.5px solid ${pickedStatus === val ? palette.accent : palette.border}`,
+                backgroundColor: pickedStatus === val ? `${palette.accent}12` : palette.bg,
+                cursor: "pointer", ...body, fontSize: "0.82rem",
+                color: pickedStatus === val ? palette.accent : palette.ink,
+              }}>{label}</button>
+            ))}
+          </div>
+          {addErr && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", marginBottom: "0.5rem" }}>{addErr}</p>}
+          <button
+            onClick={() => saveBook({ ...picked, status: pickedStatus })}
+            disabled={adding}
+            style={{
+              width: "100%", padding: "0.85rem", borderRadius: 10, border: "none",
+              backgroundColor: palette.accent, color: palette.bg,
+              cursor: adding ? "default" : "pointer",
+              ...display, fontSize: "1rem",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+            }}
+          >
+            {adding && <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} />}
+            {adding ? "Guardando..." : "Agregar a mi biblioteca"}
+          </button>
+        </div>
+      )}
+
+      {/* Footer actions */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", marginTop: picked ? 0 : "0.5rem" }}>
+        <button onClick={() => setMode("manual")} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.84rem", color: palette.inkSoft, textDecoration: "underline" }}>
+          Agregar manualmente
+        </button>
+        <button onClick={onSkip} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.83rem", color: palette.inkFaint }}>
+          Omitir por ahora
+        </button>
+      </div>
     </div>
   );
 }
