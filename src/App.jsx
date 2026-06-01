@@ -954,6 +954,14 @@ const gemsEventBus = {
     return () => { _gemsListeners = _gemsListeners.filter(f => f !== fn); };
   },
 };
+let _gemToastListeners = [];
+const gemToastBus = {
+  emit: (amount, label) => _gemToastListeners.forEach(fn => fn(amount, label)),
+  on: (fn) => {
+    _gemToastListeners.push(fn);
+    return () => { _gemToastListeners = _gemToastListeners.filter(f => f !== fn); };
+  },
+};
 
 async function initUserGems(userId) {
   const { data } = await supabase.from("user_gems").select("id").eq("user_id", userId).maybeSingle();
@@ -1625,9 +1633,9 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
           }}
         >f</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
-            <span style={{ fontSize: "0.85rem", lineHeight: 1 }}>💎</span>
-            <span style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 700, color: palette.amber, lineHeight: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem 0.28rem 0.5rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
+            <img src="/gema.png" alt="gemas" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0 }} />
+            <span key={gemBalance} style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 700, color: palette.amber, lineHeight: 1, animation: "gemBalancePop 400ms cubic-bezier(0.34,1.56,0.64,1)" }}>
               {(gemBalance || 0).toLocaleString("es-MX")}
             </span>
           </div>
@@ -8285,7 +8293,10 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
       });
       playReadingSession();
       checkAchievements(user.id, user.name);
-      addGemsDB(user.id, 5).then(() => gemsEventBus.emit(5));
+      addGemsDB(user.id, 5).then(() => {
+        gemsEventBus.emit(5);
+        gemToastBus.emit(5, "+5 gemas");
+      });
     } catch (err) { console.error("Error registrando sesión:", err); }
     finally {
       setSaving(false);
@@ -10415,6 +10426,44 @@ function Toast({ message, onDismiss }) {
   );
 }
 
+function GemToast({ amount, label, id, onDismiss }) {
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setClosing(true);
+      setTimeout(onDismiss, 220);
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [id]);
+  return (
+    <div style={{
+      position: "fixed",
+      bottom: 96,
+      left: "50%",
+      zIndex: 4000,
+      pointerEvents: "none",
+      animation: closing
+        ? "gemToastOut 220ms ease-in forwards"
+        : "gemToastIn 300ms cubic-bezier(0.34,1.56,0.64,1) both",
+      transformOrigin: "center bottom",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.45rem",
+        padding: "0.6rem 1.1rem 0.6rem 0.8rem",
+        background: `linear-gradient(135deg, ${PALETTE_LIGHT.amber} 0%, ${PALETTE_LIGHT.amberRich} 100%)`,
+        borderRadius: 999,
+        boxShadow: "0 6px 24px rgba(200,146,74,0.5), 0 2px 6px rgba(0,0,0,0.2)",
+        whiteSpace: "nowrap",
+      }}>
+        <img src="/gema.png" alt="" style={{ width: 22, height: 22, objectFit: "contain", flexShrink: 0 }} />
+        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", color: "#fff", lineHeight: 1, letterSpacing: "-0.01em" }}>
+          {label || `+${amount} gemas`} ✨
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ============ WRAPPED STORY EXPERIENCE ============
 function WrappedStoryExperience({ wrap, userName, onClose }) {
   const { data, month, year, wrap_type } = wrap;
@@ -11614,6 +11663,11 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   const [celebrationBook, setCelebrationBook] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [gemBalance, setGemBalance] = useState(0);
+  const [gemToast, setGemToast] = useState(null);
+
+  function showGemToast(amount, label) {
+    setGemToast({ amount, label, id: Date.now() });
+  }
   const [activeWrap, setActiveWrap] = useState(null);
   const [mainUsername, setMainUsername] = useState(null);
   const [refModalUser, setRefModalUser] = useState(initialRefUser || null);
@@ -11798,7 +11852,11 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
     const unsub = achievementBus.on((keys) => {
       setAchievementQueue((prev) => [...prev, ...keys]);
       if (keys.length > 0) {
-        addGemsDB(user.id, keys.length * 10).then(bal => setGemBalance(bal));
+        const gemsEarned = keys.length * 10;
+        addGemsDB(user.id, gemsEarned).then(bal => {
+          setGemBalance(bal);
+          showGemToast(gemsEarned, `+${gemsEarned} gemas`);
+        });
       }
     });
     return unsub;
@@ -11812,20 +11870,21 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   }, []);
 
   useEffect(() => {
+    const unsub = gemToastBus.on((amount, label) => showGemToast(amount, label));
+    return unsub;
+  }, []);
+
+  useEffect(() => {
     loadGems(user.id).then(bal => setGemBalance(bal));
     claimDailyGems(user.id).then(earned => {
       if (earned > 0) {
         setGemBalance(prev => prev + earned);
-        setToastMessage(`+${earned} gemas 💎 ¡Visita diaria!`);
-        setTimeout(() => setToastMessage(null), 3500);
+        setTimeout(() => showGemToast(earned, `+${earned} gemas`), 800);
       }
     });
     if (localStorage.getItem("folio_gems_welcome")) {
       localStorage.removeItem("folio_gems_welcome");
-      setTimeout(() => {
-        setToastMessage("Bienvenido. +5 gemas 💎");
-        setTimeout(() => setToastMessage(null), 3500);
-      }, 1500);
+      setTimeout(() => showGemToast(5, "+5 gemas"), 1800);
     }
   }, [user.id]);
 
@@ -11842,7 +11901,10 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
         playBookFinished();
         haptic(HAPTIC.BOOK_DONE);
         setCelebrationBook(withFinished);
-        addGemsDB(user.id, 50).then(bal => setGemBalance(bal));
+        addGemsDB(user.id, 50).then(bal => {
+          setGemBalance(bal);
+          showGemToast(50, "+50 gemas");
+        });
       } else {
         checkAchievements(user.id, user.name);
       }
@@ -11871,7 +11933,10 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
         playBookFinished();
         haptic(HAPTIC.BOOK_DONE);
         setCelebrationBook(final);
-        addGemsDB(user.id, 50).then(bal => setGemBalance(bal));
+        addGemsDB(user.id, 50).then(bal => {
+          setGemBalance(bal);
+          showGemToast(50, "+50 gemas");
+        });
       } else {
         setSelectedBook(final);
       }
@@ -12139,6 +12204,21 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
 
+        /* ── Gem toast ── */
+        @keyframes gemToastIn {
+          from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.85); }
+          to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
+        }
+        @keyframes gemToastOut {
+          from { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+          to   { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.94); }
+        }
+        @keyframes gemBalancePop {
+          0%   { transform: scale(1); }
+          40%  { transform: scale(1.28); }
+          100% { transform: scale(1); }
+        }
+
         /* ── Reduced motion — accessibility ── */
         @media (prefers-reduced-motion: reduce) {
           .tab-view-enter,
@@ -12242,6 +12322,9 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
       )}
       {toastMessage && (
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
+      )}
+      {gemToast && (
+        <GemToast key={gemToast.id} amount={gemToast.amount} label={gemToast.label} id={gemToast.id} onDismiss={() => setGemToast(null)} />
       )}
       {refModalUser && (
         <FriendProfileModal
