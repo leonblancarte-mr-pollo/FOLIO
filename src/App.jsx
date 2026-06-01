@@ -9972,7 +9972,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: 14, padding: "1.1rem 1.25rem" }}>
             <p style={{ ...display, fontSize: "1rem", color: palette.ink, margin: "0 0 0.2rem" }}>Invita a un amigo y lean juntos</p>
             <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>Comparte tu link personal de Folio</p>
-            <button onClick={handleInvite} style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}>
+            <button onClick={handleInvite} style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.bg, color: palette.ink, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}>
               Invitar amigo
             </button>
           </div>
