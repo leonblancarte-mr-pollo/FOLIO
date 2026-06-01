@@ -500,6 +500,7 @@ function dbToBook(row) {
     addedAt: row.added_at ? new Date(row.added_at).getTime() : Date.now(),
     finishedAt: row.finished_at ? new Date(row.finished_at).getTime() : null,
     isUamBook: row.is_uam_book || false,
+    isbn: row.isbn || null,
   };
 }
 
@@ -519,6 +520,7 @@ function bookToDb(book, userId) {
     added_at: book.addedAt ? new Date(book.addedAt).toISOString() : new Date().toISOString(),
     finished_at: book.finishedAt ? new Date(book.finishedAt).toISOString() : null,
     is_uam_book: book.isUamBook || false,
+    isbn: book.isbn || null,
   };
 }
 
