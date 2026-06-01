@@ -26,7 +26,6 @@ import {
   Heart,
   PlusCircle,
   LogOut,
-  Barcode,
   User,
   Users,
   MessageCircle,
@@ -61,37 +60,33 @@ import {
   Snowflake,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-let _zxingReader = null;
-function getZxingReader() {
-  if (!_zxingReader) _zxingReader = new BrowserMultiFormatReader();
-  return _zxingReader;
-}
 import confetti from "canvas-confetti";
 import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
+import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
+import { haptic, HAPTIC } from "./haptics.js";
 
 // ============ STYLES ============
 const FONT_LINK = `
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=EB+Garamond:ital,wght@0,400..800;1,400..800&display=swap');
 `;
 
-const palette = {
-  bg: "#F4EDE0",
-  bgSoft: "#EBE3D2",
-  bgCard: "#FBF6EB",
-  ink: "#2A1F1A",
-  inkSoft: "#5C4A3F",
-  inkFaint: "#8B7B6E",
-  accent: "#7A2E2E",
-  accentSoft: "#A4493D",
-  amber: "#C8924A",
-  amberRich: "#E07B1A",
-  mauve: "#A26B7A",
-  slate: "#1B3A4B",
-  sage: "#5C6B3D",
-  border: "#D4C9B5",
-  borderSoft: "#DDD5C5",
+const PALETTE_LIGHT = {
+  bg: "#F4EDE0", bgSoft: "#EBE3D2", bgCard: "#FBF6EB",
+  ink: "#2A1F1A", inkSoft: "#5C4A3F", inkFaint: "#8B7B6E",
+  accent: "#7A2E2E", accentSoft: "#A4493D",
+  amber: "#C8924A", amberRich: "#E07B1A",
+  mauve: "#A26B7A", slate: "#1B3A4B", sage: "#5C6B3D",
+  border: "#D4C9B5", borderSoft: "#DDD5C5",
 };
+const PALETTE_DARK = {
+  bg: "#1a1614", bgSoft: "#211d1a", bgCard: "#2a2420",
+  ink: "#F5EDE0", inkSoft: "#B8A99A", inkFaint: "#7A6B60",
+  accent: "#C84F4F", accentSoft: "#D06060",
+  amber: "#D4A574", amberRich: "#E08B30",
+  mauve: "#B87B8A", slate: "#4A7A9B", sage: "#7A9B5C",
+  border: "#3D3530", borderSoft: "#332E2A",
+};
+let palette = { ...PALETTE_LIGHT };
 
 const AVATAR_COLORS = [
   "#6B4C3B", "#5C6B3D", "#8B5E3C", "#4A6670",
@@ -441,25 +436,25 @@ async function registerUser(name, username, email, password) {
     .maybeSingle();
   if (existingUsername) throw new Error("Ese nombre de usuario ya está en uso.");
   const passwordHash = await hashPassword(password);
-  const { data, error } = await supabase
+  const newId = crypto.randomUUID();
+  const { error } = await supabase
     .from("users")
-    .insert({ nombre: name.trim(), username: usernameLower, email: emailLower, password_hash: passwordHash })
-    .select("id, nombre, email")
-    .single();
+    .insert({ id: newId, nombre: name.trim(), username: usernameLower, email: emailLower, password_hash: passwordHash });
   if (error) throw new Error("Error al crear la cuenta. Intenta de nuevo.");
-  return { id: data.id, name: data.nombre, email: data.email };
+  return { id: newId, name: name.trim(), email: emailLower };
 }
 
 async function loginUser(email, password) {
-  const emailLower = email.toLowerCase().trim();
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, nombre, email, password_hash")
-    .eq("email", emailLower)
-    .maybeSingle();
-  if (error || !data) throw new Error("Email o contraseña incorrectos.");
-  const hash = await hashPassword(password);
-  if (hash !== data.password_hash) throw new Error("Email o contraseña incorrectos.");
+  const res = await fetch("/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Email o contraseña incorrectos.");
+  }
+  const data = await res.json();
   return { id: data.id, name: data.nombre, email: data.email };
 }
 
@@ -604,12 +599,14 @@ async function insertBook(book, userId) {
 }
 
 async function updateBookInDB(book, userId) {
-  const { error } = await supabase
+  const { error, count } = await supabase
     .from("books")
     .update(bookToDb(book, userId))
     .eq("id", book.id)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("id", { count: "exact", head: true });
   if (error) throw error;
+  if (count === 0) throw new Error("UPDATE afectó 0 filas — posible problema de RLS o id incorrecto");
 }
 
 async function deleteBookFromDB(id, userId) {
@@ -948,6 +945,53 @@ const achievementBus = {
   },
 };
 
+// ============ GEMS ============
+let _gemsListeners = [];
+const gemsEventBus = {
+  emit: (amount) => _gemsListeners.forEach(fn => fn(amount)),
+  on: (fn) => {
+    _gemsListeners.push(fn);
+    return () => { _gemsListeners = _gemsListeners.filter(f => f !== fn); };
+  },
+};
+
+async function initUserGems(userId) {
+  const { data } = await supabase.from("user_gems").select("id").eq("user_id", userId).maybeSingle();
+  if (!data) {
+    await supabase.from("user_gems").insert({ user_id: userId, balance: 5 });
+  }
+}
+
+async function loadGems(userId) {
+  const { data } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
+  return data?.balance ?? 0;
+}
+
+async function addGemsDB(userId, amount) {
+  const { data } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
+  const current = data?.balance ?? 0;
+  const newBalance = current + amount;
+  await supabase.from("user_gems").upsert({ user_id: userId, balance: newBalance }, { onConflict: "user_id" });
+  return newBalance;
+}
+
+async function claimDailyGems(userId) {
+  const { data } = await supabase.from("user_gems").select("balance, last_daily_reward, consecutive_days").eq("user_id", userId).maybeSingle();
+  if (!data) return 0;
+  const now = new Date();
+  const last = data.last_daily_reward ? new Date(data.last_daily_reward) : null;
+  if (last && (now - last) / 3600000 < 20) return 0;
+  const consecutive = (data.consecutive_days || 0) + 1;
+  const bonus = Math.floor(consecutive / 7);
+  const earned = 5 + bonus;
+  await supabase.from("user_gems").update({
+    balance: data.balance + earned,
+    last_daily_reward: now.toISOString(),
+    consecutive_days: consecutive,
+  }).eq("user_id", userId);
+  return earned;
+}
+
 function canShowInviteCard() {
   const last = localStorage.getItem("folio_invite_peak_date");
   return last !== new Date().toISOString().slice(0, 10);
@@ -1084,7 +1128,14 @@ async function checkAchievements(userId, userName, { silent = false } = {}) {
     }
 
     console.log(`[checkAchievements] ✓ ${newKeys.length} nuevo(s): ${newKeys.join(", ")}`);
-    if (!silent) achievementBus.emit(newKeys);
+    if (!silent) {
+      achievementBus.emit(newKeys);
+      playAchievementSound(newKeys);
+      if (newKeys.length > 0) {
+        const isStreak = newKeys.some(k => ['streak_7','streak_30','streak_90'].includes(k));
+        haptic(isStreak ? HAPTIC.STREAK_MILESTONE : HAPTIC.ACHIEVEMENT);
+      }
+    }
     return newKeys;
   } catch (err) {
     console.error("[checkAchievements] unexpected error:", err);
@@ -1269,26 +1320,6 @@ async function searchGoogleBooks(query) {
   const results = deduped.slice(0, 12);
   _gbSearchCache.set(key, { ts: Date.now(), results });
   return results;
-}
-
-async function lookupISBN(isbn) {
-  try {
-    const d = await gbFetch(`/api/books?q=isbn:${encodeURIComponent(isbn)}`);
-    const item = d.items?.[0];
-    if (item) {
-      const mapped = mapGBItem(item);
-      return {
-        title: mapped.title,
-        author: mapped.author,
-        genre: mapped.genre || '',
-        summary: mapped.description?.slice(0, 500) || '',
-        coverUrl: mapped.coverUrl,
-        year: mapped.year,
-        pageCount: mapped.pageCount,
-      };
-    }
-  } catch {}
-  return null;
 }
 
 // ============ COMPONENTS ============
@@ -1576,24 +1607,44 @@ function SubTabBar({ tabs, active, onChange }) {
   );
 }
 
-function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs }) {
+function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance }) {
   return (
     <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}` }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <img src="/logo.png" alt="Folio" style={{ height: 32, width: "auto", display: "block" }} />
-        <button
-          onClick={onOpenNotifs}
-          aria-label="Notificaciones"
-          className="bell-btn"
-          style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}
-        >
-          <Bell size={22} color={palette.inkSoft} strokeWidth={1.8} />
-          {unreadNotifs > 0 && (
-            <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: "999px", fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "system-ui, sans-serif" }}>
-              {unreadNotifs > 9 ? "9+" : unreadNotifs}
+        <span
+          aria-label="Folio"
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontStyle: "italic",
+            fontWeight: 800,
+            fontSize: "2rem",
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            color: palette.bg === PALETTE_DARK.bg ? "#F5EDE0" : "#A44B3F",
+            userSelect: "none",
+          }}
+        >f</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
+            <span style={{ fontSize: "0.85rem", lineHeight: 1 }}>💎</span>
+            <span style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 700, color: palette.amber, lineHeight: 1 }}>
+              {(gemBalance || 0).toLocaleString("es-MX")}
             </span>
-          )}
-        </button>
+          </div>
+          <button
+            onClick={onOpenNotifs}
+            aria-label="Notificaciones"
+            className="bell-btn"
+            style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <Bell size={22} color={palette.inkSoft} strokeWidth={1.8} />
+            {unreadNotifs > 0 && (
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: "999px", fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "system-ui, sans-serif" }}>
+                {unreadNotifs > 9 ? "9+" : unreadNotifs}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
       {/* Desktop nav */}
       <div className="hidden sm:block" style={{ borderTop: `1px solid ${palette.borderSoft}` }}>
@@ -1656,7 +1707,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs }) 
         return (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => { haptic(HAPTIC.NAV); setTab(t.id); }}
             className={`flex-1 flex flex-col items-center justify-center py-1.5${isAdd ? " nav-add-btn" : ""}`}
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
           >
@@ -1930,321 +1981,8 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
   );
 }
 
-function BarcodeScanner({ onDetect, onManual }) {
-  const inputRef = useRef(null);
-  const [processing, setProcessing] = useState(false);
-  const [attemptNum, setAttemptNum] = useState(0);
-  const [failedImage, setFailedImage] = useState(null);
-  const [decodeError, setDecodeError] = useState(false);
-
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const blobUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        const MAX = 1280;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(blobUrl);
-        resolve(canvas.toDataURL("image/jpeg", 0.9));
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(blobUrl);
-        const fr = new FileReader();
-        fr.onload = (ev) => resolve(ev.target.result);
-        fr.onerror = reject;
-        fr.readAsDataURL(file);
-      };
-      img.src = blobUrl;
-    });
-  }
-
-  // Grayscale + contrast boost + sharpen kernel via Canvas API
-  function applyFilters(dataUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const w = img.width;
-        const h = img.height;
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-
-        // Pass 1: grayscale + contrast
-        const raw = ctx.getImageData(0, 0, w, h);
-        const gc = ctx.createImageData(w, h);
-        for (let i = 0; i < raw.data.length; i += 4) {
-          const gray = 0.299 * raw.data[i] + 0.587 * raw.data[i + 1] + 0.114 * raw.data[i + 2];
-          const c = Math.max(0, Math.min(255, (gray - 128) * 1.7 + 128));
-          gc.data[i] = gc.data[i + 1] = gc.data[i + 2] = c;
-          gc.data[i + 3] = 255;
-        }
-        ctx.putImageData(gc, 0, 0);
-
-        // Pass 2: sharpen with 3x3 Laplacian kernel [0,-1,0,-1,5,-1,0,-1,0]
-        const src = ctx.getImageData(0, 0, w, h);
-        const dst = ctx.createImageData(w, h);
-        const s = src.data;
-        const d = dst.data;
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const i = (y * w + x) * 4;
-            if (y === 0 || y === h - 1 || x === 0 || x === w - 1) {
-              d[i] = s[i]; d[i + 1] = s[i + 1]; d[i + 2] = s[i + 2]; d[i + 3] = s[i + 3];
-            } else {
-              const v = Math.max(0, Math.min(255,
-                5 * s[i]
-                - s[((y - 1) * w + x) * 4]
-                - s[((y + 1) * w + x) * 4]
-                - s[(y * w + (x - 1)) * 4]
-                - s[(y * w + (x + 1)) * 4]
-              ));
-              d[i] = d[i + 1] = d[i + 2] = v;
-              d[i + 3] = 255;
-            }
-          }
-        }
-        ctx.putImageData(dst, 0, 0);
-        resolve(canvas.toDataURL("image/jpeg", 0.95));
-      };
-      img.src = dataUrl;
-    });
-  }
-
-  function rotateDataUrl(dataUrl, deg) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const rad = (deg * Math.PI) / 180;
-        const sin = Math.abs(Math.sin(rad));
-        const cos = Math.abs(Math.cos(rad));
-        const w = Math.round(img.width * cos + img.height * sin);
-        const h = Math.round(img.width * sin + img.height * cos);
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.translate(w / 2, h / 2);
-        ctx.rotate(rad);
-        ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        resolve(canvas.toDataURL("image/jpeg", 0.92));
-      };
-      img.src = dataUrl;
-    });
-  }
-
-  function tryDecode(dataUrl) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        getZxingReader().decodeFromCanvas(canvas)
-          .then((result) => resolve(result.getText()))
-          .catch(() => resolve(null));
-      };
-      img.onerror = () => resolve(null);
-      img.src = dataUrl;
-    });
-  }
-
-  async function handleFile(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setProcessing(true);
-    setDecodeError(false);
-    setFailedImage(null);
-    try {
-      const rawUrl = await fileToDataUrl(file);
-      const processed = await applyFilters(rawUrl);
-
-      // Attempt 1: preprocessed image, normal orientation
-      setAttemptNum(1);
-      let isbn = await tryDecode(processed);
-
-      // Attempt 2: rotated 90° (handles landscape barcodes on portrait photos)
-      if (!isbn) {
-        setAttemptNum(2);
-        const rot90 = await rotateDataUrl(processed, 90);
-        isbn = await tryDecode(rot90);
-      }
-
-      // Attempt 3: rotated 180° (handles upside-down captures)
-      if (!isbn) {
-        setAttemptNum(3);
-        const rot180 = await rotateDataUrl(processed, 180);
-        isbn = await tryDecode(rot180);
-      }
-
-      if (isbn) {
-        onDetect(isbn.replace(/[^0-9X]/gi, ""));
-      } else {
-        setFailedImage(rawUrl);
-        setDecodeError(true);
-      }
-    } catch {
-      setDecodeError(true);
-    } finally {
-      setProcessing(false);
-      setAttemptNum(0);
-      e.target.value = "";
-    }
-  }
-
-  function retryCapture() {
-    setDecodeError(false);
-    setFailedImage(null);
-    inputRef.current?.click();
-  }
-
-  const attemptLabels = ["", "Analizando imagen…", "Probando otra orientación…", "Último intento…"];
-
-  return (
-    <div style={{ textAlign: "center" }}>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        style={{ display: "none" }}
-        onChange={handleFile}
-      />
-
-      {/* Visual guide shown before first error */}
-      {!decodeError && (
-        <div
-          style={{
-            marginBottom: "1.1rem",
-            padding: "1rem",
-            borderRadius: "10px",
-            backgroundColor: `${palette.amber}18`,
-            border: `1px solid ${palette.amber}50`,
-          }}
-        >
-          {/* Barcode illustration */}
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.65rem" }}>
-            <div
-              style={{
-                border: `2.5px solid ${palette.amber}`,
-                borderRadius: 8,
-                padding: "7px 10px",
-                backgroundColor: "white",
-                display: "flex",
-                alignItems: "stretch",
-                gap: 2,
-                height: 70,
-                width: 150,
-                boxSizing: "border-box",
-              }}
-            >
-              {[2,1,3,1,2,1,3,2,1,3,1,2,1,3,1,2,3,1,2,1].map((w, i) => (
-                <div key={i} style={{ flex: w, backgroundColor: i % 2 === 0 ? "#1a1a1a" : "transparent" }} />
-              ))}
-            </div>
-          </div>
-          <p style={{ ...display, fontSize: "0.84rem", fontWeight: 700, color: palette.amber, textAlign: "center", marginBottom: "0.2rem" }}>
-            Acerca el celular hasta que el código llene la pantalla
-          </p>
-          <p style={{ ...body, fontSize: "0.77rem", color: palette.inkSoft, textAlign: "center", lineHeight: 1.4 }}>
-            Buena iluminación · sin sombras ni reflejos
-          </p>
-        </div>
-      )}
-
-      <button
-        onClick={retryCapture}
-        disabled={processing}
-        className="inline-flex items-center justify-center gap-2 w-full py-5 rounded-lg transition-all hover:opacity-80 active:scale-95"
-        style={{
-          ...display,
-          fontSize: "1rem",
-          fontWeight: 600,
-          color: processing ? palette.inkFaint : palette.bg,
-          backgroundColor: processing ? palette.borderSoft : palette.amber,
-          border: "none",
-          cursor: processing ? "default" : "pointer",
-        }}
-      >
-        {processing ? <Loader2 size={20} className="animate-spin" /> : <Barcode size={20} strokeWidth={1.8} />}
-        {processing ? (attemptLabels[attemptNum] || "Procesando…") : "Tomar foto del código"}
-      </button>
-
-      {processing && attemptNum > 0 && (
-        <p style={{ ...body, fontSize: "0.77rem", color: palette.inkFaint, marginTop: "0.35rem" }}>
-          Intento {attemptNum} de 3
-        </p>
-      )}
-
-      {decodeError && (
-        <div
-          style={{
-            marginTop: "1rem",
-            padding: "0.9rem 1rem",
-            borderRadius: "8px",
-            backgroundColor: palette.bgCard,
-            border: `1px solid ${palette.border}`,
-            textAlign: "left",
-          }}
-        >
-          {/* Show captured photo with guide overlay so user sees the problem */}
-          {failedImage && (
-            <div style={{ position: "relative", marginBottom: "0.75rem" }}>
-              <img
-                src={failedImage}
-                alt="Foto capturada"
-                style={{ width: "100%", borderRadius: "6px", display: "block" }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  top: "25%",
-                  left: "8%",
-                  right: "8%",
-                  bottom: "25%",
-                  border: "3px dashed #ef4444",
-                  borderRadius: "6px",
-                  pointerEvents: "none",
-                }}
-              />
-            </div>
-          )}
-          <p style={{ ...body, color: palette.inkSoft, fontSize: "0.88rem", marginBottom: "0.75rem" }}>
-            {failedImage
-              ? "El código debe llenar el recuadro rojo. Acércate más para que el ISBN ocupe toda la pantalla."
-              : "No se detectó el código. Intenta acercarte más con buena iluminación."}
-          </p>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              onClick={retryCapture}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all hover:opacity-80"
-              style={{ ...display, fontSize: "0.85rem", fontWeight: 500, color: palette.bg, backgroundColor: palette.accent, border: "none" }}
-            >
-              Tomar otra foto
-            </button>
-            <button
-              onClick={onManual}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all hover:opacity-80"
-              style={{ ...display, fontSize: "0.85rem", fontWeight: 500, color: palette.inkSoft, border: `1px solid ${palette.border}`, backgroundColor: "transparent" }}
-            >
-              <Pencil size={12} strokeWidth={2} /> Agregar manualmente
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ============ SEARCH BOOK MODAL ============
+
 function SearchBookModal({ isOpen, onClose, onSelect }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
@@ -2343,9 +2081,9 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
   // Phase 1 — Search (portal to body, escaping all stacking contexts)
   return createPortal(
-    <div style={{ position: "fixed", inset: 0, zIndex: 99999, backgroundColor: "#F5EFE3", display: "flex", flexDirection: "column", paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, backgroundColor: palette.bg, display: "flex", flexDirection: "column", paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
       {/* Search header */}
-      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.65rem", padding: "12px 16px", borderBottom: `1px solid ${palette.borderSoft}`, backgroundColor: "#F5EFE3" }}>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.65rem", padding: "12px 16px", borderBottom: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bg }}>
         <button onClick={() => onClose()} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.25rem", flexShrink: 0 }}>
           <X size={20} color={palette.inkSoft} />
         </button>
@@ -2435,10 +2173,10 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
           <div style={{ padding: "1.5rem 1rem 1rem", textAlign: "center", borderTop: results.length > 0 ? `1px solid ${palette.borderSoft}` : "none" }}>
             <p style={{ ...ts.caption, marginBottom: "0.4rem" }}>¿No encuentras el libro?</p>
             <button
-              onClick={() => onClose("isbn")}
+              onClick={() => onClose("manual")}
               style={{ ...ts.caption, color: palette.accent, fontWeight: 500, background: "none", border: "none", cursor: "pointer" }}
             >
-              Escanea el código de barras →
+              Agregar manualmente →
             </button>
           </div>
         )}
@@ -2450,8 +2188,6 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
 function AddBookView({ onAdd, setTab, isOnline = true }) {
   const [mode, setMode] = useState("search");
-  const [isbnStage, setIsbnStage] = useState("scanning"); // scanning | loading | confirm | notfound
-  const [detectedIsbn, setDetectedIsbn] = useState("");
   const [error, setError] = useState("");
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
 
@@ -2484,7 +2220,6 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
       addedAt: Date.now(),
     });
     setMode("search");
-    setIsbnStage("scanning");
     setForm({ title: "", author: "", status: "want_to_read", genre: "", summary: "", moodTags: [], coverUrl: null, rating: 0 });
     setError("");
     setTab("perfil");
@@ -2514,7 +2249,7 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
     return (
       <SearchBookModal
         isOpen={true}
-        onClose={(fallback) => fallback === "isbn" ? (setIsbnStage("scanning"), setMode("isbn")) : setMode(null)}
+        onClose={(fallback) => fallback === "manual" ? setMode("manual") : setMode(null)}
         onSelect={handleSearchSelect}
       />
     );
@@ -2529,244 +2264,12 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
         </button>
         <h2 style={{ ...ts.h1, color: palette.ink, marginBottom: "1.25rem" }}>Otras opciones</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <button onClick={() => { setIsbnStage("scanning"); setMode("isbn"); }} className="text-left p-5 rounded-xl transition-all hover:-translate-y-0.5" style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.border}` }}>
-            <Barcode size={22} color={palette.amber} strokeWidth={1.8} />
-            <h3 style={{ ...ts.h3, color: palette.ink, marginTop: "0.55rem" }}>Código de barras</h3>
-            <p style={{ ...ts.caption, marginTop: "0.2rem" }}>Fotografía el ISBN · rellena automáticamente</p>
-          </button>
           <button onClick={() => setMode("manual")} className="text-left p-5 rounded-xl transition-all hover:-translate-y-0.5" style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.border}` }}>
             <Pencil size={22} color={palette.inkSoft} strokeWidth={1.8} />
             <h3 style={{ ...ts.h3, color: palette.ink, marginTop: "0.55rem" }}>Manual</h3>
             <p style={{ ...ts.caption, marginTop: "0.2rem" }}>Escribe título y autor a mano</p>
           </button>
         </div>
-      </div>
-    );
-  }
-
-  // isbn mode
-  if (mode === "isbn") {
-    function goBack() {
-      setMode("search");
-      setIsbnStage("scanning");
-      setError("");
-    }
-
-    return (
-      <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto">
-        <button
-          onClick={goBack}
-          className="flex items-center gap-1 mb-4"
-          style={{ ...display, color: palette.inkSoft, fontSize: "0.9rem" }}
-        >
-          <ChevronLeft size={16} /> Atrás
-        </button>
-
-        {isbnStage === "scanning" && (
-          <div>
-            <h2
-              style={{
-                ...display,
-                fontStyle: "italic",
-                fontSize: "1.5rem",
-                color: palette.ink,
-                marginBottom: "0.4rem",
-              }}
-            >
-              Fotografía el código de barras
-            </h2>
-            <p style={{ ...body, color: palette.inkSoft, fontSize: "0.9rem", marginBottom: "1.25rem" }}>
-              Toma una foto del ISBN en la contracubierta. Sin video, funciona en iOS.
-            </p>
-            <BarcodeScanner
-              onDetect={async (isbn) => {
-                setDetectedIsbn(isbn);
-                setIsbnStage("loading");
-                setError("");
-                try {
-                  const bookData = await lookupISBN(isbn);
-                  if (bookData && bookData.title) {
-                    setForm({
-                      title: bookData.title,
-                      author: bookData.author,
-                      status: "want_to_read",
-                      genre: bookData.genre,
-                      summary: bookData.summary,
-                      moodTags: [],
-                      coverUrl: bookData.coverUrl,
-                      rating: 0,
-                    });
-                    setIsbnStage("confirm");
-                  } else {
-                    setIsbnStage("notfound");
-                  }
-                } catch (e) {
-                  console.error(e);
-                  setIsbnStage("notfound");
-                }
-              }}
-              onManual={() => { setMode("manual"); setIsbnStage("scanning"); }}
-            />
-            <div
-              style={{
-                marginTop: "1.5rem",
-                paddingTop: "1.25rem",
-                borderTop: `1px solid ${palette.borderSoft}`,
-                textAlign: "center",
-              }}
-            >
-              <button
-                onClick={() => { setMode("manual"); setIsbnStage("scanning"); }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full transition-all hover:opacity-80"
-                style={{
-                  ...display,
-                  fontSize: "0.88rem",
-                  fontWeight: 500,
-                  color: palette.inkSoft,
-                  border: `1px solid ${palette.border}`,
-                  backgroundColor: palette.bgCard,
-                }}
-              >
-                <Pencil size={13} strokeWidth={2} />
-                Agregar manualmente
-              </button>
-            </div>
-          </div>
-        )}
-
-        {isbnStage === "loading" && (
-          <LoadingEntertainment label="Buscando tu libro…" />
-        )}
-
-        {isbnStage === "confirm" && (
-          <div>
-            <div className="flex gap-4 mb-5">
-              {form.coverUrl ? (
-                <img
-                  src={form.coverUrl}
-                  alt={form.title}
-                  className="rounded-sm flex-shrink-0"
-                  style={{
-                    width: 90,
-                    height: 130,
-                    objectFit: "cover",
-                    boxShadow: "0 4px 14px rgba(42,31,26,0.15)",
-                  }}
-                />
-              ) : (
-                <BookCoverPlaceholder title={form.title} author={form.author} width={90} height={130} />
-              )}
-              <div>
-                <p
-                  style={{
-                    ...display,
-                    fontSize: "0.75rem",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                    color: palette.amber,
-                    marginBottom: "0.4rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  Encontrado en Open Library
-                </p>
-                <h2
-                  style={{
-                    ...display,
-                    fontWeight: 600,
-                    fontSize: "1.4rem",
-                    color: palette.ink,
-                    lineHeight: 1.15,
-                  }}
-                >
-                  {form.title}
-                </h2>
-                <p style={{ ...body, fontStyle: "italic", color: palette.inkSoft, fontSize: "1.05rem" }}>
-                  {form.author}
-                </p>
-              </div>
-            </div>
-            <BookForm form={form} setForm={setForm} onReadSelected={() => setShowRatingPrompt(true)} />
-            {error && (
-              <p style={{ ...body, color: palette.accent, fontSize: "0.9rem", marginTop: "0.5rem" }}>
-                {error}
-              </p>
-            )}
-            <button
-              onClick={handleSave}
-              className="w-full mt-4 py-3 rounded-full transition-all hover:scale-[1.01]"
-              style={{ ...display, fontWeight: 500, backgroundColor: palette.ink, color: palette.bg }}
-            >
-              Guardar libro
-            </button>
-            {showRatingPrompt && (
-              <QuickRatingModal
-                currentRating={form.rating}
-                onSave={(r) => { setForm((prev) => ({ ...prev, rating: r })); setShowRatingPrompt(false); }}
-                onSkip={() => setShowRatingPrompt(false)}
-              />
-            )}
-          </div>
-        )}
-
-        {isbnStage === "notfound" && (
-          <div className="text-center py-10">
-            <div
-              className="inline-flex items-center justify-center mb-4 rounded-full"
-              style={{ width: 56, height: 56, backgroundColor: palette.bgSoft, border: `1px solid ${palette.border}` }}
-            >
-              <Barcode size={22} color={palette.inkFaint} strokeWidth={1.5} />
-            </div>
-            <p
-              style={{
-                ...display,
-                fontStyle: "italic",
-                fontSize: "1.2rem",
-                color: palette.ink,
-                marginBottom: "0.5rem",
-              }}
-            >
-              ISBN no encontrado
-            </p>
-            {detectedIsbn && (
-              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "0.4rem" }}>
-                ISBN detectado: <strong style={{ color: palette.inkSoft, fontFamily: "monospace" }}>{detectedIsbn}</strong>
-              </p>
-            )}
-            <p style={{ ...body, color: palette.inkSoft, fontSize: "0.95rem", marginBottom: "1.5rem" }}>
-              No encontramos este libro. Intenta escanear de nuevo o agrégalo manualmente.
-            </p>
-            <div className="flex gap-2 justify-center flex-wrap">
-              <button
-                onClick={() => setIsbnStage("scanning")}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full"
-                style={{
-                  ...display,
-                  fontSize: "0.9rem",
-                  color: palette.inkSoft,
-                  border: `1px solid ${palette.border}`,
-                }}
-              >
-                <Barcode size={14} /> Escanear de nuevo
-              </button>
-              <button
-                onClick={() => {
-                  setMode("manual");
-                  setIsbnStage("scanning");
-                }}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-full"
-                style={{
-                  ...display,
-                  fontSize: "0.9rem",
-                  backgroundColor: palette.ink,
-                  color: palette.bg,
-                }}
-              >
-                <Pencil size={14} /> Agregar manualmente
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -3599,7 +3102,7 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
     borderRadius: "24px",
     minWidth: "160px",
     border: selected ? "none" : `1px solid #D4C9B5`,
-    backgroundColor: selected ? "#6B1E2A" : "#EBE3D2",
+    backgroundColor: selected ? "#6B1E2A" : palette.bgSoft,
     color: selected ? "#FFFFFF" : palette.ink,
     fontFamily: "'EB Garamond', serif",
     fontSize: "15px",
@@ -3741,6 +3244,8 @@ function AuthView({ onLogin }) {
       try {
         const user = await registerUser(form.name, username, form.email, form.password);
         await mintToken(user);
+        await initUserGems(user.id);
+        localStorage.setItem("folio_gems_welcome", "1");
         onLogin(user, true);
       } catch (e) {
         setError(e.message);
@@ -4319,7 +3824,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
                     key={def.key}
                     onClick={() => setSelectedAch({ def, unlockedAt: unlockedMap[def.key] || null })}
                     style={{
-                      backgroundColor: isUnlocked ? "#FBF6EB" : "#F0EDE8",
+                      backgroundColor: isUnlocked ? palette.bgCard : palette.bgSoft,
                       border: isUnlocked ? "1px solid rgba(200,146,74,0.35)" : "none",
                       borderRadius: "10px", padding: "0.6rem 0.35rem", textAlign: "center",
                       cursor: "pointer", position: "relative",
@@ -4354,15 +3859,18 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
 }
 
 // ============ READING HEATMAP ============
-const CAL_COLORS = [null, "#D4E6C3", "#9DC07F", "#5C8A3E", "#3D6B28"];
 const DAY_HEADERS_ES = ["D", "L", "M", "Mi", "J", "V", "S"];
 
 function getCalColor(pages) {
   if (!pages || pages === 0) return null;
-  if (pages <= 5)  return CAL_COLORS[1];
-  if (pages <= 15) return CAL_COLORS[2];
-  if (pages <= 30) return CAL_COLORS[3];
-  return CAL_COLORS[4];
+  const dark = palette.bg === PALETTE_DARK.bg;
+  const cols = dark
+    ? [null, "#1e3a12", "#2d5a1a", "#3d8f1f", "#5bc234"]
+    : [null, "#D4E6C3", "#9DC07F", "#5C8A3E", "#3D6B28"];
+  if (pages <= 5)  return cols[1];
+  if (pages <= 15) return cols[2];
+  if (pages <= 30) return cols[3];
+  return cols[4];
 }
 
 function ReadingHeatmap({ userId }) {
@@ -4536,7 +4044,10 @@ function ReadingHeatmap({ userId }) {
               {activeDaysThisMonth} {activeDaysThisMonth === 1 ? "día activo" : "días activos"} este mes
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              {CAL_COLORS.slice(1).map(c => (
+              {(palette.bg === PALETTE_DARK.bg
+                ? ["#1e3a12","#2d5a1a","#3d8f1f","#5bc234"]
+                : ["#D4E6C3","#9DC07F","#5C8A3E","#3D6B28"]
+              ).map(c => (
                 <div key={c} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: c, flexShrink: 0 }} />
               ))}
             </div>
@@ -4548,7 +4059,7 @@ function ReadingHeatmap({ userId }) {
 }
 
 // ============ PROFILE VIEW ============
-function ProfileView({ user, books, onSelectBook, setTab, onLogout }) {
+function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'system', setTheme }) {
   const [profile, setProfile] = useState({ username: "", bio: "", avatarUrl: null, coverUrl: null });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -4818,10 +4329,9 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout }) {
       {/* ── Sección de racha ── */}
       <div style={{ padding: "0 1.25rem 0.5rem" }}>
         {streak && streak.current_streak > 0 ? (
-          <div style={{
+          <div className="streak-banner-active" style={{
             borderRadius: "14px", padding: "1rem 1.25rem",
             background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)",
-            boxShadow: "0 4px 20px rgba(122,46,46,0.3)",
             display: "flex", alignItems: "center", gap: "1rem",
           }}>
             <Flame
@@ -5229,8 +4739,32 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout }) {
       </div>
 
       {activeWrap && (
-        <WrappedModal wrap={activeWrap} userName={user.name} onClose={() => setActiveWrap(null)} />
+        <WrappedStoryExperience wrap={activeWrap} userName={user.name} onClose={() => setActiveWrap(null)} />
       )}
+
+      {/* Apariencia */}
+      <div style={{ padding: "0 1.25rem 1.25rem" }}>
+        <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Apariencia</p>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          {[{ id: "system", label: "Sistema" }, { id: "light", label: "Claro" }, { id: "dark", label: "Oscuro" }].map(({ id, label }) => (
+            <button
+              key={id}
+              onClick={() => setTheme?.(id)}
+              style={{
+                flex: 1, padding: "0.55rem 0.25rem", borderRadius: 10,
+                border: `1.5px solid ${theme === id ? palette.accent : palette.border}`,
+                backgroundColor: theme === id ? `${palette.accent}18` : "transparent",
+                color: theme === id ? palette.accent : palette.inkSoft,
+                cursor: "pointer", ...body, fontSize: "0.82rem",
+                fontWeight: theme === id ? 600 : 400,
+                transition: "all 150ms ease",
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Cerrar sesión */}
       <div style={{ padding: "0 1.25rem 2.5rem", textAlign: "center", marginTop: "0.5rem" }}>
@@ -5662,8 +5196,8 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
   const [loadingUser, setLoadingUser] = useState(true);
   const [uStreakRow, setUStreakRow] = useState(null);
   const [fStreakRow, setFStreakRow] = useState(null);
-  const [uFriendCount, setUFriendCount] = useState(0);
-  const [fFriendCount, setFFriendCount] = useState(0);
+  const [uAvgPages, setUAvgPages] = useState(0);
+  const [fAvgPages, setFAvgPages] = useState(0);
 
   useEffect(() => {
     fetchBooks(user.id).then((b) => { setUserBooks(b); setLoadingUser(false); }).catch(() => setLoadingUser(false));
@@ -5671,10 +5205,10 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
       .then(({ data }) => setUStreakRow(data));
     supabase.from("user_streaks").select("current_streak, total_pages_read").eq("user_id", friend.id).maybeSingle()
       .then(({ data }) => setFStreakRow(data));
-    supabase.from("friendships").select("id", { count: "exact", head: true }).eq("status", "accepted")
-      .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`).then(({ count }) => setUFriendCount(count || 0));
-    supabase.from("friendships").select("id", { count: "exact", head: true }).eq("status", "accepted")
-      .or(`user_id.eq.${friend.id},friend_id.eq.${friend.id}`).then(({ count }) => setFFriendCount(count || 0));
+    supabase.from("reading_logs").select("pages_read").eq("user_id", user.id).not("pages_read", "is", null)
+      .then(({ data }) => { if (data?.length) setUAvgPages(Math.round(data.reduce((s, l) => s + (l.pages_read || 0), 0) / data.length)); });
+    supabase.from("reading_logs").select("pages_read").eq("user_id", friend.id).not("pages_read", "is", null)
+      .then(({ data }) => { if (data?.length) setFAvgPages(Math.round(data.reduce((s, l) => s + (l.pages_read || 0), 0) / data.length)); });
   }, [user.id]);
 
   if (loadingUser) return (
@@ -5691,8 +5225,8 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
   const fRated   = fRead.filter((b) => b.rating > 0);
   const uAvg     = uRated.length ? uRated.reduce((s, b) => s + b.rating, 0) / uRated.length : 0;
   const fAvg     = fRated.length ? fRated.reduce((s, b) => s + b.rating, 0) / fRated.length : 0;
-  const uGenres  = new Set(userBooks.filter((b) => b.genre).map((b) => b.genre));
-  const fGenres  = new Set(friendBooks.filter((b) => b.genre).map((b) => b.genre));
+  const uGenres  = new Set([...uRead, ...uReading].filter((b) => b.genre).map((b) => b.genre));
+  const fGenres  = new Set([...fRead, ...fReading].filter((b) => b.genre).map((b) => b.genre));
   const uStreak  = readingStreak(userBooks);
   const fStreak  = readingStreak(friendBooks);
 
@@ -5774,12 +5308,13 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
       {/* Metrics */}
       <div style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 14, padding: "1rem 1.1rem", marginBottom: "1.25rem" }}>
         <p style={secLabel}>Métricas</p>
-        <MetricRow label="Libros en total" uVal={userBooks.length} fVal={friendBooks.length} maxVal={Math.max(1, userBooks.length, friendBooks.length)} />
+        <MetricRow label="Racha actual (días)" uVal={uStreakRow?.current_streak || 0} fVal={fStreakRow?.current_streak || 0} maxVal={Math.max(1, uStreakRow?.current_streak || 0, fStreakRow?.current_streak || 0)} />
         <MetricRow label="Leídos" uVal={uRead.length} fVal={fRead.length} maxVal={Math.max(1, uRead.length, fRead.length)} />
         <MetricRow label="Leyendo ahora" uVal={uReading.length} fVal={fReading.length} maxVal={Math.max(1, uReading.length, fReading.length)} />
+        <MetricRow label="Géneros (leídos + leyendo)" uVal={uGenres.size} fVal={fGenres.size} maxVal={Math.max(1, uGenres.size, fGenres.size)} />
         <MetricRow label="Calificación promedio" uVal={uAvg} fVal={fAvg} maxVal={5} fmt={(v) => v > 0 ? `${v.toFixed(1)}★` : "—"} />
-        <MetricRow label="Géneros únicos" uVal={uGenres.size} fVal={fGenres.size} maxVal={Math.max(1, uGenres.size, fGenres.size)} />
-        <MetricRow label="Racha de lectura (meses)" uVal={uStreak} fVal={fStreak} maxVal={Math.max(1, uStreak, fStreak)} />
+        <MetricRow label="Páginas leídas" uVal={uStreakRow?.total_pages_read || 0} fVal={fStreakRow?.total_pages_read || 0} maxVal={Math.max(1, uStreakRow?.total_pages_read || 0, fStreakRow?.total_pages_read || 0)} fmt={(v) => v > 0 ? v.toLocaleString("es") : "0"} />
+        <MetricRow label="Páginas / sesión (prom.)" uVal={uAvgPages} fVal={fAvgPages} maxVal={Math.max(1, uAvgPages, fAvgPages)} fmt={(v) => v > 0 ? `${v}p` : "—"} />
       </div>
 
       {/* Spider / Radar chart */}
@@ -5791,11 +5326,11 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
 
         const axes = [
           { name: "Leídos",      uRaw: uRead.length,  fRaw: fRead.length,  uDisp: uRead.length,          fDisp: fRead.length          },
-          { name: "Páginas",     uRaw: uPages,         fRaw: fPages,         uDisp: uPages,                fDisp: fPages                },
-          { name: "Racha",       uRaw: uCurStreak,     fRaw: fCurStreak,     uDisp: uCurStreak,            fDisp: fCurStreak            },
-          { name: "Rating",      uRaw: uAvg * 20,      fRaw: fAvg * 20,      uDisp: uAvg.toFixed(1),       fDisp: fAvg.toFixed(1)       },
+          { name: "Páginas",     uRaw: uPages,         fRaw: fPages,         uDisp: uPages.toLocaleString("es"), fDisp: fPages.toLocaleString("es") },
+          { name: "Racha",       uRaw: uCurStreak,     fRaw: fCurStreak,     uDisp: `${uCurStreak}d`,      fDisp: `${fCurStreak}d`      },
+          { name: "Rating",      uRaw: uAvg * 20,      fRaw: fAvg * 20,      uDisp: uAvg > 0 ? uAvg.toFixed(1) : "—", fDisp: fAvg > 0 ? fAvg.toFixed(1) : "—" },
           { name: "Géneros",     uRaw: uGenres.size,   fRaw: fGenres.size,   uDisp: uGenres.size,          fDisp: fGenres.size          },
-          { name: "Amigos",      uRaw: uFriendCount,   fRaw: fFriendCount,   uDisp: uFriendCount,          fDisp: fFriendCount          },
+          { name: "Vel. pág",    uRaw: uAvgPages,      fRaw: fAvgPages,      uDisp: uAvgPages > 0 ? `${uAvgPages}p` : "—", fDisp: fAvgPages > 0 ? `${fAvgPages}p` : "—" },
         ];
         const n = axes.length;
         const size = 310;
@@ -6354,10 +5889,10 @@ function FriendProfileModal({ friend, user, onClose }) {
 
   function StatCard({ label, value, statKey, color = palette.ink }) {
     const bgMap = {
-      read: "#F0F7F0", all: "#FBF6EB", rating: "#FBF0E5", reading: "#FDF5F0", want: "#F0F4F9",
+      read: palette.bgCard, all: palette.bgCard, rating: palette.bgCard, reading: palette.bgCard, want: palette.bgCard,
     };
     const borderMap = {
-      read: "#C8E0C0", all: "#DDD0BC", rating: "#E0C498", reading: "#E8D0C8", want: "#C0D0DC",
+      read: palette.border, all: palette.border, rating: palette.border, reading: palette.border, want: palette.border,
     };
     return (
       <button
@@ -6832,13 +6367,13 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
   const pct = Math.min(100, Math.round(scrollPct * 100));
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "#F5EFE3", display: "flex", flexDirection: "column" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1200, backgroundColor: palette.bg, display: "flex", flexDirection: "column" }}>
       {/* Header */}
       <div style={{
         display: "flex", alignItems: "center", gap: "0.75rem",
         padding: "0.65rem 1rem",
-        backgroundColor: "#F5EFE3",
-        borderBottom: "1px solid rgba(42,31,26,0.1)",
+        backgroundColor: palette.bg,
+        borderBottom: `1px solid ${palette.border}`,
         flexShrink: 0,
       }}>
         <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.4rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
@@ -6856,27 +6391,27 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 3, backgroundColor: "rgba(42,31,26,0.08)", flexShrink: 0 }}>
-        <div style={{ height: "100%", width: `${pct}%`, backgroundColor: pct >= 95 ? "#5C6B3D" : palette.accent, transition: "width 0.2s, background-color 0.4s" }} />
+      <div style={{ height: 3, backgroundColor: palette.borderSoft, flexShrink: 0 }}>
+        <div style={{ height: "100%", width: `${pct}%`, backgroundColor: pct >= 95 ? palette.sage : palette.accent, transition: "width 0.2s, background-color 0.4s" }} />
       </div>
 
       {/* Story content */}
       <div ref={containerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "2rem 1.5rem 5rem", WebkitOverflowScrolling: "touch" }}>
-        <h1 style={{ fontFamily: "'EB Garamond', serif", fontSize: "1.7rem", fontStyle: "italic", color: "#2A1F1A", marginBottom: "0.3rem", lineHeight: 1.25 }}>
+        <h1 style={{ fontFamily: "'EB Garamond', serif", fontSize: "1.7rem", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.25 }}>
           {cuento.titulo}
         </h1>
-        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: "#7A6A5A", marginBottom: "2.5rem" }}>
+        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: palette.inkFaint, marginBottom: "2.5rem" }}>
           {cuento.autor} · {cuento.duracion}
         </p>
 
         {cuento.texto.split(/\n\n+/).filter(p => p.trim()).map((para, i) => (
-          <p key={i} style={{ fontFamily: "'EB Garamond', serif", fontSize: "18px", lineHeight: 1.85, color: "#2A1F1A", marginBottom: "1.3rem", textAlign: "justify" }}>
+          <p key={i} style={{ fontFamily: "'EB Garamond', serif", fontSize: "18px", lineHeight: 1.85, color: palette.ink, marginBottom: "1.3rem", textAlign: "justify" }}>
             {para.trim()}
           </p>
         ))}
 
         {finished && (
-          <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: "#9A8A7A", textAlign: "center", padding: "1.5rem 0 0.5rem" }}>
+          <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: palette.inkFaint, textAlign: "center", padding: "1.5rem 0 0.5rem" }}>
             Fin.
           </p>
         )}
@@ -6890,7 +6425,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 480, backgroundColor: "#F5EFE3", borderRadius: "1.5rem 1.5rem 0 0", padding: "1.75rem 1.5rem 2.25rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.18)", animation: "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
+            style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bgCard, borderRadius: "1.5rem 1.5rem 0 0", padding: "1.75rem 1.5rem 2.25rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.18)", animation: "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
           >
             <div style={{ width: 36, height: 4, backgroundColor: "rgba(42,31,26,0.18)", borderRadius: 999, margin: "0 auto 1.5rem" }} />
             <p style={{ ...display, fontSize: "1.3rem", fontStyle: "italic", color: palette.ink, textAlign: "center", marginBottom: "0.25rem" }}>¿Qué te pareció?</p>
@@ -7868,7 +7403,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
   return (
     <>
       <div onClick={handleClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 1000, animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }} />
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "65vh", backgroundColor: "#F5EFE3", borderRadius: "20px 20px 0 0", zIndex: 1001, display: "flex", flexDirection: "column", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}>
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "65vh", backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0", zIndex: 1001, display: "flex", flexDirection: "column", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}>
         <div style={{ width: 40, height: 4, backgroundColor: "#D4C9B5", borderRadius: 2, margin: "12px auto 0", flexShrink: 0 }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", flexShrink: 0 }}>
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, color: palette.ink }}>Notificaciones</span>
@@ -8210,6 +7745,7 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
   const [animating, setAnimating] = useState(false);
   function handleClick(e) {
     e.stopPropagation();
+    haptic(HAPTIC.LIKE);
     if (!liked) { setAnimating(true); setTimeout(() => setAnimating(false), 320); }
     onToggle(postId);
   }
@@ -8747,19 +8283,23 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
         pagesRead: parseInt(pages) || null,
         mood,
       });
+      playReadingSession();
       checkAchievements(user.id, user.name);
-      onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0 });
+      addGemsDB(user.id, 5).then(() => gemsEventBus.emit(5));
     } catch (err) { console.error("Error registrando sesión:", err); }
-    finally { setSaving(false); }
+    finally {
+      setSaving(false);
+      onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0 });
+    }
   }
 
   return (
     <div
-      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, height: "100vh", backgroundColor: "#F5EFE3", zIndex: 9999, display: "flex", flexDirection: "column", overflowY: "auto", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
+      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, height: "100vh", backgroundColor: palette.bg, zIndex: 9999, display: "flex", flexDirection: "column", overflowY: "auto", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
     >
       <div
         style={{
-          backgroundColor: "#F5EFE3",
+          backgroundColor: palette.bg,
           padding: "1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom))",
           paddingTop: "calc(1.25rem + env(safe-area-inset-top))",
           width: "100%", maxWidth: 480, margin: "0 auto", flex: 1,
@@ -8943,7 +8483,7 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
   const coverStyle = { width: 120, height: 180, borderRadius: 8, objectFit: "cover", boxShadow: "0 8px 24px rgba(42,31,26,0.28)", display: "block" };
 
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, height: "100vh", backgroundColor: "#F5EFE3", zIndex: 9999, display: "flex", flexDirection: "column", overflowY: "auto", animation: isClosing ? "fadeOut 200ms ease-out forwards" : undefined }}>
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, height: "100vh", backgroundColor: palette.bg, zIndex: 9999, display: "flex", flexDirection: "column", overflowY: "auto", animation: isClosing ? "fadeOut 200ms ease-out forwards" : undefined }}>
 
       {/* Scrollable content */}
       <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", alignItems: "center", paddingTop: "calc(24px + env(safe-area-inset-top))" }}>
@@ -9279,6 +8819,136 @@ const CUENTO_TITLE_MAP = Object.fromEntries(
   CUENTOS.map(c => [c.titulo.toLowerCase(), c])
 );
 
+// ── Cuento del día hero ────────────────────────────────────────────────────
+function SnacksHero({ onRead }) {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const heroBase = Math.abs(dayOfYear) % CUENTOS.length;
+  const readIds = (() => { try { return new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]')); } catch { return new Set(); } })();
+  let cuento = null;
+  for (let i = 0; i < CUENTOS.length; i++) {
+    const c = CUENTOS[(heroBase + i) % CUENTOS.length];
+    if (!readIds.has(c.id)) { cuento = c; break; }
+  }
+  if (!cuento) cuento = CUENTOS[heroBase];
+  const isDark = palette.bg === PALETTE_DARK.bg;
+
+  if (!cuento) return null;
+
+  return (
+    <div style={{
+      background: isDark
+        ? `linear-gradient(135deg, ${palette.bgCard} 0%, rgba(200,79,79,0.08) 100%)`
+        : "linear-gradient(135deg, rgba(164,75,63,0.07) 0%, rgba(200,146,74,0.06) 100%)",
+      border: `1px solid ${isDark ? "#4a3830" : "rgba(164,75,63,0.2)"}`,
+      borderRadius: 18,
+      padding: "1.35rem 1.25rem 1.1rem",
+      marginBottom: "1.5rem",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      {/* Decorative accent line */}
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, backgroundColor: palette.accent, borderRadius: "18px 0 0 18px" }} />
+      <div style={{ paddingLeft: "0.75rem" }}>
+        <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.65rem", fontWeight: 600, color: palette.accent, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
+          cuento del día
+        </p>
+        <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "1.3rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "0.3rem" }}>
+          {cuento.titulo}
+        </p>
+        <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "0.65rem" }}>
+          {cuento.autor}
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
+          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.72rem", color: palette.inkFaint, fontWeight: 500 }}>
+            {cuento.duracion || `${cuento.duracion_minutos} min`} de lectura
+          </span>
+          {cuento.generos?.[0] && (
+            <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.68rem", color: palette.amber, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {cuento.generos[0]}
+            </span>
+          )}
+        </div>
+        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.88rem", color: palette.inkSoft, lineHeight: 1.5, marginBottom: "1rem", fontStyle: "italic" }}>
+          {cuento.desc}
+        </p>
+        <button
+          onClick={() => {
+            haptic(HAPTIC.NAV);
+            try {
+              const ids = new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]'));
+              ids.add(cuento.id);
+              localStorage.setItem('folio_read_cuentos', JSON.stringify([...ids]));
+            } catch {}
+            onRead(cuento);
+          }}
+          style={{
+            fontFamily: "Fraunces, serif", fontSize: "0.92rem", fontWeight: 700,
+            backgroundColor: palette.accent, color: "#F5EDE0",
+            border: "none", borderRadius: 12, padding: "0.75rem 1.5rem",
+            cursor: "pointer", width: "100%",
+            transition: "transform 150ms cubic-bezier(0.23,1,0.32,1)",
+          }}
+          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.01)"}
+          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+          onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"}
+          onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+        >
+          Leer ahora →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Snacks Carousel horizontal ──────────────────────────────────────────────
+function SnacksCarousel({ onRead }) {
+  // Show the remaining cuentos (skip today's = index 0 by day)
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const heroIdx = Math.abs(dayOfYear) % CUENTOS.length;
+  const rest = [...CUENTOS.slice(heroIdx + 1), ...CUENTOS.slice(0, heroIdx)].slice(0, 6);
+
+  if (rest.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: "1.75rem", marginBottom: "0.5rem" }}>
+      <p style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "1rem", color: palette.ink, marginBottom: "0.75rem" }}>
+        Más cuentos
+      </p>
+      <div style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.5rem", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+        {rest.map(c => (
+          <button
+            key={c.id}
+            onClick={() => onRead(c)}
+            style={{
+              flexShrink: 0, width: 160,
+              backgroundColor: palette.bgCard,
+              border: `1px solid ${palette.border}`,
+              borderRadius: 12,
+              padding: "0.9rem 0.85rem",
+              textAlign: "left",
+              cursor: "pointer",
+              display: "flex", flexDirection: "column", gap: "0.25rem",
+              transition: "transform 150ms ease, box-shadow 150ms ease",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 18px rgba(42,31,26,0.12)`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
+          >
+            <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "0.88rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
+              {c.titulo}
+            </p>
+            <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.75rem", color: palette.inkSoft, margin: 0 }}>
+              {c.autor}
+            </p>
+            <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.65rem", color: palette.inkFaint, marginTop: "0.25rem" }}>
+              {c.duracion || `${c.duracion_minutos} min`}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FeedEditorialContent({ books, onAdd, onInvite, onRead }) {
   const [addedIds, setAddedIds] = useState(new Set());
   const stories = getEditorialStories(books);
@@ -9432,6 +9102,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [feedState, setFeedState] = useState('loading');
   const [hasFriends, setHasFriends] = useState(null);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 13 ? "Buenos días" : greetingHour < 20 ? "Buenas tardes" : "Buenas noches";
@@ -9446,10 +9118,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     loadFriendsReading();
     loadStreakInfo();
   }, [isOnline]);
-
-  useEffect(() => {
-    console.log('feedState:', feedState);
-  }, [feedState]);
 
   useEffect(() => {
     // Deep link: ?action=log opens the reading log modal
@@ -9522,7 +9190,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }
 
   function scheduleNotifSW() {
-    navigator.serviceWorker?.ready.then(reg => reg.active?.postMessage({ type: 'FOLIO_SCHEDULE_NOTIF' }));
+    const bookTitle = books.find(b => b.status === 'reading')?.title || null;
+    navigator.serviceWorker?.ready.then(reg =>
+      reg.active?.postMessage({
+        type: 'FOLIO_SCHEDULE_NOTIF',
+        streak: streak?.current_streak || 0,
+        bookTitle,
+      })
+    );
   }
 
   async function requestNotifPermission() {
@@ -9644,6 +9319,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     const now = Date.now();
     const last = lastTapRef.current[postId] || 0;
     if (now - last < 350) {
+      haptic(HAPTIC.DOUBLE_LIKE);
       setDoubleTapPost(postId);
       setTimeout(() => setDoubleTapPost(null), 700);
       if (!likedPosts.has(postId)) toggleLike(postId);
@@ -9660,10 +9336,16 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }
 
   async function handleDeletePost(postId) {
+    setDeleting(true);
     try {
       await deleteFeedPost(postId, user.id);
       setPosts((prev) => prev.filter((p) => p.id !== postId));
-    } catch (err) { console.error("Error eliminando post:", err); }
+      setPostToDelete(null);
+    } catch (err) {
+      console.error("Error eliminando post:", err);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function handleCommentCountChange(postId, count) {
@@ -9765,6 +9447,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         onLog={() => setShowLogModal(true)}
         onFreeze={applyFreeze}
       />
+
+      {/* Snacks Hero — cuento del día */}
+      <SnacksHero onRead={setActiveReader} />
 
       {/* Strip: Leyendo ahora */}
       {friendsReading.length > 0 && (
@@ -9971,10 +9656,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
             if (isAchievement) {
               return (
-                <div key={post.id} id={`post-${post.id}`} style={{
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" style={{
                   position: "relative", overflow: "hidden",
-                  background: "linear-gradient(135deg, #F5EFE3 0%, #FDF6E8 100%)",
-                  border: "1px solid #E8D5A8",
+                  backgroundColor: palette.bgCard,
+                  border: `1px solid ${palette.amber}40`,
                   borderRadius: "14px",
                   padding: "18px 16px 14px",
                   boxShadow: highlightedPost === post.id ? "0 2px 10px rgba(200,146,74,0.13), 0 0 0 2px #7A2E2E" : "0 2px 10px rgba(200,146,74,0.13)",
@@ -10000,8 +9685,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
                     </div>
                     {post.user_id === user.id && (
-                      <button onClick={() => handleDeletePost(post.id)} style={{ color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
-                        <X size={14} />
+                      <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} style={{ color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
+                        <Trash2 size={14} />
                       </button>
                     )}
                   </div>
@@ -10051,6 +9736,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               console.log('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
               return (
                 <div key={post.id} id={`post-${post.id}`}
+                  className="feed-post-item"
                   onClick={() => handleDoubleTap(post.id)}
                   style={{ position: "relative", overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid #4CAF5030`, borderLeft: `4px solid #4CAF50`, borderRadius: "14px", padding: "18px", boxShadow: highlightedPost === post.id ? "0 2px 8px rgba(76,175,80,0.10), 0 0 0 2px #7A2E2E" : "0 2px 8px rgba(76,175,80,0.10)", cursor: "default", transition: "box-shadow 200ms ease" }}
                 >
@@ -10078,8 +9764,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
                     </div>
                     {post.user_id === user.id && (
-                      <button onClick={() => handleDeletePost(post.id)} style={{ color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
-                        <X size={14} />
+                      <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} style={{ color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
+                        <Trash2 size={14} />
                       </button>
                     )}
                   </div>
@@ -10132,6 +9818,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             const shadowColor = isFinished ? "rgba(122,46,46,0.13)" : isStarted ? "rgba(200,146,74,0.15)" : "rgba(27,58,75,0.12)";
             return (
               <div key={post.id} id={`post-${post.id}`}
+                className="feed-post-item"
                 onClick={() => handleDoubleTap(post.id)}
                 style={{
                   position: "relative", overflow: "hidden",
@@ -10191,8 +9878,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
                   </div>
                   {post.user_id === user.id && (
-                    <button onClick={() => handleDeletePost(post.id)} title="Eliminar" style={{ color: palette.inkFaint, backgroundColor: "transparent", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
-                      <X size={14} strokeWidth={2} />
+                    <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} title="Eliminar" style={{ color: palette.inkFaint, backgroundColor: "transparent", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
+                      <Trash2 size={14} strokeWidth={2} />
                     </button>
                   )}
                 </div>
@@ -10266,10 +9953,18 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         </div>
       )}
 
-      {/* Cuentos curados — siempre al final del feed */}
+      {/* Snacks carousel + invitar amigo — al final del feed */}
       {(feedState === 'ready' || feedState === 'empty') && (
-        <div style={{ marginTop: "2rem", paddingTop: "1.5rem", borderTop: `1px solid ${palette.borderSoft}` }}>
-          <FeedEditorialContent books={books} onAdd={onAdd} onInvite={handleInvite} onRead={setActiveReader} />
+        <div style={{ paddingTop: "1rem", borderTop: `1px solid ${palette.borderSoft}` }}>
+          <SnacksCarousel onRead={setActiveReader} />
+          {/* Invitar amigo */}
+          <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: 14, padding: "1.1rem 1.25rem" }}>
+            <p style={{ ...display, fontSize: "1rem", color: palette.ink, margin: "0 0 0.2rem" }}>Invita a un amigo y lean juntos</p>
+            <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>Comparte tu link personal de Folio</p>
+            <button onClick={handleInvite} style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}>
+              Invitar amigo
+            </button>
+          </div>
         </div>
       )}
 
@@ -10346,6 +10041,65 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           onClose={() => setActiveReader(null)}
           onAddToLibrary={(bookData) => { onAdd(bookData); }}
         />
+      )}
+
+      {/* ── Confirmación de borrar post ── */}
+      {postToDelete && (
+        <>
+          <div
+            onClick={() => !deleting && setPostToDelete(null)}
+            style={{ position: "fixed", inset: 0, backgroundColor: "rgba(42,31,26,0.55)", zIndex: 300, animation: "backdropIn 200ms ease-out" }}
+          />
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 301,
+            backgroundColor: palette.bgCard,
+            borderRadius: "20px 20px 0 0",
+            padding: "1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))",
+            maxWidth: 480, margin: "0 auto",
+            boxShadow: "0 -4px 32px rgba(42,31,26,0.18)",
+            animation: "slideUp 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+          }}>
+            <div style={{ width: 36, height: 4, backgroundColor: palette.border, borderRadius: 999, margin: "0 auto 1.25rem" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.65rem" }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Trash2 size={18} color="#DC2626" strokeWidth={2} />
+              </div>
+              <div>
+                <p style={{ ...display, fontWeight: 700, fontSize: "1rem", color: palette.ink }}>¿Borrar este post?</p>
+                <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginTop: "0.1rem" }}>Esta acción no se puede deshacer.</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "1.1rem" }}>
+              <button
+                onClick={() => handleDeletePost(postToDelete)}
+                disabled={deleting}
+                style={{
+                  width: "100%", padding: "0.85rem", borderRadius: 12,
+                  backgroundColor: "#DC2626", color: "#fff",
+                  border: "none", cursor: deleting ? "default" : "pointer",
+                  ...display, fontSize: "0.97rem", fontWeight: 600,
+                  opacity: deleting ? 0.7 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+                }}
+              >
+                {deleting && <Loader2 size={16} className="animate-spin" />}
+                {deleting ? "Borrando…" : "Sí, borrar post"}
+              </button>
+              <button
+                onClick={() => setPostToDelete(null)}
+                disabled={deleting}
+                style={{
+                  width: "100%", padding: "0.85rem", borderRadius: 12,
+                  backgroundColor: "transparent", color: palette.inkSoft,
+                  border: `1px solid ${palette.border}`, cursor: "pointer",
+                  ...body, fontSize: "0.95rem",
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -10471,7 +10225,7 @@ function ExplorarView({ books, onSelectBook, onAdd }) {
   );
 }
 
-function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline = true }) {
+function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme }) {
   const [sub, setSub] = useState("perfil");
   const TABS = [
     { id: "perfil", label: "Mi perfil" },
@@ -10492,7 +10246,7 @@ function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline =
         )}
       </div>
       {sub === "libros" && <LibraryView books={books} onSelectBook={onSelectBook} setTab={setTab} isOnline={isOnline} />}
-      {sub === "perfil" && <ProfileView user={user} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} />}
+      {sub === "perfil" && <ProfileView user={user} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} theme={theme} setTheme={setTheme} />}
       {sub === "resumen" && <ReadingStatsView books={books} />}
     </div>
   );
@@ -10657,6 +10411,364 @@ function Toast({ message, onDismiss }) {
       border: `1px solid rgba(200,146,74,0.3)`,
     }}>
       {message}
+    </div>
+  );
+}
+
+// ============ WRAPPED STORY EXPERIENCE ============
+function WrappedStoryExperience({ wrap, userName, onClose }) {
+  const { data, month, year, wrap_type } = wrap;
+  const isAnnual = wrap_type === "annual";
+  const monthName = isAnnual ? null : MONTHS_ES[(month || 1) - 1];
+  const periodLabel = isAnnual ? `${year}` : `${monthName} ${year}`;
+
+  // Derived stats
+  const books = data.booksRead || [];
+  const booksCount = books.length;
+  const totalPages = data.totalPages || 0;
+  const topGenre = data.topGenre || null;
+  const favBook = data.favoriteBook || null;
+  const uniqueGenres = [...new Set(books.map(b => b.genre).filter(Boolean))].length;
+
+  // Personality
+  const personality = (() => {
+    if (uniqueGenres >= 3) return { label: "Exploradora curiosa", sub: "los géneros no te dan miedo — los coleccionas" };
+    if (booksCount >= 4) return { label: "Devoradora rápida", sub: "terminas libros como episodios de serie" };
+    if (totalPages > 800) return { label: "Pensadora profunda", sub: "prefieres calidad sobre cantidad" };
+    if (topGenre?.toLowerCase().includes("roman")) return { label: "Romántica nocturna", sub: "las historias de amor te tienen" };
+    return { label: "Lectora constante", sub: "un libro a la vez, hasta el final" };
+  })();
+
+  // Pages comparison
+  const stPages = totalPages > 0 ? Math.round(totalPages / 187) : 0;
+  const pagesComparison = stPages > 0 ? `eso es ~${stPages} episodios de una serie` : "páginas que valen un mundo";
+
+  // Top author
+  const authorCount = {};
+  books.forEach(b => { if (b.author) authorCount[b.author] = (authorCount[b.author] || 0) + 1; });
+  const topAuthor = Object.keys(authorCount).sort((a, b) => authorCount[b] - authorCount[a])[0] || null;
+  const topAuthorCount = topAuthor ? authorCount[topAuthor] : 0;
+
+  // Hours reading (avg 25 pages/hour)
+  const hoursReading = totalPages > 0 ? Math.round(totalPages / 25) : 0;
+  const stEps = hoursReading > 0 ? Math.round(hoursReading / 0.75) : 0;
+  const hoursComparison = stEps >= 2
+    ? `como ver ${stEps} episodios de una serie`
+    : hoursReading === 1 ? "una tarde bien aprovechada" : "cada minuto que leíste vale";
+
+  // Slides config
+  const SLIDE_GRADIENTS = [
+    "linear-gradient(160deg, #3D1A18 0%, #7A2E2E 60%, #2A1510 100%)",
+    "linear-gradient(160deg, #1A1210 0%, #C8924A 60%, #8B5E20 100%)",
+    "linear-gradient(160deg, #1a2a1a 0%, #3d6b28 60%, #1a1614 100%)",
+    "linear-gradient(160deg, #1a1a2e 0%, #4A3A8B 60%, #1a1614 100%)",
+    "linear-gradient(160deg, #1a1a1a 0%, #5C4A3F 55%, #2A1F1A 100%)",
+    "linear-gradient(160deg, #2e1a2e 0%, #7A2E5E 60%, #1a1614 100%)",
+    "linear-gradient(160deg, #1a2e2a 0%, #2e5E5A 60%, #1a1614 100%)",
+    "linear-gradient(160deg, #2e2a1a 0%, #8B7020 60%, #3d2e10 100%)",
+    "linear-gradient(160deg, #7A2E2E 0%, #C8924A 60%, #F4EDE0 100%)",
+  ];
+
+  const slides = [
+    { type: "intro" },
+    { type: "books" },
+    { type: "pages" },
+    ...(topAuthor ? [{ type: "topauthor" }] : []),
+    ...(topGenre ? [{ type: "genre" }] : []),
+    ...(favBook ? [{ type: "favbook" }] : []),
+    ...(hoursReading > 0 ? [{ type: "speed" }] : []),
+    { type: "personality" },
+    { type: "share" },
+  ];
+
+  const [idx, setIdx] = useState(0);
+  const [displayCount, setDisplayCount] = useState(0);
+  const [entering, setEntering] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const timerRef = useRef(null);
+  const touchStartRef = useRef(null);
+  const slideRef = useRef(null);
+  const DURATION = 5000;
+
+  // Auto-advance
+  useEffect(() => {
+    if (paused) return;
+    timerRef.current = setInterval(() => {
+      setIdx(i => {
+        if (i >= slides.length - 1) { onClose(); return i; }
+        return i + 1;
+      });
+    }, DURATION);
+    return () => clearInterval(timerRef.current);
+  }, [idx, paused, slides.length]);
+
+  // Entry animation
+  useEffect(() => {
+    setEntering(true);
+    const t = setTimeout(() => setEntering(false), 320);
+    return () => clearTimeout(t);
+  }, [idx]);
+
+  // Books counter animation on slide 1
+  useEffect(() => {
+    if (slides[idx]?.type !== "books") return;
+    setDisplayCount(0);
+    if (booksCount === 0) return;
+    let n = 0;
+    const step = Math.max(1, Math.ceil(booksCount / 20));
+    const t = setInterval(() => {
+      n = Math.min(n + step, booksCount);
+      setDisplayCount(n);
+      if (n >= booksCount) clearInterval(t);
+    }, 60);
+    return () => clearInterval(t);
+  }, [idx]);
+
+  function goNext() {
+    if (idx < slides.length - 1) setIdx(i => i + 1);
+    else onClose();
+  }
+  function goPrev() {
+    if (idx > 0) setIdx(i => i - 1);
+  }
+
+  function handleTap(e) {
+    const x = e.clientX;
+    const w = window.innerWidth;
+    if (x < w * 0.35) goPrev(); else goNext();
+  }
+
+  function handleTouchStart(e) {
+    touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function handleTouchEnd(e) {
+    if (!touchStartRef.current) return;
+    const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+    const dx = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+    if (dy > 90 && dx < 60) { onClose(); return; }
+    if (dx > 50) {
+      const dir = e.changedTouches[0].clientX - touchStartRef.current.x;
+      if (dir < 0) goNext(); else goPrev();
+    }
+    touchStartRef.current = null;
+  }
+
+  const slide = slides[idx];
+  const bg = SLIDE_GRADIENTS[idx % SLIDE_GRADIENTS.length];
+
+  function SlideContent() {
+    const textShadow = "0 2px 12px rgba(0,0,0,0.4)";
+    const big = { fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 900, color: "#F5EDE0", textShadow, lineHeight: 1 };
+    const sub = { fontFamily: "'EB Garamond', serif", color: "rgba(245,237,224,0.75)", lineHeight: 1.45 };
+
+    if (slide.type === "intro") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ fontFamily: "system-ui", fontSize: "0.72rem", fontWeight: 600, color: "rgba(245,237,224,0.5)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "1rem" }}>folio</p>
+        <p style={{ ...big, fontSize: "clamp(2.4rem, 10vw, 3.2rem)", marginBottom: "0.5rem" }}>tu {isAnnual ? "año" : "mes"}</p>
+        <p style={{ ...big, fontSize: "clamp(2rem, 8vw, 2.8rem)", color: "#D4A574" }}>{periodLabel}</p>
+        <p style={{ ...sub, fontSize: "1rem", marginTop: "1.5rem" }}>en libros</p>
+      </div>
+    );
+
+    if (slide.type === "books") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1.1rem", marginBottom: "1rem" }}>leíste</p>
+        <p style={{ ...big, fontSize: "clamp(5rem, 22vw, 7rem)" }}>{displayCount}</p>
+        <p style={{ ...big, fontSize: "clamp(1.8rem, 7vw, 2.4rem)", color: "#D4A574", marginTop: "0.35rem" }}>
+          {booksCount === 1 ? "libro" : "libros"}
+        </p>
+        {data.prevMonthBooks > 0 && booksCount > data.prevMonthBooks && (
+          <p style={{ ...sub, fontSize: "0.88rem", marginTop: "1.25rem" }}>
+            {booksCount - data.prevMonthBooks} más que el {isAnnual ? "año" : "mes"} anterior
+          </p>
+        )}
+        {booksCount === 0 && <p style={{ ...sub, fontSize: "0.88rem", marginTop: "0.75rem" }}>el próximo {isAnnual ? "año" : "mes"} empieza la racha</p>}
+      </div>
+    );
+
+    if (slide.type === "pages") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1.1rem", marginBottom: "1rem" }}>recorriste</p>
+        <p style={{ ...big, fontSize: "clamp(4rem, 18vw, 6rem)" }}>{totalPages.toLocaleString("es")}</p>
+        <p style={{ ...big, fontSize: "clamp(1.6rem, 6vw, 2.2rem)", color: "#5bc234", marginTop: "0.35rem" }}>páginas</p>
+        <p style={{ ...sub, fontSize: "0.85rem", marginTop: "1.5rem", maxWidth: 240, margin: "1.5rem auto 0" }}>{pagesComparison}</p>
+      </div>
+    );
+
+    if (slide.type === "genre") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1rem", marginBottom: "1.25rem" }}>tu género del {isAnnual ? "año" : "mes"}</p>
+        <p style={{ ...big, fontSize: "clamp(2.2rem, 9vw, 3rem)", color: "#D4A574" }}>{topGenre}</p>
+        <p style={{ ...sub, fontSize: "0.88rem", marginTop: "1.25rem" }}>
+          {uniqueGenres > 1 ? `también exploraste ${uniqueGenres - 1} género${uniqueGenres > 2 ? "s" : ""} más` : "tu gusto es profundo"}
+        </p>
+      </div>
+    );
+
+    if (slide.type === "favbook") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1rem", marginBottom: "1.25rem" }}>el libro que te marcó</p>
+        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2rem)", maxWidth: 260, margin: "0 auto 0.5rem" }}>{favBook.title}</p>
+        <p style={{ ...sub, fontStyle: "italic", fontSize: "0.95rem", marginBottom: "0.75rem" }}>{favBook.author}</p>
+        {favBook.rating > 0 && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 4, marginTop: "0.5rem" }}>
+            {[1,2,3,4,5].map(s => (
+              <span key={s} style={{ fontSize: "1.4rem", opacity: s <= favBook.rating ? 1 : 0.25 }}>★</span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+
+    if (slide.type === "topauthor") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1rem", marginBottom: "1.25rem" }}>tu autor del {isAnnual ? "año" : "mes"}</p>
+        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2.2rem)", color: "#D4A574", maxWidth: 280, margin: "0 auto 0.5rem", lineHeight: 1.2 }}>{topAuthor}</p>
+        {topAuthorCount > 1 && (
+          <p style={{ ...sub, fontSize: "0.88rem", marginTop: "1rem" }}>
+            {topAuthorCount} {topAuthorCount === 1 ? "libro suyo" : "libros suyos"} este {isAnnual ? "año" : "mes"}
+          </p>
+        )}
+        <p style={{ ...sub, fontStyle: "italic", fontSize: "0.78rem", marginTop: "1.25rem", color: "rgba(245,237,224,0.45)" }}>
+          sin pedirle permiso, claro
+        </p>
+      </div>
+    );
+
+    if (slide.type === "speed") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1rem", marginBottom: "1rem" }}>tiempo leyendo</p>
+        <p style={{ ...big, fontSize: "clamp(4rem, 18vw, 6rem)" }}>{hoursReading}</p>
+        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2rem)", color: "#D4A574", marginTop: "0.35rem" }}>
+          {hoursReading === 1 ? "hora" : "horas"}
+        </p>
+        <p style={{ ...sub, fontSize: "0.85rem", marginTop: "1.5rem", maxWidth: 240, margin: "1.5rem auto 0" }}>{hoursComparison}</p>
+      </div>
+    );
+
+    if (slide.type === "personality") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...sub, fontSize: "1rem", marginBottom: "1.5rem" }}>tu personalidad lectora</p>
+        <p style={{ ...big, fontSize: "clamp(1.8rem, 7vw, 2.6rem)" }}>{personality.label}</p>
+        <p style={{ ...sub, fontSize: "0.9rem", maxWidth: 240, margin: "1rem auto 0", lineHeight: 1.6, fontStyle: "italic" }}>{personality.sub}</p>
+      </div>
+    );
+
+    if (slide.type === "share") return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ ...big, fontSize: "clamp(1.8rem, 7vw, 2.4rem)", marginBottom: "0.75rem" }}>comparte</p>
+        <p style={{ ...sub, fontSize: "0.9rem", marginBottom: "2rem", maxWidth: 220, margin: "0.75rem auto 2rem" }}>
+          cuéntale a tu gente cómo fue tu {isAnnual ? "año" : "mes"} lector
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", maxWidth: 260, margin: "0 auto" }}>
+          <ShareButton wrap={wrap} userName={userName} setPaused={setPaused} slideRef={slideRef} />
+          <button onClick={onClose} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: "rgba(245,237,224,0.6)", background: "none", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer" }}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    );
+
+    return null;
+  }
+
+  function ShareButton({ wrap: w, userName: uName, setPaused: sp, slideRef: sr }) {
+    const [sharing, setSharing] = useState(false);
+    const [shared, setShared] = useState(false);
+
+    async function handleShare() {
+      const { data: d, month: m, year: y, wrap_type: wt } = w;
+      const isA = wt === "annual";
+      const mn = isA ? null : MONTHS_ES[(m || 1) - 1];
+      const label = isA ? `${y}` : `${mn} ${y}`;
+      const text = `mi wrapped de ${label} en folio: ${d.booksRead?.length || 0} libros, ${d.totalPages || 0} páginas${d.topGenre ? `, mi género favorito fue ${d.topGenre}` : ""}. #folio #lectura`;
+      if (navigator.share) {
+        try { await navigator.share({ title: "Mi Folio Wrapped", text }); setShared(true); } catch {}
+      } else {
+        try { await navigator.clipboard.writeText(text); setShared(true); setTimeout(() => setShared(false), 2500); } catch {}
+      }
+    }
+
+    async function handleDownload() {
+      sp(true);
+      setSharing(true);
+      try {
+        const { default: html2canvas } = await import("html2canvas");
+        const el = sr?.current;
+        if (el) {
+          const canvas = await html2canvas(el, { backgroundColor: null, scale: 2, useCORS: true });
+          const link = document.createElement("a");
+          link.download = `folio-wrapped.png`;
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        }
+      } catch (err) { console.error(err); }
+      setSharing(false);
+      sp(false);
+    }
+
+    return (
+      <>
+        <button onClick={handleShare} style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", backgroundColor: "#F5EDE0", color: "#7A2E2E", border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
+          <Share2 size={17} />{shared ? "¡compartido!" : "compartir wrapped"}
+        </button>
+        <button onClick={handleDownload} disabled={sharing} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: "#F5EDE0", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+          {sharing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={14} />}
+          guardar imagen
+        </button>
+      </>
+    );
+  }
+
+  const shouldReduceMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  return (
+    <div
+      ref={slideRef}
+      style={{ position: "fixed", inset: 0, zIndex: 1300, background: bg, display: "flex", flexDirection: "column", cursor: "pointer", userSelect: "none", transition: shouldReduceMotion ? "none" : "background 400ms ease" }}
+      onClick={handleTap}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Progress bars */}
+      <div style={{ display: "flex", gap: 4, padding: "env(safe-area-inset-top, 12px) 14px 10px", flexShrink: 0 }}>
+        {slides.map((_, i) => (
+          <div key={i} style={{ flex: 1, height: 3, borderRadius: 999, backgroundColor: "rgba(245,237,224,0.25)", overflow: "hidden" }}>
+            {i < idx && <div style={{ width: "100%", height: "100%", backgroundColor: "#F5EDE0" }} />}
+            {i === idx && !paused && !shouldReduceMotion && (
+              <div style={{ height: "100%", backgroundColor: "#F5EDE0", animation: `progressFill ${DURATION}ms linear forwards` }} />
+            )}
+            {i === idx && (paused || shouldReduceMotion) && (
+              <div style={{ height: "100%", width: "50%", backgroundColor: "#F5EDE0" }} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Close button */}
+      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 12px) + 18px)", right: 16, zIndex: 10 }}>
+        <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <X size={16} color="#F5EDE0" />
+        </button>
+      </div>
+
+      {/* Slide content */}
+      <div
+        style={{
+          flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "1.5rem 2rem 3rem",
+          animation: entering && !shouldReduceMotion ? "wrapSlideIn 300ms cubic-bezier(0.23,1,0.32,1)" : "none",
+        }}
+      >
+        <SlideContent />
+      </div>
+
+      {/* Tap zones hint (mobile) */}
+      {idx === 0 && (
+        <div style={{ position: "absolute", bottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)", left: 0, right: 0, textAlign: "center" }}>
+          <p style={{ fontFamily: "system-ui", fontSize: "0.68rem", color: "rgba(245,237,224,0.4)", letterSpacing: "0.06em" }}>toca para avanzar · desliza abajo para cerrar</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -11029,7 +11141,7 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
           </button>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
+        <div className="share-card-enter" style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
           <BookShareCard book={book} rating={rating} review={review} streak={streak} booksThisYear={booksThisYear} cardRef={cardRef} />
         </div>
 
@@ -11082,6 +11194,23 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
   const [showShareCard, setShowShareCard] = useState(false);
   const [friendCount, setFriendCount] = useState(-1);
   const [showPeakInvite, setShowPeakInvite] = useState(true);
+  const postCreatedRef = useRef(false);
+
+  async function createFinishedPost() {
+    if (postCreatedRef.current) return;
+    postCreatedRef.current = true;
+    try {
+      await createFeedPost({
+        userId: user.id,
+        type: "book_update",
+        bookId: book.id,
+        action: "finished",
+        content: review?.trim() || null,
+      });
+    } catch (err) {
+      console.error("[BookFinishedCelebration] Error creando post:", err);
+    }
+  }
 
   const wantCount = allBooks.filter(b => b.status === "want_to_read" || b.status === "wish").length;
   const currentYear = new Date().getFullYear();
@@ -11124,12 +11253,14 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
   async function handleSaveRating() {
     setSaving(true);
     await onSaveRating(book.id, rating, review);
+    await createFinishedPost();
     await fetchSummaryData();
     setSaving(false);
     setStep(3);
   }
 
   async function handleSkipRating() {
+    await createFinishedPost();
     await fetchSummaryData();
     setStep(3);
   }
@@ -11462,6 +11593,12 @@ function PWAUpdateBanner() {
 }
 
 // ============ MAIN APP ============
+function resolveTheme(pref) {
+  if (pref === 'dark') return 'dark';
+  if (pref === 'light') return 'light';
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   const [tab, setTab] = useState("feed");
   const [books, setBooks] = useState([]);
@@ -11476,10 +11613,32 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   const [achievementQueue, setAchievementQueue] = useState([]);
   const [celebrationBook, setCelebrationBook] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
+  const [gemBalance, setGemBalance] = useState(0);
   const [activeWrap, setActiveWrap] = useState(null);
   const [mainUsername, setMainUsername] = useState(null);
   const [refModalUser, setRefModalUser] = useState(initialRefUser || null);
   const isOnline = useOnlineStatus();
+
+  const [themePref, setThemePref] = useState(() => localStorage.getItem('folio_theme') || 'system');
+  const [, forceThemeUpdate] = useState(0);
+
+  // Sync palette synchronously on every render
+  const isDark = resolveTheme(themePref) === 'dark';
+  Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT);
+
+  // Listen for OS-level preference changes when using "system"
+  useEffect(() => {
+    if (themePref !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => forceThemeUpdate(n => n + 1);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [themePref]);
+
+  function setTheme(pref) {
+    localStorage.setItem('folio_theme', pref);
+    setThemePref(pref);
+  }
 
   useEffect(() => {
     supabase.from("users").select("username").eq("id", user.id).single()
@@ -11638,9 +11797,37 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
   useEffect(() => {
     const unsub = achievementBus.on((keys) => {
       setAchievementQueue((prev) => [...prev, ...keys]);
+      if (keys.length > 0) {
+        addGemsDB(user.id, keys.length * 10).then(bal => setGemBalance(bal));
+      }
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    const unsub = gemsEventBus.on((amount) => {
+      setGemBalance(prev => prev + amount);
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    loadGems(user.id).then(bal => setGemBalance(bal));
+    claimDailyGems(user.id).then(earned => {
+      if (earned > 0) {
+        setGemBalance(prev => prev + earned);
+        setToastMessage(`+${earned} gemas 💎 ¡Visita diaria!`);
+        setTimeout(() => setToastMessage(null), 3500);
+      }
+    });
+    if (localStorage.getItem("folio_gems_welcome")) {
+      localStorage.removeItem("folio_gems_welcome");
+      setTimeout(() => {
+        setToastMessage("Bienvenido. +5 gemas 💎");
+        setTimeout(() => setToastMessage(null), 3500);
+      }, 1500);
+    }
+  }, [user.id]);
 
   async function addBook(book) {
     const withFinished =
@@ -11652,7 +11839,10 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
         checkAchievements(user.id, user.name);
         setPendingPost({ type: "book_update", action: "started", book: withFinished });
       } else if (book.status === "read") {
+        playBookFinished();
+        haptic(HAPTIC.BOOK_DONE);
         setCelebrationBook(withFinished);
+        addGemsDB(user.id, 50).then(bal => setGemBalance(bal));
       } else {
         checkAchievements(user.id, user.name);
       }
@@ -11678,7 +11868,10 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
         setPendingPost({ type: "book_update", action: "started", book: final });
       } else if (isFinishing) {
         setSelectedBook(null);
+        playBookFinished();
+        haptic(HAPTIC.BOOK_DONE);
         setCelebrationBook(final);
+        addGemsDB(user.id, 50).then(bal => setGemBalance(bal));
       } else {
         setSelectedBook(final);
       }
@@ -11689,8 +11882,12 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
     try {
       await updateBookInDB(final, user.id);
       if (!isFinishing) checkAchievements(user.id, user.name);
+      fetchBooks(user.id).then((b) => setBooks(b)).catch(() => {});
     } catch (err) {
       console.error("Error actualizando libro:", err);
+      if (prevBook) setBooks((prev) => prev.map((b) => (b.id === prevBook.id ? prevBook : b)));
+      setToastMessage("No se pudo guardar el cambio. Intenta de nuevo.");
+      setTimeout(() => setToastMessage(null), 4000);
     }
   }
 
@@ -11725,13 +11922,18 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         input:focus, textarea:focus { border-color: ${palette.accent} !important; box-shadow: 0 0 0 3px ${palette.accent}22; transition: box-shadow 150ms ease, border-color 150ms ease; outline: none; }
         ::selection { background: ${palette.amber}55; color: ${palette.ink}; }
-        body { background-color: ${palette.bg}; }
+        body {
+          background-color: ${palette.bg};
+          color: ${palette.ink};
+          transition: background-color 300ms ease, color 300ms ease;
+        }
         .line-clamp-2 {
           display: -webkit-box;
           -webkit-line-clamp: 2;
           -webkit-box-orient: vertical;
           overflow: hidden;
         }
+        /* ── Base ── */
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -11742,59 +11944,221 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
           50% { background-position: 200% center; }
           100% { background-position: 0% center; }
         }
-        @keyframes slideUp {
-          from { transform: translateY(100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes backdropIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 4px 20px rgba(122,46,46,0.5), 0 0 0 0 rgba(122,46,46,0.3); }
-          50% { box-shadow: 0 4px 28px rgba(122,46,46,0.7), 0 0 0 6px rgba(122,46,46,0); }
-        }
-        @keyframes fire-pulse-anim {
-          0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(200,146,74,0.5)); }
-          50% { transform: scale(1.18); filter: drop-shadow(0 0 12px rgba(200,146,74,0.9)); }
-        }
-        .fire-pulse { display: inline-block; }
-        @keyframes achievementPop {
-          from { opacity: 0; transform: scale(0.7); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes achievementBounce {
-          0% { transform: scale(0.5) rotate(-10deg); opacity: 0; }
-          60% { transform: scale(1.2) rotate(5deg); opacity: 1; }
-          100% { transform: scale(1) rotate(0deg); opacity: 1; }
-        }
-        @keyframes bookAppear {
-          from { opacity: 0; transform: scale(0.55) rotate(-10deg); }
-          to { opacity: 1; transform: scale(1) rotate(0deg); }
-        }
-        @keyframes bookClosing {
-          0% { transform: scale(1) rotate(0deg); }
-          40% { transform: scale(1.1) rotate(-6deg); }
-          100% { transform: scale(0.8) rotate(-20deg) translateY(-10px); opacity: 0.7; }
-        }
-        @keyframes bookClosed {
-          from { transform: scale(0.8) rotate(-20deg) translateY(-10px); opacity: 0.7; }
-          to { transform: scale(0.75) rotate(-18deg) translateY(-8px); opacity: 0; }
-        }
-        @keyframes celebCardIn {
-          from { opacity: 0; transform: translateY(18px) scale(0.97); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+
+        /* ── Modal system (fixes previously undefined keyframes) ── */
+        @keyframes backdropIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes backdropOut {
+          from { opacity: 1; }
+          to   { opacity: 0; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes slideDown {
+          from { transform: translateY(0);    opacity: 1; }
+          to   { transform: translateY(100%); opacity: 0; }
+        }
+
+        /* ── Tab screen transitions ── */
+        @keyframes tabViewEnter {
+          from { opacity: 0; transform: translateY(5px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
+        .tab-view-enter {
+          animation: tabViewEnter 220ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* ── Feed load — fade + slight rise ── */
+        @keyframes feedFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0);   }
+        }
+
+        /* ── Feed post stagger entrance ── */
+        @keyframes feedPostEnter {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        .feed-post-item { animation: feedPostEnter 360ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+        .feed-post-item:nth-child(1) { animation-delay: 0ms;   }
+        .feed-post-item:nth-child(2) { animation-delay: 55ms;  }
+        .feed-post-item:nth-child(3) { animation-delay: 110ms; }
+        .feed-post-item:nth-child(4) { animation-delay: 155ms; }
+        .feed-post-item:nth-child(5) { animation-delay: 190ms; }
+        .feed-post-item:nth-child(n+6) { animation-delay: 215ms; }
+
+        /* ── Book list cards — hover lift + active press ── */
+        .book-list-card {
+          transition: transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+                      box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .book-list-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(42,31,26,0.13);
+          }
+        }
+        .book-list-card:active {
+          transform: scale(0.98) !important;
+          transition: transform 100ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* ── Book card in feed ── */
+        .book-card-hover {
+          transition: background-color 150ms ease,
+                      transform 150ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        @media (hover: hover) and (pointer: fine) {
+          .book-card-hover:hover {
+            transform: translateY(-1px);
+          }
+        }
+        .book-card-hover:active { transform: scale(0.99); }
+
+        /* ── Nav add button press ── */
+        .nav-add-btn > div {
+          transition: transform 130ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        .nav-add-btn:active > div { transform: scale(0.88) !important; }
+
+        /* ── Streak banner glow ── */
+        .streak-banner-active {
+          animation: streakGlow 4s ease-in-out infinite;
+        }
+        @keyframes streakGlow {
+          0%, 100% {
+            box-shadow: 0 4px 20px rgba(122,46,46,0.35), 0 2px 6px rgba(200,146,74,0.18);
+          }
+          50% {
+            box-shadow: 0 6px 36px rgba(122,46,46,0.6), 0 3px 18px rgba(200,146,74,0.38),
+                        inset 0 0 0 1px rgba(244,237,224,0.12);
+          }
+        }
+
+        /* ── Achievement icon pop (scale from 0.82, not 0) ── */
+        .achieve-icon-enter {
+          animation: achieveIconPop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+        @keyframes achieveIconPop {
+          from { opacity: 0; transform: scale(0.82); }
+          to   { opacity: 1; transform: scale(1);    }
+        }
+
+        /* ── Achievement row items (improved from scale(0.5) → scale(0.82)) ── */
+        @keyframes achievementBounce {
+          0%   { transform: scale(0.82) rotate(-6deg); opacity: 0; }
+          55%  { transform: scale(1.09) rotate(3deg);  opacity: 1; }
+          100% { transform: scale(1)    rotate(0deg);  opacity: 1; }
+        }
+
+        /* ── Heart double-tap pop ── */
+        .heart-pop-anim {
+          animation: heartPop 650ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+        @keyframes heartPop {
+          0%   { opacity: 0; transform: scale(0.5);  }
+          35%  { opacity: 1; transform: scale(1.35); }
+          65%  {             transform: scale(0.9);  }
+          85%  {             transform: scale(1.05); opacity: 1; }
+          100% { opacity: 0; transform: scale(1.1);  }
+        }
+
+        /* ── Comments section expand ── */
+        .comments-enter {
+          animation: commentsReveal 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
+        }
+        @keyframes commentsReveal {
+          from { opacity: 0; transform: translateY(-6px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+
+        /* ── Share card slide-up + scale entrance ── */
+        @keyframes shareCardEnter {
+          from { opacity: 0; transform: translateY(28px) scale(0.95); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);    }
+        }
+        .share-card-enter {
+          animation: shareCardEnter 400ms cubic-bezier(0.23, 1, 0.32, 1) both;
+        }
+
+        /* ── Celebration card ── */
+        @keyframes celebCardIn {
+          from { opacity: 0; transform: translateY(18px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);    }
+        }
+
+        /* ── Book animations ── */
+        @keyframes achievementPop {
+          from { opacity: 0; transform: scale(0.82); }
+          to   { opacity: 1; transform: scale(1);    }
+        }
+        @keyframes bookAppear {
+          from { opacity: 0; transform: scale(0.72) rotate(-8deg); }
+          to   { opacity: 1; transform: scale(1)    rotate(0deg);  }
+        }
+        @keyframes bookClosing {
+          0%   { transform: scale(1)   rotate(0deg);                  }
+          40%  { transform: scale(1.1) rotate(-6deg);                 }
+          100% { transform: scale(0.8) rotate(-20deg) translateY(-10px); opacity: 0.7; }
+        }
+        @keyframes bookClosed {
+          from { transform: scale(0.8)  rotate(-20deg) translateY(-10px); opacity: 0.7; }
+          to   { transform: scale(0.75) rotate(-18deg) translateY(-8px);  opacity: 0;   }
+        }
+
+        /* ── Fire flame pulse ── */
+        @keyframes fire-pulse-anim {
+          0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(200,146,74,0.5));  }
+          50%      { transform: scale(1.18); filter: drop-shadow(0 0 12px rgba(200,146,74,0.9)); }
+        }
+        .fire-pulse { display: inline-block; animation: fire-pulse-anim 2s ease-in-out infinite; }
+
+        /* ── Sparkle ── */
         @keyframes sparkle-pulse {
-          0%, 100% { opacity: 1; transform: scale(1) rotate(0deg); }
-          40% { opacity: 0.6; transform: scale(1.25) rotate(12deg); }
-          70% { opacity: 0.9; transform: scale(0.9) rotate(-8deg); }
+          0%, 100% { opacity: 1; transform: scale(1)    rotate(0deg);  }
+          40%      { opacity: 0.6; transform: scale(1.25) rotate(12deg); }
+          70%      { opacity: 0.9; transform: scale(0.9)  rotate(-8deg); }
         }
         .sparkle-anim { animation: sparkle-pulse 2.2s ease-in-out 2; display: inline-block; }
+
+        /* ── Wrapped Story ── */
+        @keyframes progressFill {
+          from { width: 0%; }
+          to   { width: 100%; }
+        }
+        @keyframes wrapSlideIn {
+          from { opacity: 0; transform: translateY(10px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* ── Reduced motion — accessibility ── */
+        @media (prefers-reduced-motion: reduce) {
+          .tab-view-enter,
+          .feed-post-item,
+          .streak-banner-active,
+          .share-card-enter,
+          .achieve-icon-enter,
+          .comments-enter,
+          .heart-pop-anim,
+          .fire-pulse {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+          }
+          .book-list-card,
+          .book-list-card:hover,
+          .book-card-hover:hover {
+            transform: none !important;
+            transition: none !important;
+          }
+        }
       `}</style>
       <PWAUpdateBanner />
       {!isOnline && (
@@ -11805,13 +12169,13 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
           </span>
         </div>
       )}
-      <AppHeader tab={tab} setTab={setTab} user={user} onLogout={onLogout} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} />
+      <AppHeader tab={tab} setTab={setTab} user={user} onLogout={onLogout} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} />
       <main className="max-w-4xl mx-auto pb-24 sm:pb-10 fade-in" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)" }}>
         {loaded && tab === "feed" && <div className="tab-view-enter"><FeedView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} /></div>}
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView books={books} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} isOnline={isOnline} /></div>}
         {loaded && tab === "amigos" && <div className="tab-view-enter"><FriendsView user={user} onPendingChange={setPendingCount} onMessagesRead={refreshUnreadMessages} unreadNotifs={unreadNotifs} onNotifsRead={refreshUnreadNotifs} isOnline={isOnline} /></div>}
-        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} /></div>}
+        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} /></div>}
       </main>
       <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} />
       {notifsSheetOpen && (
@@ -11870,7 +12234,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed }) {
         />
       )}
       {activeWrap && (
-        <WrappedModal
+        <WrappedStoryExperience
           wrap={activeWrap}
           userName={user.name}
           onClose={() => setActiveWrap(null)}
@@ -11958,48 +12322,6 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
   const [mode, setMode] = useState(null);
   const [form, setForm] = useState({ title: "", author: "", status: "reading" });
   const [adding, setAdding] = useState(false);
-  const [isbnStage, setIsbnStage] = useState("scanning");
-  const [scannedBook, setScannedBook] = useState(null);
-  const [scanError, setScanError] = useState("");
-  const scannerRef = useRef(null);
-
-  useEffect(() => {
-    if (mode !== "scan" || isbnStage !== "scanning") return;
-    let active = true;
-    const el = scannerRef.current;
-    if (!el) return;
-
-    Quagga.init({
-      inputStream: { type: "LiveStream", target: el, constraints: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } },
-      decoder: { readers: ["ean_reader"] },
-      locate: true,
-    }, (err) => {
-      if (err || !active) { setScanError("No se pudo acceder a la cámara"); return; }
-      Quagga.start();
-    });
-
-    async function onDetected({ codeResult }) {
-      if (!active) return;
-      active = false;
-      Quagga.stop();
-      const isbn = codeResult.code;
-      setIsbnStage("loading");
-      try {
-        const bookData = await lookupISBN(isbn);
-        if (bookData && bookData.title) {
-          setScannedBook({ title: bookData.title, author: bookData.author, coverUrl: bookData.coverUrl || "", status: "reading" });
-          setIsbnStage("confirm");
-        } else {
-          setIsbnStage("notfound");
-        }
-      } catch { setIsbnStage("notfound"); }
-    }
-    Quagga.onDetected(onDetected);
-    return () => {
-      active = false;
-      try { Quagga.stop(); } catch {}
-    };
-  }, [mode, isbnStage]);
 
   async function handleAdd(bookData) {
     setAdding(true);
@@ -12044,7 +12366,7 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
     <div style={{ padding: "0 1.25rem 2.5rem", maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
       {/* Back button */}
       <button
-        onClick={mode !== null ? () => { setMode(null); setIsbnStage("scanning"); setScanError(""); setScannedBook(null); } : onBack}
+        onClick={mode !== null ? () => setMode(null) : onBack}
         style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}
       >
         <ChevronLeft size={16} />{mode !== null ? "Cambiar método" : "Atrás"}
@@ -12059,15 +12381,6 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
             Agrega el libro que estás leyendo o que quieres leer
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "2rem" }}>
-            <button style={cardBtn} onClick={() => setMode("scan")}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: `${palette.accent}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Camera size={22} color={palette.accent} />
-              </div>
-              <div>
-                <div style={{ ...display, fontSize: "0.97rem", fontWeight: 600, color: palette.ink }}>Fotografiar código de barras</div>
-                <div style={{ ...body, fontSize: "0.78rem", color: palette.inkSoft }}>Escanea el ISBN del libro</div>
-              </div>
-            </button>
             <button style={cardBtn} onClick={() => setMode("manual")}>
               <div style={{ width: 44, height: 44, borderRadius: 10, backgroundColor: `${palette.accent}14`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <PenLine size={22} color={palette.accent} />
@@ -12131,76 +12444,109 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
         </div>
       )}
 
-      {mode === "scan" && (
-        <div>
-          <h2 style={{ ...display, fontSize: "1.6rem", fontStyle: "italic", color: palette.ink, marginBottom: "1rem" }}>Escanear código</h2>
-          {isbnStage === "scanning" && (
-            <>
-              <div ref={scannerRef} style={{ width: "100%", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", backgroundColor: "#111", position: "relative", marginBottom: "0.75rem" }}>
-                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1, pointerEvents: "none" }}>
-                  <div style={{ width: "65%", height: 2, backgroundColor: `${palette.accent}CC`, boxShadow: `0 0 14px ${palette.accent}` }} />
-                </div>
-              </div>
-              {scanError && <p style={{ ...body, fontSize: "0.85rem", color: "#C0392B", textAlign: "center", marginBottom: "0.5rem" }}>{scanError}</p>}
-              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, textAlign: "center" }}>Apunta la cámara al código de barras del libro</p>
-            </>
-          )}
-          {isbnStage === "loading" && (
-            <div style={{ textAlign: "center", padding: "2rem 0" }}>
-              <Loader2 size={32} color={palette.accent} style={{ animation: "spin 1s linear infinite", display: "block", margin: "0 auto 0.75rem" }} />
-              <p style={{ ...body, color: palette.inkSoft }}>Buscando libro...</p>
-            </div>
-          )}
-          {isbnStage === "confirm" && scannedBook && (
-            <div>
-              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", padding: "1rem", backgroundColor: palette.bgCard, borderRadius: 12, border: `1px solid ${palette.border}` }}>
-                {scannedBook.coverUrl
-                  ? <img src={scannedBook.coverUrl} alt="" style={{ width: 64, height: 92, objectFit: "cover", borderRadius: 6, flexShrink: 0 }} />
-                  : <div style={{ width: 64, height: 92, borderRadius: 6, backgroundColor: `${palette.accent}20`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><BookOpen size={24} color={palette.accent} /></div>
-                }
-                <div>
-                  <p style={{ ...display, fontSize: "1rem", color: palette.ink, marginBottom: "0.25rem" }}>{scannedBook.title}</p>
-                  <p style={{ ...body, fontSize: "0.85rem", color: palette.inkSoft }}>{scannedBook.author}</p>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                {[{ val: "reading", label: "Lo estoy leyendo" }, { val: "want_to_read", label: "Lo quiero leer" }].map(({ val, label }) => (
-                  <button key={val} onClick={() => setScannedBook(p => ({ ...p, status: val }))} style={{
-                    flex: 1, padding: "0.65rem 0.5rem", borderRadius: 10,
-                    border: `1.5px solid ${scannedBook.status === val ? palette.accent : palette.border}`,
-                    backgroundColor: scannedBook.status === val ? `${palette.accent}12` : palette.bgCard,
-                    cursor: "pointer", ...body, fontSize: "0.82rem",
-                    color: scannedBook.status === val ? palette.accent : palette.ink,
-                  }}>{label}</button>
-                ))}
-              </div>
-              <button onClick={() => handleAdd(scannedBook)} disabled={adding} style={{
-                width: "100%", padding: "0.9rem", borderRadius: 12, border: "none",
-                backgroundColor: palette.accent, color: palette.bg, cursor: "pointer",
-                ...display, fontSize: "1.05rem",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
-              }}>
-                {adding && <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />}
-                Agregar este libro
-              </button>
-            </div>
-          )}
-          {isbnStage === "notfound" && (
-            <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
-              <p style={{ ...body, color: palette.inkSoft, marginBottom: "1rem" }}>No encontramos ese ISBN. ¿Ingresarlo manualmente?</p>
-              <button onClick={() => setMode("manual")} style={{
-                padding: "0.75rem 1.5rem", borderRadius: 10, border: `1.5px solid ${palette.accent}`,
-                backgroundColor: "transparent", cursor: "pointer", ...display, fontSize: "0.95rem", color: palette.accent,
-              }}>Ingresar manualmente</button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
 
-function OnboardingStep3({ user, addedFriend, setAddedFriend, onBack, onComplete, completing }) {
+const PRESET_AVATARS = Array.from({ length: 10 }, (_, i) => `/avatars/avatar-${i + 1}.png`);
+
+function OnboardingStep3Avatar({ selectedAvatar, setSelectedAvatar, onBack, onNext, onSkip }) {
+  const fileInputRef = useRef(null);
+
+  function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = 200;
+    canvas.height = 200;
+    const ctx = canvas.getContext("2d");
+    const img = new window.Image();
+    img.onload = () => {
+      const side = Math.min(img.width, img.height);
+      const sx = (img.width - side) / 2;
+      const sy = (img.height - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, 200, 200);
+      setSelectedAvatar(canvas.toDataURL("image/jpeg", 0.85));
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(file);
+  }
+
+  return (
+    <div style={{ padding: "0 1.25rem 2.5rem", maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
+        <ChevronLeft size={16} />Atrás
+      </button>
+      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
+        Elige tu avatar
+      </h1>
+      <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "1.5rem", lineHeight: 1.55 }}>
+        Así te verán tus amigos lectores
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.6rem", marginBottom: "1.5rem" }}>
+        {PRESET_AVATARS.map((src, i) => {
+          const selected = selectedAvatar === src;
+          return (
+            <button
+              key={i}
+              onClick={() => setSelectedAvatar(src)}
+              style={{
+                padding: 0, background: "none", border: `2.5px solid ${selected ? palette.accent : "transparent"}`,
+                borderRadius: "50%", cursor: "pointer", aspectRatio: "1",
+                overflow: "hidden", transition: "border-color 0.18s",
+                boxShadow: selected ? `0 0 0 2px ${palette.bg}, 0 0 0 4.5px ${palette.accent}` : "none",
+              }}
+            >
+              <img src={src} alt={`Avatar ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: "50%" }} />
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedAvatar && !PRESET_AVATARS.includes(selectedAvatar) && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
+          <img src={selectedAvatar} alt="Tu foto" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: `2.5px solid ${palette.accent}` }} />
+        </div>
+      )}
+
+      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleFileChange} />
+
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        style={{
+          width: "100%", padding: "0.8rem", borderRadius: 12, marginBottom: "0.65rem",
+          border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard,
+          cursor: "pointer", ...display, fontSize: "0.95rem", color: palette.inkSoft,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+        }}
+      >
+        <Camera size={18} color={palette.inkSoft} />Subir mi foto
+      </button>
+
+      <button
+        onClick={onNext}
+        style={{
+          width: "100%", padding: "0.9rem", borderRadius: 12, border: "none",
+          backgroundColor: selectedAvatar ? palette.accent : palette.border,
+          color: selectedAvatar ? palette.bg : palette.inkFaint,
+          cursor: "pointer", ...display, fontSize: "1.05rem", marginBottom: "0.6rem",
+          transition: "all 0.2s",
+        }}
+      >
+        Continuar
+      </button>
+
+      <div style={{ textAlign: "center" }}>
+        <button onClick={onSkip} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.85rem", color: palette.inkFaint }}>
+          Lo haré más tarde
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete, completing }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -12332,6 +12678,7 @@ function OnboardingStep3({ user, addedFriend, setAddedFriend, onBack, onComplete
 function NewUserOnboarding({ user, onComplete }) {
   const [step, setStep] = useState(1);
   const [selectedGenres, setSelectedGenres] = useState([]);
+  const [selectedAvatar, setSelectedAvatar] = useState(null);
   const [addedFriend, setAddedFriend] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [stepKey, setStepKey] = useState(0);
@@ -12344,10 +12691,9 @@ function NewUserOnboarding({ user, onComplete }) {
   async function handleComplete() {
     setCompleting(true);
     try {
-      await supabase.from("users").update({
-        preferred_genres: selectedGenres,
-        onboarding_completed: true,
-      }).eq("id", user.id);
+      const updates = { preferred_genres: selectedGenres, onboarding_completed: true };
+      if (selectedAvatar) updates.avatar_url = selectedAvatar;
+      await supabase.from("users").update(updates).eq("id", user.id);
     } catch (err) { console.error("Error completing onboarding:", err); }
     onComplete();
   }
@@ -12367,7 +12713,7 @@ function NewUserOnboarding({ user, onComplete }) {
       <div style={{ padding: "1.1rem 1.5rem 0", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
         <span style={{ ...display, fontSize: "1.05rem", fontStyle: "italic", color: palette.accent }}>Folio</span>
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-          {[1, 2, 3].map(n => (
+          {[1, 2, 3, 4].map(n => (
             <div key={n} style={{
               height: 8, borderRadius: 999,
               width: n === step ? 28 : 8,
@@ -12411,11 +12757,20 @@ function NewUserOnboarding({ user, onComplete }) {
           />
         )}
         {step === 3 && (
-          <OnboardingStep3
+          <OnboardingStep3Avatar
+            selectedAvatar={selectedAvatar}
+            setSelectedAvatar={setSelectedAvatar}
+            onBack={() => goStep(2)}
+            onNext={() => goStep(4)}
+            onSkip={() => goStep(4)}
+          />
+        )}
+        {step === 4 && (
+          <OnboardingStep4
             user={user}
             addedFriend={addedFriend}
             setAddedFriend={setAddedFriend}
-            onBack={() => goStep(2)}
+            onBack={() => goStep(3)}
             onComplete={handleComplete}
             completing={completing}
           />
@@ -12548,8 +12903,19 @@ function OnboardingScreen({ user, onDone }) {
 
 // ============ ROOT ============
 async function checkOnboardingNeeded(userId) {
-  const { data } = await supabase.from("users").select("onboarding_completed").eq("id", userId).maybeSingle();
-  return data?.onboarding_completed !== true;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  try {
+    const { data } = await supabase
+      .from("users")
+      .select("onboarding_completed")
+      .eq("id", userId)
+      .abortSignal(controller.signal)
+      .maybeSingle();
+    return data?.onboarding_completed !== true;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function resolveRefProfile(username) {
@@ -12606,21 +12972,26 @@ export default function App() {
         });
       });
     }
-    getStoredUser().then(async (u) => {
-      if (u) {
-        setUser(u);
-        const needed = await checkOnboardingNeeded(u.id);
-        setShowOnboarding(needed);
-        // If there's a ref and the user is already logged in, resolve the profile
-        const savedRef = localStorage.getItem("folio_ref");
-        if (savedRef) {
-          resolveRefProfile(savedRef).then((p) => {
-            if (p && p.id !== u.id) setRefUser(p);
-          });
+    (async () => {
+      try {
+        const u = await getStoredUser();
+        if (u) {
+          setUser(u);
+          const needed = await checkOnboardingNeeded(u.id);
+          setShowOnboarding(needed);
+          const savedRef = localStorage.getItem("folio_ref");
+          if (savedRef) {
+            resolveRefProfile(savedRef).then((p) => {
+              if (p && p.id !== u.id) setRefUser(p);
+            });
+          }
         }
+      } catch (err) {
+        console.error("Auth init error:", err);
+      } finally {
+        setAuthLoaded(true);
       }
-      setAuthLoaded(true);
-    });
+    })();
   }, []);
 
   async function handleLogin(u, isNew = false) {
