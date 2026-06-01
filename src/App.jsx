@@ -989,11 +989,15 @@ async function loadGems(userId) {
 
 async function addGemsDB(userId, amount) {
   try {
-    const { data, error } = await supabase.rpc("add_gems", { p_user_id: userId, p_amount: amount });
-    if (error) { console.error("Error adding gems:", error); return null; }
-    return data?.new_balance ?? 0;
+    const { data, error } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
+    if (error) { console.error("[gems] select error:", error); return null; }
+    if (!data) { console.error("[gems] no record for", userId); return null; }
+    const newBalance = (data.balance || 0) + amount;
+    const { error: upErr } = await supabase.from("user_gems").update({ balance: newBalance }).eq("user_id", userId);
+    if (upErr) { console.error("[gems] update error:", upErr); return null; }
+    return newBalance;
   } catch (err) {
-    console.error("Gems transaction failed:", err);
+    console.error("[gems] transaction failed:", err);
     return null;
   }
 }
@@ -1649,7 +1653,7 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
         >f</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <div data-tutorial="gems" style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem 0.28rem 0.5rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
-            <img src="/gema.png" alt="gemas" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0 }} />
+            <img src="/gema.png" alt="gemas" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0, display: "block" }} />
             <span key={gemBalance} style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 700, color: palette.amber, lineHeight: 1, animation: "gemBalancePop 400ms cubic-bezier(0.34,1.56,0.64,1)" }}>
               {(gemBalance || 0).toLocaleString("es-MX")}
             </span>
@@ -11709,11 +11713,11 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
   const [celebrationBook, setCelebrationBook] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [gemBalance, setGemBalance] = useState(0);
-  const [gemToast, setGemToast] = useState(null);
+  const [gemToastQueue, setGemToastQueue] = useState([]);
   const [tutorialActive, setTutorialActive] = useState(() => showTutorial && !localStorage.getItem('folio_firstLoginTutorial'));
 
   function showGemToast(amount, label) {
-    setGemToast({ amount, label, id: Date.now() });
+    setGemToastQueue(prev => [...prev, { amount, label, id: Date.now() + Math.random() }]);
   }
   const [activeWrap, setActiveWrap] = useState(null);
   const [mainUsername, setMainUsername] = useState(null);
@@ -11901,7 +11905,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
       if (keys.length > 0) {
         const gemsEarned = keys.length * 10;
         addGemsDB(user.id, gemsEarned).then(bal => {
-          setGemBalance(bal);
+          if (bal !== null) setGemBalance(bal);
           showGemToast(gemsEarned, `+${gemsEarned} gemas`);
         });
       }
@@ -11949,7 +11953,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
         haptic(HAPTIC.BOOK_DONE);
         setCelebrationBook(withFinished);
         addGemsDB(user.id, 50).then(bal => {
-          setGemBalance(bal);
+          if (bal !== null) setGemBalance(bal);
           showGemToast(50, "+50 gemas");
         });
       } else {
@@ -11983,7 +11987,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
         haptic(HAPTIC.BOOK_DONE);
         setCelebrationBook(final);
         addGemsDB(user.id, 50).then(bal => {
-          setGemBalance(bal);
+          if (bal !== null) setGemBalance(bal);
           showGemToast(50, "+50 gemas");
         });
       } else {
@@ -12372,8 +12376,14 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
       {toastMessage && (
         <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />
       )}
-      {gemToast && (
-        <GemToast key={gemToast.id} amount={gemToast.amount} label={gemToast.label} id={gemToast.id} onDismiss={() => setGemToast(null)} />
+      {gemToastQueue.length > 0 && (
+        <GemToast
+          key={gemToastQueue[0].id}
+          amount={gemToastQueue[0].amount}
+          label={gemToastQueue[0].label}
+          id={gemToastQueue[0].id}
+          onDismiss={() => setGemToastQueue(prev => prev.slice(1))}
+        />
       )}
       {refModalUser && (
         <FriendProfileModal
