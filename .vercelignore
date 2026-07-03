@@ -1,0 +1,18 @@
+# Raw scratch files in root — not needed in deployment
+pg132_raw.txt
+pg148_raw.txt
+temp_148.txt
+temp_174.txt
+temp_42068.txt
+temp_844.txt
+temp_86.txt
+
+# Test images
+test_avatar.png
+test_avatar2.png
+avatars-grid.png
+gema.png.png
+
+# Agent skills and Claude Code config (not needed at runtime)
+.agents/
+.claude/

@@ -4,11 +4,11 @@ import express from "express";
 const app = express();
 app.use(express.json({ limit: "25mb" })); // base64 images can be large
 
-const API_KEY = process.env.VITE_ANTHROPIC_API_KEY;
+const API_KEY = process.env.ANTHROPIC_API_KEY;
 
 app.post("/api/anthropic", async (req, res) => {
   if (!API_KEY) {
-    return res.status(500).json({ error: "VITE_ANTHROPIC_API_KEY not set in .env" });
+    return res.status(500).json({ error: "ANTHROPIC_API_KEY not set in .env" });
   }
   try {
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {

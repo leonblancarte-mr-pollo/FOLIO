@@ -2,7 +2,9 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/anthropic", "destination": "/api/anthropic" }
+    { "source": "/api/anthropic", "destination": "/api/anthropic" },
+    { "source": "/api/login", "destination": "/api/login" },
+    { "source": "/api/buscalibre-check", "destination": "/api/buscalibre-check" }
   ],
   "headers": [
     {

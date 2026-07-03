@@ -1,16 +1,56 @@
 // Folio — Daily notification scheduler
-// Imported by the Workbox-generated service worker via importScripts
 
-const PHRASES = [
-  "📖 Regálate 5 minutos. Tu libro te está esperando.",
-  "🔥 Tu racha sigue viva. No la dejes morir hoy.",
-  "✨ Los mejores lectores no leen mucho. Leen seguido.",
-  "📚 5 páginas hoy. Eso es todo lo que necesitas.",
-  "🌙 Antes de dormir, una página. Solo una.",
-  "⏰ Tienes 5 minutos libres ahora mismo. Úsalos.",
+const PHRASES_DEFAULT = [
+  "ese libro lleva días viéndote feo desde la mesa",
+  "5 minutos. ni el tiempo de un tiktok decente",
+  "tu cerebro pide algo que no sea instagram",
+  "el libro de la mesa de noche no se va a leer solo",
+  "literalmente solo 5 páginas",
+  "leer es el reset que tu día necesita",
+  "vamos, una página y ya. te conozco, acabas leyendo 30",
+  "tu yo de las 2am también te lo agradecerá",
+  "ni el tiempo de una serie. solo 5 minutos",
+  "tu yo del lunes prometió leer hoy",
 ];
 
+const PHRASES_STREAK = [
+  "tu racha pide que no la abandones",
+  "ni un día perdido, eres distinto",
+  "no rompas lo que llevas construyendo",
+  "hoy también cuenta. una página ya es victoria",
+];
+
+const PHRASES_BOOK = [
+  "el cap 7 te está esperando",
+  "tu personaje favorito también te extraña",
+  "¿en qué parte quedaste? ya sé que lo recuerdas",
+];
+
+let ctx = { streak: 0, bookTitle: null };
 let notifTimerId = null;
+
+function pickPhrase() {
+  const { streak, bookTitle } = ctx;
+
+  if (streak >= 3) {
+    const pool = [
+      `tu racha de ${streak} días te observa`,
+      ...PHRASES_STREAK,
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  if (bookTitle) {
+    const pool = [
+      `"${bookTitle.slice(0, 28)}" sigue donde lo dejaste`,
+      ...PHRASES_BOOK,
+      ...PHRASES_DEFAULT.slice(0, 4),
+    ];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  return PHRASES_DEFAULT[Math.floor(Math.random() * PHRASES_DEFAULT.length)];
+}
 
 function msUntilNextEightPM() {
   const now = new Date();
@@ -23,9 +63,9 @@ function msUntilNextEightPM() {
 function scheduleNotification() {
   if (notifTimerId) clearTimeout(notifTimerId);
   notifTimerId = setTimeout(() => {
-    const phrase = PHRASES[Math.floor(Math.random() * PHRASES.length)];
-    self.registration.showNotification('Folio 📚', {
-      body: phrase,
+    const body = pickPhrase();
+    self.registration.showNotification('folio', {
+      body,
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       tag: 'folio-daily',
@@ -38,6 +78,8 @@ function scheduleNotification() {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'FOLIO_SCHEDULE_NOTIF') {
+    if (event.data.streak !== undefined) ctx.streak = event.data.streak;
+    if (event.data.bookTitle !== undefined) ctx.bookTitle = event.data.bookTitle;
     scheduleNotification();
   }
 });

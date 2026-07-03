@@ -1,4 +1,4 @@
-// cache-bust: v3
+// cache-bust: v4
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'logo.png'],
       manifest: {
         name: 'Folio',
@@ -17,16 +17,16 @@ export default defineConfig({
         background_color: '#F4EDE0',
         display: 'standalone',
         start_url: '/',
-        version: '1.2',
+        version: '1.4',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
       },
       workbox: {
-        skipWaiting: false,
+        skipWaiting: true,
         importScripts: ['/sw-notifications.js'],
-        clientsClaim: false,
+        clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         navigateFallback: 'index.html',
@@ -45,7 +45,7 @@ export default defineConfig({
             urlPattern: /\/assets\/.+\.(js|css)(\?.*)?$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'assets-v3',
+              cacheName: 'assets-v4',
               expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
           },

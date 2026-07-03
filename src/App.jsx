@@ -31,6 +31,7 @@ import {
   MessageCircle,
   Send,
   Home,
+  PawPrint,
   GraduationCap,
   Compass,
   Camera,
@@ -61,13 +62,16 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
+import { loginWithSupabase, registerWithSupabase, logout, getSessionUser } from "./services/authService.js";
 import confetti from "canvas-confetti";
 import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
 import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
 import { haptic, HAPTIC } from "./haptics.js";
+import BookTinder from "./components/BookTinder.jsx";
+import BookCoverImage from "./components/BookCoverImage.jsx";
 
 // ============ AFFILIATE ============
-const AMAZON_AFFILIATE_ID = import.meta.env.VITE_AMAZON_AFFILIATE_ID || "TU_AFFILIATE_ID";
+const BUSCALIBRE_AFFILIATE_ID = import.meta.env.VITE_BUSCALIBRE_AFFILIATE_ID || "ac4c19281310afaacacd";
 
 // ============ STYLES ============
 const FONT_LINK = `
@@ -362,127 +366,8 @@ function LoadingEntertainment({ label = "Cargando…" }) {
 }
 
 // ============ AUTH ============
-// JWT stores the session client-side (localStorage). Supabase holds the real data.
-const TOKEN_KEY = "folio:token";
-const JWT_SECRET = "folio-local-jwt-2024";
-
-function b64uEncode(str) {
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
-}
-
-function b64uDecode(str) {
-  let s = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (s.length % 4) s += "=";
-  return atob(s);
-}
-
-async function signJWT(payload) {
-  const header = b64uEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const body = b64uEncode(JSON.stringify(payload));
-  const data = `${header}.${body}`;
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(JWT_SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
-  return `${data}.${b64uEncode(String.fromCharCode(...new Uint8Array(sig)))}`;
-}
-
-async function verifyJWT(token) {
-  try {
-    const [header, body, sig] = token.split(".");
-    if (!header || !body || !sig) return null;
-    const data = `${header}.${body}`;
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(JWT_SECRET),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["verify"]
-    );
-    const sigBytes = Uint8Array.from(b64uDecode(sig), (c) => c.charCodeAt(0));
-    const valid = await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(data));
-    if (!valid) return null;
-    const payload = JSON.parse(b64uDecode(body));
-    if (payload.exp && Date.now() / 1000 > payload.exp) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-async function hashPassword(password) {
-  const buf = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(`${password}::folio-pepper`)
-  );
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function registerUser(name, username, email, password) {
-  const emailLower = email.toLowerCase().trim();
-  const usernameLower = username.toLowerCase().trim();
-  const { data: existingEmail } = await supabase
-    .from("users")
-    .select("id")
-    .eq("email", emailLower)
-    .maybeSingle();
-  if (existingEmail) throw new Error("Ya existe una cuenta con ese email.");
-  const { data: existingUsername } = await supabase
-    .from("users")
-    .select("id")
-    .eq("username", usernameLower)
-    .maybeSingle();
-  if (existingUsername) throw new Error("Ese nombre de usuario ya está en uso.");
-  const passwordHash = await hashPassword(password);
-  const newId = crypto.randomUUID();
-  const { error } = await supabase
-    .from("users")
-    .insert({ id: newId, nombre: name.trim(), username: usernameLower, email: emailLower, password_hash: passwordHash });
-  if (error) throw new Error("Error al crear la cuenta. Intenta de nuevo.");
-  return { id: newId, name: name.trim(), email: emailLower };
-}
-
-async function loginUser(email, password) {
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim(), password }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || "Email o contraseña incorrectos.");
-  }
-  const data = await res.json();
-  return { id: data.id, name: data.nombre, email: data.email };
-}
-
-async function mintToken(user) {
-  const token = await signJWT({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60,
-  });
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-async function getStoredUser() {
-  try {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return null;
-    const payload = await verifyJWT(token);
-    // Reject old tokens that pre-date the Supabase migration (no id field)
-    if (!payload || !payload.id) return null;
-    return { id: payload.id, name: payload.name, email: payload.email };
-  } catch { return null; }
-}
+// La autenticación vive en src/services/authService.js (Supabase Auth).
+// La sesión la maneja Supabase; public.users es la tabla de PERFIL (id = auth.uid()).
 
 // ============ STORAGE ============
 function dbToBook(row) {
@@ -501,17 +386,17 @@ function dbToBook(row) {
     finishedAt: row.finished_at ? new Date(row.finished_at).getTime() : null,
     isUamBook: row.is_uam_book || false,
     isbn: row.isbn || null,
+    totalPages: row.total_pages || null,
   };
 }
 
 function bookToDb(book, userId) {
   return {
-    id: book.id,
     user_id: userId,
     title: book.title,
     author: book.author,
     status: book.status,
-    genre: book.genre || null,
+    genre: book.genre ? (book.genre.trim().charAt(0).toUpperCase() + book.genre.trim().slice(1).toLowerCase()) : null,
     summary: book.summary || null,
     rating: book.rating || 0,
     review: book.review || null,
@@ -521,7 +406,19 @@ function bookToDb(book, userId) {
     finished_at: book.finishedAt ? new Date(book.finishedAt).toISOString() : null,
     is_uam_book: book.isUamBook || false,
     isbn: book.isbn || null,
+    total_pages: book.totalPages ?? book.pageCount ?? null,
   };
+}
+
+// La columna total_pages puede no existir aún (migración pendiente). Si Supabase
+// se queja de columna desconocida, reintenta sin ese campo para no romper guardado.
+function isUnknownColumnError(error) {
+  return error && (error.code === "42703" || error.code === "PGRST204" ||
+    /total_pages/.test(error.message || ""));
+}
+function stripTotalPages(dbBook) {
+  const { total_pages, ...rest } = dbBook;
+  return rest;
 }
 
 // ============ ONLINE STATUS HOOK ============
@@ -600,25 +497,119 @@ async function fetchBooks(userId) {
 }
 
 async function insertBook(book, userId) {
-  const { error } = await supabase.from("books").insert(bookToDb(book, userId));
+  const id = book.id || crypto.randomUUID();
+  const dbBook = { id, ...bookToDb(book, userId) };
+  let { data, error } = await supabase.from("books").insert(dbBook).select("id").single();
+  if (error && isUnknownColumnError(error)) {
+    const { total_pages: _tp, ...stripped } = dbBook;
+    ({ data, error } = await supabase.from("books").insert(stripped).select("id").single());
+  }
   if (error) throw error;
+  return data?.id ?? id;
 }
 
 async function updateBookInDB(book, userId) {
-  const { error, count } = await supabase
-    .from("books")
-    .update(bookToDb(book, userId))
-    .eq("id", book.id)
-    .eq("user_id", userId)
-    .select("id", { count: "exact", head: true });
+  const dbBook = bookToDb(book, userId);
+  const run = (payload) => supabase.from("books").update(payload).eq("id", book.id).eq("user_id", userId).select("id", { count: "exact", head: true });
+  let { error, count } = await run(dbBook);
+  if (error && isUnknownColumnError(error)) {
+    ({ error, count } = await run(stripTotalPages(dbBook)));
+  }
   if (error) throw error;
   if (count === 0) throw new Error("UPDATE afectó 0 filas — posible problema de RLS o id incorrecto");
 }
 
 async function deleteBookFromDB(id, userId) {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("books")
     .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
+    .select();
+  if (error) throw error;
+  // If data is empty, DELETE matched 0 rows — likely an RLS policy issue
+  if (!data || data.length === 0) throw new Error("DELETE_NO_ROWS");
+}
+
+// ============ QUOTES CRUD ============
+async function fetchQuotes(userId) {
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("*, books(title, author, cover_url)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(q => ({
+    ...q,
+    bookTitle: q.books?.title || null,
+    bookAuthor: q.books?.author || null,
+    bookCoverUrl: q.books?.cover_url || null,
+  }));
+}
+
+async function fetchQuotesForBook(userId, bookId) {
+  const { data, error } = await supabase
+    .from("quotes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("book_id", bookId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function insertQuote(q, userId) {
+  const { data, error } = await supabase
+    .from("quotes")
+    .insert({
+      user_id: userId,
+      book_id: q.bookId || null,
+      text: q.text.trim(),
+      page_number: q.pageNumber || null,
+      mood: q.mood || null,
+      tags: [],
+      is_favorite: false,
+      is_public: q.isPublic || false,
+    })
+    .select("*, books(title, author, cover_url)")
+    .single();
+  if (error) throw error;
+  return {
+    ...data,
+    bookTitle: data.books?.title || null,
+    bookAuthor: data.books?.author || null,
+    bookCoverUrl: data.books?.cover_url || null,
+  };
+}
+
+async function updateQuoteInDB(q, userId) {
+  const { error } = await supabase
+    .from("quotes")
+    .update({
+      text: q.text.trim(),
+      book_id: q.book_id || null,
+      page_number: q.page_number || null,
+      mood: q.mood || null,
+      is_favorite: q.is_favorite,
+    })
+    .eq("id", q.id)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+async function deleteQuoteFromDB(id, userId) {
+  const { error } = await supabase
+    .from("quotes")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+async function toggleQuoteFavorite(id, userId, isFavorite) {
+  const { error } = await supabase
+    .from("quotes")
+    .update({ is_favorite: isFavorite })
     .eq("id", id)
     .eq("user_id", userId);
   if (error) throw error;
@@ -713,11 +704,29 @@ async function fetchFeed(userId) {
   const authorMap = {};
   (authors || []).forEach((a) => { authorMap[a.id] = { ...a }; });
 
-  return posts.map((p) => ({
-    ...p,
-    book: p.book_id ? bookMap[p.book_id] : null,
-    author: authorMap[p.user_id] || { nombre: "Usuario", username: "" },
-  }));
+  return posts.map((p) => {
+    let type = p.type;
+    let quote = null;
+
+    // Detect quote posts embedded in "text" type (avoids DB type constraints)
+    if (p.content) {
+      try {
+        const parsed = JSON.parse(p.content);
+        if (parsed.__folio_type === "quote") {
+          type = "quote";
+          quote = parsed;
+        }
+      } catch { /* not JSON, regular text post */ }
+    }
+
+    return {
+      ...p,
+      type,
+      book: p.book_id ? bookMap[p.book_id] : null,
+      author: authorMap[p.user_id] || { nombre: "Usuario", username: "" },
+      quote,
+    };
+  });
 }
 
 async function fetchComments(postId) {
@@ -787,7 +796,7 @@ async function compressAndUploadPostImage(file, userId) {
   });
 }
 
-async function createFeedPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead }) {
+async function createFeedPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead, quoteId }) {
   if (!navigator.onLine) {
     addPendingPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead });
     return;
@@ -802,6 +811,7 @@ async function createFeedPost({ userId, type, bookId, action, content, imageUrl,
   if (action !== undefined) payload.action = action || null;
   if (pagesRead !== undefined) payload.pages_read = pagesRead || null;
   if (minutesRead !== undefined) payload.minutes_read = minutesRead || null;
+  // quote_id stored in content as JSON — no schema column required
   console.log("[createFeedPost] insertando:", payload);
   console.log("[createFeedPost] User ID:", userId);
   const { error } = await supabase.from("posts").insert(payload);
@@ -854,6 +864,40 @@ function daysBetweenLocalDates(a, b) {
   return Math.round((dateA - dateB) / (1000 * 60 * 60 * 24));
 }
 
+async function checkStreakOnLoad(userId) {
+  const today = localDateStr();
+  const { data: existing } = await supabase.from("user_streaks")
+    .select("*").eq("user_id", userId).maybeSingle();
+
+  if (!existing || !existing.last_log_date || existing.current_streak === 0) {
+    console.log("[streak] checkStreakOnLoad: sin racha activa, nada que hacer");
+    return;
+  }
+
+  const diffDays = daysBetweenLocalDates(today, existing.last_log_date);
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const freezeProtected = diffDays === 2 && existing.streak_freeze_used_at === localDateStr(yesterday);
+
+  console.log(`[streak] checkStreakOnLoad: hoy=${today}, última_lectura=${existing.last_log_date}, diff=${diffDays}d, freeze=${freezeProtected}, racha_actual=${existing.current_streak}`);
+
+  if (diffDays > 1 && !freezeProtected) {
+    console.log(`[streak] REINICIANDO racha: ${existing.current_streak} → 0 (sin lectura por ${diffDays} días)`);
+    await supabase.from("user_streaks").update({
+      current_streak: 0,
+      updated_at: new Date().toISOString(),
+    }).eq("user_id", userId);
+  } else {
+    console.log(`[streak] Racha ACTIVA: diff=${diffDays}d, racha=${existing.current_streak}`);
+    // Pet XP por mantener la racha: +3 XP, solo una vez al día
+    const petStreakKey = `folio_pet_streak_xp_${userId}_${today}`;
+    if (!localStorage.getItem(petStreakKey)) {
+      localStorage.setItem(petStreakKey, "1");
+      addPetXP(userId, 3).catch(() => {});
+    }
+  }
+}
+
 async function logReadingSession({ userId, bookId, pagesRead, mood }) {
   if (!navigator.onLine) {
     addPendingLog({ userId, bookId, pagesRead: pagesRead || null, mood, date: localDateStr() });
@@ -869,6 +913,10 @@ async function logReadingSession({ userId, bookId, pagesRead, mood }) {
     log_date: today,
   });
   if (logError) throw logError;
+
+  if (pagesRead > 0 && bookId) {
+    createFeedPost({ userId, type: 'reading_session', bookId, content: '', pagesRead, imageUrl: null }).catch(() => {});
+  }
 
   const { data: existing } = await supabase.from("user_streaks")
     .select("*").eq("user_id", userId).maybeSingle();
@@ -900,6 +948,12 @@ async function logReadingSession({ userId, bookId, pagesRead, mood }) {
       total_pages_read: (existing.total_pages_read || 0) + (pagesRead || 0),
       updated_at: new Date().toISOString(),
     }).eq("user_id", userId);
+  }
+
+  // Pet XP por páginas leídas: +2 XP por cada 10 páginas
+  const pagesXp = Math.floor((pagesRead || 0) / 10) * 2;
+  if (pagesXp > 0) {
+    addPetXP(userId, pagesXp).catch(() => {});
   }
 }
 
@@ -978,26 +1032,34 @@ async function initUserGems(userId) {
 
 async function loadGems(userId) {
   try {
+    console.log('[GEMS] loadGems INICIO', { userId });
     const { data, error } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
-    if (error) { console.error("Load gems error:", error); return 0; }
+    console.log('[GEMS] loadGems RESULT', { data, error });
+    if (error) { console.error("[GEMS] loadGems ERROR:", error); return 0; }
     return data?.balance ?? 0;
   } catch (err) {
-    console.error("Gems fetch failed:", err);
+    console.error("[GEMS] loadGems EXCEPTION:", err);
     return 0;
   }
 }
 
 async function addGemsDB(userId, amount) {
+  console.log('[GEMS] addGemsDB INICIO', { userId, amount, timestamp: new Date().toISOString() });
   try {
-    const { data, error } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
-    if (error) { console.error("[gems] select error:", error); return null; }
-    if (!data) { console.error("[gems] no record for", userId); return null; }
-    const newBalance = (data.balance || 0) + amount;
-    const { error: upErr } = await supabase.from("user_gems").update({ balance: newBalance }).eq("user_id", userId);
-    if (upErr) { console.error("[gems] update error:", upErr); return null; }
+    const { data: current, error: selErr } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
+    console.log('[GEMS] SELECT result', { current, selErr });
+    if (selErr) { console.error("[GEMS] SELECT ERROR:", selErr); return null; }
+    if (!current) { console.error("[GEMS] NO RECORD para userId:", userId); return null; }
+    const newBalance = (current.balance || 0) + amount;
+    console.log('[GEMS] Calculated newBalance', { prev: current.balance, amount, newBalance });
+    const { error: upErr, count } = await supabase.from("user_gems").update({ balance: newBalance }).eq("user_id", userId);
+    console.log('[GEMS] UPDATE result', { error: upErr, count, newBalance });
+    if (upErr) { console.error("[GEMS] UPDATE ERROR:", upErr); return null; }
+    if (count === 0) { console.error("[GEMS] UPDATE AFECTÓ 0 FILAS — posible RLS block"); }
+    console.log('[GEMS] SUCCESS', { newBalance });
     return newBalance;
   } catch (err) {
-    console.error("[gems] transaction failed:", err);
+    console.error("[GEMS] EXCEPTION:", err);
     return null;
   }
 }
@@ -1017,6 +1079,127 @@ async function claimDailyGems(userId) {
     consecutive_days: consecutive,
   }).eq("user_id", userId);
   return earned;
+}
+
+// ============ PET (MASCOTA) ============
+const PET_MAX_LEVEL = 50;
+const petXpForLevel = (level) => level * 100; // XP necesario para salir del nivel actual
+const PET_TYPES = {
+  gato: {
+    img: "/pets/cat.png",
+    title: "El Sensible",
+    quote: "Leo para encontrarme, no para escapar.",
+    label: "Gato",
+  },
+};
+function petImageSrc(petType) {
+  return (PET_TYPES[petType] || PET_TYPES.gato).img;
+}
+
+let _petListeners = [];
+const petBus = {
+  emit: (payload) => _petListeners.forEach(fn => fn(payload)),
+  on: (fn) => {
+    _petListeners.push(fn);
+    return () => { _petListeners = _petListeners.filter(f => f !== fn); };
+  },
+};
+
+// Devuelve el pet, o null si la tabla existe pero el usuario no tiene mascota,
+// o undefined si la tabla no existe / hubo error (para no forzar onboarding roto).
+async function loadPet(userId) {
+  try {
+    const { data, error } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
+    if (error) {
+      console.warn("[PET] loadPet error (¿existe la tabla user_pets?):", error.message,
+        "\n→ Ejecuta el SQL en Supabase: CREATE TABLE user_pets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES users(id) ON DELETE CASCADE UNIQUE NOT NULL, pet_type text NOT NULL DEFAULT 'gato', pet_name text DEFAULT 'Mi compañero', xp int DEFAULT 0, level int DEFAULT 1, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()); ALTER TABLE user_pets DISABLE ROW LEVEL SECURITY;");
+      return undefined;
+    }
+    return data || null;
+  } catch (e) {
+    console.error("[PET] loadPet exception:", e);
+    return undefined;
+  }
+}
+
+async function createPet(userId, { petType = "gato", petName = "Mi compañero" } = {}) {
+  console.log("[PET CREATION PRE] inserting:", { userId, petType, petName });
+  try {
+    // Insert SIN .select() para no depender de una política SELECT de RLS
+    const { error } = await supabase.from("user_pets")
+      .insert({ user_id: userId, pet_type: petType, pet_name: petName, xp: 0, level: 1 });
+    console.log("[PET CREATION POST] insert error:", error ? { code: error.code, message: error.message, details: error.details } : null);
+
+    if (error) {
+      // Ya existe (unique violation) → recuperar la existente
+      if (error.code === "23505") {
+        const { data: existing } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
+        if (existing) { console.log("[PET CREATION] ya existía, recuperada:", existing); return existing; }
+      }
+      console.error("[PET] createPet ERROR:", error.code, error.message,
+        error.code === "42501"
+          ? "\n→ RLS está bloqueando. Ejecuta en Supabase: ALTER TABLE user_pets DISABLE ROW LEVEL SECURITY;"
+          : error.code === "23503"
+          ? "\n→ Foreign key: user_id no existe en la tabla users."
+          : "");
+      return { __error: error };
+    }
+
+    // Verificar que realmente persistió (si RLS bloquea SELECT, esto será null)
+    const { data: verify, error: vErr } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
+    console.log("[PET CREATION VERIFY] re-fetched:", verify, "verifyError:", vErr ? vErr.message : null);
+    if (verify) return verify;
+
+    // Insert no dio error pero no se puede leer → probablemente RLS bloquea SELECT
+    console.warn("[PET CREATION] insert OK pero no se pudo releer (¿RLS en SELECT?). Devuelvo objeto local.");
+    return { __unverified: true, user_id: userId, pet_type: petType, pet_name: petName, xp: 0, level: 1 };
+  } catch (e) {
+    console.error("[PET] createPet exception:", e);
+    return { __error: e };
+  }
+}
+
+async function updatePetName(userId, petName) {
+  const clean = (petName || "").trim().slice(0, 40) || "Mi compañero";
+  const { error } = await supabase.from("user_pets")
+    .update({ pet_name: clean, updated_at: new Date().toISOString() }).eq("user_id", userId);
+  if (error) { console.error("[PET] updatePetName error:", error.message); return null; }
+  return clean;
+}
+
+// Suma XP a la mascota; sube de nivel si corresponde y emite el resultado en petBus.
+async function addPetXP(userId, amount) {
+  if (!userId || !amount || amount <= 0) return null;
+  try {
+    let { data: pet, error: selErr } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
+    if (selErr) { console.warn("[PET] addPetXP select error:", selErr.message); return null; }
+    if (!pet) {
+      pet = await createPet(userId);
+      if (!pet) return null;
+    }
+    const startLevel = Math.max(1, pet.level || 1);
+    let level = startLevel;
+    let xp = (pet.xp || 0) + amount;
+    while (level < PET_MAX_LEVEL && xp >= petXpForLevel(level)) {
+      xp -= petXpForLevel(level);
+      level += 1;
+    }
+    if (level >= PET_MAX_LEVEL) {
+      level = PET_MAX_LEVEL;
+      xp = Math.min(xp, petXpForLevel(PET_MAX_LEVEL));
+    }
+    const leveledUp = level > startLevel;
+    const { error: upErr } = await supabase.from("user_pets")
+      .update({ xp, level, updated_at: new Date().toISOString() }).eq("user_id", userId);
+    if (upErr) { console.error("[PET] addPetXP update error:", upErr.message); return null; }
+    console.log(`[PET XP] userId: ${userId}, +${amount} XP, level: ${level}, xp_en_nivel: ${xp}, leveledUp: ${leveledUp}`);
+    const result = { newLevel: level, newXp: xp, leveledUp, added: amount, petName: pet.pet_name, petType: pet.pet_type };
+    petBus.emit(result);
+    return result;
+  } catch (e) {
+    console.error("[PET] addPetXP exception:", e);
+    return null;
+  }
 }
 
 function canShowInviteCard() {
@@ -1594,11 +1777,20 @@ function QuickRatingModal({ currentRating, onSave, onSkip }) {
 }
 
 const NAV_ITEMS = [
-  { id: "feed", label: "Feed", icon: Home },
+  { id: "home", label: "Home", icon: Home },
   { id: "explorar", label: "Explorar", icon: Compass },
-  { id: "add", label: "Agregar", icon: Plus },
-  { id: "amigos", label: "Amigos", icon: Users },
+  { id: "mascota", label: "Mascota", icon: PawPrint },
+  { id: "social", label: "Social", icon: MessageCircle },
   { id: "perfil", label: "Perfil", icon: User },
+];
+
+const MOOD_OPTIONS = [
+  { key: "inspirador", label: "🔥 Inspirador" },
+  { key: "dolor_bonito", label: "💔 Dolor bonito" },
+  { key: "mente_expandida", label: "🧠 Mente expandida" },
+  { key: "gracioso", label: "😂 Gracioso" },
+  { key: "poetico", label: "🌅 Poético" },
+  { key: "motivador", label: "💪 Motivador" },
 ];
 
 function SubTabBar({ tabs, active, onChange }) {
@@ -1634,9 +1826,9 @@ function SubTabBar({ tabs, active, onChange }) {
   );
 }
 
-function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance }) {
+function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, pet, onOpenPet }) {
   return (
-    <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}` }}>
+    <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}`, paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span
           aria-label="Folio"
@@ -1652,12 +1844,9 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
           }}
         >f</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <div data-tutorial="gems" style={{ display: "flex", alignItems: "center", gap: "0.3rem", padding: "0.28rem 0.65rem 0.28rem 0.5rem", backgroundColor: `${palette.amber}1A`, borderRadius: 999, border: `1px solid ${palette.amber}40` }}>
-            <img src="/gema.png" alt="gemas" style={{ width: 18, height: 18, objectFit: "contain", flexShrink: 0, display: "block" }} />
-            <span key={gemBalance} style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 700, color: palette.amber, lineHeight: 1, animation: "gemBalancePop 400ms cubic-bezier(0.34,1.56,0.64,1)" }}>
-              {(gemBalance || 0).toLocaleString("es-MX")}
-            </span>
-          </div>
+          <span style={{ display: "flex", alignItems: "center", gap: "3px", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "999px", padding: "3px 10px 3px 8px", fontFamily: "system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 600, color: palette.amber ?? "#C8924A" }}>
+            💎 {gemBalance ?? 0}
+          </span>
           <button
             onClick={onOpenNotifs}
             aria-label="Notificaciones"
@@ -1680,11 +1869,11 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
             const Icon = t.icon;
             const active = tab === t.id;
             const isAdd = t.id === "add";
-            const badge = t.id === "amigos" ? pendingCount + unreadMessages : 0;
+            const badge = t.id === "social" ? pendingCount + unreadMessages : 0;
             return (
               <button
                 key={t.id}
-                onClick={() => setTab(t.id)}
+                onClick={() => { if (t.id === "mascota" && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
                 style={{
                   display: "flex", alignItems: "center", gap: "0.35rem",
                   padding: "0.4rem 1rem", borderRadius: "999px",
@@ -1714,7 +1903,7 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
   );
 }
 
-function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs }) {
+function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onAddPress, pet, onOpenPet }) {
   return (
     <nav
       className="sm:hidden fixed bottom-0 left-0 right-0 z-20 flex items-center"
@@ -1729,25 +1918,29 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs }) 
       {NAV_ITEMS.map((t) => {
         const Icon = t.icon;
         const active = tab === t.id;
-        const isAdd = t.id === "add";
-        const badge = t.id === "amigos" ? pendingCount + unreadMessages : 0;
+        const isCenter = t.id === "mascota";
+        const badge = t.id === "social" ? pendingCount + unreadMessages : 0;
         return (
           <button
             key={t.id}
             data-tutorial={`nav-${t.id}`}
-            onClick={() => { haptic(HAPTIC.NAV); setTab(t.id); }}
-            className={`flex-1 flex flex-col items-center justify-center py-1.5${isAdd ? " nav-add-btn" : ""}`}
+            onClick={() => { haptic(HAPTIC.NAV); if (isCenter && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5${isCenter ? " nav-add-btn" : ""}`}
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
           >
-            {isAdd ? (
+            {isCenter ? (
               <div style={{
                 width: 52, height: 52, borderRadius: "50%",
-                backgroundColor: palette.accent,
+                background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(107, 30, 42, 0.3)",
-                marginBottom: 1,
+                boxShadow: "0 4px 14px rgba(122, 46, 46, 0.4)",
+                marginBottom: 1, overflow: "hidden",
               }}>
-                <Plus size={24} color="#fff" strokeWidth={2.5} />
+                {pet ? (
+                  <img src={petImageSrc(pet.pet_type)} alt="" className="pet-sprite-img" style={{ width: 42, height: 42, objectFit: "contain", display: "block" }} />
+                ) : (
+                  <PawPrint size={24} color="#fff" strokeWidth={2.5} />
+                )}
               </div>
             ) : (
               <div style={{
@@ -2018,6 +2211,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
   const [error, setError] = useState("");
   const [selectedBook, setSelectedBook] = useState(null);
   const [pickedStatus, setPickedStatus] = useState("want_to_read");
+  const [buscalibreMap, setBuscalibreMap] = useState({});
   const inputRef = useRef(null);
   const [recents, setRecents] = useState(() => {
     try { return JSON.parse(localStorage.getItem("ol_recent_searches") || "[]"); } catch { return []; }
@@ -2025,7 +2219,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
   useEffect(() => {
     if (isOpen) {
-      setQuery(""); setResults([]); setError(""); setSelectedBook(null); setPickedStatus("want_to_read");
+      setQuery(""); setResults([]); setError(""); setSelectedBook(null); setPickedStatus("want_to_read"); setBuscalibreMap({});
       setTimeout(() => inputRef.current?.focus(), 120);
     }
   }, [isOpen]);
@@ -2047,6 +2241,27 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  useEffect(() => {
+    if (!results.length) { setBuscalibreMap({}); return; }
+    const isbns = results.map(r => r.isbn).filter(Boolean);
+    if (!isbns.length) return;
+    let cancelled = false;
+    Promise.all(
+      isbns.map(isbn =>
+        fetch(`/api/buscalibre-check?isbn=${encodeURIComponent(isbn)}`)
+          .then(r => r.json())
+          .then(d => ({ isbn, available: d.available === true }))
+          .catch(() => ({ isbn, available: false }))
+      )
+    ).then(checks => {
+      if (cancelled) return;
+      const map = {};
+      checks.forEach(({ isbn, available }) => { map[isbn] = available; });
+      setBuscalibreMap(map);
+    });
+    return () => { cancelled = true; };
+  }, [results]);
+
   function saveRecent(q) {
     const next = [q, ...recents.filter(r => r !== q)].slice(0, 5);
     setRecents(next);
@@ -2060,8 +2275,6 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
   }
 
   if (!isOpen) return null;
-
-  console.log('[SearchBookModal] render: query=', query, 'loading=', loading, 'results=', results.length);
 
   // Phase 2 — Status picker (portal to body)
   if (selectedBook) {
@@ -2122,8 +2335,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
             autoFocus
             type="text"
             value={query}
-            onChange={(e) => { console.log('[input] onChange:', e.target.value); setQuery(e.target.value); }}
-            onInput={(e) => console.log('[input] onInput:', e.currentTarget.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Busca por título, autor o ISBN..."
             style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "'EB Garamond', serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
           />
@@ -2166,27 +2378,43 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
         {!loading && !error && results.length > 0 && (
           <div>
-            {results.map((book, i) => (
-              <button
-                key={book.olKey || i}
-                onClick={() => setSelectedBook(book)}
-                style={{ display: "flex", alignItems: "center", gap: "0.75rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`, cursor: "pointer", textAlign: "left", transition: "background-color 0.1s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = palette.bgSoft; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-              >
-                {book.coverUrl ? (
-                  <img src={book.coverUrl} alt="" style={{ width: 50, height: 75, objectFit: "cover", borderRadius: 4, flexShrink: 0, backgroundColor: palette.bgSoft }} loading="lazy" />
-                ) : (
-                  <BookCoverPlaceholder title={book.title} author={book.author} width={50} height={75} />
-                )}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
-                  <p style={{ ...ts.caption, marginBottom: book.year ? "0.15rem" : 0 }}>{book.author}</p>
-                  {book.year && <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", color: palette.inkFaint }}>{book.year}</p>}
-                </div>
-                <ChevronRight size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />
-              </button>
-            ))}
+            {[...results]
+              .sort((a, b) => {
+                const aOk = a.isbn && buscalibreMap[a.isbn];
+                const bOk = b.isbn && buscalibreMap[b.isbn];
+                return (aOk ? 0 : 1) - (bOk ? 0 : 1);
+              })
+              .map((book, i) => {
+                const inBuscalibre = book.isbn && buscalibreMap[book.isbn];
+                return (
+                  <button
+                    key={book.olKey || i}
+                    onClick={() => setSelectedBook(book)}
+                    style={{ display: "flex", alignItems: "center", gap: "0.75rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`, cursor: "pointer", textAlign: "left", transition: "background-color 0.1s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = palette.bgSoft; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                  >
+                    {book.coverUrl ? (
+                      <img src={book.coverUrl} alt="" style={{ width: 50, height: 75, objectFit: "cover", borderRadius: 4, flexShrink: 0, backgroundColor: palette.bgSoft }} loading="lazy" />
+                    ) : (
+                      <BookCoverPlaceholder title={book.title} author={book.author} width={50} height={75} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+                      <p style={{ ...ts.caption, marginBottom: book.year ? "0.15rem" : 0 }}>{book.author}</p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.15rem", flexWrap: "wrap" }}>
+                        {book.year && <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", color: palette.inkFaint }}>{book.year}</span>}
+                        {inBuscalibre && (
+                          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "10px", fontWeight: 600, color: "#2D6A4F", backgroundColor: "#D8F3DC", borderRadius: "4px", padding: "1px 5px", lineHeight: 1.4 }}>
+                            ✓ Buscalibre
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ChevronRight size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />
+                  </button>
+                );
+              })}
           </div>
         )}
 
@@ -2267,6 +2495,7 @@ function AddBookView({ onAdd, setTab, isOnline = true }) {
       review: "",
       addedAt: Date.now(),
       year: book.year || null,
+      isbn: book.isbn || null,
     });
     setMode("search");
     setTab("perfil");
@@ -2511,13 +2740,77 @@ function BookForm({ form, setForm, onReadSelected }) {
   );
 }
 
-function BookDetailModal({ book, onClose, onUpdate, onDelete }) {
+function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuote }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(book);
   const [shareMsg, setShareMsg] = useState("");
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+  const [isAvailableInBuscalibre, setIsAvailableInBuscalibre] = useState(false);
+  const [buscalibreIsbn, setBuscalibreIsbn] = useState(null);
+  const [bookQuotes, setBookQuotes] = useState([]);
 
   useEffect(() => setDraft(book), [book]);
+
+  useEffect(() => {
+    if (!userId || !book?.id) return;
+    fetchQuotesForBook(userId, book.id).then(setBookQuotes).catch(() => {});
+  }, [userId, book?.id]);
+
+  useEffect(() => {
+    if (!book?.id) return;
+    let cancelled = false;
+    setIsAvailableInBuscalibre(false);
+    setBuscalibreIsbn(null);
+
+    async function check() {
+      console.log('[Buscalibre] check() START — book.id:', book?.id, 'book.isbn:', book?.isbn);
+
+      // Build candidate ISBNs: book.isbn first, then from Google Books (skipping nulls)
+      const candidates = [];
+      if (book.isbn) candidates.push(book.isbn);
+
+      try {
+        const hits = await searchGoogleBooks(`${book.title} ${book.author}`);
+        console.log('[Buscalibre] Google Books hits:', hits.length, '— ISBNs:', hits.map(h => h.isbn));
+        hits.forEach(h => { if (h.isbn && !candidates.includes(h.isbn)) candidates.push(h.isbn); });
+      } catch (e) {
+        console.warn('[Buscalibre] Google Books fallback failed:', e);
+      }
+
+      console.log('[Buscalibre] candidates:', candidates);
+
+      if (!candidates.length || cancelled) {
+        console.log('[Buscalibre] No ISBN candidates found, aborting.');
+        return;
+      }
+
+      for (const isbn of candidates.slice(0, 4)) {
+        if (cancelled) return;
+        try {
+          console.log('[Buscalibre] Checking ISBN:', isbn);
+          const r = await fetch(`/api/buscalibre-check?isbn=${encodeURIComponent(isbn)}`);
+          const d = await r.json();
+          console.log('[Buscalibre] Response for', isbn, ':', d);
+          if (d.available === true) {
+            if (!cancelled) {
+              console.log('[Buscalibre] AVAILABLE — setting state, isbn:', isbn);
+              setIsAvailableInBuscalibre(true);
+              setBuscalibreIsbn(isbn);
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('[Buscalibre] fetch error for isbn', isbn, ':', e);
+        }
+      }
+
+      console.log('[Buscalibre] No available ISBN found after checking all candidates.');
+      if (!cancelled) setIsAvailableInBuscalibre(false);
+    }
+
+    check();
+    return () => { cancelled = true; };
+  }, [book?.id]);
 
   if (!book) return null;
 
@@ -2775,10 +3068,10 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete }) {
                   }}
                 />
               </div>
-              {book.isbn && (
+              {isAvailableInBuscalibre && buscalibreIsbn && (
                 <div style={{ marginTop: "1rem" }}>
                   <a
-                    href={`https://amazon.com.mx/dp/${book.isbn}?tag=${AMAZON_AFFILIATE_ID}`}
+                    href={`https://www.buscalibre.com.mx/libros/isbn/${buscalibreIsbn}?afiliado=${BUSCALIBRE_AFFILIATE_ID}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -2800,8 +3093,45 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete }) {
                     }}
                   >
                     <ExternalLink size={14} />
-                    Comprar en Amazon
+                    Comprar en Buscalibre
                   </a>
+                </div>
+              )}
+
+              {userId && (
+                <div style={{ marginTop: "1.5rem", paddingTop: "1.1rem", borderTop: `1px solid ${palette.borderSoft}` }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                    <h3 style={{ ...display, fontSize: "0.9rem", fontWeight: 600, color: palette.ink }}>Frases guardadas</h3>
+                    {onSaveQuote && (
+                      <button
+                        onClick={onSaveQuote}
+                        style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.75rem", fontWeight: 500, color: palette.accent, backgroundColor: "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.2rem", padding: "2px 0" }}
+                      >
+                        <Plus size={12} /> Añadir
+                      </button>
+                    )}
+                  </div>
+                  {bookQuotes.length === 0 ? (
+                    <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, fontStyle: "italic" }}>
+                      No has guardado frases de este libro todavía
+                    </p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                      {bookQuotes.slice(0, 3).map(q => (
+                        <div key={q.id} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "8px", padding: "0.65rem 0.85rem 0.65rem 1.1rem", position: "relative", overflow: "hidden" }}>
+                          <div style={{ position: "absolute", top: 2, left: 6, fontFamily: "Georgia, serif", fontSize: "1.8rem", lineHeight: 1, color: palette.accent + "20", userSelect: "none" }}>"</div>
+                          <p style={{ ...body, fontSize: "0.9rem", fontStyle: "italic", color: palette.ink, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            {q.text}
+                          </p>
+                        </div>
+                      ))}
+                      {bookQuotes.length > 3 && (
+                        <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.75rem", color: palette.inkFaint, textAlign: "center", marginTop: "0.1rem" }}>
+                          +{bookQuotes.length - 3} más en Mis Frases
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -2820,6 +3150,117 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete }) {
           onSkip={() => setShowRatingPrompt(false)}
         />
       )}
+    </div>
+  );
+}
+
+// Recomendaciones colaborativas (Matrix Factorization / SVD híbrido).
+// Vive por separado de RecommendFlow (el quiz por mood, más abajo) para no
+// tocar su lógica: se monta arriba, en el tab "Para ti", y si falla o no
+// hay datos suficientes simplemente no renderiza nada — el quiz sigue
+// funcionando exactamente igual debajo.
+function CollaborativeRecommendations({ user, onAdd }) {
+  const [items, setItems] = useState(null); // null = cargando, [] = sin resultado
+  const [personalized, setPersonalized] = useState(false);
+  const [addedIds, setAddedIds] = useState(new Set());
+
+  useEffect(() => {
+    if (!user?.id) { setItems([]); return; }
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) { if (!cancelled) setItems([]); return; }
+
+        const res = await fetch(`/api/recommendations?userId=${user.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setItems(data.items || []);
+        setPersonalized(!!data.personalized);
+      } catch (err) {
+        console.warn("[CollaborativeRecommendations] fallback silencioso:", err.message);
+        if (!cancelled) setItems([]);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  function handleAdd(item) {
+    onAdd({
+      id: crypto.randomUUID(),
+      title: item.title,
+      author: item.author,
+      status: "wish",
+      genre: item.genres?.[0] || "",
+      summary: "",
+      moodTags: [],
+      coverUrl: item.cover_url || null,
+      rating: 0,
+      review: "",
+      addedAt: Date.now(),
+    });
+    setAddedIds((prev) => new Set([...prev, item.book_id]));
+  }
+
+  if (items === null) {
+    return (
+      <div className="px-4 sm:px-6 pt-2" style={{ display: "flex", gap: "0.8rem", overflowX: "auto" }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{ width: 130, flexShrink: 0 }}>
+            <div style={{ width: 130, height: 180, borderRadius: 10, backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+          </div>
+        ))}
+        <style>{`@keyframes skeletonPulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }`}</style>
+      </div>
+    );
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="px-4 sm:px-6 pt-2 pb-1 max-w-4xl mx-auto">
+      <p style={{ ...display, fontStyle: "italic", fontSize: "1.15rem", color: palette.ink, marginBottom: "0.7rem" }}>
+        {personalized ? "Recomendado para ti" : "Los mejor valorados"}
+      </p>
+      <div style={{ display: "flex", gap: "0.9rem", overflowX: "auto", paddingBottom: "0.4rem" }}>
+        {items.map((item) => {
+          const added = addedIds.has(item.book_id);
+          return (
+            <div key={item.book_id} style={{ width: 130, flexShrink: 0 }}>
+              <div style={{ position: "relative", width: 130, height: 180, borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 14px rgba(0,0,0,0.14)" }}>
+                <BookCoverImage coverUrl={item.cover_url} title={item.title} author={item.author} genres={item.genres} compact={false} />
+              </div>
+              <p style={{ ...display, fontSize: "0.85rem", fontWeight: 700, color: palette.ink, marginTop: "0.4rem", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                {item.title}
+              </p>
+              <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: "2px 0 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {item.author}
+              </p>
+              <button
+                onClick={() => handleAdd(item)}
+                disabled={added}
+                className="btn-press"
+                style={{
+                  width: "100%", padding: "0.4rem", borderRadius: 8,
+                  border: `1px solid ${added ? palette.borderSoft : palette.accent}`,
+                  backgroundColor: added ? palette.bgSoft : "transparent",
+                  color: added ? palette.inkFaint : palette.accent,
+                  cursor: added ? "default" : "pointer",
+                  ...body, fontSize: "0.78rem", fontWeight: 600,
+                }}
+              >
+                {added ? "Guardado ✓" : "+ Guardar"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2923,9 +3364,19 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
           >
             ✦ Para tu mood actual
           </p>
-          <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.6rem", color: palette.ink }}>
-            Mis sugerencias
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+            <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.6rem", color: palette.ink }}>
+              Mis sugerencias
+            </h2>
+            <button
+              onClick={() => fetchRecs(answers)}
+              disabled={loading}
+              className="btn-press"
+              style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.45rem 0.9rem", borderRadius: 999, border: `1.5px solid ${palette.accent}`, backgroundColor: "transparent", color: palette.accent, cursor: loading ? "default" : "pointer", ...display, fontSize: "0.82rem", fontWeight: 600, opacity: loading ? 0.6 : 1 }}
+            >
+              {loading ? <Loader2 size={14} className="animate-spin" /> : "🎲"} Sorpréndeme
+            </button>
+          </div>
         </div>
 
         {fromLibraryMatched.length > 0 && (
@@ -3282,9 +3733,9 @@ function AuthView({ onLogin }) {
       }
       setLoading(true);
       try {
-        const user = await loginUser(form.email, form.password);
-        await mintToken(user);
-        onLogin(user);
+        const result = await loginWithSupabase(form.email, form.password);
+        if (!result.ok) { setError(result.error); return; }
+        onLogin(result.user);
       } catch (e) {
         setError(e.message);
       } finally {
@@ -3295,15 +3746,15 @@ function AuthView({ onLogin }) {
       const username = form.username.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase().trim();
       if (!username) { setError("El nombre de usuario es requerido."); return; }
       if (!form.email.trim()) { setError("El email es requerido."); return; }
-      if (form.password.length < 4) { setError("La contraseña debe tener al menos 4 caracteres."); return; }
+      if (form.password.length < 6) { setError("La contraseña debe tener al menos 6 caracteres."); return; }
       if (form.password !== form.confirm) { setError("Las contraseñas no coinciden."); return; }
       setLoading(true);
       try {
-        const user = await registerUser(form.name, username, form.email, form.password);
-        await mintToken(user);
-        await initUserGems(user.id);
+        const result = await registerWithSupabase({ name: form.name, username, email: form.email, password: form.password });
+        if (!result.ok) { setError(result.error); return; }
+        await initUserGems(result.user.id);
         localStorage.setItem("folio_gems_welcome", "1");
-        onLogin(user, true);
+        onLogin(result.user, true);
       } catch (e) {
         setError(e.message);
       } finally {
@@ -4116,7 +4567,7 @@ function ReadingHeatmap({ userId }) {
 }
 
 // ============ PROFILE VIEW ============
-function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'system', setTheme }) {
+function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'system', setTheme, pet, onRenamePet }) {
   const [profile, setProfile] = useState({ username: "", bio: "", avatarUrl: null, coverUrl: null });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -4132,6 +4583,7 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
   const [wraps, setWraps] = useState([]);
   const [generatingWrap, setGeneratingWrap] = useState(false);
   const [activeWrap, setActiveWrap] = useState(null);
+  const [achievementsExpanded, setAchievementsExpanded] = useState(false);
   const fileInput = useRef(null);
   const coverFileInput = useRef(null);
 
@@ -4156,8 +4608,10 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
         setLoading(false);
       })
       .catch(() => { setLoading(false); });
-    supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => { if (data) setStreak(data); });
+    checkStreakOnLoad(user.id).then(() => {
+      supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle()
+        .then(({ data }) => { if (data) setStreak(data); });
+    });
 
     const refreshAchievements = () =>
       supabase.from("achievements").select("achievement_key, unlocked_at").eq("user_id", user.id)
@@ -4207,12 +4661,15 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
     try {
       const ext = file.name.split(".").pop();
       const path = `${user.id}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data } = supabase.storage.from("avatars").getPublicUrl(path);
-      setProfile((p) => ({ ...p, avatarUrl: data.publicUrl + `?t=${Date.now()}` }));
+      const { data: uploadData, error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+      if (upErr) throw new Error(`Storage error: ${upErr.message}`);
+      const publicUrl = supabase.storage.from("avatars").getPublicUrl(uploadData.path).data.publicUrl;
+      if (!publicUrl) throw new Error("No se pudo obtener la URL pública del avatar.");
+      const { error: dbErr } = await supabase.from("users").update({ avatar_url: publicUrl }).eq("id", user.id);
+      if (dbErr) throw new Error(`DB error: ${dbErr.message}`);
+      setProfile((p) => ({ ...p, avatarUrl: publicUrl + `?t=${Date.now()}` }));
     } catch (e) {
-      setError("Error al subir la imagen. Verifica que el bucket 'avatars' existe y es público.");
+      setError(e.message || "Error al subir la imagen.");
     } finally {
       setUploading(false);
     }
@@ -4225,14 +4682,15 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
     try {
       const ext = file.name.split(".").pop();
       const path = `${user.id}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("covers").upload(path, file, { upsert: true });
-      if (upErr) throw upErr;
-      const { data } = supabase.storage.from("covers").getPublicUrl(path);
-      const url = data.publicUrl + `?t=${Date.now()}`;
-      setProfile((p) => ({ ...p, coverUrl: url }));
-      await supabase.from("users").update({ cover_url: url }).eq("id", user.id);
+      const { data: uploadData, error: upErr } = await supabase.storage.from("covers").upload(path, file, { upsert: true });
+      if (upErr) throw new Error(`Storage error: ${upErr.message}`);
+      const publicUrl = supabase.storage.from("covers").getPublicUrl(uploadData.path).data.publicUrl;
+      if (!publicUrl) throw new Error("No se pudo obtener la URL pública de la portada.");
+      const { error: dbErr } = await supabase.from("users").update({ cover_url: publicUrl }).eq("id", user.id);
+      if (dbErr) throw new Error(`DB error: ${dbErr.message}`);
+      setProfile((p) => ({ ...p, coverUrl: publicUrl + `?t=${Date.now()}` }));
     } catch (e) {
-      setError("Error al subir la portada. Verifica que el bucket 'covers' existe y es público.");
+      setError(e.message || "Error al subir la portada.");
     } finally {
       setUploadingCover(false);
     }
@@ -4324,7 +4782,11 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
   const maxYearCount = yearEntries.length > 0 ? Math.max(...yearEntries.map(([, v]) => v)) : 0;
   const genreCounts = {};
   books.forEach((b) => {
-    if (b.genre) genreCounts[b.genre] = (genreCounts[b.genre] || 0) + 1;
+    if (b.genre) {
+      const g = b.genre.trim();
+      const normalized = g.charAt(0).toUpperCase() + g.slice(1).toLowerCase();
+      genreCounts[normalized] = (genreCounts[normalized] || 0) + 1;
+    }
   });
   const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const topRated = [...readBooks]
@@ -4709,44 +5171,40 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
       )}
       </div>{/* end grid */}
 
-      {/* ── Mis logros ── */}
+      {/* ── Mis logros (colapsado por default) ── */}
       <div style={{ padding: "1.75rem 1.25rem 2rem", backgroundColor: palette.bgCard }}>
-        <p style={{ ...ts.h2, color: palette.ink, marginBottom: "1.25rem" }}>
-          Mis logros
-        </p>
-        <AchievementGrid unlockedAchievements={unlockedAchievements} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+          <p style={{ ...ts.h2, color: palette.ink }}>Mis logros{unlockedAchievements.length > 0 ? ` (${unlockedAchievements.length})` : ""}</p>
+          {unlockedAchievements.length > 0 && (
+            <button onClick={() => setAchievementsExpanded((v) => !v)} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.82rem", color: palette.accent, fontWeight: 600 }}>
+              {achievementsExpanded ? "Ver menos" : "Ver todos"}
+            </button>
+          )}
+        </div>
+        <div style={{ position: "relative", maxHeight: achievementsExpanded ? "none" : 132, overflow: "hidden" }}>
+          <AchievementGrid unlockedAchievements={unlockedAchievements} />
+          {!achievementsExpanded && unlockedAchievements.length > 0 && (
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 50, background: `linear-gradient(to bottom, transparent, ${palette.bgCard})`, pointerEvents: "none" }} />
+          )}
+        </div>
       </div>
 
-      {/* ── Mis Wrappeds ── */}
-      <div style={{ padding: "1.75rem 1.25rem 2.5rem", backgroundColor: palette.bgSoft }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-          <p style={{ ...ts.h2, color: palette.ink }}>
-            Mis Wrappeds
-          </p>
-          <button
-            onClick={() => {
-              const now = new Date();
-              handleGenerateWrap(now.getMonth() + 1, now.getFullYear(), "monthly");
-            }}
-            disabled={generatingWrap}
-            style={{ background: "none", border: `1px solid ${palette.border}`, borderRadius: 8, padding: "0.3rem 0.65rem", cursor: "pointer", ...body, fontSize: "0.78rem", color: palette.inkSoft, display: "flex", alignItems: "center", gap: "0.35rem" }}
-          >
-            {generatingWrap ? <Loader2 size={12} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={12} />}
-            {generatingWrap ? "Generando..." : `Ver ${MONTHS_ES[new Date().getMonth()]}`}
-          </button>
-        </div>
-
-        {/* Annual wrap shortcut */}
-        {(() => {
-          const now = new Date();
-          const year = now.getFullYear();
-          const annualWrap = wraps.find(w => w.wrap_type === "annual" && w.year === year);
-          return (
+      {/* ── Wrapped anual (solo en temporada nov–ene) ── */}
+      {(() => {
+        const now = new Date();
+        const m = now.getMonth(); // 0=ene … 11=dic
+        const inSeason = m === 10 || m === 11 || m === 0; // nov, dic, ene
+        if (!inSeason) return null;
+        const year = now.getFullYear();
+        const annualWrap = wraps.find(w => w.wrap_type === "annual" && w.year === year);
+        return (
+          <div style={{ padding: "1.75rem 1.25rem 2.5rem", backgroundColor: palette.bgSoft }}>
+            <p style={{ ...ts.h2, color: palette.ink, marginBottom: "1rem" }}>Tu Wrapped {year}</p>
             <button
               onClick={() => annualWrap ? setActiveWrap(annualWrap) : handleGenerateWrap(null, year, "annual")}
               disabled={generatingWrap}
               style={{
-                width: "100%", minHeight: "80px", padding: "1.1rem 1.25rem", marginBottom: "0.85rem",
+                width: "100%", minHeight: "80px", padding: "1.1rem 1.25rem",
                 background: "linear-gradient(120deg, #6B1E2A 0%, #7A2E2E 40%, #C8924A 100%)",
                 borderRadius: 14, border: "none", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -4754,46 +5212,19 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-                <span className="sparkle-anim">
-                  <Sparkles size={20} color="#F4EDE0" />
-                </span>
+                <span className="sparkle-anim"><Sparkles size={20} color="#F4EDE0" /></span>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", fontWeight: 500, color: "rgba(244,237,224,0.65)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.2rem" }}>{year}</div>
                   <div style={{ fontFamily: "Fraunces, serif", fontSize: "1.1rem", fontWeight: 700, fontStyle: "italic", color: "#F4EDE0" }}>Wrapped</div>
                 </div>
               </div>
               <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 700, color: "#F4EDE0" }}>
-                {annualWrap ? "Ver mi Wrapped →" : "Generar →"}
+                {generatingWrap ? "Generando…" : annualWrap ? "Ver mi Wrapped →" : "Generar →"}
               </span>
             </button>
-          );
-        })()}
-
-        {/* Monthly wrap grid */}
-        {wraps.filter(w => w.wrap_type === "monthly").length > 0 ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.5rem" }}>
-            {wraps.filter(w => w.wrap_type === "monthly").slice(0, 6).map(w => {
-              const mName = MONTHS_ES[(w.month || 1) - 1];
-              const bCount = w.data?.booksRead?.length || 0;
-              return (
-                <button key={`${w.month}-${w.year}`} onClick={() => setActiveWrap(w)} style={{
-                  backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`,
-                  borderRadius: 10, padding: "0.65rem 0.5rem", cursor: "pointer",
-                  textAlign: "center", transition: "box-shadow 0.15s",
-                }}>
-                  <div style={{ ...display, fontSize: "1.3rem", fontWeight: 900, fontStyle: "italic", color: palette.accent }}>{bCount}</div>
-                  <div style={{ ...body, fontSize: "0.7rem", color: palette.inkSoft }}>{bCount === 1 ? "libro" : "libros"}</div>
-                  <div style={{ ...display, fontSize: "0.72rem", color: palette.inkFaint, marginTop: "0.2rem" }}>{mName} {w.year}</div>
-                </button>
-              );
-            })}
           </div>
-        ) : (
-          <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, fontStyle: "italic", textAlign: "center" }}>
-            Genera tu primer Wrapped del mes para verlo aquí.
-          </p>
-        )}
-      </div>
+        );
+      })()}
 
       {activeWrap && (
         <WrappedStoryExperience wrap={activeWrap} userName={user.name} onClose={() => setActiveWrap(null)} />
@@ -5849,6 +6280,8 @@ function FriendProfileModal({ friend, user, onClose }) {
   const [userStreak, setUserStreak] = useState(null);
   const [mainRequestSent, setMainRequestSent] = useState(false);
   const [mutualsExpanded, setMutualsExpanded] = useState(false);
+  const [friendPublicQuotes, setFriendPublicQuotes] = useState([]);
+  const [friendPet, setFriendPet] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -5860,6 +6293,20 @@ function FriendProfileModal({ friend, user, onClose }) {
       setFriendBooks(booksData || []);
       setLoading(false);
 
+      // Public quotes
+      const { data: qData } = await supabase
+        .from("quotes")
+        .select("id, text, mood, page_number, created_at, book_id, books(title, author)")
+        .eq("user_id", friend.id)
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setFriendPublicQuotes((qData || []).map(q => ({
+        ...q,
+        bookTitle: q.books?.title || null,
+        bookAuthor: q.books?.author || null,
+      })));
+
       // Achievements
       const { data: achData } = await supabase
         .from("achievements").select("achievement_key, unlocked_at").eq("user_id", friend.id);
@@ -5869,6 +6316,11 @@ function FriendProfileModal({ friend, user, onClose }) {
       const { data: streakData } = await supabase
         .from("user_streaks").select("current_streak, longest_streak").eq("user_id", friend.id).maybeSingle();
       setFriendStreak(streakData);
+
+      // Pet (mascota) del amigo
+      const { data: petData } = await supabase
+        .from("user_pets").select("pet_type, pet_name, level").eq("user_id", friend.id).maybeSingle();
+      if (petData) setFriendPet(petData);
 
       // Friends of friend
       const { data: fs } = await supabase
@@ -6058,6 +6510,8 @@ function FriendProfileModal({ friend, user, onClose }) {
                   {readingBooks.length > 0 && <StatCard label="leyendo" value={readingBooks.length} statKey="reading" color="#1B3A4B" />}
                   {wantBooks.length > 0 && <StatCard label="por leer" value={wantBooks.length} statKey="want" color="#5C6B3D" />}
                 </div>
+                <RatingDistribution books={friendBooks} />
+
                 {/* Streak mini cards */}
                 {friendStreak && (
                   <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -6082,6 +6536,26 @@ function FriendProfileModal({ friend, user, onClose }) {
                         <div style={{ ...body, fontSize: "0.72rem", color: "rgba(255,255,255,0.8)", marginTop: "0.35rem" }}>{label}</div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Su compañero (mascota) — sin XP exacto */}
+                {friendPet && (
+                  <div>
+                    <p style={secLabel}>Su compañero</p>
+                    <div style={{ borderRadius: 14, padding: "1rem 1.25rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, display: "flex", alignItems: "center", gap: "1rem" }}>
+                      <div style={{ flexShrink: 0 }}>
+                        <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} size="medium" />
+                      </div>
+                      <div>
+                        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.15rem", color: palette.ink, lineHeight: 1.1 }}>
+                          {friendPet.pet_name || "Su compañero"}
+                        </p>
+                        <p style={{ ...display, fontSize: "0.88rem", fontWeight: 600, color: palette.accent, marginTop: "0.25rem" }}>
+                          Nivel {friendPet.level}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -6278,6 +6752,38 @@ function FriendProfileModal({ friend, user, onClose }) {
                   <p style={secLabel}>Logros</p>
                   <AchievementGrid unlockedAchievements={friendAchievements} friendOnly={true} />
                 </div>
+
+                {/* Public quotes */}
+                {friendPublicQuotes.length > 0 && (
+                  <div>
+                    <p style={secLabel}>Frases guardadas ({friendPublicQuotes.length})</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                      {friendPublicQuotes.map(q => {
+                        const moodLabel = MOOD_OPTIONS.find(m => m.key === q.mood)?.label;
+                        return (
+                          <div key={q.id} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", padding: "1rem 0.9rem 0.85rem", position: "relative", overflow: "hidden" }}>
+                            <div style={{ position: "absolute", top: 4, left: 7, fontFamily: "Georgia, serif", fontSize: "2.8rem", lineHeight: 1, color: palette.accent + "18", userSelect: "none", pointerEvents: "none" }}>"</div>
+                            <p style={{ ...body, fontSize: "0.95rem", fontStyle: "italic", color: palette.ink, lineHeight: 1.6, paddingLeft: "0.6rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                              {q.text}
+                            </p>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.6rem", paddingLeft: "0.6rem", flexWrap: "wrap" }}>
+                              {q.bookTitle && (
+                                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.72rem", color: palette.inkSoft, fontWeight: 500 }}>
+                                  {q.bookTitle}
+                                </span>
+                              )}
+                              {moodLabel && (
+                                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.accent, backgroundColor: palette.accent + "15", borderRadius: "999px", padding: "0.1rem 0.45rem" }}>
+                                  {moodLabel}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -6977,7 +7483,6 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
     { id: "amigos", label: "Mis amigos" },
     { id: "solicitudes", label: `Solicitudes${pending.length > 0 ? ` (${pending.length})` : ""}` },
     { id: "chats", label: `Chats${totalUnread > 0 ? ` · ${totalUnread}` : ""}` },
-    { id: "actividad", label: "Actividad" },
   ];
 
   return (
@@ -7226,48 +7731,6 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
         )
       )}
 
-      {/* ── ACTIVIDAD ── */}
-      {subtab === "actividad" && (
-        loadingActivity ? (
-          <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin" color={palette.inkFaint} /></div>
-        ) : activityFeed.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-            <BarChart3 size={32} color={palette.border} style={{ margin: "0 auto 0.75rem" }} />
-            <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>
-              {friends.length === 0 ? "Agrega amigos para ver su actividad." : "Aún no hay actividad reciente."}
-            </p>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
-            {activityFeed.map((ev) => {
-              const IconComp = ev.icon === "open" ? BookOpen : ev.icon === "check" ? BookCheck : ev.icon === "award" ? Award : Plus;
-              const iconColor = ev.icon === "open" ? palette.amber : ev.icon === "check" ? palette.sage : ev.icon === "award" ? "#8A5A1A" : palette.slate;
-              const fp = { ...ev.profile, name: ev.profile.nombre };
-              return (
-                <button
-                  key={ev.id}
-                  onClick={() => setSelectedFriend(fp)}
-                  className="hover-bg-soft"
-                  style={{ display: "flex", alignItems: "center", gap: "0.65rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", padding: "0.65rem 0.75rem", textAlign: "left", cursor: "pointer", width: "100%" }}
-                >
-                  <FriendAvatar profile={ev.profile} size={32} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ ...body, fontSize: "0.85rem", color: palette.ink, lineHeight: 1.35 }}>
-                      <span style={{ fontWeight: 600 }}>{ev.profile.nombre}</span>{" "}
-                      <span style={{ color: palette.inkSoft }}>{ev.action}</span>
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.15rem", flexShrink: 0 }}>
-                    <IconComp size={14} color={iconColor} />
-                    <span style={{ ...body, fontSize: "0.65rem", color: palette.inkFaint }}>{timeAgo(ev.ts)}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )
-      )}
-
       {selectedFriend && (
         <FriendProfileModal friend={selectedFriend} user={user} onClose={() => setSelectedFriend(null)} />
       )}
@@ -7277,6 +7740,60 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
         const msg = `${user.name || username} te invita a Folio. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
         return <InviteShareModal message={msg} url={refUrl} onClose={() => setInviteModalOpen(false)} />;
       })()}
+    </div>
+  );
+}
+
+// Drawer de amigos (lista + búsqueda + solicitudes + chats) — abre desde Social
+function AmigosSheet({ user, onClose, onPendingChange, onMessagesRead }) {
+  return (
+    <div className="fixed inset-0 z-[60]" style={{ backgroundColor: "rgba(42,31,26,0.5)", animation: "backdropIn 200ms ease-out" }} onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(440px, 100%)", backgroundColor: palette.bg, overflowY: "auto", boxShadow: "-8px 0 30px rgba(0,0,0,0.25)", animation: "slideInRight 280ms cubic-bezier(0.32,0.72,0,1)", paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.9rem 1rem", borderBottom: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bg + "F5", backdropFilter: "blur(8px)" }}>
+          <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink }}>Amigos</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="btn-press" style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex" }}>
+            <X size={22} color={palette.inkSoft} />
+          </button>
+        </div>
+        <FriendsView
+          user={user}
+          onPendingChange={onPendingChange}
+          onMessagesRead={onMessagesRead}
+          unreadNotifs={0}
+          onNotifsRead={() => {}}
+          isOnline={true}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Social — feed de amigos con acceso a amigos y notificaciones
+function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, onNavigationDone, onOpenAmigos, onOpenNotifs, unreadNotifs = 0, pendingCount = 0 }) {
+  return (
+    <div>
+      <div style={{ maxWidth: "42rem", margin: "0 auto", padding: "1rem 1rem 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1 style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "1.4rem", color: palette.ink }}>Social</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <button onClick={onOpenAmigos} aria-label="Amigos" className="btn-press" style={{ position: "relative", background: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem 0.8rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Users size={18} color={palette.inkSoft} />
+            <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, fontWeight: 600 }}>Amigos</span>
+            {pendingCount > 0 && (
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
+            )}
+          </button>
+          <button onClick={onOpenNotifs} aria-label="Notificaciones" className="btn-press" style={{ position: "relative", background: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem", display: "flex" }}>
+            <Bell size={18} color={palette.inkSoft} />
+            {unreadNotifs > 0 && (
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unreadNotifs > 9 ? "9+" : unreadNotifs}</span>
+            )}
+          </button>
+        </div>
+      </div>
+      <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} />
     </div>
   );
 }
@@ -7831,7 +8348,7 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
   );
 }
 
-function PostComments({ postId, user, onCountChange }) {
+function PostComments({ postId, user, onCountChange, postOwnerId }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -7873,8 +8390,12 @@ function PostComments({ postId, user, onCountChange }) {
     } else {
       supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.id }).then();
       const comment = comments.find(c => c.id === commentId);
-      if (comment && comment.user_id !== user.id) {
-        supabase.from("notifications").insert({ user_id: comment.user_id, actor_id: user.id, type: "like_comment", comment_id: commentId }).then();
+      if (!comment) { console.warn("[notif] like_comment: comment not found in state for id", commentId); }
+      else if (comment.user_id !== user.id) {
+        const notifPayload = { user_id: comment.user_id, actor_id: user.id, type: "like_comment", comment_id: commentId, read: false };
+        console.log("[like-insert-pre] Inserting into notifications:", notifPayload);
+        supabase.from("notifications").insert(notifPayload)
+          .then(({ data, error, count }) => { console.log("[like-insert-post] Result:", { data, error, count }); });
       }
     }
   }
@@ -7899,6 +8420,12 @@ function PostComments({ postId, user, onCountChange }) {
     setSending(true);
     try {
       await createComment({ postId, userId: user.id, content: text.trim() });
+      if (postOwnerId && postOwnerId !== user.id) {
+        const notifPayload = { user_id: postOwnerId, actor_id: user.id, type: "comment", post_id: postId, read: false };
+        console.log("[like-insert-pre] Inserting into notifications:", notifPayload);
+        supabase.from("notifications").insert(notifPayload)
+          .then(({ data, error, count }) => { console.log("[like-insert-post] Result:", { data, error, count }); });
+      }
       setText("");
       await loadComments();
       checkAchievements(user.id, user.name);
@@ -8306,13 +8833,13 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   );
 }
 
-function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday = 0 }) {
+function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday = 0, initialBook = null }) {
   const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialBook ? 2 : 1);
   const [readingBooks, setReadingBooks] = useState([]);
   const [loadingBooks, setLoadingBooks] = useState(true);
-  const [selectedBook, setSelectedBook] = useState(null);
+  const [selectedBook, setSelectedBook] = useState(initialBook || null);
   const [pages, setPages] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -8880,6 +9407,20 @@ const CUENTO_TITLE_MAP = Object.fromEntries(
   CUENTOS.map(c => [c.titulo.toLowerCase(), c])
 );
 
+// Cuento del día — el primero no leído a partir del índice del día.
+function getCuentoDelDia() {
+  if (!CUENTOS || CUENTOS.length === 0) return null;
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  const base = Math.abs(dayOfYear) % CUENTOS.length;
+  let readIds;
+  try { readIds = new Set(JSON.parse(localStorage.getItem("folio_read_cuentos") || "[]")); } catch { readIds = new Set(); }
+  for (let i = 0; i < CUENTOS.length; i++) {
+    const c = CUENTOS[(base + i) % CUENTOS.length];
+    if (!readIds.has(c.id)) return c;
+  }
+  return CUENTOS[base];
+}
+
 // ── Cuento del día hero ────────────────────────────────────────────────────
 function SnacksHero({ onRead }) {
   const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
@@ -9128,6 +9669,403 @@ function FeedEditorialContent({ books, onAdd, onInvite, onRead }) {
   );
 }
 
+// ============ QUOTE POST CARD (feed) ============
+function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsOpen, doubleTapId, onLike, onToggleComments, onAuthorClick, children }) {
+  const quote = post.quote;
+  const [expanded, setExpanded] = useState(false);
+  const text = quote?.text || "";
+  const isLong = text.length > 280;
+  const displayText = !expanded && isLong ? text.slice(0, 280) + "…" : text;
+  const moodLabel = MOOD_OPTIONS.find(m => m.key === quote?.mood)?.label;
+  const isDark = palette.bg === PALETTE_DARK.bg;
+
+  const cardBg = isDark
+    ? "linear-gradient(155deg, #2a1f1a 0%, #1a1210 50%, #3d1a1a 100%)"
+    : "linear-gradient(155deg, #2A1F1A 0%, #4A2525 55%, #7A2E2E 100%)";
+
+  return (
+    <div
+      id={`post-${post.id}`}
+      className="feed-post-item"
+      onClick={() => onLike && onLike(post.id, true)}
+      style={{ position: "relative", overflow: "hidden", borderRadius: "16px", boxShadow: "0 6px 24px rgba(42,31,26,0.22), 0 2px 6px rgba(42,31,26,0.1)", cursor: "default" }}
+    >
+      {/* Poster background */}
+      <div style={{ background: cardBg, padding: "1.4rem 1.3rem 1.1rem" }}>
+        {/* Header: user + timestamp */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
+          {post.user_id !== userId && onAuthorClick ? (
+            <button onClick={() => onAuthorClick(post.author)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
+              <Avatar author={post.author} size={30} />
+            </button>
+          ) : <Avatar author={post.author} size={30} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", flexWrap: "wrap" }}>
+              {post.user_id !== userId && onAuthorClick ? (
+                <button onClick={() => onAuthorClick(post.author)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                  <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
+                    {post.author?.nombre || "Usuario"}
+                  </span>
+                </button>
+              ) : (
+              <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
+                {post.author?.nombre || "Usuario"}
+              </span>
+              )}
+              <span style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.8rem", color: "rgba(244,237,224,0.55)", fontStyle: "italic" }}>
+                guardó una frase
+              </span>
+            </div>
+            <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: "rgba(244,237,224,0.4)" }}>
+              {timeAgo(post.created_at)}
+            </span>
+          </div>
+        </div>
+
+        {/* Decorative opening quote */}
+        <div style={{ fontFamily: "Georgia, serif", fontSize: "4.5rem", lineHeight: 0.85, color: "rgba(200,146,74,0.35)", marginBottom: "0.1rem", marginLeft: "-0.15rem", userSelect: "none" }}>"</div>
+
+        {/* Quote text */}
+        <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "clamp(1.1rem, 4.5vw, 1.3rem)", lineHeight: 1.65, color: "rgba(244,237,224,0.95)", marginBottom: isLong && !expanded ? "0.5rem" : "1.4rem", letterSpacing: "0.01em" }}>
+          {displayText}
+        </p>
+        {isLong && (
+          <button
+            onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'EB Garamond', serif", fontSize: "0.85rem", color: "rgba(200,146,74,0.8)", padding: "0 0 1.2rem", display: "block" }}
+          >
+            {expanded ? "Leer menos ↑" : "Leer más ↓"}
+          </button>
+        )}
+
+        {/* Book info */}
+        {quote?.bookTitle && (
+          <div style={{ borderTop: "1px solid rgba(244,237,224,0.12)", paddingTop: "0.75rem", marginBottom: moodLabel ? "0.65rem" : 0 }}>
+            <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.85rem", color: "rgba(244,237,224,0.6)", fontStyle: "italic" }}>
+              — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
+            </p>
+          </div>
+        )}
+
+        {/* Mood pill */}
+        {moodLabel && (
+          <div style={{ marginTop: quote?.bookTitle ? 0 : "0.65rem" }}>
+            <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.72rem", color: "rgba(200,146,74,0.9)", backgroundColor: "rgba(200,146,74,0.15)", borderRadius: "999px", padding: "0.2rem 0.6rem", border: "1px solid rgba(200,146,74,0.25)" }}>
+              {moodLabel}
+            </span>
+          </div>
+        )}
+
+        {/* Double-tap heart overlay */}
+        {doubleTapId === post.id && (
+          <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
+            <Heart size={60} color="#E74C3C" fill="#E74C3C" strokeWidth={0} />
+          </div>
+        )}
+      </div>
+
+      {/* Footer: likes + comments */}
+      <div style={{ backgroundColor: palette.bgCard, borderTop: "1px solid rgba(122,46,46,0.2)", padding: "0.6rem 1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+        <LikeButton postId={post.id} count={likeCount || 0} liked={liked} onToggle={(id) => onLike && onLike(id)} size={15} />
+        <button
+          onClick={e => { e.stopPropagation(); onToggleComments(post.id); }}
+          style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <MessageCircle size={14} strokeWidth={2} />
+          {commentsOpen ? "Ocultar" : commentCount ? `Comentarios (${commentCount})` : "Comentarios"}
+        </button>
+      </div>
+
+      {/* Comments section (injected from parent) */}
+      {commentsOpen && children}
+    </div>
+  );
+}
+
+// ============ HOME (dashboard personalizado) ============
+// Barra de progreso reutilizable por libro (% leído, color rojo→verde)
+function ProgressBarBook({ current = 0, total = 0, height = 9 }) {
+  const has = total > 0;
+  const pct = has ? Math.min(100, Math.round((current / total) * 100)) : 0;
+  const hue = Math.round(pct * 1.2); // 0=rojo, 120=verde
+  return (
+    <div style={{ width: "100%" }}>
+      <div style={{ height, borderRadius: 999, backgroundColor: palette.border, overflow: "hidden" }}>
+        {has && (
+          <div style={{
+            width: `${Math.max(pct, 3)}%`, height: "100%", borderRadius: 999,
+            background: `linear-gradient(90deg, hsl(${hue},70%,42%), hsl(${hue},62%,52%))`,
+            transition: "width 500ms cubic-bezier(0.23,1,0.32,1)",
+          }} />
+        )}
+      </div>
+      <p style={{ ...body, fontSize: "0.76rem", color: palette.inkFaint, marginTop: "0.35rem" }}>
+        {has ? `Vas en ${pct}% · ${current} de ${total} páginas` : `${current} páginas leídas`}
+      </p>
+    </div>
+  );
+}
+
+// Modal motivacional de racha
+function RachaModal({ streak, onClose }) {
+  const cur = streak?.current_streak || 0;
+  const best = streak?.longest_streak || 0;
+  const msg = cur === 0
+    ? "Lee aunque sea 5 minutos hoy y empieza tu racha. El primer día es el más importante."
+    : cur < 3 ? "¡Vas empezando! Los primeros días construyen el hábito."
+    : cur < 7 ? "Buen ritmo. Una semana está a la vuelta de la esquina."
+    : cur < 30 ? "Eres constante. Esto ya es parte de quién eres."
+    : "Lector de élite. Tu disciplina es tu superpoder.";
+  return (
+    <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
+        <Flame size={48} color="#F4EDE0" style={{ margin: "0 auto" }} className={cur > 7 ? "fire-pulse" : ""} />
+        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "3rem", color: "#fff", lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
+        <p style={{ ...display, fontSize: "1rem", color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
+        <p style={{ ...body, fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", marginTop: "0.3rem" }}>Mejor racha: {best} {best === 1 ? "día" : "días"}</p>
+        <p style={{ ...body, fontSize: "0.92rem", color: "#fff", lineHeight: 1.4, marginTop: "1.25rem" }}>{msg}</p>
+        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.95)", color: "#7A2E2E", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem" }}>
+          ¡A leer!
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Modal "Leer ahora" — una sola decisión: continuar libro o cuento del día
+function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }) {
+  const primary = booksReading[0] || null;
+  const rest = booksReading.slice(1);
+  return (
+    <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
+      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "1.5rem 1.25rem 2rem", maxHeight: "85vh", overflowY: "auto", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
+        <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center" }}>¿Qué quieres leer?</h2>
+        {primary && (
+          <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.accent}`, backgroundColor: `${palette.accent}10`, display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={20} color={palette.inkFaint} />}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ ...body, fontSize: "0.72rem", color: palette.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
+              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
+              <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{primary.author}</p>
+            </div>
+          </button>
+        )}
+        {cuento && (
+          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: "linear-gradient(135deg, #7A2E2E, #C8924A)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Sparkles size={20} color="#fff" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ ...body, fontSize: "0.72rem", color: palette.amber, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
+              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
+              <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{cuento.autor}</p>
+            </div>
+          </button>
+        )}
+        {rest.length > 0 && (
+          <div style={{ marginTop: "1.25rem" }}>
+            <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 600, marginBottom: "0.6rem" }}>También estás leyendo</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.6rem" }}>
+              {rest.map((b) => (
+                <button key={b.id} onClick={() => onRead(b)} className="btn-press" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "center" }}>
+                  <div style={{ width: "100%", aspectRatio: "2/3", borderRadius: 8, overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {b.coverUrl ? <img src={b.coverUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={18} color={palette.inkFaint} />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBook, onAdd, isOnline = true }) {
+  const [activeReader, setActiveReader] = useState(null);
+  const [bookProgress, setBookProgress] = useState({});
+  const [rachaOpen, setRachaOpen] = useState(false);
+  const [leerOpen, setLeerOpen] = useState(false);
+  const [logBook, setLogBook] = useState(null);
+  const [progressNonce, setProgressNonce] = useState(0);
+
+  const firstName = (user.name || "").trim().split(" ")[0] || "lector";
+  const h = new Date().getHours();
+  const timeOfDay = (h >= 6 && h < 12) ? { text: "Buenos días", emoji: "☀️" }
+    : (h >= 12 && h < 18) ? { text: "Buenas tardes", emoji: "🌤️" }
+    : { text: "Buenas noches", emoji: "🌙" };
+  const readingBooks = books.filter((b) => b.status === "reading");
+  const wantBooks = books.filter((b) => b.status === "want_to_read" || b.status === "wish").slice(0, 4);
+  const cuento = getCuentoDelDia();
+  const cur = streak?.current_streak || 0;
+  const best = streak?.longest_streak || 0;
+
+  useEffect(() => {
+    if (!isOnline) return;
+    const ids = books.filter((b) => b.status === "reading").map((b) => b.id);
+    if (ids.length === 0) { setBookProgress({}); return; }
+    supabase.from("reading_logs").select("book_id, pages_read").eq("user_id", user.id).in("book_id", ids)
+      .then(({ data }) => {
+        const m = {};
+        (data || []).forEach((r) => { if (r.book_id) m[r.book_id] = (m[r.book_id] || 0) + (r.pages_read || 0); });
+        setBookProgress(m);
+      }).catch(() => {});
+  }, [user.id, isOnline, books.map((b) => b.id).join(","), progressNonce]);
+
+  const sectionTitle = { ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink, marginBottom: "0.7rem" };
+
+  function openRead(book) {
+    if (!book) return;
+    setLeerOpen(false);
+    setLogBook(book);
+  }
+
+  function openCuento() {
+    setLeerOpen(false);
+    if (cuento) {
+      try {
+        const ids = new Set(JSON.parse(localStorage.getItem("folio_read_cuentos") || "[]"));
+        ids.add(cuento.id);
+        localStorage.setItem("folio_read_cuentos", JSON.stringify([...ids]));
+      } catch {}
+      setActiveReader(cuento);
+    }
+  }
+
+  return (
+    <div style={{ padding: "1.25rem 1rem 2.5rem", maxWidth: "42rem", margin: "0 auto" }}>
+      {/* 1. Saludo + hora */}
+      <p style={{ ...body, fontSize: "0.92rem", color: palette.inkSoft, marginBottom: "1.1rem" }}>
+        {timeOfDay.text}, {firstName} {timeOfDay.emoji}
+      </p>
+
+      {/* 2. Racha prominente */}
+      <button
+        onClick={() => setRachaOpen(true)}
+        className="btn-press"
+        style={{ width: "100%", textAlign: "left", marginBottom: "1.25rem", padding: "1.25rem 1.4rem", borderRadius: 20, cursor: "pointer", border: "none", background: cur > 0 ? "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)" : palette.bgCard, boxShadow: cur > 0 ? "0 8px 28px rgba(122,46,46,0.3)" : "none", display: "flex", alignItems: "center", gap: "1.1rem", ...(cur > 0 ? {} : { borderWidth: 1, borderStyle: "dashed", borderColor: palette.border }) }}
+      >
+        <Flame size={44} color={cur > 0 ? "#F4EDE0" : palette.inkFaint} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          {cur > 0 ? (
+            <>
+              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "2.6rem", color: "#F4EDE0", lineHeight: 1 }}>{cur}</p>
+              <p style={{ ...display, fontSize: "0.95rem", color: "#F4EDE0", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
+              <p style={{ ...body, fontSize: "0.78rem", color: "rgba(244,237,224,0.75)", marginTop: "0.15rem" }}>Mejor: {best} {best === 1 ? "día" : "días"}</p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "1.3rem", color: palette.ink, lineHeight: 1.1 }}>Empieza tu racha hoy</p>
+              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginTop: "0.2rem" }}>Lee aunque sea 5 minutos</p>
+            </>
+          )}
+        </div>
+      </button>
+
+      {/* 3. CTA principal */}
+      <button
+        onClick={() => setLeerOpen(true)}
+        className="btn-press"
+        style={{ width: "100%", marginBottom: "1.5rem", padding: "1.15rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: "#fff", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.15rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)" }}
+      >
+        Leer ahora →
+      </button>
+
+      {/* 4. Seguir leyendo (con progreso) */}
+      {readingBooks.length > 0 && (
+        <div style={{ marginBottom: "1.75rem" }}>
+          <p style={sectionTitle}>Seguir leyendo</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+            {readingBooks.slice(0, 3).map((b) => (
+              <button key={b.id} onClick={() => openRead(b)} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "0.85rem 1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, display: "flex", gap: "0.85rem", alignItems: "center" }}>
+                <div style={{ width: 48, height: 70, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {b.coverUrl ? <img src={b.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={22} color={palette.inkFaint} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.98rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
+                  <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, marginBottom: "0.5rem" }}>{b.author}</p>
+                  <ProgressBarBook current={bookProgress[b.id] || 0} total={b.totalPages || 0} />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Mascota teaser */}
+      {pet && (
+        <button onClick={onOpenPet} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "1.75rem", padding: "0.85rem 1rem", borderRadius: 16, cursor: "pointer", border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.85rem" }}>
+          <div style={{ flexShrink: 0 }}>
+            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={56} showShadow={false} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15 }}>{pet.pet_name}</p>
+            <p style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, marginTop: "0.15rem" }}>Nivel {pet.level} · ver mascota</p>
+          </div>
+          <ChevronRight size={20} color={palette.inkFaint} style={{ flexShrink: 0 }} />
+        </button>
+      )}
+
+      {/* 6. Descubre tu siguiente */}
+      {wantBooks.length > 0 ? (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.7rem" }}>
+            <p style={{ ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink }}>Descubre tu siguiente</p>
+            <button onClick={() => setTab("explorar")} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.82rem", color: palette.accent, fontWeight: 600 }}>Ver más</button>
+          </div>
+          <div className="scrollbar-hide" style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
+            {wantBooks.map((b) => (
+              <button key={b.id} onClick={() => onSelectBook(b)} className="btn-press" style={{ flexShrink: 0, width: 92, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                <div style={{ width: 92, height: 138, borderRadius: 10, overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {b.coverUrl ? <img src={b.coverUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={24} color={palette.inkFaint} />}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setTab("explorar")} className="btn-press" style={{ width: "100%", padding: "1.1rem", borderRadius: 16, cursor: "pointer", border: `1px dashed ${palette.border}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Compass size={26} color={palette.accent} style={{ flexShrink: 0 }} />
+          <div style={{ textAlign: "left" }}>
+            <p style={{ ...display, fontWeight: 700, fontSize: "0.95rem", color: palette.ink }}>Descubre tu próxima lectura</p>
+            <p style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint }}>Recomendaciones para ti</p>
+          </div>
+        </button>
+      )}
+
+      {rachaOpen && <RachaModal streak={streak} onClose={() => setRachaOpen(false)} />}
+      {leerOpen && (
+        <LeerAhoraModal
+          booksReading={readingBooks}
+          cuento={cuento}
+          onRead={openRead}
+          onCuento={openCuento}
+          onClose={() => setLeerOpen(false)}
+        />
+      )}
+      {logBook && (
+        <ReadingLogModal
+          user={user}
+          initialBook={{ id: logBook.id, title: logBook.title, author: logBook.author, cover_url: logBook.coverUrl }}
+          onClose={() => setLogBook(null)}
+          onGoToAdd={() => { setLogBook(null); setTab("add"); }}
+          onSuccess={() => { setLogBook(null); setProgressNonce((n) => n + 1); }}
+        />
+      )}
+      {activeReader && (
+        <ReaderView
+          cuento={activeReader}
+          user={user}
+          onClose={() => setActiveReader(null)}
+          onAddToLibrary={(bookData) => { onAdd(bookData); }}
+        />
+      )}
+    </div>
+  );
+}
+
 function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone }) {
   const [posts, setPosts] = useState([]);
   const [feedError, setFeedError] = useState("");
@@ -9370,8 +10308,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     } else {
       supabase.from("post_likes").insert({ post_id: postId, user_id: user.id }).then();
       const post = posts.find(p => p.id === postId);
-      if (post && post.user_id !== user.id) {
-        supabase.from("notifications").insert({ user_id: post.user_id, actor_id: user.id, type: "like_post", post_id: postId }).then();
+      if (!post) { console.warn("[notif] like_post: post not found in state for id", postId); }
+      else if (post.user_id !== user.id) {
+        const notifPayload = { user_id: post.user_id, actor_id: user.id, type: "like_post", post_id: postId, read: false };
+        console.log("[like-insert-pre] Inserting into notifications:", notifPayload);
+        supabase.from("notifications").insert(notifPayload)
+          .then(({ data, error, count }) => { console.log("[like-insert-post] Result:", { data, error, count }); });
       }
     }
   }
@@ -9710,8 +10652,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             const commentsOpen = openComments.has(post.id);
             const isFinished = post.type === "book_update" && post.action === "finished";
             const isStarted = post.type === "book_update" && post.action === "started";
-            // Detect achievement posts: new type OR legacy text with emoji pattern
-            const isAchievement = post.type === "achievement" || (post.type === "text" && post.content?.includes("¡Logro desbloqueado!"));
+            // Detect achievement posts: new type OR legacy text with emoji pattern (exclude quote posts)
+            const isAchievement = post.type === "achievement" || (post.type === "text" && !post.quote && post.content?.includes("¡Logro desbloqueado!"));
             const achDef = isAchievement ? ACHIEVEMENT_DEFS.find(a => post.content?.includes(`"${a.name}"`)) : null;
             const AchIcon = achDef ? (ACHIEVEMENT_ICON_MAP[achDef.key] || Award) : Award;
 
@@ -9785,8 +10727,28 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       {commentsOpen ? "Ocultar comentarios" : commentCounts[post.id] ? `Comentarios (${commentCounts[post.id]})` : "Comentarios"}
                     </button>
                   </div>
-                  {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} /></div>}
+                  {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
                 </div>
+              );
+            }
+
+            if (post.type === "quote") {
+              return (
+                <QuotePostCard
+                  key={post.id}
+                  post={post}
+                  userId={user.id}
+                  liked={likedPosts.has(post.id)}
+                  likeCount={likeCounts[post.id] || 0}
+                  commentCount={commentCounts[post.id] || 0}
+                  commentsOpen={openComments.has(post.id)}
+                  doubleTapId={doubleTapPost}
+                  onLike={(id, isDoubleTap) => { if (isDoubleTap) { handleDoubleTap(id); } else { toggleLike(id); } }}
+                  onToggleComments={toggleComments}
+                  onAuthorClick={(author) => setProfileModalAuthor({ ...(author || {}), name: author?.nombre || 'Usuario' })}
+                >
+                  <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>
+                </QuotePostCard>
               );
             }
 
@@ -9870,7 +10832,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       {commentsOpen ? "Ocultar comentarios" : commentCounts[post.id] ? `Comentarios (${commentCounts[post.id]})` : "Comentarios"}
                     </button>
                   </div>
-                  {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} /></div>}
+                  {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
                 </div>
               );
             }
@@ -10007,7 +10969,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                         : "Comentarios"}
                   </button>
                 </div>
-                {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} /></div>}
+                {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
               </div>
             );
           })}
@@ -10166,70 +11128,37 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   );
 }
 
-function SorprendeView({ books }) {
-  const wishlist = books.filter((b) => b.status === "want_to_read");
-  const [pick, setPick] = useState(() => wishlist.length > 0 ? wishlist[Math.floor(Math.random() * wishlist.length)] : null);
+function RatingDistribution({ books }) {
+  const rated = (books || []).filter(b => b.rating >= 1 && b.rating <= 5);
+  if (rated.length === 0) return null;
 
-  const readBooks = books.filter((b) => b.status === "read" && b.rating > 0);
-  const topRatedBook = readBooks.sort((a, b) => b.rating - a.rating)[0];
-  const genreCount = {};
-  readBooks.forEach((b) => { if (b.genre) genreCount[b.genre] = (genreCount[b.genre] || 0) + 1; });
-  const topGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0];
-
-  function reshuffle() {
-    if (wishlist.length === 0) return;
-    let idx;
-    do { idx = Math.floor(Math.random() * wishlist.length); } while (wishlist.length > 1 && wishlist[idx]?.id === pick?.id);
-    setPick(wishlist[idx]);
-  }
-
-  if (wishlist.length === 0) {
-    return (
-      <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-        <Sparkles size={32} color={palette.inkFaint} style={{ margin: "0 auto 1rem" }} />
-        <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: palette.inkSoft }}>Añade libros a "Quiero leer" para que pueda sorprenderte.</p>
-      </div>
-    );
-  }
+  const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  rated.forEach(b => { counts[Math.round(b.rating)]++; });
+  const max = Math.max(...Object.values(counts), 1);
+  const avg = (rated.reduce((s, b) => s + b.rating, 0) / rated.length).toFixed(1);
 
   return (
-    <div style={{ maxWidth: 400, margin: "2rem auto", padding: "0 1rem", textAlign: "center" }}>
-      <p style={{ ...ts.caption, marginBottom: "1.5rem" }}>Tu próxima lectura podría ser…</p>
-      {pick && (
-        <div style={{ backgroundColor: palette.bgCard, borderRadius: "16px", padding: "2rem 1.5rem", marginBottom: "0.75rem" }}>
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-            <BookCoverPlaceholder title={pick.title} author={pick.author} width={100} height={145} />
+    <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "14px", padding: "1rem 1.1rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+        <span style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 600, color: palette.inkSoft }}>Calificaciones</span>
+        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", fontWeight: 700, color: palette.amber }}>{avg} ★ promedio</span>
+      </div>
+      {[5, 4, 3, 2, 1].map(star => (
+        <div key={star} style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: star > 1 ? "0.38rem" : 0 }}>
+          <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.inkFaint, width: 26, textAlign: "right", flexShrink: 0, letterSpacing: "-0.01em" }}>{star} ★</span>
+          <div style={{ flex: 1, height: 8, borderRadius: "999px", backgroundColor: palette.bgSoft, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: "999px",
+              width: `${(counts[star] / max) * 100}%`,
+              backgroundColor: counts[star] === max ? palette.amber : palette.amber + "80",
+              transition: "width 500ms cubic-bezier(0.16,1,0.3,1)",
+            }} />
           </div>
-          <p style={{ ...ts.h2, fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem" }}>{pick.title}</p>
-          <p style={{ ...ts.body15, color: palette.inkSoft, marginBottom: topRatedBook ? "0.75rem" : 0 }}>{pick.author}</p>
-          {topRatedBook && (
-            <p style={{ ...ts.caption, fontStyle: "italic" }}>
-              Porque disfrutaste <em>{topRatedBook.title}</em>
-              {topGenre ? ` y te gusta ${topGenre}` : ""}
-            </p>
-          )}
+          <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: counts[star] > 0 ? palette.inkSoft : palette.inkFaint, width: 18, flexShrink: 0, fontWeight: counts[star] === max ? 700 : 400 }}>
+            {counts[star]}
+          </span>
         </div>
-      )}
-      <button
-        onClick={reshuffle}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "0.4rem",
-          color: palette.accent,
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "14px",
-          fontWeight: 500,
-          padding: "0.5rem 0",
-          marginTop: "0.25rem",
-        }}
-      >
-        <RotateCcw size={14} strokeWidth={2} />
-        Otra sugerencia
-      </button>
+      ))}
     </div>
   );
 }
@@ -10263,34 +11192,663 @@ function ReadingStatsView({ books }) {
           </div>
         ))}
       </div>
+      <RatingDistribution books={books} />
     </div>
   );
 }
 
-function ExplorarView({ books, onSelectBook, onAdd }) {
+function ExplorarView({ user, books, onSelectBook, onAdd }) {
   const [sub, setSub] = useState("para_ti");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const isUAM = (user?.university || "").toUpperCase() === "UAM";
   const TABS = [
     { id: "para_ti", label: "Para ti" },
-    { id: "uam", label: "Bib. UAM" },
-    { id: "sorprendeme", label: "Sorpréndeme" },
+    { id: "descubrir", label: "Descubrir" },
+    ...(isUAM ? [{ id: "uam", label: "Bib. UAM" }] : []),
   ];
   return (
     <div>
       <div className="px-4 sm:px-6 pt-5 max-w-4xl mx-auto">
+        {/* Buscar — solo visible fuera de Descubrir */}
+        {sub !== "descubrir" && (
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="btn-press"
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.8rem 1rem", marginBottom: "1rem", borderRadius: 12, border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, cursor: "pointer" }}
+          >
+            <Search size={18} color={palette.inkFaint} />
+            <span style={{ ...body, fontSize: "0.92rem", color: palette.inkFaint }}>Busca por título, autor o ISBN…</span>
+          </button>
+        )}
         <SubTabBar tabs={TABS} active={sub} onChange={setSub} />
       </div>
-      {sub === "para_ti" && <RecommendFlow books={books} onSelectBook={onSelectBook} onAdd={onAdd} />}
-      {sub === "uam" && <UAMLibraryView books={books} onAdd={onAdd} />}
-      {sub === "sorprendeme" && <SorprendeView books={books} />}
+      {sub === "para_ti" && (
+        <>
+          <CollaborativeRecommendations user={user} onAdd={onAdd} />
+          <RecommendFlow books={books} onSelectBook={onSelectBook} onAdd={onAdd} />
+        </>
+      )}
+      {sub === "descubrir" && <BookTinder user={user} onAdd={onAdd} />}
+      {sub === "uam" && isUAM && <UAMLibraryView books={books} onAdd={onAdd} />}
+      {searchOpen && (
+        <SearchBookModal
+          isOpen={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelect={(b) => { onAdd(b); setSearchOpen(false); }}
+        />
+      )}
     </div>
   );
 }
 
-function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme }) {
+// ============ QUOTES COMPONENTS ============
+
+function SaveQuoteModal({ books, userId, onClose, onSaved, defaultBookId }) {
+  const [text, setText] = useState("");
+  const [bookId, setBookId] = useState(() => {
+    if (defaultBookId) return defaultBookId;
+    const reading = (books || []).find(b => b.status === "reading");
+    return reading?.id || "";
+  });
+  const [pageNumber, setPageNumber] = useState("");
+  const [shareToFeed, setShareToFeed] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    try {
+      const q = await insertQuote({
+        bookId: bookId || null,
+        text,
+        pageNumber: pageNumber ? parseInt(pageNumber) : null,
+        mood: null,
+        isPublic: shareToFeed,
+        sharedToFeed: shareToFeed,
+      }, userId);
+      if (shareToFeed) {
+        const quoteContent = JSON.stringify({
+          __folio_type: "quote",
+          text: q.text,
+          mood: q.mood || null,
+          page_number: q.page_number || null,
+          bookTitle: q.bookTitle || null,
+          bookAuthor: q.bookAuthor || null,
+        });
+        // Use type "text" to avoid any CHECK constraint on the posts table
+        await createFeedPost({ userId, type: "text", bookId: bookId || null, content: quoteContent }).catch(e => console.error("[SaveQuoteModal] feed post:", e));
+      }
+      onSaved(q);
+    } catch (e) {
+      console.error("[SaveQuoteModal]", e);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const readingBooks = (books || []).filter(b => b.status === "reading");
+  const otherBooks = (books || []).filter(b => b.status !== "reading");
+
+  return (
+    <div
+      className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center sm:p-4"
+      style={{ backgroundColor: "rgba(42,31,26,0.65)", animation: "backdropIn 200ms ease-out" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-t-2xl sm:rounded-xl"
+        style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, maxHeight: "92vh", overflowY: "auto" }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ padding: "1rem 1rem 0.75rem", borderBottom: `1px solid ${palette.borderSoft}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <h2 style={{ ...display, fontSize: "1.1rem", fontWeight: 600, color: palette.ink }}>Guardar frase</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: palette.inkFaint, display: "flex", padding: "4px" }}>
+            <X size={20} />
+          </button>
+        </div>
+        <div style={{ padding: "1rem" }}>
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder="Escribe la frase que te voló la cabeza..."
+            autoFocus
+            rows={5}
+            style={{
+              width: "100%", boxSizing: "border-box",
+              ...body, fontSize: "1.05rem", color: palette.ink,
+              backgroundColor: palette.bgCard,
+              border: `1.5px solid ${text.trim() ? palette.accent + "60" : palette.border}`,
+              borderRadius: "10px", padding: "0.85rem",
+              resize: "none", outline: "none", lineHeight: 1.55,
+              marginBottom: "0.85rem", transition: "border-color 150ms ease",
+            }}
+          />
+
+          <div style={{ marginBottom: "0.75rem" }}>
+            <label style={{ ...ts.label, display: "block", marginBottom: "0.3rem" }}>Libro</label>
+            <select
+              value={bookId}
+              onChange={e => setBookId(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "0.95rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.55rem 0.75rem", outline: "none", cursor: "pointer" }}
+            >
+              <option value="">Sin libro específico</option>
+              {readingBooks.map(b => <option key={b.id} value={b.id}>📖 {b.title} — {b.author}</option>)}
+              {otherBooks.map(b => <option key={b.id} value={b.id}>{b.title} — {b.author}</option>)}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: "0.85rem" }}>
+            <label style={{ ...ts.label, display: "block", marginBottom: "0.3rem" }}>Página (opcional)</label>
+            <input
+              type="number"
+              value={pageNumber}
+              onChange={e => setPageNumber(e.target.value)}
+              placeholder="ej. 142"
+              min="1"
+              style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "0.95rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.55rem 0.75rem", outline: "none" }}
+            />
+          </div>
+
+
+          {/* Share to feed toggle */}
+          <button
+            onClick={() => setShareToFeed(v => !v)}
+            style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: shareToFeed ? palette.accent + "12" : palette.bgCard, border: `1.5px solid ${shareToFeed ? palette.accent + "60" : palette.border}`, borderRadius: "10px", padding: "0.75rem 1rem", cursor: "pointer", marginBottom: "0.85rem", transition: "all 150ms ease" }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+              <Feather size={15} color={shareToFeed ? palette.accent : palette.inkFaint} strokeWidth={2} />
+              <div style={{ textAlign: "left" }}>
+                <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.85rem", fontWeight: 600, color: shareToFeed ? palette.accent : palette.ink, margin: 0 }}>Compartir en mi feed</p>
+                <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.72rem", color: palette.inkFaint, margin: "0.1rem 0 0" }}>Tus amigos podrán verla</p>
+              </div>
+            </div>
+            <div style={{ width: 38, height: 22, borderRadius: "999px", backgroundColor: shareToFeed ? palette.accent : palette.border, position: "relative", transition: "background-color 200ms ease", flexShrink: 0 }}>
+              <div style={{ position: "absolute", top: 3, left: shareToFeed ? 19 : 3, width: 16, height: 16, borderRadius: "50%", backgroundColor: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.25)", transition: "left 200ms ease" }} />
+            </div>
+          </button>
+
+          <button
+            onClick={handleSave}
+            disabled={!text.trim() || saving}
+            style={{ width: "100%", ...display, fontSize: "1rem", fontWeight: 600, color: "#fff", backgroundColor: (!text.trim() || saving) ? palette.border : palette.accent, border: "none", borderRadius: "10px", padding: "0.85rem", cursor: (!text.trim() || saving) ? "not-allowed" : "pointer", transition: "background-color 150ms ease", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}
+          >
+            {saving ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={16} />}
+            {saving ? "Guardando..." : shareToFeed ? "Guardar y compartir" : "Guardar frase"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuoteCard({ quote, onPress, onToggleFavorite, onShareToFeed }) {
+  const moodLabel = MOOD_OPTIONS.find(m => m.key === quote.mood)?.label;
+  return (
+    <div
+      style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(42,31,26,0.05)" }}
+    >
+      <button
+        onClick={onPress}
+        className="text-left"
+        style={{ width: "100%", padding: "1.25rem 1.1rem 1rem", position: "relative", overflow: "hidden", cursor: "pointer", background: "none", border: "none" }}
+      >
+        <div style={{ position: "absolute", top: 6, left: 10, fontFamily: "Georgia, serif", fontSize: "4.5rem", lineHeight: 1, color: palette.accent + "12", pointerEvents: "none", userSelect: "none" }}>"</div>
+        <div style={{ paddingLeft: "0.4rem", paddingTop: "0.35rem" }}>
+          <p style={{ ...body, fontSize: "1.05rem", fontStyle: "italic", color: palette.ink, lineHeight: 1.62, marginBottom: "0.8rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {quote.text}
+          </p>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "0.5rem" }}>
+            <div style={{ minWidth: 0 }}>
+              {quote.bookTitle && (
+                <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.74rem", color: palette.inkSoft, fontWeight: 500, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
+                </p>
+              )}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+                {quote.page_number && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.inkFaint }}>Pág. {quote.page_number}</span>}
+                {moodLabel && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.accent, backgroundColor: palette.accent + "15", borderRadius: "999px", padding: "0.12rem 0.45rem" }}>{moodLabel}</span>}
+                {quote.is_public && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.65rem", color: palette.inkFaint, display: "flex", alignItems: "center", gap: "0.2rem" }}>✓ En feed</span>}
+              </div>
+            </div>
+            <button
+              onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", flexShrink: 0 }}
+            >
+              <Heart size={18} fill={quote.is_favorite ? "#E74C3C" : "none"} strokeWidth={1.8} color={quote.is_favorite ? "#E74C3C" : palette.inkFaint} />
+            </button>
+          </div>
+        </div>
+      </button>
+
+      {/* Share to feed strip */}
+      {!quote.is_public && onShareToFeed && (
+        <button
+          onClick={onShareToFeed}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", padding: "0.5rem", borderTop: `1px solid ${palette.borderSoft}`, background: "none", border: "none", cursor: "pointer", fontFamily: "system-ui, sans-serif", fontSize: "0.75rem", fontWeight: 500, color: palette.inkFaint, transition: "color 150ms ease" }}
+        >
+          <Feather size={12} strokeWidth={2} />
+          Compartir en feed
+        </button>
+      )}
+    </div>
+  );
+}
+
+function QuoteShareCard({ quote, cardRef }) {
+  return (
+    <div ref={cardRef} style={{ width: "320px", background: "linear-gradient(155deg, #F5EFE3 0%, #C9976A 55%, #7A2E2E 100%)", borderRadius: "20px", padding: "2.5rem 2rem 1.75rem", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: "1rem", minHeight: "380px" }}>
+      <div style={{ position: "absolute", top: -60, right: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -40, left: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
+      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>FOLIO</p>
+      <div style={{ fontFamily: "Georgia, serif", fontSize: "4rem", lineHeight: 0.9, color: "rgba(42,31,26,0.18)", margin: 0 }}>"</div>
+      <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "1.15rem", lineHeight: 1.62, color: "#2A1F1A", margin: 0, flex: 1 }}>
+        {(quote.text || "").length > 220 ? (quote.text || "").slice(0, 220) + "…" : quote.text}
+      </p>
+      {quote.bookTitle && (
+        <div style={{ borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem" }}>
+          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.85rem", color: "rgba(42,31,26,0.6)", margin: 0 }}>
+            — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
+          </p>
+        </div>
+      )}
+      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.65rem", color: "rgba(42,31,26,0.4)", letterSpacing: "0.06em", margin: 0 }}>
+        folio-final.vercel.app
+      </p>
+    </div>
+  );
+}
+
+function QuoteShareModal({ quote, onClose }) {
+  const cardRef = useRef(null);
+  const [generating, setGenerating] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  async function handleShare() {
+    if (generating) return;
+    setGenerating(true);
+    try {
+      const { default: html2canvas } = await import("html2canvas");
+      const canvas = await html2canvas(cardRef.current, { scale: 2.5, useCORS: true, backgroundColor: null, logging: false });
+      canvas.toBlob(async blob => {
+        const file = new File([blob], "frase-folio.png", { type: "image/png" });
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: "Frase guardada en Folio" });
+          setShared(true);
+        } else {
+          const url = canvas.toDataURL("image/png");
+          const a = document.createElement("a");
+          a.href = url; a.download = "frase-folio.png"; a.click();
+          setShared(true);
+        }
+      }, "image/png");
+    } catch (e) {
+      if (e.name !== "AbortError") console.error(e);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[65] flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.78)" }} onClick={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }} onClick={e => e.stopPropagation()}>
+        <QuoteShareCard quote={quote} cardRef={cardRef} />
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <button
+            onClick={handleShare}
+            disabled={generating}
+            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "10px", padding: "0.75rem 1.5rem", cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+          >
+            {generating ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={16} />}
+            {shared ? "¡Listo!" : generating ? "Generando..." : "Compartir imagen"}
+          </button>
+          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "Fraunces, serif" }}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdate, onDelete, onToggleFavorite }) {
+  const [quote, setQuote] = useState(initialQuote);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(initialQuote);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const moodLabel = MOOD_OPTIONS.find(m => m.key === quote.mood)?.label;
+  const formattedDate = new Date(quote.created_at).toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" });
+
+  async function handleSave() {
+    if (!draft.text?.trim() || saving) return;
+    setSaving(true);
+    try {
+      await updateQuoteInDB(draft, userId);
+      const book = (books || []).find(b => b.id === draft.book_id);
+      const updated = { ...draft, bookTitle: book?.title || quote.bookTitle, bookAuthor: book?.author || quote.bookAuthor };
+      setQuote(updated);
+      onUpdate(updated);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggle() {
+    const newVal = !quote.is_favorite;
+    setQuote(q => ({ ...q, is_favorite: newVal }));
+    await toggleQuoteFavorite(quote.id, userId, newVal);
+    onToggleFavorite({ ...quote, is_favorite: newVal });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.62)", animation: "backdropIn 200ms ease-out" }} onClick={onClose}>
+      <div className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-t-2xl sm:rounded-xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}` }} onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0" style={{ backgroundColor: palette.bg, borderBottom: `1px solid ${palette.borderSoft}`, padding: "0.875rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {!editing ? (
+            <div style={{ display: "flex", gap: "0.35rem" }}>
+              <button onClick={() => { setEditing(true); setDraft(quote); }} style={{ background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, padding: "4px", display: "flex" }} title="Editar"><Pencil size={18} strokeWidth={1.8} /></button>
+              <button onClick={() => setShowDeleteConfirm(true)} style={{ background: "none", border: "none", cursor: "pointer", color: palette.inkFaint, padding: "4px", display: "flex" }} title="Eliminar"><Trash2 size={18} strokeWidth={1.8} /></button>
+              <button onClick={() => setShowShare(true)} style={{ background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, padding: "4px", display: "flex" }} title="Compartir"><Share2 size={18} strokeWidth={1.8} /></button>
+            </div>
+          ) : (
+            <span style={{ ...display, fontSize: "0.95rem", fontWeight: 600, color: palette.ink }}>Editar frase</span>
+          )}
+          <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+            {editing && (
+              <button onClick={handleSave} disabled={saving} style={{ ...display, fontSize: "0.82rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "8px", padding: "0.32rem 0.8rem", cursor: saving ? "not-allowed" : "pointer" }}>
+                {saving ? "..." : "Guardar"}
+              </button>
+            )}
+            <button onClick={editing ? () => { setEditing(false); setDraft(quote); } : onClose} style={{ background: "none", border: "none", cursor: "pointer", color: palette.inkFaint, padding: "4px", display: "flex" }}>
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: "1.5rem 1.25rem" }}>
+          {editing ? (
+            <div>
+              <textarea
+                value={draft.text}
+                onChange={e => setDraft(d => ({ ...d, text: e.target.value }))}
+                rows={6}
+                autoFocus
+                style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "1.05rem", fontStyle: "italic", color: palette.ink, backgroundColor: palette.bgCard, border: `1.5px solid ${palette.border}`, borderRadius: "10px", padding: "0.85rem", resize: "none", outline: "none", lineHeight: 1.55, marginBottom: "1rem" }}
+              />
+              <div style={{ marginBottom: "0.75rem" }}>
+                <label style={{ ...ts.label, display: "block", marginBottom: "0.25rem" }}>Libro</label>
+                <select value={draft.book_id || ""} onChange={e => setDraft(d => ({ ...d, book_id: e.target.value || null }))} style={{ width: "100%", ...body, fontSize: "0.9rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem 0.65rem", outline: "none" }}>
+                  <option value="">Sin libro</option>
+                  {(books || []).map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+              </div>
+              <div style={{ marginBottom: "0.75rem" }}>
+                <label style={{ ...ts.label, display: "block", marginBottom: "0.25rem" }}>Página (opcional)</label>
+                <input type="number" value={draft.page_number || ""} onChange={e => setDraft(d => ({ ...d, page_number: e.target.value ? parseInt(e.target.value) : null }))} style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "0.9rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem 0.65rem", outline: "none" }} />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ position: "relative", marginBottom: "1.5rem", padding: "0.75rem 0.5rem" }}>
+                <div style={{ position: "absolute", top: -4, left: -2, fontFamily: "Georgia, serif", fontSize: "5rem", lineHeight: 0.85, color: palette.accent + "22", userSelect: "none", pointerEvents: "none" }}>"</div>
+                <p style={{ ...body, fontSize: "1.18rem", fontStyle: "italic", lineHeight: 1.68, color: palette.ink, paddingLeft: "1.25rem", paddingRight: "0.5rem" }}>
+                  {quote.text}
+                </p>
+                <div style={{ position: "absolute", bottom: -8, right: -2, fontFamily: "Georgia, serif", fontSize: "5rem", lineHeight: 0.85, color: palette.accent + "22", userSelect: "none", pointerEvents: "none" }}>"</div>
+              </div>
+
+              {quote.bookTitle && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.6rem", paddingBottom: "0.75rem", borderBottom: `1px solid ${palette.borderSoft}` }}>
+                  <BookOpen size={13} color={palette.inkFaint} strokeWidth={1.8} />
+                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.82rem", color: palette.inkSoft }}>
+                    {quote.bookTitle}{quote.bookAuthor && <span style={{ fontStyle: "italic" }}> · {quote.bookAuthor}</span>}
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem", marginBottom: "1.25rem" }}>
+                {quote.page_number && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.inkFaint }}>Página {quote.page_number}</span>}
+                {moodLabel && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.accent, backgroundColor: palette.accent + "15", borderRadius: "999px", padding: "0.15rem 0.55rem" }}>{moodLabel}</span>}
+                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.inkFaint }}>{formattedDate}</span>
+              </div>
+
+              <button
+                onClick={handleToggle}
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem", ...body, fontSize: "0.9rem", color: quote.is_favorite ? "#E74C3C" : palette.inkSoft, background: "none", border: `1px solid ${quote.is_favorite ? "#E74C3C40" : palette.border}`, borderRadius: "8px", padding: "0.6rem 1rem", cursor: "pointer", transition: "all 150ms ease", width: "100%", justifyContent: "center" }}
+              >
+                <Heart size={16} fill={quote.is_favorite ? "#E74C3C" : "none"} strokeWidth={1.8} color={quote.is_favorite ? "#E74C3C" : palette.inkSoft} />
+                {quote.is_favorite ? "Quitar de favoritas" : "Marcar como favorita"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {showDeleteConfirm && (
+          <div style={{ padding: "0 1.25rem 1.25rem" }}>
+            <div style={{ backgroundColor: "#FFF5F5", border: "1px solid #FCA5A5", borderRadius: "10px", padding: "1rem" }}>
+              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.88rem", color: "#7F1D1D", marginBottom: "0.75rem" }}>
+                ¿Eliminar esta frase? No se puede deshacer.
+              </p>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, ...body, fontSize: "0.88rem", backgroundColor: palette.bgCard, color: palette.inkSoft, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
+                  Cancelar
+                </button>
+                <button onClick={onDelete} style={{ flex: 1, ...body, fontSize: "0.88rem", fontWeight: 600, backgroundColor: "#EF4444", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showShare && <QuoteShareModal quote={quote} onClose={() => setShowShare(false)} />}
+    </div>
+  );
+}
+
+function QuotesView({ user, books, onSaveQuote }) {
+  const [quotes, setQuotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterFav, setFilterFav] = useState(false);
+  const [filterBook, setFilterBook] = useState("");
+  const [filterMood, setFilterMood] = useState("");
+  const [selectedQuote, setSelectedQuote] = useState(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [localToast, setLocalToast] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchQuotes(user.id)
+      .then(setQuotes)
+      .catch(e => console.error("[QuotesView]", e))
+      .finally(() => setLoading(false));
+  }, [user.id]);
+
+  function showToast(msg) {
+    setLocalToast(msg);
+    setTimeout(() => setLocalToast(null), 3500);
+  }
+
+  async function handleToggleFavorite(quote) {
+    const newVal = !quote.is_favorite;
+    setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_favorite: newVal } : q));
+    await toggleQuoteFavorite(quote.id, user.id, newVal).catch(() => {});
+  }
+
+  async function handleDelete(quoteId) {
+    await deleteQuoteFromDB(quoteId, user.id).catch(e => console.error(e));
+    setQuotes(prev => prev.filter(q => q.id !== quoteId));
+    setSelectedQuote(null);
+    showToast("Frase eliminada");
+  }
+
+  async function handleShareToFeed(quote) {
+    try {
+      // Create post FIRST — only mark is_public if post creation succeeds
+      const quoteContent = JSON.stringify({
+        __folio_type: "quote",
+        text: quote.text,
+        mood: quote.mood || null,
+        page_number: quote.page_number || null,
+        bookTitle: quote.bookTitle || null,
+        bookAuthor: quote.bookAuthor || null,
+      });
+      // Use type "text" to avoid any CHECK constraint on the posts table
+      await createFeedPost({ userId: user.id, type: "text", bookId: quote.book_id || null, content: quoteContent });
+
+      // Post created successfully → now mark quote as public
+      await supabase.from("quotes").update({ is_public: true }).eq("id", quote.id).eq("user_id", user.id);
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_public: true } : q));
+      showToast("¡Frase compartida en tu feed! 🔥");
+    } catch (e) {
+      console.error("[QuotesView] handleShareToFeed:", e.message, e);
+      showToast("No se pudo compartir en tu feed");
+    }
+  }
+
+  function handleUpdate(updated) {
+    setQuotes(prev => prev.map(q => q.id === updated.id ? updated : q));
+    setSelectedQuote(updated);
+  }
+
+  function handleSaved(newQuote) {
+    const book = (books || []).find(b => b.id === newQuote.book_id);
+    const enriched = { ...newQuote, bookTitle: newQuote.bookTitle || book?.title || null, bookAuthor: newQuote.bookAuthor || book?.author || null };
+    setQuotes(prev => [enriched, ...prev]);
+    setShowSaveModal(false);
+    showToast("Frase guardada ✨");
+  }
+
+  const filtered = quotes.filter(q => {
+    if (filterFav && !q.is_favorite) return false;
+    if (filterBook && q.book_id !== filterBook) return false;
+    if (filterMood && q.mood !== filterMood) return false;
+    return true;
+  });
+
+  const booksWithQuotes = (books || []).filter(b => quotes.some(q => q.book_id === b.id));
+  const moodsWithQuotes = MOOD_OPTIONS.filter(m => quotes.some(q => q.mood === m.key));
+  const activeFilter = filterFav || filterBook || filterMood;
+
+  return (
+    <div className="px-4 sm:px-6 py-5 max-w-4xl mx-auto">
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+        <div>
+          <h1 style={{ ...ts.h1, color: palette.ink, marginBottom: "0.15rem" }}>Mis Frases</h1>
+          {quotes.length > 0 && (
+            <p style={{ ...body, color: palette.inkFaint, fontSize: "0.85rem" }}>
+              {quotes.length} frase{quotes.length !== 1 ? "s" : ""} guardada{quotes.length !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => setShowSaveModal(true)}
+          style={{ ...display, fontSize: "0.88rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "10px", padding: "0.55rem 1rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}
+        >
+          <Plus size={15} /> Guardar
+        </button>
+      </div>
+
+      {quotes.length > 1 && (
+        <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
+          <button onClick={() => { setFilterFav(false); setFilterBook(""); setFilterMood(""); }}
+            style={{ ...body, fontSize: "0.8rem", padding: "0.28rem 0.75rem", borderRadius: "999px", border: `1px solid ${!activeFilter ? palette.accent : palette.border}`, backgroundColor: !activeFilter ? palette.accent + "18" : palette.bgCard, color: !activeFilter ? palette.accent : palette.inkSoft, cursor: "pointer" }}>
+            Todas
+          </button>
+          <button onClick={() => { setFilterFav(f => !f); setFilterBook(""); setFilterMood(""); }}
+            style={{ ...body, fontSize: "0.8rem", padding: "0.28rem 0.75rem", borderRadius: "999px", border: `1px solid ${filterFav ? palette.accent : palette.border}`, backgroundColor: filterFav ? palette.accent + "18" : palette.bgCard, color: filterFav ? palette.accent : palette.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+            <Heart size={11} fill={filterFav ? palette.accent : "none"} color={filterFav ? palette.accent : palette.inkSoft} strokeWidth={2} />
+            Favoritas
+          </button>
+          {booksWithQuotes.length > 0 && (
+            <select value={filterBook} onChange={e => { setFilterBook(e.target.value); setFilterFav(false); setFilterMood(""); }}
+              style={{ ...body, fontSize: "0.8rem", padding: "0.28rem 0.75rem", borderRadius: "999px", border: `1px solid ${filterBook ? palette.accent : palette.border}`, backgroundColor: filterBook ? palette.accent + "18" : palette.bgCard, color: filterBook ? palette.accent : palette.inkSoft, cursor: "pointer", outline: "none" }}>
+              <option value="">Por libro</option>
+              {booksWithQuotes.map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "3rem 0" }}>
+          <Loader2 size={26} color={palette.border} style={{ animation: "spin 1s linear infinite", display: "block", margin: "0 auto 0.5rem" }} />
+          <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Cargando frases...</p>
+        </div>
+      ) : quotes.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "4rem 1.5rem" }}>
+          <div style={{ fontSize: "2.8rem", marginBottom: "0.85rem" }}>📖</div>
+          <p style={{ ...display, fontStyle: "italic", fontSize: "1.25rem", color: palette.ink, marginBottom: "0.45rem" }}>
+            Aún no guardas frases
+          </p>
+          <p style={{ ...body, color: palette.inkSoft, fontSize: "0.9rem", maxWidth: 300, margin: "0 auto 1.75rem" }}>
+            Cuando leas algo que te vuele la cabeza, guárdalo aquí
+          </p>
+          <button
+            onClick={() => setShowSaveModal(true)}
+            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "10px", padding: "0.7rem 1.5rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+          >
+            <Plus size={16} /> Guardar primera frase
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
+          <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>No hay frases con este filtro</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          {filtered.map(q => (
+            <QuoteCard
+              key={q.id}
+              quote={q}
+              onPress={() => setSelectedQuote(q)}
+              onToggleFavorite={() => handleToggleFavorite(q)}
+              onShareToFeed={() => handleShareToFeed(q)}
+            />
+          ))}
+        </div>
+      )}
+
+      {selectedQuote && (
+        <QuoteDetailModal
+          quote={selectedQuote}
+          books={books}
+          userId={user.id}
+          onClose={() => setSelectedQuote(null)}
+          onUpdate={handleUpdate}
+          onDelete={() => handleDelete(selectedQuote.id)}
+          onToggleFavorite={updated => setQuotes(prev => prev.map(q => q.id === updated.id ? updated : q))}
+        />
+      )}
+
+      {showSaveModal && (
+        <SaveQuoteModal
+          books={books}
+          userId={user.id}
+          onClose={() => setShowSaveModal(false)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {localToast && (
+        <div style={{ position: "fixed", bottom: 86, left: "50%", transform: "translateX(-50%)", backgroundColor: "#2A1F1A", color: palette.bg, padding: "0.75rem 1.25rem", borderRadius: "14px", boxShadow: "0 4px 24px rgba(0,0,0,0.35)", zIndex: 4000, maxWidth: "88vw", textAlign: "center", ...body, fontSize: "0.88rem", lineHeight: 1.4, animation: "slideUp 350ms cubic-bezier(0.32, 0.72, 0, 1)", border: "1px solid rgba(200,146,74,0.3)" }}>
+          {localToast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme, onSaveQuote, pet, onRenamePet }) {
   const [sub, setSub] = useState("perfil");
   const TABS = [
     { id: "perfil", label: "Mi perfil" },
     { id: "libros", label: "Mis libros" },
+    { id: "frases", label: "Mis Frases" },
     { id: "resumen", label: "Resumen" },
   ];
   return (
@@ -10307,7 +11865,8 @@ function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline =
         )}
       </div>
       {sub === "libros" && <LibraryView books={books} onSelectBook={onSelectBook} setTab={setTab} isOnline={isOnline} />}
-      {sub === "perfil" && <ProfileView user={user} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} theme={theme} setTheme={setTheme} />}
+      {sub === "perfil" && <ProfileView user={user} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} theme={theme} setTheme={setTheme} pet={pet} onRenamePet={onRenamePet} />}
+      {sub === "frases" && <QuotesView user={user} books={books} onSaveQuote={onSaveQuote} />}
       {sub === "resumen" && <ReadingStatsView books={books} />}
     </div>
   );
@@ -10509,6 +12068,326 @@ function GemToast({ amount, label, id, onDismiss }) {
         <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", color: "#fff", lineHeight: 1, letterSpacing: "-0.01em" }}>
           {label || `+${amount} gemas`} ✨
         </span>
+      </div>
+    </div>
+  );
+}
+
+// ============ PET (MASCOTA) UI ============
+const PET_SIZE_PX = { small: 32, medium: 150, large: 200, hero: 270 };
+function PetDisplay({ petType = "gato", petName, size = "medium", px: pxOverride, levelUp = false, showShadow = true, shadowColor = "rgba(42,31,26,1)", style = {} }) {
+  const px = pxOverride || PET_SIZE_PX[size] || 150;
+  const fullAnim = size !== "small";
+  return (
+    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", ...style }}>
+      {/* El wrapper hace el bob; la imagen hace la respiración (escala sutil) */}
+      <div className={`pet-sprite-wrap${levelUp ? " pet-level-up" : ""}`} style={{ position: "relative", width: px, height: px, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+        <img
+          src={petImageSrc(petType)}
+          alt={petName || "Mascota"}
+          draggable={false}
+          className={fullAnim ? "pet-sprite-img" : ""}
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", userSelect: "none", WebkitUserDrag: "none" }}
+        />
+      </div>
+      {showShadow && fullAnim && (
+        <div className="pet-shadow" style={{ width: px * 0.42, height: Math.max(6, px * 0.06), borderRadius: "50%", background: shadowColor, marginTop: -Math.round(px * 0.02) }} />
+      )}
+    </div>
+  );
+}
+
+function PetOnboarding({ user, onComplete }) {
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState("Mi compañero");
+  const [saving, setSaving] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+  const info = PET_TYPES.gato;
+
+  async function confirm() {
+    if (saving) return;
+    setSaving(true);
+    setErrMsg("");
+    const finalName = name.trim() || "Mi compañero";
+    const pet = await createPet(user.id, { petType: "gato", petName: finalName });
+    setSaving(false);
+    if (pet && pet.__error) {
+      const code = pet.__error.code;
+      setErrMsg(
+        code === "42501" ? "No se pudo guardar: RLS está bloqueando. Desactiva RLS de user_pets en Supabase."
+        : code === "23503" ? "No se pudo guardar: el usuario no existe en la base de datos."
+        : `No se pudo guardar tu mascota (${code || "error"}). Intenta de nuevo.`
+      );
+      return;
+    }
+    // pet válido (verificado) o __unverified (insert ok pero RLS bloquea relectura) o fallback
+    onComplete(pet && !pet.__error ? pet : { user_id: user.id, pet_type: "gato", pet_name: finalName, xp: 0, level: 1 });
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 6000, backgroundColor: palette.bg,
+      backgroundImage: "radial-gradient(at 15% 0%, rgba(122,46,46,0.06) 0px, transparent 45%), radial-gradient(at 85% 100%, rgba(200,146,74,0.08) 0px, transparent 45%)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      padding: "2rem 1.25rem calc(2rem + env(safe-area-inset-bottom))",
+      paddingTop: "calc(2rem + env(safe-area-inset-top))", overflowY: "auto",
+    }}>
+      <style>{FONT_LINK}</style>
+      <div style={{ maxWidth: 420, width: "100%", textAlign: "center", animation: "obFadeUp 500ms cubic-bezier(0.23,1,0.32,1) both" }}>
+        <h1 style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "1.75rem", color: palette.ink, lineHeight: 1.15, marginBottom: "0.5rem" }}>
+          Escoge a tu compañero de lectura
+        </h1>
+        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkFaint, marginBottom: "1.75rem" }}>
+          Te acompañará en cada página que leas
+        </p>
+
+        <div style={{
+          backgroundColor: palette.bgCard, border: `1.5px solid ${palette.accent}55`,
+          borderRadius: 20, padding: "1.75rem 1.25rem 1.5rem", boxShadow: "0 10px 36px rgba(122,46,46,0.14)",
+        }}>
+          <PetDisplay petType="gato" petName={info.title} size="large" />
+          <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.35rem", color: palette.ink, marginTop: "1rem", lineHeight: 1.1 }}>
+            {info.title}
+          </p>
+          <p style={{ ...body, fontStyle: "italic", fontSize: "0.88rem", color: palette.inkFaint, marginTop: "0.4rem" }}>
+            "{info.quote}"
+          </p>
+        </div>
+
+        {!naming ? (
+          <button
+            onClick={() => setNaming(true)}
+            className="btn-press"
+            style={{
+              marginTop: "1.75rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: "pointer",
+              background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", color: "#fff",
+              fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
+            }}
+          >
+            ¡Este es mi compañero!
+          </button>
+        ) : (
+          <div style={{ marginTop: "1.75rem", animation: "obFadeUp 320ms ease both" }}>
+            <label style={{ ...display, fontSize: "0.9rem", fontWeight: 600, color: palette.ink, display: "block", marginBottom: "0.6rem" }}>
+              ¿Cómo se llama tu compañero?
+            </label>
+            <input
+              type="text"
+              value={name}
+              autoFocus
+              maxLength={40}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") confirm(); }}
+              placeholder="Mi compañero"
+              style={{
+                width: "100%", padding: "0.85rem 1rem", borderRadius: 12, border: `1.5px solid ${palette.border}`,
+                backgroundColor: palette.bg, color: palette.ink, ...body, fontSize: "1rem", textAlign: "center", outline: "none", boxSizing: "border-box",
+              }}
+            />
+            <button
+              onClick={confirm}
+              disabled={saving}
+              className="btn-press"
+              style={{
+                marginTop: "1rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: saving ? "default" : "pointer",
+                background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", color: "#fff",
+                fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
+                opacity: saving ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
+              }}
+            >
+              {saving ? <Loader2 size={18} className="animate-spin" /> : null}
+              {saving ? "Guardando…" : "Confirmar"}
+            </button>
+            {errMsg && (
+              <p style={{ ...body, fontSize: "0.82rem", color: "#C0392B", marginTop: "0.75rem", textAlign: "center", lineHeight: 1.35 }}>{errMsg}</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PetLevelUpToast({ petName, level, petType, id, onDismiss }) {
+  const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => { setClosing(true); setTimeout(onDismiss, 240); }, 3600);
+    return () => clearTimeout(t);
+  }, [id]);
+  return (
+    <div style={{
+      position: "fixed", bottom: 104, left: "50%", zIndex: 4100, pointerEvents: "none",
+      animation: closing ? "petToastOut 240ms ease-in forwards" : "petToastIn 380ms cubic-bezier(0.34,1.56,0.64,1) both",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.6rem 1.2rem 0.6rem 0.7rem",
+        background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", borderRadius: 999,
+        boxShadow: "0 8px 28px rgba(122,46,46,0.5), 0 2px 6px rgba(0,0,0,0.2)", whiteSpace: "nowrap",
+      }}>
+        <img src={petImageSrc(petType)} alt="" style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }} />
+        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.02rem", color: "#fff", lineHeight: 1.1, letterSpacing: "-0.01em" }}>
+          ¡{petName || "Tu compañero"} subió a nivel {level}! 🎉
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Escena decorativa SVG detrás de la mascota (cielo, sol, nubes, árbol, pasto)
+function PetScene({ isDark }) {
+  const sky = isDark
+    ? "linear-gradient(180deg, #131F38 0%, #1E3050 42%, #21402F 75%, #1B3326 100%)"
+    : "linear-gradient(180deg, #7EC8F0 0%, #A9DEF6 38%, #D7F0E0 70%, #A6E0A0 100%)";
+  const sun = isDark ? "#F4D77A" : "#FFE08A";
+  const sunGlow = isDark ? "rgba(244,215,122,0.30)" : "rgba(255,224,138,0.65)";
+  const cloud = isDark ? "rgba(220,230,245,0.18)" : "rgba(255,255,255,0.92)";
+  const grassBack = isDark ? "#234A35" : "#8FD982";
+  const grassFront = isDark ? "#1C3B2A" : "#6BBF5B";
+  const trunk = isDark ? "#5A4030" : "#8A5A3B";
+  const leaf = isDark ? "#2E5A3E" : "#4FA35A";
+  const leaf2 = isDark ? "#356646" : "#62B86C";
+
+  return (
+    <div aria-hidden style={{ position: "absolute", inset: 0, background: sky, overflow: "hidden" }}>
+      {/* Sol */}
+      <div className="pet-sun" style={{ position: "absolute", top: "8%", right: "12%", width: 64, height: 64, borderRadius: "50%", background: sun, boxShadow: `0 0 50px 24px ${sunGlow}` }} />
+      {/* Nubes */}
+      <svg className="pet-cloud" style={{ position: "absolute", top: "14%", left: "8%" }} width="110" height="44" viewBox="0 0 110 44" fill="none">
+        <ellipse cx="34" cy="28" rx="34" ry="16" fill={cloud} />
+        <ellipse cx="64" cy="22" rx="26" ry="20" fill={cloud} />
+        <ellipse cx="86" cy="30" rx="22" ry="13" fill={cloud} />
+      </svg>
+      <svg className="pet-cloud-2" style={{ position: "absolute", top: "30%", right: "6%" }} width="84" height="34" viewBox="0 0 110 44" fill="none">
+        <ellipse cx="34" cy="28" rx="34" ry="16" fill={cloud} />
+        <ellipse cx="64" cy="22" rx="26" ry="20" fill={cloud} />
+        <ellipse cx="86" cy="30" rx="22" ry="13" fill={cloud} />
+      </svg>
+      {/* Pasto (colinas) */}
+      <svg style={{ position: "absolute", bottom: 0, left: 0, width: "100%" }} height="160" viewBox="0 0 400 160" preserveAspectRatio="none" fill="none">
+        <path d="M0 70 Q 100 30 200 60 T 400 55 L400 160 L0 160 Z" fill={grassBack} />
+        <path d="M0 110 Q 120 75 230 100 T 400 95 L400 160 L0 160 Z" fill={grassFront} />
+      </svg>
+      {/* Árbol */}
+      <svg className="pet-tree" style={{ position: "absolute", bottom: "13%", left: "9%" }} width="74" height="96" viewBox="0 0 74 96" fill="none">
+        <rect x="32" y="52" width="10" height="40" rx="4" fill={trunk} />
+        <circle cx="37" cy="34" r="26" fill={leaf} />
+        <circle cx="20" cy="44" r="17" fill={leaf2} />
+        <circle cx="54" cy="44" r="17" fill={leaf2} />
+      </svg>
+    </div>
+  );
+}
+
+// Pet Hub — pantalla completa tipo Tamagotchi
+function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
+  const [editing, setEditing] = useState(false);
+  const [nameDraft, setNameDraft] = useState(pet?.pet_name || "Mi compañero");
+  const [savingName, setSavingName] = useState(false);
+  const [flash, setFlash] = useState(null);
+
+  useEffect(() => { setNameDraft(pet?.pet_name || "Mi compañero"); }, [pet?.pet_name]);
+
+  if (!pet) return null;
+  const isDark = palette.bg === PALETTE_DARK.bg;
+  const onSceneText = "#FFFFFF";
+  const textShadow = "0 2px 8px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)";
+
+  const max = petXpForLevel(pet.level);
+  const atMax = pet.level >= PET_MAX_LEVEL;
+  const pct = atMax ? 100 : Math.min(100, Math.round((pet.xp / max) * 100));
+
+  async function saveName() {
+    if (savingName) return;
+    setSavingName(true);
+    const saved = await onRename(nameDraft);
+    setSavingName(false);
+    if (saved) { setEditing(false); setFlash("✓ Nombre actualizado"); setTimeout(() => setFlash(null), 2200); }
+  }
+
+  function showFlash(msg) { setFlash(msg); setTimeout(() => setFlash(null), 2400); }
+
+  const topBtn = {
+    width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer",
+    backgroundColor: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)", color: "#fff",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 5500, display: "flex", flexDirection: "column", overflow: "hidden", animation: "fadeIn 220ms ease-out" }}>
+      <style>{FONT_LINK}</style>
+      <PetScene isDark={isDark} />
+
+      {/* Barra superior */}
+      <div style={{ position: "relative", zIndex: 3, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top) + 0.85rem) 1rem 0.5rem" }}>
+        <button onClick={onGoToProfile} className="btn-press" style={{ ...topBtn, width: "auto", borderRadius: 999, padding: "0 0.95rem", gap: "0.4rem", fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "0.85rem" }}>
+          <User size={16} /> Mi perfil
+        </button>
+        <button onClick={onClose} aria-label="Cerrar" className="btn-press" style={topBtn}>
+          <X size={22} />
+        </button>
+      </div>
+
+      {/* Contenido central */}
+      <div style={{ position: "relative", zIndex: 3, flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0.5rem 1.5rem", boxSizing: "border-box", overflowY: "auto" }}>
+        <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={300} shadowColor="rgba(20,40,20,0.4)" />
+
+        {/* Nombre editable */}
+        <div style={{ marginTop: "1.5rem", minHeight: 46, display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+          {editing ? (
+            <div style={{ display: "flex", gap: "0.45rem", alignItems: "center", maxWidth: 340, width: "100%" }}>
+              <input
+                value={nameDraft} autoFocus maxLength={40}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
+                style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 12, border: "none", backgroundColor: "rgba(255,255,255,0.94)", color: "#2A1F1A", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", textAlign: "center", outline: "none", minWidth: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
+              />
+              <button onClick={saveName} disabled={savingName} className="btn-press" style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 12, border: "none", background: "#7A2E2E", color: "#fff", cursor: "pointer", ...display, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}>
+                {savingName ? "…" : "OK"}
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", padding: "0.2rem 0.5rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.55rem" }}>
+              <span style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "2.1rem", color: onSceneText, textShadow, lineHeight: 1.05 }}>{pet.pet_name || "Mi compañero"}</span>
+              <Pencil size={19} color={onSceneText} style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", opacity: 0.9 }} />
+            </button>
+          )}
+        </div>
+
+        {flash && <span style={{ marginTop: "0.3rem", ...body, fontSize: "0.85rem", color: onSceneText, textShadow }}>{flash}</span>}
+
+        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.25rem", color: onSceneText, textShadow, marginTop: "0.45rem" }}>Nivel {pet.level}</p>
+
+        {/* Barra XP grande */}
+        <div style={{ width: "100%", maxWidth: 360, marginTop: "1.35rem" }}>
+          <div style={{ height: 18, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.35)", overflow: "hidden", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.25)" }}>
+            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #C8924A 0%, #F4C77A 100%)", animation: "petXpFill 600ms cubic-bezier(0.23,1,0.32,1)", transition: "width 500ms cubic-bezier(0.23,1,0.32,1)", boxShadow: "0 0 12px rgba(244,199,122,0.8)" }} />
+          </div>
+          <p style={{ ...body, fontSize: "0.88rem", color: onSceneText, textShadow, marginTop: "0.55rem", textAlign: "center", fontWeight: 600 }}>
+            {atMax ? `¡Nivel máximo ${PET_MAX_LEVEL}!` : `${pet.xp} / ${max} XP hasta nivel ${pet.level + 1}`}
+          </p>
+        </div>
+
+        {/* Features de la mascota: Tienda + Mis objetos (próximamente) */}
+        <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.6rem", width: "100%", maxWidth: 360 }}>
+          <button onClick={() => showFlash("🛍️ Tienda: ¡muy pronto!")} className="btn-press" style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.18)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 14, padding: "0.9rem 0.4rem", textAlign: "center", cursor: "pointer" }}>
+            <p style={{ fontSize: "1.4rem", lineHeight: 1 }}>🛍️</p>
+            <p style={{ ...display, fontSize: "0.8rem", fontWeight: 700, color: onSceneText, textShadow, marginTop: "0.3rem" }}>Tienda</p>
+          </button>
+          <button onClick={() => showFlash("🎁 Mis objetos: ¡muy pronto!")} className="btn-press" style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.18)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 14, padding: "0.9rem 0.4rem", textAlign: "center", cursor: "pointer" }}>
+            <p style={{ fontSize: "1.4rem", lineHeight: 1 }}>🎁</p>
+            <p style={{ ...display, fontSize: "0.8rem", fontWeight: 700, color: onSceneText, textShadow, marginTop: "0.3rem" }}>Mis objetos</p>
+          </button>
+        </div>
+
+        {/* Acciones */}
+        <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.5rem", width: "100%", maxWidth: 360, paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
+          <button onClick={onGoToProfile} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.92)", color: "#7A2E2E", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
+            Mi perfil
+          </button>
+          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: "#fff", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
+            Ver galería
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -11699,7 +13578,7 @@ function resolveTheme(pref) {
 }
 
 function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutorial }) {
-  const [tab, setTab] = useState("feed");
+  const [tab, setTab] = useState("home");
   const [books, setBooks] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -11714,11 +13593,26 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
   const [toastMessage, setToastMessage] = useState(null);
   const [gemBalance, setGemBalance] = useState(0);
   const [gemToastQueue, setGemToastQueue] = useState([]);
+  const [pet, setPet] = useState(null);
+  const [petLoaded, setPetLoaded] = useState(false);
+  const [showPetOnboarding, setShowPetOnboarding] = useState(false);
+  const [petHubOpen, setPetHubOpen] = useState(false);
+  const [amigosSheetOpen, setAmigosSheetOpen] = useState(false);
+  const [petToastQueue, setPetToastQueue] = useState([]);
+  const [petStreak, setPetStreak] = useState(null);
   const [tutorialActive, setTutorialActive] = useState(() => showTutorial && !localStorage.getItem('folio_firstLoginTutorial'));
+  const [showFabMenu, setShowFabMenu] = useState(false);
+  const [showSaveQuote, setShowSaveQuote] = useState(false);
+  const [defaultQuoteBookId, setDefaultQuoteBookId] = useState(null);
 
-  function showGemToast(amount, label) {
-    setGemToastQueue(prev => [...prev, { amount, label, id: Date.now() + Math.random() }]);
+  function openSaveQuote(bookId) {
+    setDefaultQuoteBookId(bookId || null);
+    setShowSaveQuote(true);
   }
+
+  // Gemas: lógica conservada (addGemsDB), pero la moneda visible es SOLO el XP de la mascota.
+  // showGemToast queda como no-op para no mostrar gemas en la UI.
+  function showGemToast(_amount, _label) {}
   const [activeWrap, setActiveWrap] = useState(null);
   const [mainUsername, setMainUsername] = useState(null);
   const [refModalUser, setRefModalUser] = useState(initialRefUser || null);
@@ -11802,6 +13696,8 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
     refreshPendingCount();
     refreshUnreadMessages();
     refreshUnreadNotifs();
+    debugNotifications();
+    checkStreakOnLoad(user.id);
 
     // Retroactive achievements — run once per user via localStorage flag
     const retroFlag = `retroactive_check_done_${user.id}`;
@@ -11854,13 +13750,26 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
 
   async function refreshUnreadNotifs() {
     try {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from("notifications")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("read", false);
+      if (error) { console.error("[notif] refreshUnreadNotifs SELECT error:", error.message, error); return; }
+      console.log(`[notif] refreshUnreadNotifs → count sin leer: ${count}`);
       setUnreadNotifs(count || 0);
-    } catch {}
+    } catch (e) { console.error("[notif] refreshUnreadNotifs catch:", e); }
+  }
+
+  async function debugNotifications() {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    console.log("[NOTIF DEBUG] Todos los registros en notifications:", JSON.stringify(data, null, 2));
+    console.log("[NOTIF DEBUG] Error en debug SELECT:", error);
+    console.log("[NOTIF DEBUG] user.id del usuario actual:", user.id);
   }
 
   async function saveBookRating(bookId, rating, review) {
@@ -11888,15 +13797,24 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
     const channel = supabase
       .channel(`notifs:${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => {
+        console.log("[notif] Realtime INSERT received → refreshing badge");
         refreshUnreadNotifs();
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log("[notif] Realtime subscription status:", status, err || "");
+      });
     return () => { supabase.removeChannel(channel); };
   }, [user.id]);
 
   useEffect(() => {
-    const interval = setInterval(refreshUnreadNotifs, 30000);
+    const interval = setInterval(refreshUnreadNotifs, 15000);
     return () => clearInterval(interval);
+  }, [user.id]);
+
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") refreshUnreadNotifs(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [user.id]);
 
   useEffect(() => {
@@ -11925,6 +13843,43 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
     return unsub;
   }, []);
 
+  // Cargar mascota; si no tiene, mostrar selección inicial
+  useEffect(() => {
+    let cancelled = false;
+    loadPet(user.id).then((p) => {
+      if (cancelled) return;
+      if (p) {
+        setPet(p);
+      } else if (p === null) {
+        // La tabla existe pero el usuario aún no tiene mascota → selección inicial
+        setShowPetOnboarding(true);
+      }
+      // p === undefined → tabla ausente/error: no mostrar mascota ni onboarding
+      setPetLoaded(true);
+    });
+    supabase.from("user_streaks").select("current_streak, total_pages_read").eq("user_id", user.id).maybeSingle()
+      .then(({ data }) => { if (!cancelled && data) setPetStreak(data); });
+    return () => { cancelled = true; };
+  }, [user.id]);
+
+  // Reaccionar a cambios de XP/nivel de la mascota
+  useEffect(() => {
+    const unsub = petBus.on((result) => {
+      setPet((prev) => prev ? { ...prev, level: result.newLevel, xp: result.newXp, pet_name: result.petName ?? prev.pet_name, pet_type: result.petType ?? prev.pet_type } : prev);
+      if (result.leveledUp) {
+        haptic(HAPTIC.BOOK_DONE);
+        if (typeof confetti === "function") {
+          const colors = ["#7A2E2E", "#C8924A", "#F4EDE0"];
+          confetti({ particleCount: 80, spread: 75, origin: { y: 0.4 }, colors });
+          setTimeout(() => confetti({ particleCount: 40, spread: 100, angle: 60, origin: { x: 0, y: 0.5 }, colors }), 200);
+          setTimeout(() => confetti({ particleCount: 40, spread: 100, angle: 120, origin: { x: 1, y: 0.5 }, colors }), 350);
+        }
+        setPetToastQueue((q) => [...q, { id: Date.now() + Math.random(), petName: result.petName, level: result.newLevel, petType: result.petType }]);
+      }
+    });
+    return unsub;
+  }, []);
+
   useEffect(() => {
     loadGems(user.id).then(bal => setGemBalance(bal));
     claimDailyGems(user.id).then(earned => {
@@ -11944,7 +13899,10 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
       book.status === "read" && !book.finishedAt ? { ...book, finishedAt: Date.now() } : book;
     setBooks((prev) => [withFinished, ...prev]);
     try {
-      await insertBook(withFinished, user.id);
+      const dbId = await insertBook(withFinished, user.id);
+      if (dbId && dbId !== withFinished.id) {
+        setBooks((prev) => prev.map((b) => b.id === withFinished.id ? { ...b, id: dbId } : b));
+      }
       if (book.status === "reading") {
         checkAchievements(user.id, user.name);
         setPendingPost({ type: "book_update", action: "started", book: withFinished });
@@ -11956,6 +13914,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
           if (bal !== null) setGemBalance(bal);
           showGemToast(50, "+50 gemas");
         });
+        addPetXP(user.id, 50).catch(() => {});
       } else {
         checkAchievements(user.id, user.name);
       }
@@ -11990,6 +13949,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
           if (bal !== null) setGemBalance(bal);
           showGemToast(50, "+50 gemas");
         });
+        addPetXP(user.id, 50).catch(() => {});
       } else {
         setSelectedBook(final);
       }
@@ -12010,13 +13970,37 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
   }
 
   async function deleteBook(id) {
-    setBooks((prev) => prev.filter((b) => b.id !== id));
+    const updated = books.filter((b) => b.id !== id);
+    setBooks(updated);
     setSelectedBook(null);
     try {
       await deleteBookFromDB(id, user.id);
+      cacheBooks(updated);
+      setToastMessage("Libro eliminado ✓");
+      setTimeout(() => setToastMessage(null), 3000);
     } catch (err) {
-      console.error("Error eliminando libro:", err);
+      console.error("[deleteBook] error:", err?.message);
+      setBooks(books);
+      const msg = err?.message === "DELETE_NO_ROWS"
+        ? "No se pudo eliminar (sin permisos en DB). Verifica RLS en Supabase."
+        : "No se pudo eliminar el libro. Intenta de nuevo.";
+      setToastMessage(msg);
+      setTimeout(() => setToastMessage(null), 5000);
     }
+  }
+
+  if (showPetOnboarding) {
+    return (
+      <PetOnboarding
+        user={user}
+        onComplete={(newPet) => {
+          setPet(newPet);
+          setShowPetOnboarding(false);
+          setToastMessage(`¡Bienvenido, ${newPet?.pet_name || "compañero"}! 🐱`);
+          setTimeout(() => setToastMessage(null), 3500);
+        }}
+      />
+    );
   }
 
   return (
@@ -12302,24 +14286,50 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
           </span>
         </div>
       )}
-      <AppHeader tab={tab} setTab={setTab} user={user} onLogout={onLogout} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} />
-      <main className="max-w-4xl mx-auto pb-24 sm:pb-10 fade-in" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)" }}>
-        {loaded && tab === "feed" && <div className="tab-view-enter"><FeedView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} /></div>}
-        {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView books={books} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
+      <AppHeader tab={tab} setTab={setTab} user={user} onLogout={onLogout} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
+      <main className="max-w-4xl mx-auto pb-24 sm:pb-10 fade-in" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
+        {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
+        {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}
+        {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} isOnline={isOnline} /></div>}
-        {loaded && tab === "amigos" && <div className="tab-view-enter"><FriendsView user={user} onPendingChange={setPendingCount} onMessagesRead={refreshUnreadMessages} unreadNotifs={unreadNotifs} onNotifsRead={refreshUnreadNotifs} isOnline={isOnline} /></div>}
-        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} /></div>}
+        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSaveQuote={() => openSaveQuote(null)} pet={pet} onRenamePet={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }} /></div>}
       </main>
-      <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} />
+      <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onAddPress={() => setShowFabMenu(true)} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
+      {/* FAB flotante para agregar (el centro de la nav ahora es Mascota) */}
+      {!petHubOpen && (
+        <button
+          onClick={() => setShowFabMenu(true)}
+          aria-label="Agregar"
+          className="btn-press"
+          style={{
+            position: "fixed", right: 18, zIndex: 35,
+            bottom: "calc(env(safe-area-inset-bottom) + 80px)",
+            width: 58, height: 58, borderRadius: "50%", border: "none", cursor: "pointer",
+            background: "linear-gradient(135deg, #7A2E2E 0%, #A4493D 100%)",
+            boxShadow: "0 6px 20px rgba(122,46,46,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          <Plus size={26} color="#fff" strokeWidth={2.6} />
+        </button>
+      )}
       {notifsSheetOpen && (
         <NotificationsSheet
           user={user}
           onClose={() => setNotifsSheetOpen(false)}
           onNotifsRead={refreshUnreadNotifs}
           onNavigate={(postId, shouldOpenComments) => {
-            setTab("feed");
+            setTab("social");
             setPendingNavigation({ postId, openComments: shouldOpenComments });
           }}
+        />
+      )}
+      {amigosSheetOpen && (
+        <AmigosSheet
+          user={user}
+          onClose={() => setAmigosSheetOpen(false)}
+          onPendingChange={setPendingCount}
+          onMessagesRead={refreshUnreadMessages}
         />
       )}
       {selectedBook && (
@@ -12328,6 +14338,8 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
           onClose={() => setSelectedBook(null)}
           onUpdate={updateBook}
           onDelete={deleteBook}
+          userId={user.id}
+          onSaveQuote={() => openSaveQuote(selectedBook?.id)}
         />
       )}
       {pendingPost && (
@@ -12385,6 +14397,26 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
           onDismiss={() => setGemToastQueue(prev => prev.slice(1))}
         />
       )}
+      {petHubOpen && pet && (
+        <PetHub
+          user={user}
+          pet={pet}
+          streak={petStreak}
+          onClose={() => setPetHubOpen(false)}
+          onGoToProfile={() => { setPetHubOpen(false); setTab("perfil"); }}
+          onRename={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }}
+        />
+      )}
+      {petToastQueue.length > 0 && (
+        <PetLevelUpToast
+          key={petToastQueue[0].id}
+          id={petToastQueue[0].id}
+          petName={petToastQueue[0].petName}
+          level={petToastQueue[0].level}
+          petType={petToastQueue[0].petType}
+          onDismiss={() => setPetToastQueue(prev => prev.slice(1))}
+        />
+      )}
       {refModalUser && (
         <FriendProfileModal
           friend={{ ...refModalUser, name: refModalUser.nombre }}
@@ -12393,6 +14425,63 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
         />
       )}
       {tutorialActive && <TutorialOverlay onDone={() => setTutorialActive(false)} />}
+
+      {showFabMenu && (
+        <div
+          className="fixed inset-0 z-40 flex items-end sm:hidden"
+          style={{ backgroundColor: "rgba(42,31,26,0.5)" }}
+          onClick={() => setShowFabMenu(false)}
+        >
+          <div
+            className="w-full"
+            style={{ backgroundColor: palette.bg, borderTop: `1px solid ${palette.border}`, borderRadius: "20px 20px 0 0", padding: "1.1rem 1rem calc(1.75rem + env(safe-area-inset-bottom))" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ width: 36, height: 3, borderRadius: "2px", backgroundColor: palette.border, margin: "0 auto 1.1rem" }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <button
+                onClick={() => { setShowFabMenu(false); setTab("add"); }}
+                style={{ display: "flex", alignItems: "center", gap: "0.85rem", padding: "0.9rem 1rem", borderRadius: "12px", border: "none", backgroundColor: palette.bgCard, cursor: "pointer", textAlign: "left", width: "100%" }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: "10px", backgroundColor: palette.accent + "18", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <BookOpen size={20} color={palette.accent} strokeWidth={2} />
+                </div>
+                <div>
+                  <p style={{ ...display, fontSize: "1rem", fontWeight: 600, color: palette.ink, margin: 0 }}>Agregar libro</p>
+                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.76rem", color: palette.inkFaint, margin: "0.1rem 0 0" }}>Añade un libro a tu biblioteca</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowFabMenu(false); openSaveQuote(null); }}
+                style={{ display: "flex", alignItems: "center", gap: "0.85rem", padding: "0.9rem 1rem", borderRadius: "12px", border: "none", backgroundColor: palette.bgCard, cursor: "pointer", textAlign: "left", width: "100%" }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: "10px", backgroundColor: palette.amber + "28", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Feather size={20} color={palette.amber} strokeWidth={2} />
+                </div>
+                <div>
+                  <p style={{ ...display, fontSize: "1rem", fontWeight: 600, color: palette.ink, margin: 0 }}>Guardar frase</p>
+                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.76rem", color: palette.inkFaint, margin: "0.1rem 0 0" }}>Guarda una cita que te impactó</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSaveQuote && (
+        <SaveQuoteModal
+          books={books}
+          userId={user.id}
+          defaultBookId={defaultQuoteBookId}
+          onClose={() => setShowSaveQuote(false)}
+          onSaved={() => {
+            setShowSaveQuote(false);
+            setToastMessage("Frase guardada ✨");
+            setTimeout(() => setToastMessage(null), 3500);
+            addPetXP(user.id, 5).catch(() => {});
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -12400,8 +14489,8 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
 // ============ FIRST-LOGIN TUTORIAL ============
 function TutorialOverlay({ onDone }) {
   const STEPS = [
-    { key: 'nav-add',     text: 'Aquí agregas libros a tu biblioteca',        dir: 'above' },
-    { key: 'nav-feed',    text: 'Tu feed de amigos + cuentos curados',         dir: 'above' },
+    { key: 'nav-home',    text: 'Tu inicio: cuento del día y tus lecturas',    dir: 'above' },
+    { key: 'nav-mascota', text: 'Tu compañero de lectura. ¡Sube de nivel!',    dir: 'above' },
     { key: 'snacks-hero', text: 'Lee un cuento en 5 min. ¡Empieza tu racha!', dir: 'below' },
     { key: 'gems',        text: 'Gana gemas leyendo. Cada acción cuenta',      dir: 'below' },
     { key: 'nav-perfil',  text: 'Tu biblioteca, logros y estadísticas',        dir: 'above' },
@@ -13320,7 +15409,7 @@ export default function App() {
     }
     (async () => {
       try {
-        const u = await getStoredUser();
+        const u = await getSessionUser();
         if (u) {
           setUser(u);
           const needed = await checkOnboardingNeeded(u.id);
@@ -13357,8 +15446,8 @@ export default function App() {
     }
   }
 
-  function handleLogout() {
-    localStorage.removeItem(TOKEN_KEY);
+  async function handleLogout() {
+    await logout();
     setUser(null);
     setShowOnboarding(false);
     setRefUser(null);

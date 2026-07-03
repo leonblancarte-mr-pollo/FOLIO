@@ -5,6 +5,17 @@ import textoCollar from "./cuentos/el-collar.txt?raw";
 import textoHoguera from "./cuentos/encender-una-hoguera.txt?raw";
 import textoAsesinos from "./cuentos/los-asesinos.txt?raw";
 import textoPerrito from "./cuentos/la-dama-del-perrito.txt?raw";
+import textoNocheBocaArriba from "./cuentos/la-noche-boca-arriba.txt?raw";
+import textoCasaTomada from "./cuentos/casa-tomada.txt?raw";
+import textoContinuidad from "./cuentos/continuidad-de-los-parques.txt?raw";
+import textoAxolotl from "./cuentos/axolotl.txt?raw";
+import textoTorito from "./cuentos/torito.txt?raw";
+import textoEnElBosque from "./cuentos/en-el-bosque.txt?raw";
+import textoGuardagujas from "./cuentos/el-guardagujas.txt?raw";
+import textoOvejaNegra from "./cuentos/la-oveja-negra.txt?raw";
+import textoNocheFeos from "./cuentos/la-noche-de-los-feos.txt?raw";
+import textoHombreEsquina from "./cuentos/hombre-de-la-esquina-rosada.txt?raw";
+import textoElSur from "./cuentos/el-sur.txt?raw";
 
 export const CUENTOS = [
   {
@@ -17,6 +28,61 @@ export const CUENTOS = [
     desc: "Una historia de amor con un secreto perturbador.",
     palabras: 800,
     texto: textoAlmohadon,
+  },
+  {
+    id: "la-noche-boca-arriba",
+    titulo: "La noche boca arriba",
+    autor: "Julio Cortázar",
+    generos: ["fantástico", "aventura"],
+    duracion: "15 min",
+    duracion_minutos: 15,
+    desc: "Dos realidades que se persiguen: ¿cuál es el sueño?",
+    palabras: 3116,
+    texto: textoNocheBocaArriba,
+  },
+  {
+    id: "continuidad-de-los-parques",
+    titulo: "Continuidad de los parques",
+    autor: "Julio Cortázar",
+    generos: ["fantástico", "drama"],
+    duracion: "3 min",
+    duracion_minutos: 3,
+    desc: "El lector que no sabe que él es el personaje.",
+    palabras: 541,
+    texto: textoContinuidad,
+  },
+  {
+    id: "axolotl",
+    titulo: "Axolotl",
+    autor: "Julio Cortázar",
+    generos: ["fantástico", "filosofia"],
+    duracion: "10 min",
+    duracion_minutos: 10,
+    desc: "Un hombre que se convierte en lo que observa.",
+    palabras: 1975,
+    texto: textoAxolotl,
+  },
+  {
+    id: "casa-tomada",
+    titulo: "Casa tomada",
+    autor: "Julio Cortázar",
+    generos: ["fantástico", "terror"],
+    duracion: "10 min",
+    duracion_minutos: 10,
+    desc: "Algo ocupa la casa. No importa qué es.",
+    palabras: 1933,
+    texto: textoCasaTomada,
+  },
+  {
+    id: "torito",
+    titulo: "Torito",
+    autor: "Julio Cortázar",
+    generos: ["drama", "realismo"],
+    duracion: "15 min",
+    duracion_minutos: 15,
+    desc: "Un boxeador recuerda su vida entera desde una cama de hospital.",
+    palabras: 3061,
+    texto: textoTorito,
   },
   {
     id: "el-corazon-delator",
@@ -52,15 +118,59 @@ export const CUENTOS = [
     texto: textoCollar,
   },
   {
-    id: "encender-una-hoguera",
-    titulo: "Encender una hoguera",
-    autor: "Jack London",
-    generos: ["aventura", "naturaleza"],
-    duracion: "35 min",
-    duracion_minutos: 35,
-    desc: "Un hombre solo contra el invierno del Yukón.",
-    palabras: 6500,
-    texto: textoHoguera,
+    id: "la-noche-de-los-feos",
+    titulo: "La noche de los feos",
+    autor: "Mario Benedetti",
+    generos: ["romance", "drama"],
+    duracion: "5 min",
+    duracion_minutos: 5,
+    desc: "El cuento de amor más honesto que vas a leer.",
+    palabras: 1059,
+    texto: textoNocheFeos,
+  },
+  {
+    id: "en-el-bosque",
+    titulo: "En el bosque",
+    autor: "Ryūnosuke Akutagawa",
+    generos: ["aventura", "misterio"],
+    duracion: "8 min",
+    duracion_minutos: 8,
+    desc: "La misma historia contada por siete personas distintas.",
+    palabras: 1617,
+    texto: textoEnElBosque,
+  },
+  {
+    id: "el-guardagujas",
+    titulo: "El guardagujas",
+    autor: "Juan José Arreola",
+    generos: ["fantástico", "filosofia"],
+    duracion: "12 min",
+    duracion_minutos: 12,
+    desc: "Los trenes que llegan. Los trenes que nunca llegan.",
+    palabras: 2344,
+    texto: textoGuardagujas,
+  },
+  {
+    id: "hombre-de-la-esquina-rosada",
+    titulo: "Hombre de la esquina rosada",
+    autor: "Jorge Luis Borges",
+    generos: ["aventura", "drama"],
+    duracion: "14 min",
+    duracion_minutos: 14,
+    desc: "Una pelea de cuchillos y el honor en los arrabales de Buenos Aires.",
+    palabras: 2806,
+    texto: textoHombreEsquina,
+  },
+  {
+    id: "el-sur",
+    titulo: "El Sur",
+    autor: "Jorge Luis Borges",
+    generos: ["fantástico", "aventura"],
+    duracion: "12 min",
+    duracion_minutos: 12,
+    desc: "Un hombre viaja hacia el sur. O tal vez solo sueña que lo hace.",
+    palabras: 2391,
+    texto: textoElSur,
   },
   {
     id: "los-asesinos",
@@ -74,6 +184,17 @@ export const CUENTOS = [
     texto: textoAsesinos,
   },
   {
+    id: "encender-una-hoguera",
+    titulo: "Encender una hoguera",
+    autor: "Jack London",
+    generos: ["aventura", "naturaleza"],
+    duracion: "35 min",
+    duracion_minutos: 35,
+    desc: "Un hombre solo contra el invierno del Yukón.",
+    palabras: 6500,
+    texto: textoHoguera,
+  },
+  {
     id: "la-dama-del-perrito",
     titulo: "La dama del perrito",
     autor: "Antón Chéjov",
@@ -83,6 +204,17 @@ export const CUENTOS = [
     desc: "El amor que aparece cuando ya no lo esperabas.",
     palabras: 5800,
     texto: textoPerrito,
+  },
+  {
+    id: "la-oveja-negra",
+    titulo: "La oveja negra",
+    autor: "Augusto Monterroso",
+    generos: ["fantástico", "sátira"],
+    duracion: "1 min",
+    duracion_minutos: 1,
+    desc: "Una fábula sobre la diferencia. Y sobre cómo la castigamos.",
+    palabras: 63,
+    texto: textoOvejaNegra,
   },
 ];
 
