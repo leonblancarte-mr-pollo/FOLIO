@@ -1,0 +1,35 @@
+name: Entrenar recomendador (Matrix Factorization)
+
+# Por qué GitHub Actions y no un "worker Node" (node-cron):
+# Vercel despliega este proyecto como funciones serverless sin proceso
+# persistente — no hay dónde correr un cron de toda la vida en producción.
+# Tampoco tendría sentido: una función Node no puede ejecutar Python ni
+# cargar un modelo .pkl entrenado en Python. Por eso el job de
+# entrenamiento vive fuera de Vercel, corre el script Python directo, y
+# escribe el resultado (top-20 por usuario) en la tabla
+# recommendation_scores de Supabase. El endpoint Node solo LEE esa tabla.
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 3:00 AM UTC todos los días
+  workflow_dispatch: {} # permite correrlo manualmente desde la pestaña Actions
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install fuzzywuzzy python-Levenshtein pandas numpy scipy scikit-surprise supabase
+
+      - name: Entrenar y escribir recomendaciones
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/train_recommender.py --write-db
