@@ -25,7 +25,7 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install fuzzywuzzy python-Levenshtein pandas numpy scipy scikit-surprise supabase
+        run: pip install -r requirements.txt
 
       - name: Entrenar y escribir recomendaciones
         env:

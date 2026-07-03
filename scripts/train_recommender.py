@@ -57,8 +57,12 @@ import numpy as np
 import pandas as pd
 from supabase import create_client
 
-SUPABASE_URL = os.environ.get("VITE_SUPABASE_URL") or "https://dvegpxvfeynbzveglqxk.supabase.co"
-ANON_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY")
+SUPABASE_URL = (
+    os.environ.get("SUPABASE_URL")
+    or os.environ.get("VITE_SUPABASE_URL")
+    or "https://dvegpxvfeynbzveglqxk.supabase.co"
+)
+ANON_KEY = os.environ.get("VITE_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 
 if not ANON_KEY:
@@ -69,7 +73,8 @@ if not ANON_KEY:
                 if line.startswith("VITE_SUPABASE_ANON_KEY="):
                     ANON_KEY = line.strip().split("=", 1)[1]
 
-RATING_MAP = {"read": 4.0, "reading": 3.5}  # want_to_read / wish: sin señal de calidad, se ignoran
+RATING_MAP = {"read": 5.0, "reading": 4.0, "want_to_read": 3.0}
+DEFAULT_RATING = 2.0  # status desconocido o "wish": señal débil, no se descarta del entrenamiento
 TOP_N = 20
 MIN_FACTORS = 2
 MAX_FACTORS = 20
@@ -154,7 +159,7 @@ def build_real_interactions(catalog_df, service_client):
     if saved_df.empty:
         return pd.DataFrame(columns=["user_id", "book_id", "rating"])
 
-    saved_df = saved_df[saved_df["status"].isin(RATING_MAP.keys())].copy()
+    saved_df = saved_df.copy()
     saved_df["title_norm"] = saved_df["title"].apply(normalize)
     saved_df["author_norm"] = saved_df["author"].apply(normalize)
 
@@ -168,9 +173,10 @@ def build_real_interactions(catalog_df, service_client):
         if book_id is None:
             unmatched += 1
             continue
-        matched_rows.append({"user_id": row["user_id"], "book_id": book_id, "rating": RATING_MAP[row["status"]]})
+        rating = RATING_MAP.get(row["status"], DEFAULT_RATING)
+        matched_rows.append({"user_id": row["user_id"], "book_id": book_id, "rating": rating})
 
-    print(f"  Guardados con status read/reading: {len(saved_df)} | emparejados con books_curated: {len(matched_rows)} | sin match: {unmatched}")
+    print(f"  Guardados totales: {len(saved_df)} | emparejados con books_curated: {len(matched_rows)} | sin match: {unmatched}")
     return pd.DataFrame(matched_rows)
 
 
@@ -284,41 +290,65 @@ def main():
     args = parser.parse_args()
 
     t0 = time.time()
-    anon_client = create_client(SUPABASE_URL, ANON_KEY)
 
-    print("Leyendo catálogo (books_curated)...")
-    catalog_rows = fetch_all(anon_client, "books_curated", "id, title, author, genres")
+    try:
+        anon_client = create_client(SUPABASE_URL, ANON_KEY)
+        print("Leyendo catálogo (books_curated)...")
+        catalog_rows = fetch_all(anon_client, "books_curated", "id, title, author, genres")
+    except Exception as err:
+        print(f"❌ No se pudo conectar/leer books_curated: {err}")
+        sys.exit(1)
+
     catalog_df = pd.DataFrame(catalog_rows)
+    if catalog_df.empty:
+        print("❌ books_curated está vacía. No hay nada contra qué entrenar.")
+        sys.exit(1)
+
     catalog_df["title_norm"] = catalog_df["title"].apply(normalize)
     catalog_df["author_norm"] = catalog_df["author"].apply(normalize)
     print(f"  {len(catalog_df)} libros en el catálogo")
 
     user_personas = {}
-    if args.mock:
-        print(f"\nModo --mock: generando {args.n_mock_users} usuarios sintéticos con 'personas' de gusto por género...")
-        ratings_df, user_personas = build_mock_interactions(catalog_df, n_users=args.n_mock_users)
-    else:
-        if not SERVICE_KEY:
-            print("\n❌ Falta SUPABASE_SERVICE_ROLE_KEY en el entorno (requerido para leer `books` de todos los usuarios).")
-            print("   Usa --mock para probar el pipeline sin credenciales de escritura.")
-            sys.exit(1)
-        print("\nLeyendo interacciones reales (tabla `books`, vía service_role)...")
-        service_client = create_client(SUPABASE_URL, SERVICE_KEY)
-        ratings_df = build_real_interactions(catalog_df, service_client)
+    try:
+        if args.mock:
+            print(f"\nModo --mock: generando {args.n_mock_users} usuarios sintéticos con 'personas' de gusto por género...")
+            ratings_df, user_personas = build_mock_interactions(catalog_df, n_users=args.n_mock_users)
+        else:
+            if not SERVICE_KEY:
+                print("\n❌ Falta SUPABASE_SERVICE_ROLE_KEY en el entorno (requerido para leer `books` de todos los usuarios).")
+                print("   Usa --mock para probar el pipeline sin credenciales de escritura.")
+                sys.exit(1)
+            print("\nLeyendo interacciones reales (tabla `books`, vía service_role)...")
+            service_client = create_client(SUPABASE_URL, SERVICE_KEY)
+            ratings_df = build_real_interactions(catalog_df, service_client)
+    except Exception as err:
+        print(f"❌ No se pudieron leer/construir las interacciones: {err}")
+        sys.exit(1)
+
+    print(f"\nRatings: {len(ratings_df)}")
+
+    if ratings_df.empty:
+        print("⚠️  No hay interacciones todavía (tabla `books` sin status read/reading/want_to_read, o datos mock vacíos).")
+        print("   Nada que entrenar por ahora — no es un error, solo no hay señal todavía.")
+        sys.exit(0)
 
     n_users = ratings_df["user_id"].nunique()
     n_items = ratings_df["book_id"].nunique()
-    print(f"\nRatings totales: {len(ratings_df)} | usuarios únicos: {n_users} | libros con interacción: {n_items}")
+    print(f"  usuarios únicos: {n_users} | libros con interacción: {n_items}")
 
     if len(ratings_df) < 10 or n_users < 2:
         print("⚠️  Muy pocos datos para un SVD con sentido estadístico. Se entrena igual, pero no esperes personalización real todavía.")
 
-    # ── Entrenar ──
+    # ── Entrenar (con fallback robusto: cualquier falla en surprise cae a SVD manual) ──
     try:
         predict, model_type, n_factors = train_surprise(ratings_df)
-    except ImportError:
-        print("  scikit-surprise no disponible, usando fallback manual (scipy SVD)")
-        predict, model_type, n_factors = train_manual_svd(ratings_df)
+    except Exception as err:
+        print(f"  scikit-surprise no disponible o falló ({err}); usando fallback manual (scipy SVD)")
+        try:
+            predict, model_type, n_factors = train_manual_svd(ratings_df)
+        except Exception as fallback_err:
+            print(f"❌ El fallback manual también falló: {fallback_err}")
+            sys.exit(1)
 
     train_seconds = time.time() - t0
     print(f"\n✅ Modelo entrenado: {model_type} (n_factors={n_factors}) en {train_seconds:.1f}s")
@@ -382,14 +412,26 @@ def main():
         print(f"\nEscribiendo {len(results_df)} filas en recommendation_scores...")
         service_client = create_client(SUPABASE_URL, SERVICE_KEY)
         rows = results_df.to_dict("records")
+        written = 0
+        failed_batches = 0
         for i in range(0, len(rows), 500):
             batch = rows[i : i + 500]
-            service_client.table("recommendation_scores").upsert(batch, on_conflict="user_id,book_id").execute()
+            try:
+                service_client.table("recommendation_scores").upsert(batch, on_conflict="user_id,book_id").execute()
+                written += len(batch)
+            except Exception as err:
+                failed_batches += 1
+                print(f"  ❌ Falló el lote {i}-{i + len(batch)}: {err}")
+
+        print(f"Scores guardados: {written}")
+        if failed_batches:
+            print(f"⚠️  {failed_batches} lote(s) fallaron — revisa el mensaje de arriba. El resto sí se guardó.")
+            sys.exit(1)
         print("✅ Escritura completa.")
 
     print(f"\n{'=' * 60}\nResumen:")
-    print(f"  Modelo: {model_type}")
-    print(f"  Ratings usados: {len(ratings_df)}")
+    print(f"  Modelo entrenado: {model_type}")
+    print(f"  Ratings: {len(ratings_df)}")
     print(f"  Usuarios: {n_users}")
     print(f"  Recomendaciones generadas: {len(results_df)}")
     print(f"  Tiempo total: {time.time() - t0:.1f}s")
