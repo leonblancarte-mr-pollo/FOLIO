@@ -959,12 +959,12 @@ async function checkStreakOnLoad(userId) {
     console.log(`[streak] Racha en PAUSA: ${existing.current_streak} días congelados (sin lectura por ${diffDays} días)`);
   } else {
     console.log(`[streak] Racha ACTIVA: diff=${diffDays}d, racha=${existing.current_streak}`);
-    // Pet XP por mantener la racha: +3 XP, solo una vez al día
-    const petStreakKey = `folio_pet_streak_xp_${userId}_${today}`;
-    if (!localStorage.getItem(petStreakKey)) {
-      localStorage.setItem(petStreakKey, "1");
-      addPetXP(userId, 3).catch(() => {});
-    }
+    // Pet XP por mantener la racha: +3/día. Lo otorga el SERVIDOR (RPC
+    // idempotente por día, funciona multi-dispositivo — antes el gate era
+    // localStorage y se duplicaba); después se sincroniza la mascota.
+    supabase.rpc("pet_daily_checkin")
+      .then(() => addPetXP(userId, 3))
+      .catch(() => {});
   }
 }
 
@@ -1092,10 +1092,13 @@ const gemToastBus = {
   },
 };
 
-async function initUserGems(userId) {
-  const { data } = await supabase.from("user_gems").select("id").eq("user_id", userId).maybeSingle();
-  if (!data) {
-    await supabase.from("user_gems").insert({ user_id: userId, balance: 5 });
+async function initUserGems(_userId) {
+  // Server-side: claim_daily_gems crea la fila con la bienvenida (+5) si no
+  // existe. El cliente ya no puede insertar en user_gems (RLS lo bloquea).
+  try {
+    await supabase.rpc("claim_daily_gems");
+  } catch (e) {
+    console.warn("[GEMS] initUserGems rpc:", e?.message);
   }
 }
 
@@ -1112,42 +1115,15 @@ async function loadGems(userId) {
   }
 }
 
-async function addGemsDB(userId, amount) {
-  console.log('[GEMS] addGemsDB INICIO', { userId, amount, timestamp: new Date().toISOString() });
-  try {
-    const { data: current, error: selErr } = await supabase.from("user_gems").select("balance").eq("user_id", userId).maybeSingle();
-    console.log('[GEMS] SELECT result', { current, selErr });
-    if (selErr) { console.error("[GEMS] SELECT ERROR:", selErr); return null; }
-    if (!current) { console.error("[GEMS] NO RECORD para userId:", userId); return null; }
-    const newBalance = (current.balance || 0) + amount;
-    console.log('[GEMS] Calculated newBalance', { prev: current.balance, amount, newBalance });
-    const { error: upErr, count } = await supabase.from("user_gems").update({ balance: newBalance }).eq("user_id", userId);
-    console.log('[GEMS] UPDATE result', { error: upErr, count, newBalance });
-    if (upErr) { console.error("[GEMS] UPDATE ERROR:", upErr); return null; }
-    if (count === 0) { console.error("[GEMS] UPDATE AFECTÓ 0 FILAS — posible RLS block"); }
-    console.log('[GEMS] SUCCESS', { newBalance });
-    return newBalance;
-  } catch (err) {
-    console.error("[GEMS] EXCEPTION:", err);
-    return null;
+// Las gemas se otorgan SOLO en el servidor (triggers + RPCs de
+// supabase/sprint1_server_authority.sql). El cliente únicamente lee.
+async function claimDailyGems(_userId) {
+  const { data, error } = await supabase.rpc("claim_daily_gems");
+  if (error) {
+    console.warn("[GEMS] claim_daily_gems rpc:", error.message);
+    return 0;
   }
-}
-
-async function claimDailyGems(userId) {
-  const { data } = await supabase.from("user_gems").select("balance, last_daily_reward, consecutive_days").eq("user_id", userId).maybeSingle();
-  if (!data) return 0;
-  const now = new Date();
-  const last = data.last_daily_reward ? new Date(data.last_daily_reward) : null;
-  if (last && (now - last) / 3600000 < 20) return 0;
-  const consecutive = (data.consecutive_days || 0) + 1;
-  const bonus = Math.floor(consecutive / 7);
-  const earned = 5 + bonus;
-  await supabase.from("user_gems").update({
-    balance: data.balance + earned,
-    last_daily_reward: now.toISOString(),
-    consecutive_days: consecutive,
-  }).eq("user_id", userId);
-  return earned;
+  return data ?? 0;
 }
 
 // ============ PET (MASCOTA) ============
@@ -1184,6 +1160,7 @@ async function loadPet(userId) {
         "\n→ Ejecuta el SQL en Supabase: CREATE TABLE user_pets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES users(id) ON DELETE CASCADE UNIQUE NOT NULL, pet_type text NOT NULL DEFAULT 'gato', pet_name text DEFAULT 'Mi compañero', xp int DEFAULT 0, level int DEFAULT 1, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()); ALTER TABLE user_pets DISABLE ROW LEVEL SECURITY;");
       return undefined;
     }
+    if (data) _lastKnownPetLevel = data.level; // semilla para detectar level-ups
     return data || null;
   } catch (e) {
     console.error("[PET] loadPet exception:", e);
@@ -1236,37 +1213,25 @@ async function updatePetName(userId, petName) {
   return clean;
 }
 
-// Suma XP a la mascota; sube de nivel si corresponde y emite el resultado en petBus.
+// El XP ahora lo otorga el SERVIDOR (triggers en books/reading_logs y RPC de
+// racha en supabase/sprint1_server_authority.sql); un trigger de columnas
+// impide que el cliente escriba xp/level. Esta función quedó como
+// SINCRONIZADOR: re-lee la mascota y emite en petBus el mismo payload de
+// siempre para que la UI (toast de nivel, confetti, estado) siga idéntica.
+let _lastKnownPetLevel = null;
 async function addPetXP(userId, amount) {
-  if (!userId || !amount || amount <= 0) return null;
+  if (!userId) return null;
   try {
-    let { data: pet, error: selErr } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
-    if (selErr) { console.warn("[PET] addPetXP select error:", selErr.message); return null; }
-    if (!pet) {
-      pet = await createPet(userId);
-      if (!pet) return null;
-    }
-    const startLevel = Math.max(1, pet.level || 1);
-    let level = startLevel;
-    let xp = (pet.xp || 0) + amount;
-    while (level < PET_MAX_LEVEL && xp >= petXpForLevel(level)) {
-      xp -= petXpForLevel(level);
-      level += 1;
-    }
-    if (level >= PET_MAX_LEVEL) {
-      level = PET_MAX_LEVEL;
-      xp = Math.min(xp, petXpForLevel(PET_MAX_LEVEL));
-    }
-    const leveledUp = level > startLevel;
-    const { error: upErr } = await supabase.from("user_pets")
-      .update({ xp, level, updated_at: new Date().toISOString() }).eq("user_id", userId);
-    if (upErr) { console.error("[PET] addPetXP update error:", upErr.message); return null; }
-    console.log(`[PET XP] userId: ${userId}, +${amount} XP, level: ${level}, xp_en_nivel: ${xp}, leveledUp: ${leveledUp}`);
-    const result = { newLevel: level, newXp: xp, leveledUp, added: amount, petName: pet.pet_name, petType: pet.pet_type };
+    const { data: pet, error } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
+    if (error || !pet) return null;
+    const leveledUp = _lastKnownPetLevel !== null && pet.level > _lastKnownPetLevel;
+    _lastKnownPetLevel = pet.level;
+    console.log(`[PET XP] sync: level ${pet.level}, xp ${pet.xp}, leveledUp: ${leveledUp}`);
+    const result = { newLevel: pet.level, newXp: pet.xp, leveledUp, added: amount, petName: pet.pet_name, petType: pet.pet_type };
     petBus.emit(result);
     return result;
   } catch (e) {
-    console.error("[PET] addPetXP exception:", e);
+    console.error("[PET] addPetXP sync exception:", e);
     return null;
   }
 }
@@ -9622,10 +9587,10 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
       });
       playReadingSession();
       checkAchievements(user.id, user.name);
-      addGemsDB(user.id, 5).then(() => {
-        gemsEventBus.emit(5);
-        gemToastBus.emit(5, "+5 gemas");
-      });
+      // Las +5 gemas de la sesión las otorga el trigger del servidor al
+      // insertar el reading_log; aquí solo se refleja en la UI.
+      gemsEventBus.emit(5);
+      gemToastBus.emit(5, "+5 gemas");
     } catch (err) { console.error("Error registrando sesión:", err); }
     finally {
       setSaving(false);
@@ -14363,7 +14328,8 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
     setShowSaveQuote(true);
   }
 
-  // Gemas: lógica conservada (addGemsDB), pero la moneda visible es SOLO el XP de la mascota.
+  // Gemas: se otorgan en el SERVIDOR (triggers/RPCs), pero la moneda visible
+  // es SOLO el XP de la mascota.
   // showGemToast queda como no-op para no mostrar gemas en la UI.
   function showGemToast(_amount, _label) {}
   const [activeWrap, setActiveWrap] = useState(null);
@@ -14575,8 +14541,10 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       setAchievementQueue((prev) => [...prev, ...keys]);
       if (keys.length > 0) {
         const gemsEarned = keys.length * 10;
-        addGemsDB(user.id, gemsEarned).then(bal => {
-          if (bal !== null) setGemBalance(bal);
+        // Server-side: +10 por logro, UNA vez por logro (la RPC valida que el
+        // logro exista en la tabla y es idempotente). Devuelve el balance real.
+        supabase.rpc("claim_achievement_gems", { p_keys: keys }).then(({ data }) => {
+          if (data !== null && data !== undefined) setGemBalance(data);
           showGemToast(gemsEarned, `+${gemsEarned} gemas`);
         });
       }
@@ -14664,10 +14632,10 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         haptic(HAPTIC.BOOK_DONE);
         setReadDateBook(dbId && dbId !== withFinished.id ? { ...withFinished, id: dbId } : withFinished);
         setCelebrationBook(withFinished);
-        addGemsDB(user.id, 50).then(bal => {
-          if (bal !== null) setGemBalance(bal);
-          showGemToast(50, "+50 gemas");
-        });
+        // Las +50 gemas y +50 XP los otorgó el trigger del servidor en el
+        // INSERT; aquí solo se refresca el estado visible.
+        loadGems(user.id).then(bal => setGemBalance(bal));
+        showGemToast(50, "+50 gemas");
         addPetXP(user.id, 50).catch(() => {});
       } else {
         checkAchievements(user.id, user.name);
@@ -14700,11 +14668,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         haptic(HAPTIC.BOOK_DONE);
         setReadDateBook(final);
         setCelebrationBook(final);
-        addGemsDB(user.id, 50).then(bal => {
-          if (bal !== null) setGemBalance(bal);
-          showGemToast(50, "+50 gemas");
-        });
-        addPetXP(user.id, 50).catch(() => {});
+        showGemToast(50, "+50 gemas");
       } else {
         setSelectedBook(final);
       }
@@ -14714,6 +14678,12 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
 
     try {
       await updateBookInDB(final, user.id);
+      if (isFinishing) {
+        // Recién aquí el trigger del servidor ya otorgó las +50 gemas y +50 XP
+        // (el UPDATE de status acaba de persistir): sincronizar estado real.
+        loadGems(user.id).then(bal => setGemBalance(bal));
+        addPetXP(user.id, 50).catch(() => {});
+      }
       if (!isFinishing) checkAchievements(user.id, user.name);
       fetchBooks(user.id).then((b) => setBooks(b)).catch(() => {});
     } catch (err) {
