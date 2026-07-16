@@ -5243,6 +5243,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
   const [activeWrap, setActiveWrap] = useState(null);
   const [achievementsExpanded, setAchievementsExpanded] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isPublicProfile, setIsPublicProfile] = useState(true);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
   const fileInput = useRef(null);
   const coverFileInput = useRef(null);
 
@@ -5271,6 +5273,13 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
       supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle()
         .then(({ data }) => { if (data) setStreak(data); });
     });
+
+    // Privacidad — query aparte y tolerante: si la columna aún no existe
+    // (migración pendiente) no rompe la carga del resto del perfil.
+    supabase.from("users").select("is_public").eq("id", user.id).maybeSingle()
+      .then(({ data, error }) => {
+        if (!error && data) setIsPublicProfile(data.is_public !== false);
+      });
 
     const refreshAchievements = () =>
       supabase.from("achievements").select("achievement_key, unlocked_at").eq("user_id", user.id)
@@ -5906,6 +5915,47 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
 
       {/* Mis listas */}
       <ListsSection user={user} books={books} onSelectBook={onSelectBook} />
+
+      {/* Privacidad */}
+      <div style={{ padding: "0 1.25rem 1.25rem" }}>
+        <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Privacidad</p>
+        <div style={{ display: "flex", gap: "0.4rem" }}>
+          {[{ v: true, label: "Perfil público" }, { v: false, label: "Perfil privado" }].map(({ v, label }) => (
+            <button
+              key={String(v)}
+              disabled={savingPrivacy}
+              onClick={async () => {
+                if (isPublicProfile === v || savingPrivacy) return;
+                setSavingPrivacy(true);
+                const prev = isPublicProfile;
+                setIsPublicProfile(v);
+                const { error: privErr } = await supabase.from("users").update({ is_public: v }).eq("id", user.id);
+                if (privErr) {
+                  console.error("[PRIVACIDAD] error:", privErr.message);
+                  setIsPublicProfile(prev);
+                }
+                setSavingPrivacy(false);
+              }}
+              style={{
+                flex: 1, padding: "0.55rem 0.25rem", borderRadius: 10,
+                border: `1.5px solid ${isPublicProfile === v ? palette.accent : palette.border}`,
+                backgroundColor: isPublicProfile === v ? `${palette.accent}18` : "transparent",
+                color: isPublicProfile === v ? palette.accent : palette.inkSoft,
+                cursor: "pointer", ...body, fontSize: "0.82rem",
+                fontWeight: isPublicProfile === v ? 600 : 400,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
+                transition: "all 150ms ease",
+              }}
+            >
+              {!v && <Lock size={12} />}
+              {label}
+            </button>
+          ))}
+        </div>
+        <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, marginTop: "0.4rem", lineHeight: 1.4 }}>
+          Con el perfil privado, solo tus amigos ven tus libros, stats, racha y mascota. Tu nombre y foto siguen visibles para que puedan enviarte solicitudes.
+        </p>
+      </div>
 
       {/* Apariencia */}
       <div style={{ padding: "0 1.25rem 1.25rem" }}>
@@ -6966,6 +7016,7 @@ function FriendProfileModal({ friend, user, onClose }) {
   const [mutualsExpanded, setMutualsExpanded] = useState(false);
   const [friendPublicQuotes, setFriendPublicQuotes] = useState([]);
   const [friendPet, setFriendPet] = useState(null);
+  const [friendIsPublic, setFriendIsPublic] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -7005,6 +7056,11 @@ function FriendProfileModal({ friend, user, onClose }) {
       const { data: petData } = await supabase
         .from("user_pets").select("pet_type, pet_name, level").eq("user_id", friend.id).maybeSingle();
       if (petData) setFriendPet(petData);
+
+      // Privacidad del amigo (tolerante si la columna aún no existe)
+      const { data: privData, error: privErr } = await supabase
+        .from("users").select("is_public").eq("id", friend.id).maybeSingle();
+      if (!privErr && privData) setFriendIsPublic(privData.is_public !== false);
 
       // Friends of friend
       const { data: fs } = await supabase
@@ -7067,6 +7123,11 @@ function FriendProfileModal({ friend, user, onClose }) {
   );
   const friendName = friend.name || friend.nombre || "Amigo";
   const initials = friendName.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+
+  // Perfil privado: solo amigos aceptados (o el propio usuario) ven la actividad.
+  const isPrivateLocked = friendIsPublic === false
+    && friend.id !== user?.id
+    && !userFriendIds.has(friend.id);
 
   const secLabel = { ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.5rem" };
 
@@ -7143,7 +7204,7 @@ function FriendProfileModal({ friend, user, onClose }) {
             {friend.username && <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint }}>@{friend.username}</p>}
             {friend.bio && <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, marginTop: "0.3rem", lineHeight: 1.45 }}>{friend.bio}</p>}
           </div>
-          {user && (
+          {user && !isPrivateLocked && (
             <button
               onClick={() => { setShowCompare(true); setExpandedStat(null); }}
               style={{ ...display, fontSize: "0.8rem", fontWeight: 600, color: palette.accent, border: `1.5px solid ${palette.accent}55`, borderRadius: "999px", padding: "0.4rem 0.9rem", cursor: "pointer", backgroundColor: palette.accent + "10", flexShrink: 0, marginTop: "0.1rem" }}
@@ -7183,6 +7244,16 @@ function FriendProfileModal({ friend, user, onClose }) {
             {loading ? (
               <div className="flex justify-center py-8">
                 <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
+              </div>
+            ) : isPrivateLocked ? (
+              <div style={{ textAlign: "center", padding: "1.5rem 1rem 2.5rem" }}>
+                <div style={{ width: 56, height: 56, borderRadius: "50%", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.85rem" }}>
+                  <Lock size={22} color={palette.inkFaint} />
+                </div>
+                <p style={{ ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink, marginBottom: "0.35rem" }}>Este perfil es privado</p>
+                <p style={{ ...body, fontSize: "0.88rem", color: palette.inkFaint, lineHeight: 1.5, maxWidth: 300, margin: "0 auto" }}>
+                  Solo sus amigos pueden ver sus libros, stats y actividad. Envíale una solicitud para conocer su biblioteca.
+                </p>
               </div>
             ) : (
               <>

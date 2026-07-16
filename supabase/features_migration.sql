@@ -123,3 +123,13 @@ GRANT EXECUTE ON FUNCTION public.delete_my_account() TO authenticated;
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.books
   ADD COLUMN IF NOT EXISTS read_date_precision text DEFAULT 'exact';
+
+
+-- ----------------------------------------------------------------------------
+-- FEATURE 5 — Privacidad de perfil
+-- users.is_public = false → solo amigos aceptados ven la actividad del perfil
+-- (libros, stats, racha, mascota, frases). El nombre/avatar siguen visibles
+-- para poder enviar solicitud de amistad.
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.users
+  ADD COLUMN IF NOT EXISTS is_public boolean DEFAULT true;
