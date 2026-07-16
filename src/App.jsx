@@ -615,6 +615,65 @@ async function toggleQuoteFavorite(id, userId, isFavorite) {
   if (error) throw error;
 }
 
+// ============ LISTAS PERSONALIZADAS CRUD ============
+async function fetchUserLists(userId) {
+  const { data, error } = await supabase
+    .from("user_lists")
+    .select("*, user_list_books(book_id)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map((l) => ({
+    ...l,
+    bookIds: (l.user_list_books || []).map((r) => r.book_id),
+  }));
+}
+
+async function createUserList(userId, { name, description = "", isPublic = true }) {
+  const { data, error } = await supabase
+    .from("user_lists")
+    .insert({ user_id: userId, name: name.trim().slice(0, 100), description: description.trim() || null, is_public: isPublic })
+    .select()
+    .single();
+  if (error) throw error;
+  return { ...data, bookIds: [] };
+}
+
+async function updateUserList(listId, userId, patch) {
+  const { error } = await supabase
+    .from("user_lists")
+    .update(patch)
+    .eq("id", listId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+async function deleteUserList(listId, userId) {
+  const { error } = await supabase
+    .from("user_lists")
+    .delete()
+    .eq("id", listId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+async function addBookToList(listId, bookId) {
+  const { error } = await supabase
+    .from("user_list_books")
+    .insert({ list_id: listId, book_id: bookId });
+  // 23505 = ya estaba en la lista; lo tratamos como éxito (idempotente)
+  if (error && error.code !== "23505") throw error;
+}
+
+async function removeBookFromList(listId, bookId) {
+  const { error } = await supabase
+    .from("user_list_books")
+    .delete()
+    .eq("list_id", listId)
+    .eq("book_id", bookId);
+  if (error) throw error;
+}
+
 // ============ MESSAGING HELPERS ============
 async function getOrCreateConversation(userId, friendId) {
   const { data: c1 } = await supabase
@@ -2748,6 +2807,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
   const [isAvailableInBuscalibre, setIsAvailableInBuscalibre] = useState(false);
   const [buscalibreIsbn, setBuscalibreIsbn] = useState(null);
   const [bookQuotes, setBookQuotes] = useState([]);
+  const [showAddToList, setShowAddToList] = useState(false);
 
   useEffect(() => setDraft(book), [book]);
 
@@ -3099,6 +3159,24 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
               )}
 
               {userId && (
+                <div style={{ marginTop: "1rem" }}>
+                  <button
+                    onClick={() => setShowAddToList(true)}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
+                      width: "100%", padding: "0.65rem 1rem", borderRadius: "8px",
+                      border: `1px solid ${palette.border}`, backgroundColor: palette.bgCard,
+                      color: palette.inkSoft, cursor: "pointer",
+                      ...body, fontSize: "0.88rem", fontWeight: 500, boxSizing: "border-box",
+                    }}
+                  >
+                    <Bookmark size={14} />
+                    Agregar a lista
+                  </button>
+                </div>
+              )}
+
+              {userId && (
                 <div style={{ marginTop: "1.5rem", paddingTop: "1.1rem", borderTop: `1px solid ${palette.borderSoft}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
                     <h3 style={{ ...display, fontSize: "0.9rem", fontWeight: 600, color: palette.ink }}>Frases guardadas</h3>
@@ -3148,6 +3226,392 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
             setShowRatingPrompt(false);
           }}
           onSkip={() => setShowRatingPrompt(false)}
+        />
+      )}
+      {showAddToList && userId && (
+        <AddToListSheet userId={userId} bookId={book.id} onClose={() => setShowAddToList(false)} />
+      )}
+    </div>
+  );
+}
+
+// ============ LISTAS PERSONALIZADAS UI ============
+// Sheet para agregar/quitar el libro actual de las listas del usuario.
+function AddToListSheet({ userId, bookId, onClose }) {
+  const [lists, setLists] = useState(null); // null = cargando
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    fetchUserLists(userId).then(setLists).catch(() => setLists([]));
+  }, [userId]);
+
+  async function toggle(list) {
+    if (busyId) return;
+    setBusyId(list.id);
+    const inList = list.bookIds.includes(bookId);
+    try {
+      if (inList) await removeBookFromList(list.id, bookId);
+      else await addBookToList(list.id, bookId);
+      setLists((prev) => prev.map((l) => l.id === list.id
+        ? { ...l, bookIds: inList ? l.bookIds.filter((id) => id !== bookId) : [...l.bookIds, bookId] }
+        : l));
+    } catch (e) { console.error("[LISTAS] toggle error:", e.message); }
+    setBusyId(null);
+  }
+
+  async function createAndAdd() {
+    const name = newName.trim();
+    if (!name || busyId) return;
+    setBusyId("new");
+    try {
+      const list = await createUserList(userId, { name });
+      await addBookToList(list.id, bookId);
+      setLists((prev) => [{ ...list, bookIds: [bookId] }, ...(prev || [])]);
+      setNewName("");
+      setCreating(false);
+    } catch (e) { console.error("[LISTAS] create error:", e.message); }
+    setBusyId(null);
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 300, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.25rem 1.25rem 2rem", width: "100%", maxWidth: 480, maxHeight: "70vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <p style={{ ...display, fontSize: "1.1rem", fontWeight: 700, color: palette.ink }}>Agregar a lista</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.25rem" }}>
+            <X size={20} color={palette.inkSoft} />
+          </button>
+        </div>
+
+        {lists === null ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "1.5rem" }}>
+            <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
+          </div>
+        ) : (
+          <>
+            {lists.length === 0 && !creating && (
+              <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic", marginBottom: "0.75rem" }}>
+                Aún no tienes listas. Crea la primera.
+              </p>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "0.85rem" }}>
+              {lists.map((l) => {
+                const inList = l.bookIds.includes(bookId);
+                return (
+                  <button
+                    key={l.id}
+                    onClick={() => toggle(l)}
+                    disabled={busyId === l.id}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "0.7rem", width: "100%",
+                      padding: "0.7rem 0.9rem", borderRadius: 12, cursor: "pointer", textAlign: "left",
+                      border: `1.5px solid ${inList ? palette.accent : palette.border}`,
+                      backgroundColor: inList ? `${palette.accent}12` : palette.bgCard,
+                    }}
+                  >
+                    {!l.is_public && <Lock size={13} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ ...display, fontSize: "0.92rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
+                      <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: 0 }}>{l.bookIds.length} {l.bookIds.length === 1 ? "libro" : "libros"}</p>
+                    </div>
+                    {busyId === l.id
+                      ? <Loader2 size={16} className="animate-spin" color={palette.inkFaint} />
+                      : inList && <CheckCircle2 size={17} color={palette.accent} />}
+                  </button>
+                );
+              })}
+            </div>
+            {creating ? (
+              <div style={{ display: "flex", gap: "0.45rem" }}>
+                <input
+                  value={newName}
+                  autoFocus
+                  maxLength={100}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") createAndAdd(); }}
+                  placeholder="Nombre de la lista..."
+                  style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 10, border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, color: palette.ink, ...body, fontSize: "0.92rem", outline: "none", minWidth: 0 }}
+                />
+                <button
+                  onClick={createAndAdd}
+                  disabled={!newName.trim() || busyId === "new"}
+                  style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 10, border: "none", backgroundColor: newName.trim() ? palette.accent : palette.border, color: "#fff", cursor: newName.trim() ? "pointer" : "default", ...display, fontWeight: 600, fontSize: "0.9rem" }}
+                >
+                  {busyId === "new" ? "…" : "Crear"}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCreating(true)}
+                style={{ display: "flex", alignItems: "center", gap: "0.4rem", background: "none", border: "none", cursor: "pointer", color: palette.accent, ...body, fontSize: "0.9rem", fontWeight: 600, padding: "0.25rem 0" }}
+              >
+                <Plus size={15} /> Nueva lista
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Modal para crear o editar una lista (nombre, descripción, pública/privada).
+function ListFormModal({ initial, onSave, onClose }) {
+  const [name, setName] = useState(initial?.name || "");
+  const [description, setDescription] = useState(initial?.description || "");
+  const [isPublic, setIsPublic] = useState(initial ? !!initial.is_public : true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function save() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    setErr("");
+    try {
+      await onSave({ name: name.trim(), description: description.trim(), isPublic });
+    } catch (e) {
+      setErr(e.message || "No se pudo guardar la lista.");
+      setSaving(false);
+    }
+  }
+
+  const fieldStyle = { width: "100%", padding: "0.7rem 0.9rem", borderRadius: 10, border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, color: palette.ink, ...body, fontSize: "0.95rem", outline: "none", boxSizing: "border-box" };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 1000, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.25rem 2.25rem", width: "100%", maxWidth: 480 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.1rem" }}>
+          <p style={{ ...display, fontSize: "1.15rem", fontWeight: 700, color: palette.ink }}>{initial ? "Editar lista" : "Nueva lista"}</p>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.25rem" }}>
+            <X size={20} color={palette.inkSoft} />
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          <div>
+            <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Nombre *</label>
+            <input value={name} autoFocus maxLength={100} onChange={(e) => setName(e.target.value)} placeholder='Ej: "Favoritos", "No entendí nada"...' style={fieldStyle} />
+          </div>
+          <div>
+            <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Descripción (opcional)</label>
+            <textarea value={description} maxLength={300} rows={2} onChange={(e) => setDescription(e.target.value)} placeholder="¿De qué va esta lista?" style={{ ...fieldStyle, resize: "none", lineHeight: 1.4 }} />
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            {[{ v: true, label: "Pública", desc: "Cualquiera puede verla" }, { v: false, label: "Privada", desc: "Solo tú la ves" }].map(({ v, label, desc }) => (
+              <button key={String(v)} onClick={() => setIsPublic(v)} style={{
+                flex: 1, padding: "0.6rem 0.5rem", borderRadius: 10, cursor: "pointer", textAlign: "center",
+                border: `1.5px solid ${isPublic === v ? palette.accent : palette.border}`,
+                backgroundColor: isPublic === v ? `${palette.accent}12` : palette.bgCard,
+              }}>
+                <p style={{ ...display, fontSize: "0.88rem", fontWeight: 600, color: isPublic === v ? palette.accent : palette.ink, margin: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem" }}>
+                  {!v && <Lock size={12} />}{label}
+                </p>
+                <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, margin: "0.1rem 0 0" }}>{desc}</p>
+              </button>
+            ))}
+          </div>
+          {err && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", margin: 0 }}>{err}</p>}
+          <button
+            onClick={save}
+            disabled={!name.trim() || saving}
+            style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: name.trim() ? palette.accent : palette.border, color: name.trim() ? "#fff" : palette.inkFaint, cursor: name.trim() && !saving ? "pointer" : "default", ...display, fontSize: "1rem", fontWeight: 600, marginTop: "0.25rem" }}
+          >
+            {saving ? "Guardando…" : initial ? "Guardar cambios" : "Crear lista"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Detalle de una lista: sus libros, quitar libros, editar, y borrar la lista.
+function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDeleted, onClose }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [removingId, setRemovingId] = useState(null);
+  const listBooks = list.bookIds.map((id) => books.find((b) => b.id === id)).filter(Boolean);
+
+  async function handleRemove(bookId) {
+    if (removingId) return;
+    setRemovingId(bookId);
+    try {
+      await removeBookFromList(list.id, bookId);
+      onChanged({ ...list, bookIds: list.bookIds.filter((id) => id !== bookId) });
+    } catch (e) { console.error("[LISTAS] remove error:", e.message); }
+    setRemovingId(null);
+  }
+
+  async function handleDelete() {
+    if (!confirm(`¿Eliminar la lista "${list.name}"? Los libros no se borran de tu biblioteca.`)) return;
+    try {
+      await deleteUserList(list.id, userId);
+      onDeleted(list.id);
+    } catch (e) { console.error("[LISTAS] delete error:", e.message); }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+      style={{ backgroundColor: "rgba(42,31,26,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-t-2xl sm:rounded-md"
+        style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 flex justify-between items-center px-4 py-3 border-b" style={{ backgroundColor: palette.bg, borderColor: palette.borderSoft }}>
+          <button onClick={onClose} className="p-2 -ml-2 rounded-full hover:opacity-70">
+            <X size={20} color={palette.inkSoft} />
+          </button>
+          <div className="flex gap-1.5">
+            <button onClick={() => setEditOpen(true)} className="flex items-center gap-1 px-3 py-1.5 rounded-full" style={{ ...display, fontSize: "0.85rem", color: palette.inkSoft, border: `1px solid ${palette.border}` }}>
+              <Pencil size={13} /> Editar
+            </button>
+            <button onClick={handleDelete} className="p-2 rounded-full hover:opacity-70" style={{ color: palette.accent }}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div style={{ padding: "1.25rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <h2 style={{ ...display, fontWeight: 700, fontSize: "1.35rem", color: palette.ink, margin: 0 }}>{list.name}</h2>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", ...body, fontSize: "0.72rem", color: palette.inkFaint, backgroundColor: palette.bgSoft, padding: "0.15rem 0.55rem", borderRadius: 999 }}>
+              {list.is_public ? "Pública" : <><Lock size={10} /> Privada</>}
+            </span>
+          </div>
+          {list.description && (
+            <p style={{ ...body, fontSize: "0.9rem", fontStyle: "italic", color: palette.inkSoft, marginTop: "0.4rem" }}>{list.description}</p>
+          )}
+          <p style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint, marginTop: "0.3rem" }}>
+            {listBooks.length} {listBooks.length === 1 ? "libro" : "libros"}
+          </p>
+
+          {listBooks.length === 0 ? (
+            <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic", marginTop: "1.25rem" }}>
+              Lista vacía. Agrega libros desde el detalle de cualquier libro de tu biblioteca.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginTop: "1.1rem" }}>
+              {listBooks.map((b) => (
+                <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.55rem 0.7rem" }}>
+                  <div onClick={() => onSelectBook?.(b)} style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0, cursor: onSelectBook ? "pointer" : "default" }}>
+                    {b.coverUrl ? (
+                      <img src={b.coverUrl} alt={b.title} style={{ width: 36, height: 52, objectFit: "cover", borderRadius: 5, flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 36, height: 52, borderRadius: 5, flexShrink: 0, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <BookOpen size={14} color={palette.inkFaint} />
+                      </div>
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ ...display, fontSize: "0.92rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
+                      <p style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint, margin: 0 }}>{b.author}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => handleRemove(b.id)} disabled={removingId === b.id} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.35rem", color: palette.inkFaint, flexShrink: 0 }}>
+                    {removingId === b.id ? <Loader2 size={15} className="animate-spin" /> : <X size={15} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editOpen && (
+        <ListFormModal
+          initial={list}
+          onClose={() => setEditOpen(false)}
+          onSave={async ({ name, description, isPublic }) => {
+            await updateUserList(list.id, userId, { name, description: description || null, is_public: isPublic });
+            onChanged({ ...list, name, description, is_public: isPublic });
+            setEditOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Sección "Mis listas" del perfil propio.
+function ListsSection({ user, books, onSelectBook }) {
+  const [lists, setLists] = useState(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [openList, setOpenList] = useState(null);
+
+  useEffect(() => {
+    fetchUserLists(user.id).then(setLists).catch(() => setLists([]));
+  }, [user.id]);
+
+  function handleChanged(updated) {
+    setLists((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    setOpenList(updated);
+  }
+
+  return (
+    <div style={{ padding: "0 1.25rem 1.25rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+        <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Mis listas</p>
+        <button onClick={() => setCreateOpen(true)} style={{ display: "flex", alignItems: "center", gap: "0.25rem", background: "none", border: "none", cursor: "pointer", color: palette.accent, ...body, fontSize: "0.82rem", fontWeight: 600, padding: 0 }}>
+          <Plus size={14} /> Nueva
+        </button>
+      </div>
+
+      {lists === null ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "1rem" }}>
+          <Loader2 size={18} className="animate-spin" color={palette.inkFaint} />
+        </div>
+      ) : lists.length === 0 ? (
+        <button onClick={() => setCreateOpen(true)} style={{ width: "100%", borderRadius: 14, padding: "1rem 1.25rem", backgroundColor: palette.bgCard, border: `1px dashed ${palette.border}`, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Bookmark size={22} color={palette.inkFaint} style={{ flexShrink: 0 }} />
+          <div>
+            <p style={{ ...display, fontWeight: 700, fontSize: "0.92rem", color: palette.inkSoft, margin: 0 }}>Crea tu primera lista</p>
+            <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, margin: 0 }}>"Favoritos", "No entendí nada", lo que quieras</p>
+          </div>
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          {lists.map((l) => (
+            <button key={l.id} onClick={() => setOpenList(l)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.7rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.75rem 0.9rem", cursor: "pointer", textAlign: "left" }}>
+              {l.is_public ? <Bookmark size={16} color={palette.accent} style={{ flexShrink: 0 }} /> : <Lock size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ ...display, fontSize: "0.95rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
+                <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: 0 }}>
+                  {l.bookIds.length} {l.bookIds.length === 1 ? "libro" : "libros"} · {l.is_public ? "pública" : "privada"}
+                </p>
+              </div>
+              <ChevronRight size={16} color={palette.inkFaint} />
+            </button>
+          ))}
+        </div>
+      )}
+
+      {createOpen && (
+        <ListFormModal
+          onClose={() => setCreateOpen(false)}
+          onSave={async ({ name, description, isPublic }) => {
+            const list = await createUserList(user.id, { name, description, isPublic });
+            setLists((prev) => [list, ...(prev || [])]);
+            setCreateOpen(false);
+          }}
+        />
+      )}
+      {openList && (
+        <ListDetailModal
+          list={openList}
+          books={books}
+          userId={user.id}
+          onSelectBook={onSelectBook}
+          onChanged={handleChanged}
+          onDeleted={(id) => { setLists((prev) => prev.filter((l) => l.id !== id)); setOpenList(null); }}
+          onClose={() => setOpenList(null)}
         />
       )}
     </div>
@@ -5229,6 +5693,9 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
       {activeWrap && (
         <WrappedStoryExperience wrap={activeWrap} userName={user.name} onClose={() => setActiveWrap(null)} />
       )}
+
+      {/* Mis listas */}
+      <ListsSection user={user} books={books} onSelectBook={onSelectBook} />
 
       {/* Apariencia */}
       <div style={{ padding: "0 1.25rem 1.25rem" }}>
