@@ -384,6 +384,7 @@ function dbToBook(row) {
     moodTags: row.mood_tags || [],
     addedAt: row.added_at ? new Date(row.added_at).getTime() : Date.now(),
     finishedAt: row.finished_at ? new Date(row.finished_at).getTime() : null,
+    readDatePrecision: row.read_date_precision || "exact",
     isUamBook: row.is_uam_book || false,
     isbn: row.isbn || null,
     totalPages: row.total_pages || null,
@@ -404,21 +405,34 @@ function bookToDb(book, userId) {
     mood_tags: book.moodTags || [],
     added_at: book.addedAt ? new Date(book.addedAt).toISOString() : new Date().toISOString(),
     finished_at: book.finishedAt ? new Date(book.finishedAt).toISOString() : null,
+    read_date_precision: book.readDatePrecision || "exact",
     is_uam_book: book.isUamBook || false,
     isbn: book.isbn || null,
     total_pages: book.totalPages ?? book.pageCount ?? null,
   };
 }
 
-// La columna total_pages puede no existir aún (migración pendiente). Si Supabase
-// se queja de columna desconocida, reintenta sin ese campo para no romper guardado.
+// Las columnas total_pages / read_date_precision pueden no existir aún (migración
+// pendiente). Si Supabase se queja de columna desconocida, reintenta sin esos
+// campos para no romper guardado.
 function isUnknownColumnError(error) {
   return error && (error.code === "42703" || error.code === "PGRST204" ||
-    /total_pages/.test(error.message || ""));
+    /total_pages|read_date_precision/.test(error.message || ""));
 }
 function stripTotalPages(dbBook) {
-  const { total_pages, ...rest } = dbBook;
+  const { total_pages, read_date_precision, ...rest } = dbBook;
   return rest;
+}
+
+// Etiqueta legible de cuándo se leyó un libro, según la precisión elegida.
+function readDateLabel(book) {
+  if (book.status !== "read") return null;
+  if (book.readDatePrecision === "before_folio") return "Leído antes de FOLIO 📚";
+  if (book.readDatePrecision === "unknown") return "Leído en otra vida ✨";
+  if (!book.finishedAt) return null;
+  const d = new Date(book.finishedAt);
+  if (book.readDatePrecision === "year") return `Leído en ${d.getFullYear()}`;
+  return `Terminado el ${d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })}`;
 }
 
 // ============ ONLINE STATUS HOOK ============
@@ -501,8 +515,7 @@ async function insertBook(book, userId) {
   const dbBook = { id, ...bookToDb(book, userId) };
   let { data, error } = await supabase.from("books").insert(dbBook).select("id").single();
   if (error && isUnknownColumnError(error)) {
-    const { total_pages: _tp, ...stripped } = dbBook;
-    ({ data, error } = await supabase.from("books").insert(stripped).select("id").single());
+    ({ data, error } = await supabase.from("books").insert(stripTotalPages(dbBook)).select("id").single());
   }
   if (error) throw error;
   return data?.id ?? id;
@@ -3038,6 +3051,11 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
                   </p>
                   <div className="mt-2 mb-1 flex flex-wrap gap-1.5 items-center">
                     <StatusBadge status={book.status} />
+                    {readDateLabel(book) && (
+                      <span style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, fontStyle: "italic" }}>
+                        {readDateLabel(book)}
+                      </span>
+                    )}
                     {book.genre && (
                       <span
                         style={{
@@ -3536,6 +3554,103 @@ function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDelet
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ============ FECHA DE LECTURA FLEXIBLE ============
+// Al marcar un libro como leído, el usuario elige cuándo lo leyó:
+// fecha exacta, solo el año, "antes de FOLIO" o "en otra vida".
+function ReadDateModal({ book, onConfirm, onClose }) {
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const [option, setOption] = useState("exact");
+  const [dateStr, setDateStr] = useState(todayStr);
+  const [year, setYear] = useState(today.getFullYear());
+  const years = [];
+  for (let y = today.getFullYear(); y >= 1950; y--) years.push(y);
+
+  const OPTIONS = [
+    { id: "exact", emoji: "📅", label: "Fecha exacta", desc: "Sé exactamente cuándo lo terminé" },
+    { id: "year", emoji: "📆", label: "Solo el año", desc: "Recuerdo el año, más o menos" },
+    { id: "before_folio", emoji: "📚", label: "Antes de FOLIO", desc: "Lo leí antes de usar la app" },
+    { id: "unknown", emoji: "✨", label: "En otra vida", desc: "Ni idea, pero lo leí" },
+  ];
+
+  function confirm() {
+    let finishedAt = null;
+    if (option === "exact") {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      finishedAt = new Date(y, m - 1, d, 12).getTime();
+    } else if (option === "year") {
+      // Mitad del año para que cuente bien en stats anuales (o hoy si es el año actual)
+      finishedAt = year === today.getFullYear() ? Date.now() : new Date(year, 5, 15, 12).getTime();
+    }
+    onConfirm({ finishedAt, precision: option });
+  }
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, zIndex: 7000, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.25rem 1.25rem 2rem", width: "100%", maxWidth: 480, maxHeight: "80vh", overflowY: "auto" }}>
+        <div style={{ width: 40, height: 4, backgroundColor: palette.border, borderRadius: 2, margin: "0 auto 1rem" }} />
+        <p style={{ ...display, fontSize: "1.1rem", fontWeight: 700, color: palette.ink, marginBottom: "0.25rem" }}>¿Cuándo leíste este libro?</p>
+        <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, fontStyle: "italic", marginBottom: "1rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "1rem" }}>
+          {OPTIONS.map((opt) => {
+            const active = option === opt.id;
+            return (
+              <div key={opt.id}>
+                <button
+                  onClick={() => setOption(opt.id)}
+                  style={{
+                    width: "100%", padding: "0.7rem 0.9rem", borderRadius: 12, cursor: "pointer", textAlign: "left",
+                    border: `1.5px solid ${active ? palette.accent : palette.border}`,
+                    backgroundColor: active ? `${palette.accent}12` : palette.bgCard,
+                    display: "flex", alignItems: "center", gap: "0.7rem",
+                  }}
+                >
+                  <span style={{ fontSize: "1.15rem", flexShrink: 0 }}>{opt.emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ ...display, fontSize: "0.92rem", fontWeight: 600, color: active ? palette.accent : palette.ink, margin: 0 }}>{opt.label}</p>
+                    <p style={{ ...body, fontSize: "0.76rem", color: palette.inkFaint, margin: 0 }}>{opt.desc}</p>
+                  </div>
+                  {active && <CheckCircle2 size={17} color={palette.accent} style={{ flexShrink: 0 }} />}
+                </button>
+                {active && opt.id === "exact" && (
+                  <input
+                    type="date"
+                    value={dateStr}
+                    max={todayStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    style={{ width: "100%", marginTop: "0.4rem", padding: "0.6rem 0.85rem", borderRadius: 10, border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, color: palette.ink, ...body, fontSize: "0.95rem", outline: "none", boxSizing: "border-box" }}
+                  />
+                )}
+                {active && opt.id === "year" && (
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    style={{ width: "100%", marginTop: "0.4rem", padding: "0.6rem 0.85rem", borderRadius: 10, border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, color: palette.ink, ...body, fontSize: "0.95rem", outline: "none", boxSizing: "border-box" }}
+                  >
+                    {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={confirm}
+          disabled={option === "exact" && !dateStr}
+          style={{ width: "100%", padding: "0.9rem", borderRadius: 12, border: "none", backgroundColor: palette.accent, color: "#fff", cursor: "pointer", ...display, fontSize: "1rem", fontWeight: 600 }}
+        >
+          Guardar
+        </button>
+      </div>
     </div>
   );
 }
@@ -14159,6 +14274,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   const [pendingPost, setPendingPost] = useState(null);
   const [achievementQueue, setAchievementQueue] = useState([]);
   const [celebrationBook, setCelebrationBook] = useState(null);
+  const [readDateBook, setReadDateBook] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
   const [gemBalance, setGemBalance] = useState(0);
   const [gemToastQueue, setGemToastQueue] = useState([]);
@@ -14478,6 +14594,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       } else if (book.status === "read") {
         playBookFinished();
         haptic(HAPTIC.BOOK_DONE);
+        setReadDateBook(dbId && dbId !== withFinished.id ? { ...withFinished, id: dbId } : withFinished);
         setCelebrationBook(withFinished);
         addGemsDB(user.id, 50).then(bal => {
           if (bal !== null) setGemBalance(bal);
@@ -14513,6 +14630,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         setSelectedBook(null);
         playBookFinished();
         haptic(HAPTIC.BOOK_DONE);
+        setReadDateBook(final);
         setCelebrationBook(final);
         addGemsDB(user.id, 50).then(bal => {
           if (bal !== null) setGemBalance(bal);
@@ -14945,6 +15063,22 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           onSaveRating={saveBookRating}
           onClose={() => setCelebrationBook(null)}
           onGoToExplorer={() => { setCelebrationBook(null); setTab("explorar"); }}
+        />
+      )}
+      {readDateBook && (
+        <ReadDateModal
+          book={readDateBook}
+          onConfirm={async ({ finishedAt, precision }) => {
+            const updated = { ...readDateBook, finishedAt, readDatePrecision: precision };
+            setReadDateBook(null);
+            setBooks((prev) => prev.map((b) => (b.id === updated.id ? { ...b, finishedAt, readDatePrecision: precision } : b)));
+            try {
+              await updateBookInDB(updated, user.id);
+            } catch (e) {
+              console.error("Error guardando fecha de lectura:", e);
+            }
+          }}
+          onClose={() => setReadDateBook(null)}
         />
       )}
       {activeWrap && (

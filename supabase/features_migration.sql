@@ -111,3 +111,15 @@ $$;
 
 REVOKE ALL ON FUNCTION public.delete_my_account() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.delete_my_account() TO authenticated;
+
+
+-- ----------------------------------------------------------------------------
+-- FEATURE 4 — Fecha de lectura flexible
+-- Precisión de la fecha de terminado de un libro:
+--   'exact'        → finished_at es la fecha real elegida
+--   'year'         → solo se sabe el año (finished_at apunta a mitad de ese año)
+--   'before_folio' → lo leyó antes de usar la app (finished_at NULL)
+--   'unknown'      → "en otra vida", no recuerda (finished_at NULL)
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.books
+  ADD COLUMN IF NOT EXISTS read_date_precision text DEFAULT 'exact';
