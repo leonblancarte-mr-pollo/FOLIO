@@ -45,3 +45,69 @@ CREATE POLICY list_books_select ON public.user_list_books FOR SELECT TO authenti
 CREATE POLICY list_books_write_own ON public.user_list_books FOR ALL TO authenticated
   USING      (list_id IN (SELECT id FROM public.user_lists WHERE user_id = auth.uid()))
   WITH CHECK (list_id IN (SELECT id FROM public.user_lists WHERE user_id = auth.uid()));
+
+
+-- ----------------------------------------------------------------------------
+-- FEATURE 3 — Eliminar cuenta
+-- RPC SECURITY DEFINER: borra explícitamente todos los datos del usuario
+-- (no dependemos de que cada FK tenga ON DELETE CASCADE) y al final la cuenta
+-- de auth.users. Solo puede borrar la cuenta propia (usa auth.uid()).
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.delete_my_account()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  uid uuid := auth.uid();
+BEGIN
+  IF uid IS NULL THEN
+    RAISE EXCEPTION 'No autenticado';
+  END IF;
+
+  -- Social: likes/respuestas/comentarios míos o colgados de mis posts
+  DELETE FROM comment_likes WHERE user_id = uid
+    OR comment_id IN (SELECT id FROM comments WHERE user_id = uid
+                      OR post_id IN (SELECT id FROM posts WHERE user_id = uid));
+  DELETE FROM comment_replies WHERE user_id = uid
+    OR comment_id IN (SELECT id FROM comments WHERE user_id = uid
+                      OR post_id IN (SELECT id FROM posts WHERE user_id = uid));
+  DELETE FROM comments WHERE user_id = uid
+    OR post_id IN (SELECT id FROM posts WHERE user_id = uid);
+  DELETE FROM post_likes WHERE user_id = uid
+    OR post_id IN (SELECT id FROM posts WHERE user_id = uid);
+  DELETE FROM posts WHERE user_id = uid;
+
+  -- Mensajería
+  DELETE FROM messages WHERE sender_id = uid
+    OR conversation_id IN (SELECT id FROM conversations WHERE uid IN (user1_id, user2_id));
+  DELETE FROM conversations WHERE uid IN (user1_id, user2_id);
+
+  -- Notificaciones y amistades (en ambas direcciones)
+  DELETE FROM notifications WHERE user_id = uid OR actor_id = uid;
+  DELETE FROM friendships WHERE uid IN (user_id, friend_id);
+
+  -- Listas (también entradas de otras listas que apunten a mis libros)
+  DELETE FROM user_list_books WHERE list_id IN (SELECT id FROM user_lists WHERE user_id = uid)
+    OR book_id IN (SELECT id FROM books WHERE user_id = uid);
+  DELETE FROM user_lists WHERE user_id = uid;
+
+  -- Lectura y gamificación (hijos antes que books)
+  DELETE FROM quotes WHERE user_id = uid;
+  DELETE FROM reading_logs WHERE user_id = uid;
+  DELETE FROM books WHERE user_id = uid;
+  DELETE FROM user_streaks WHERE user_id = uid;
+  DELETE FROM user_gems WHERE user_id = uid;
+  DELETE FROM user_pets WHERE user_id = uid;
+  DELETE FROM achievements WHERE user_id = uid;
+  DELETE FROM monthly_wraps WHERE user_id = uid;
+
+  -- Perfil y cuenta de autenticación
+  DELETE FROM public.users WHERE id = uid;
+  DELETE FROM auth.users WHERE id = uid;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.delete_my_account() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.delete_my_account() TO authenticated;
