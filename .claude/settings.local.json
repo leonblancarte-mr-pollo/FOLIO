@@ -73,7 +73,18 @@
       "Bash(rm -f _dev-recs.html src/_dev-recs.jsx scripts/recommendations_preview.json duplicates_report.csv)",
       "Bash(netstat -ano)",
       "Bash(awk '{print $5}')",
-      "Bash(xargs -r -I{} powershell -Command \"Stop-Process -Id {} -Force -ErrorAction SilentlyContinue\")"
+      "Bash(xargs -r -I{} powershell -Command \"Stop-Process -Id {} -Force -ErrorAction SilentlyContinue\")",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "Bash(python scripts/train_recommender.py --write-db)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(python scripts/train_recommender.py --mock --n-mock-users 0 --dry-run)",
+      "Read(//tmp/**)",
+      "Bash(gh run *)",
+      "Bash(where gh *)",
+      "Read(//c/Program Files/**)",
+      "Bash(command -v gh.exe)",
+      "PowerShell(\\(Get-Content \"src\\\\App.jsx\" | Measure-Object -Line\\).Lines; \\(Get-Content \"src\\\\index.css\" | Measure-Object -Line\\).Lines)"
     ]
   },
   "enabledPlugins": {}

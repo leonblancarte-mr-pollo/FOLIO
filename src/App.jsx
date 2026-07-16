@@ -954,11 +954,9 @@ async function checkStreakOnLoad(userId) {
   console.log(`[streak] checkStreakOnLoad: hoy=${today}, última_lectura=${existing.last_log_date}, diff=${diffDays}d, freeze=${freezeProtected}, racha_actual=${existing.current_streak}`);
 
   if (diffDays > 1 && !freezeProtected) {
-    console.log(`[streak] REINICIANDO racha: ${existing.current_streak} → 0 (sin lectura por ${diffDays} días)`);
-    await supabase.from("user_streaks").update({
-      current_streak: 0,
-      updated_at: new Date().toISOString(),
-    }).eq("user_id", userId);
+    // Racha en PAUSA, no reset: el contador se congela hasta que el usuario
+    // vuelva a leer (filosofía anti-castigo: nunca se pierde lo construido).
+    console.log(`[streak] Racha en PAUSA: ${existing.current_streak} días congelados (sin lectura por ${diffDays} días)`);
   } else {
     console.log(`[streak] Racha ACTIVA: diff=${diffDays}d, racha=${existing.current_streak}`);
     // Pet XP por mantener la racha: +3 XP, solo una vez al día
@@ -1006,12 +1004,11 @@ async function logReadingSession({ userId, bookId, pagesRead, mood }) {
     const diffDays = existing.last_log_date
       ? daysBetweenLocalDates(today, existing.last_log_date)
       : 999;
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const freezeProtected = diffDays === 2 && existing.streak_freeze_used_at === localDateStr(yesterday);
-    const newStreak = (diffDays === 1 || freezeProtected)
-      ? existing.current_streak + 1
-      : diffDays === 0 ? existing.current_streak : 1;
+    // Racha con PAUSA (nunca se reinicia): el mismo día no suma; cualquier otro
+    // día suma 1 y retoma donde quedó, sin importar cuántos días pasaron.
+    const newStreak = diffDays === 0
+      ? existing.current_streak
+      : (existing.current_streak || 0) + 1;
     const newLongest = Math.max(existing.longest_streak, newStreak);
     await supabase.from("user_streaks").update({
       current_streak: newStreak,
