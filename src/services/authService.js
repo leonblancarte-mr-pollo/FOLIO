@@ -94,6 +94,18 @@ export async function registerWithSupabase({ name, username, email, password }) 
   return { ok: true, user };
 }
 
+// Actualiza el nombre visible (users.nombre) y el caché local.
+// El username NO se toca aquí: ese se edita aparte y este campo es independiente.
+export async function updateDisplayName(userId, name) {
+  const clean = (name || "").trim().slice(0, 60);
+  if (!clean) return null;
+  const { error } = await supabase.from("users").update({ nombre: clean }).eq("id", userId);
+  if (error) return null;
+  const cached = getCachedAuthUser();
+  if (cached && cached.id === userId) cacheAuthUser({ ...cached, name: clean });
+  return clean;
+}
+
 export async function logout() {
   try { await supabase.auth.signOut(); } catch {}
   try { localStorage.removeItem(AUTH_USER_KEY); } catch {}

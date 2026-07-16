@@ -62,7 +62,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
-import { loginWithSupabase, registerWithSupabase, logout, getSessionUser } from "./services/authService.js";
+import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName } from "./services/authService.js";
 import confetti from "canvas-confetti";
 import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
 import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
@@ -5031,8 +5031,9 @@ function ReadingHeatmap({ userId }) {
 }
 
 // ============ PROFILE VIEW ============
-function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'system', setTheme, pet, onRenamePet }) {
+function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, theme = 'system', setTheme, pet, onRenamePet }) {
   const [profile, setProfile] = useState({ username: "", bio: "", avatarUrl: null, coverUrl: null });
+  const [displayName, setDisplayName] = useState(user.name || "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -5165,6 +5166,14 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
     setError("");
     setSuccess("");
     try {
+      // Nombre de display (separado del username, que no cambia de reglas)
+      const cleanName = displayName.trim();
+      if (!cleanName) throw new Error("El nombre no puede quedar vacío.");
+      if (cleanName !== user.name) {
+        const saved = await updateDisplayName(user.id, cleanName);
+        if (!saved) throw new Error("No se pudo actualizar el nombre.");
+        onUserUpdate?.({ name: saved });
+      }
       const username = profile.username.toLowerCase().trim();
       if (username) {
         const { data: taken } = await supabase
@@ -5374,8 +5383,15 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
             </div>
             <div className="space-y-4">
               <div>
-                <label style={labelStyle}>Nombre completo</label>
-                <p style={{ ...ts.body15, color: palette.inkFaint }}>{user.name}</p>
+                <label style={labelStyle}>Nombre</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value.slice(0, 60))}
+                  placeholder="Tu nombre"
+                  style={inputStyle}
+                />
+                <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Es el nombre que ven los demás. Tu @usuario no cambia.</p>
               </div>
               <div>
                 <label style={labelStyle}>Email</label>
@@ -5432,7 +5448,7 @@ function ProfileView({ user, books, onSelectBook, setTab, onLogout, theme = 'sys
       )}
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
         <button
-          onClick={() => { setError(""); setSuccess(""); setEditModalOpen(true); }}
+          onClick={() => { setError(""); setSuccess(""); setDisplayName(user.name || ""); setEditModalOpen(true); }}
           style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 1.1rem", borderRadius: "999px", border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, color: palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 500, cursor: "pointer" }}
         >
           <PenLine size={14} strokeWidth={2} />
@@ -12310,7 +12326,7 @@ function QuotesView({ user, books, onSaveQuote }) {
   );
 }
 
-function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme, onSaveQuote, pet, onRenamePet }) {
+function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme, onSaveQuote, pet, onRenamePet }) {
   const [sub, setSub] = useState("perfil");
   const TABS = [
     { id: "perfil", label: "Mi perfil" },
@@ -12332,7 +12348,7 @@ function PerfilWrapper({ user, books, onSelectBook, setTab, onLogout, isOnline =
         )}
       </div>
       {sub === "libros" && <LibraryView books={books} onSelectBook={onSelectBook} setTab={setTab} isOnline={isOnline} />}
-      {sub === "perfil" && <ProfileView user={user} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} theme={theme} setTheme={setTheme} pet={pet} onRenamePet={onRenamePet} />}
+      {sub === "perfil" && <ProfileView user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} theme={theme} setTheme={setTheme} pet={pet} onRenamePet={onRenamePet} />}
       {sub === "frases" && <QuotesView user={user} books={books} onSaveQuote={onSaveQuote} />}
       {sub === "resumen" && <ReadingStatsView books={books} />}
     </div>
@@ -14044,7 +14060,7 @@ function resolveTheme(pref) {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutorial }) {
+function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsumed, showTutorial }) {
   const [tab, setTab] = useState("home");
   const [books, setBooks] = useState([]);
   const [selectedBook, setSelectedBook] = useState(null);
@@ -14759,7 +14775,7 @@ function MainApp({ user, onLogout, initialRefUser, onRefUserConsumed, showTutori
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} isOnline={isOnline} /></div>}
-        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSaveQuote={() => openSaveQuote(null)} pet={pet} onRenamePet={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }} /></div>}
+        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSaveQuote={() => openSaveQuote(null)} pet={pet} onRenamePet={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }} /></div>}
       </main>
       <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onAddPress={() => setShowFabMenu(true)} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
       {/* FAB flotante para agregar (el centro de la nav ahora es Mascota) */}
@@ -15931,5 +15947,5 @@ export default function App() {
 
   if (!user) return <AuthView onLogin={handleLogin} />;
   if (showOnboarding) return <NewUserOnboarding user={user} onComplete={() => { setShowOnboarding(false); setJustCompletedOnboarding(true); }} />;
-  return <ErrorBoundary><MainApp user={user} onLogout={handleLogout} initialRefUser={refUser} onRefUserConsumed={() => setRefUser(null)} showTutorial={justCompletedOnboarding} /></ErrorBoundary>;
+  return <ErrorBoundary><MainApp user={user} onLogout={handleLogout} onUserUpdate={(patch) => setUser((u) => (u ? { ...u, ...patch } : u))} initialRefUser={refUser} onRefUserConsumed={() => setRefUser(null)} showTutorial={justCompletedOnboarding} /></ErrorBoundary>;
 }
