@@ -4275,9 +4275,14 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
       if (upErr) throw new Error(`Storage error: ${upErr.message}`);
       const publicUrl = supabase.storage.from("avatars").getPublicUrl(uploadData.path).data.publicUrl;
       if (!publicUrl) throw new Error("No se pudo obtener la URL pública del avatar.");
-      const { error: dbErr } = await supabase.from("users").update({ avatar_url: publicUrl }).eq("id", user.id);
+      const { data: dbData, error: dbErr } = await supabase.from("users").update({ avatar_url: publicUrl }).eq("id", user.id).select("avatar_url, cover_url, username, bio");
       if (dbErr) throw new Error(`DB error: ${dbErr.message}`);
-      setProfile((p) => ({ ...p, avatarUrl: publicUrl + `?t=${Date.now()}` }));
+      if (!dbData || dbData.length === 0) throw new Error("No se pudo guardar el avatar (posible bloqueo de permisos).");
+      setProfile((p) => {
+        const next = { ...p, avatarUrl: publicUrl + `?t=${Date.now()}` };
+        cacheProfile(next);
+        return next;
+      });
     } catch (e) {
       setError(e.message || "Error al subir la imagen.");
     } finally {
@@ -4296,9 +4301,14 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
       if (upErr) throw new Error(`Storage error: ${upErr.message}`);
       const publicUrl = supabase.storage.from("covers").getPublicUrl(uploadData.path).data.publicUrl;
       if (!publicUrl) throw new Error("No se pudo obtener la URL pública de la portada.");
-      const { error: dbErr } = await supabase.from("users").update({ cover_url: publicUrl }).eq("id", user.id);
+      const { data: dbData, error: dbErr } = await supabase.from("users").update({ cover_url: publicUrl }).eq("id", user.id).select("avatar_url, cover_url, username, bio");
       if (dbErr) throw new Error(`DB error: ${dbErr.message}`);
-      setProfile((p) => ({ ...p, coverUrl: publicUrl + `?t=${Date.now()}` }));
+      if (!dbData || dbData.length === 0) throw new Error("No se pudo guardar la portada (posible bloqueo de permisos).");
+      setProfile((p) => {
+        const next = { ...p, coverUrl: publicUrl + `?t=${Date.now()}` };
+        cacheProfile(next);
+        return next;
+      });
     } catch (e) {
       setError(e.message || "Error al subir la portada.");
     } finally {
@@ -4334,6 +4344,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
         .update({ username: username || null, bio: profile.bio.trim() || null, avatar_url: profile.avatarUrl || null, cover_url: profile.coverUrl || null })
         .eq("id", user.id);
       if (updateErr) throw updateErr;
+      cacheProfile({ ...profile, username: username || "" });
       setSuccess("Perfil actualizado.");
       setTimeout(() => setSuccess(""), 3000);
       return true;
