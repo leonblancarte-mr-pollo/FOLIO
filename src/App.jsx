@@ -85,7 +85,7 @@ import { dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabe
 import { fetchUserLists, createUserList, updateUserList, deleteUserList, addBookToList, removeBookFromList } from "./services/listsService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { PET_MAX_LEVEL, petXpForLevel, PET_TYPES, petImageSrc, petBus, loadPet, createPet, updatePetName, addPetXP } from "./services/petService.js";
-import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad } from "./services/streakService.js";
+import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData } from "./services/streakService.js";
 
 // ============ AFFILIATE ============
 const BUSCALIBRE_AFFILIATE_ID = import.meta.env.VITE_BUSCALIBRE_AFFILIATE_ID || "ac4c19281310afaacacd";
@@ -9851,15 +9851,24 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }, [pendingNavigation]);
 
   async function loadStreakInfo() {
-    const { streak: s, hasLoggedToday: logged, pagesLoggedToday: pages } = await fetchStreakData(user.id);
+    let s = null, logged = false, pages = 0;
+    try {
+      ({ streak: s, hasLoggedToday: logged, pagesLoggedToday: pages } = await fetchStreakData(user.id));
+    } catch (err) {
+      console.error("[streak] fetchStreakData falló, usando valores default:", err);
+    }
     // Monthly freeze reset
     if (s) {
-      const currentMonth = new Date().getMonth() + 1;
-      const needsReset = s.last_freeze_reset_month !== currentMonth && (s.streak_freezes_remaining ?? 1) < 1;
-      if (needsReset) {
-        await supabase.from("user_streaks").update({ streak_freezes_remaining: 1, last_freeze_reset_month: currentMonth }).eq("user_id", user.id);
-        s.streak_freezes_remaining = 1;
-        s.last_freeze_reset_month = currentMonth;
+      try {
+        const currentMonth = new Date().getMonth() + 1;
+        const needsReset = s.last_freeze_reset_month !== currentMonth && (s.streak_freezes_remaining ?? 1) < 1;
+        if (needsReset) {
+          await supabase.from("user_streaks").update({ streak_freezes_remaining: 1, last_freeze_reset_month: currentMonth }).eq("user_id", user.id);
+          s.streak_freezes_remaining = 1;
+          s.last_freeze_reset_month = currentMonth;
+        }
+      } catch (err) {
+        console.error("[streak] freeze reset falló:", err);
       }
     }
     setStreak(s);

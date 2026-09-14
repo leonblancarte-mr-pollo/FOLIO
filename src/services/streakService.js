@@ -60,4 +60,4 @@ async function checkStreakOnLoad(userId) {
 }
 
 
-export { localDateStr, daysBetweenLocalDates, checkStreakOnLoad };
+export { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData };
