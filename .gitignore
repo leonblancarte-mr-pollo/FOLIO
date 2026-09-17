@@ -5,5 +5,6 @@ dist/
 .env.*.local
 
 .vercel
+.env.vercel.tmp
 __pycache__/
 *.pyc

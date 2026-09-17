@@ -1,4 +1,5 @@
 import { supabase } from "../supabase.js";
+import { localDateStr } from "./streakService.js";
 
 const DAILY_LIMIT = 15;
 const GEMS_PER_PACK = 5;
@@ -118,7 +119,7 @@ export async function getRecommendations(userId, preferredGenres = [], limit = 2
 }
 
 export async function checkDailyLimit(userId) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
   const { data } = await supabase
     .from("daily_save_limits")
     .select("saves_used, gems_spent")
@@ -141,7 +142,7 @@ export async function checkDailyLimit(userId) {
 }
 
 export async function incrementSaveCounter(userId) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
 
   const { data } = await supabase
     .from("daily_save_limits")
@@ -162,7 +163,7 @@ export async function incrementSaveCounter(userId) {
 }
 
 export async function buyExtraSaves(userId) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDateStr();
 
   const { data: gemsRow, error: gemsErr } = await supabase
     .from("user_gems")

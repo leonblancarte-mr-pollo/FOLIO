@@ -660,9 +660,14 @@ async function deleteFeedPost(postId, userId) {
 
 // (movido a src/services/streakService.js)
 
-async function logReadingSession({ userId, bookId, pagesRead, mood }) {
+function newClientUuid() {
+  return (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId }) {
+  const sid = sessionId || newClientUuid();
   if (!navigator.onLine) {
-    addPendingLog({ userId, bookId, pagesRead: pagesRead || null, mood, date: localDateStr() });
+    addPendingLog({ userId, bookId, pagesRead: pagesRead || null, mood, date: localDateStr(), sessionId: sid });
     return;
   }
   const today = localDateStr();
@@ -673,43 +678,25 @@ async function logReadingSession({ userId, bookId, pagesRead, mood }) {
     pages_read: pagesRead || null,
     mood,
     log_date: today,
+    session_id: sid,
   });
-  if (logError) throw logError;
+  if (logError) {
+    if (logError.code === "23505") {
+      // Esta sesión ya se sincronizó antes (reintento offline duplicado): no
+      // repetir el post/racha, ya se hicieron la primera vez.
+      return;
+    }
+    throw logError;
+  }
 
   if (pagesRead > 0 && bookId) {
     createFeedPost({ userId, type: 'reading_session', bookId, content: '', pagesRead, imageUrl: null }).catch(() => {});
   }
 
-  const { data: existing } = await supabase.from("user_streaks")
-    .select("*").eq("user_id", userId).maybeSingle();
-
-  if (!existing) {
-    await supabase.from("user_streaks").insert({
-      user_id: userId,
-      current_streak: 1,
-      longest_streak: 1,
-      last_log_date: today,
-      total_pages_read: pagesRead || 0,
-      updated_at: new Date().toISOString(),
-    });
-  } else {
-    const diffDays = existing.last_log_date
-      ? daysBetweenLocalDates(today, existing.last_log_date)
-      : 999;
-    // Racha con PAUSA (nunca se reinicia): el mismo día no suma; cualquier otro
-    // día suma 1 y retoma donde quedó, sin importar cuántos días pasaron.
-    const newStreak = diffDays === 0
-      ? existing.current_streak
-      : (existing.current_streak || 0) + 1;
-    const newLongest = Math.max(existing.longest_streak, newStreak);
-    await supabase.from("user_streaks").update({
-      current_streak: newStreak,
-      longest_streak: newLongest,
-      last_log_date: today,
-      total_pages_read: (existing.total_pages_read || 0) + (pagesRead || 0),
-      updated_at: new Date().toISOString(),
-    }).eq("user_id", userId);
-  }
+  // La racha ya no la escribe el cliente: el servidor la avanza (RPC
+  // SECURITY DEFINER) validando que exista este reading_log real de hoy.
+  const { error: streakErr } = await supabase.rpc("update_streak");
+  if (streakErr) console.error("[streak] update_streak falló:", streakErr.message);
 
   // Pet XP por páginas leídas: +2 XP por cada 10 páginas
   const pagesXp = Math.floor((pagesRead || 0) / 10) * 2;
@@ -726,7 +713,7 @@ async function syncPendingLogs() {
   const remaining = [];
   for (const log of logs) {
     try {
-      await logReadingSession({ userId: log.userId, bookId: log.bookId, pagesRead: log.pagesRead, mood: log.mood });
+      await logReadingSession({ userId: log.userId, bookId: log.bookId, pagesRead: log.pagesRead, mood: log.mood, sessionId: log.sessionId });
       synced++;
     } catch {
       remaining.push(log);
@@ -879,21 +866,24 @@ async function checkAchievements(userId, userName, { silent = false } = {}) {
       }
     }
 
-    const newKeys = Object.entries(checks)
+    const candidateKeys = Object.entries(checks)
       .filter(([k, v]) => v && !unlockedSet.has(k))
       .map(([k]) => k);
 
-    if (newKeys.length === 0) return [];
+    if (candidateKeys.length === 0) return [];
 
-    // Use upsert with onConflict to avoid duplicate errors
-    const { error: insertErr } = await supabase.from("achievements").upsert(
-      newKeys.map(k => ({ user_id: userId, achievement_key: k })),
-      { onConflict: "user_id,achievement_key", ignoreDuplicates: true }
-    );
-    if (insertErr) { console.error("[checkAchievements] insert error:", insertErr.message); return []; }
+    // El servidor revalida cada condición real antes de otorgar (RPC
+    // SECURITY DEFINER); el cliente ya no puede insertar logros directo.
+    const grantedKeys = [];
+    for (const key of candidateKeys) {
+      const { data: granted, error: rpcErr } = await supabase.rpc("award_achievement", { p_key: key });
+      if (rpcErr) { console.error("[checkAchievements] award_achievement error:", key, rpcErr.message); continue; }
+      if (granted) grantedKeys.push(key);
+    }
+    if (grantedKeys.length === 0) return [];
 
     // Auto feed post for notable achievements
-    for (const key of newKeys) {
+    for (const key of grantedKeys) {
       if (FEED_WORTHY_ACHIEVEMENTS.has(key)) {
         const def = ACHIEVEMENT_DEFS.find(a => a.key === key);
         if (def) {
@@ -905,16 +895,16 @@ async function checkAchievements(userId, userName, { silent = false } = {}) {
       }
     }
 
-    console.log(`[checkAchievements] ✓ ${newKeys.length} nuevo(s): ${newKeys.join(", ")}`);
+    console.log(`[checkAchievements] ✓ ${grantedKeys.length} nuevo(s): ${grantedKeys.join(", ")}`);
     if (!silent) {
-      achievementBus.emit(newKeys);
-      playAchievementSound(newKeys);
-      if (newKeys.length > 0) {
-        const isStreak = newKeys.some(k => ['streak_7','streak_30','streak_90'].includes(k));
+      achievementBus.emit(grantedKeys);
+      playAchievementSound(grantedKeys);
+      if (grantedKeys.length > 0) {
+        const isStreak = grantedKeys.some(k => ['streak_7','streak_30','streak_90'].includes(k));
         haptic(isStreak ? HAPTIC.STREAK_MILESTONE : HAPTIC.ACHIEVEMENT);
       }
     }
-    return newKeys;
+    return grantedKeys;
   } catch (err) {
     console.error("[checkAchievements] unexpected error:", err);
     return [];
@@ -922,10 +912,17 @@ async function checkAchievements(userId, userName, { silent = false } = {}) {
 }
 
 // ============ AI HELPERS ============
+async function authHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) throw new Error("Debes iniciar sesión de nuevo para usar esta función.");
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function enrichBook(title, author) {
   const response = await fetch("/api/anthropic", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 600,
@@ -944,7 +941,13 @@ Si no conoces el libro con seguridad, haz tu mejor estimación basada en el tít
       ],
     }),
   });
-  const data = await response.json();
+  if (response.status === 429) {
+    throw new Error("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.");
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(data?.content)) {
+    throw new Error("No se pudo obtener la información del libro. Intenta de nuevo.");
+  }
   const text = data.content.find((b) => b.type === "text")?.text || "";
   const clean = text.replace(/```json|```/g, "").trim();
   return JSON.parse(clean);
@@ -1013,14 +1016,20 @@ Responde SOLO con JSON válido (sin markdown, sin texto extra):
 
   const response = await fetch("/api/anthropic", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({
       model: "claude-sonnet-4-6",
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
-  const data = await response.json();
+  if (response.status === 429) {
+    throw new Error("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.");
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(data?.content)) {
+    throw new Error("No se pudieron generar recomendaciones. Intenta de nuevo.");
+  }
   const text = data.content.find((b) => b.type === "text")?.text || "";
   const clean = text.replace(/```json|```/g, "").trim();
   return JSON.parse(clean);
@@ -2175,7 +2184,7 @@ function BookForm({ form, setForm, onReadSelected }) {
       });
     } catch (e) {
       console.error(e);
-      setEnrichError("No pude buscar la info. Intenta de nuevo.");
+      setEnrichError(e.message || "No pude buscar la info. Intenta de nuevo.");
     } finally {
       setEnriching(false);
     }
@@ -2894,7 +2903,7 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
       setResults(res);
     } catch (e) {
       console.error(e);
-      setError("Algo salió mal. Intenta de nuevo.");
+      setError(e.message || "Algo salió mal. Intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -9868,15 +9877,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     } catch (err) {
       console.error("[streak] fetchStreakData falló, usando valores default:", err);
     }
-    // Monthly freeze reset
+    // Monthly freeze reset (RPC server-side: user_streaks es solo-lectura para el cliente)
     if (s) {
       try {
         const currentMonth = new Date().getMonth() + 1;
         const needsReset = s.last_freeze_reset_month !== currentMonth && (s.streak_freezes_remaining ?? 1) < 1;
         if (needsReset) {
-          await supabase.from("user_streaks").update({ streak_freezes_remaining: 1, last_freeze_reset_month: currentMonth }).eq("user_id", user.id);
-          s.streak_freezes_remaining = 1;
-          s.last_freeze_reset_month = currentMonth;
+          const { data: updated } = await supabase.rpc("reset_monthly_freeze");
+          if (updated) s = updated;
         }
       } catch (err) {
         console.error("[streak] freeze reset falló:", err);
@@ -9895,14 +9903,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   }
 
   async function applyFreeze() {
-    const today = localDateStr();
-    const currentMonth = new Date().getMonth() + 1;
-    await supabase.from("user_streaks").update({
-      streak_freeze_used_at: today,
-      streak_freezes_remaining: 0,
-      last_freeze_reset_month: currentMonth,
-    }).eq("user_id", user.id);
-    setStreak(prev => prev ? { ...prev, streak_freeze_used_at: today, streak_freezes_remaining: 0, last_freeze_reset_month: currentMonth } : prev);
+    const { data: updated, error } = await supabase.rpc("use_streak_freeze");
+    if (error) { console.error("[streak] use_streak_freeze falló:", error.message); return; }
+    if (updated) setStreak(updated);
   }
 
   function scheduleNotifSW() {

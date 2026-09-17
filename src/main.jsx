@@ -14,6 +14,10 @@ if ('serviceWorker' in navigator) {
 }
 
 function showFatalError(msg) {
+  if (!import.meta.env.DEV) {
+    console.error('ERROR CAPTURADO:', msg);
+    return;
+  }
   const div = document.createElement('div');
   div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7A2E2E;color:white;padding:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;max-height:50vh;overflow:auto';
   div.textContent = 'ERROR CAPTURADO:\n' + msg;

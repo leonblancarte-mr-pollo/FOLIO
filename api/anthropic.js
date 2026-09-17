@@ -1,6 +1,11 @@
+import { createClient } from "@supabase/supabase-js";
+
 const rateLimitStore = new Map();
 const WINDOW_MS = 60 * 1000;
 const MAX_FREE = 10;
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
 function getClientIp(req) {
   const fwd = req.headers["x-forwarded-for"];
@@ -48,6 +53,17 @@ export default async function handler(req, res) {
     req.headers["x-admin-key"] === process.env.ADMIN_KEY;
 
   if (!isAdmin) {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    if (!token) {
+      return res.status(401).json({ error: "Missing Authorization header" });
+    }
+    const supabaseAuth = createClient(SUPABASE_URL, ANON_KEY);
+    const { data: userData, error: userErr } = await supabaseAuth.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return res.status(401).json({ error: "Invalid session" });
+    }
+
     const ip = getClientIp(req);
     const limit = checkRateLimit(ip, MAX_FREE);
 
