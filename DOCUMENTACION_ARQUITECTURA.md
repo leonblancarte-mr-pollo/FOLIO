@@ -1,7 +1,13 @@
 # FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-09-13 · Generada tras auditoría completa del código.
+> Última actualización: 2026-09-18 · Sincronizada con el código en el commit `8eac60a` (audit de documentación).
 > Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
+
+## CHANGELOG
+
+- 2026-09-13 — Doc inicial de arquitectura (Fable 5)
+- 2026-09-17 — Sprint fixes críticos: bugs UI, seguridad economía, privacidad, higiene técnica
+- 2026-09-18 — Audit + sincronización con estado actual del código
 
 ---
 
@@ -19,7 +25,7 @@
 | vite-plugin-pwa (Workbox) | PWA instalable, offline | Público mobile-first; `registerType: autoUpdate`, `skipWaiting` |
 | Supabase (`@supabase/supabase-js` v2) | Auth + DB + RLS + RPCs | Backend completo sin servidor propio |
 | Vercel serverless (`api/`) | Proxies + endpoint de recomendaciones | Ocultar API keys, evitar CORS |
-| Anthropic Claude (`claude-sonnet-4-6`) | Enriquecer libros, recomendaciones por mood | Vía proxy, nunca desde el browser |
+| Anthropic Claude (`claude-sonnet-4-6`) | Enriquecer libros, recomendaciones por mood | Vía proxy que exige JWT de Supabase, nunca desde el browser |
 | Google Books API | Buscar libros/portadas/ISBN | Vía `api/books.js` con fallback ES→global |
 | Python (scikit-surprise, SVD) | Recomendador colaborativo | Corre en GitHub Actions (cron diario), materializa a Postgres |
 | Tailwind 3 (parcial) + estilos inline | UI | La mayor parte del estilo es inline con objeto `palette` de `theme.js` |
@@ -33,40 +39,49 @@
 ```
 FOLIO FINAL/
 ├── api/                      # Funciones serverless de Vercel (Node)
-│   ├── anthropic.js          # Proxy a api.anthropic.com + rate limit (10/min por IP)
+│   ├── anthropic.js          # Proxy a api.anthropic.com: exige JWT de Supabase (o x-admin-key) + rate limit 10/min por IP
 │   ├── books.js              # Proxy a Google Books (ES primero, global si <3 resultados)
-│   ├── recommendations.js    # GET recomendaciones: lee recommendation_scores con el JWT del usuario
+│   ├── recommendations.js    # GET recomendaciones: valida el JWT y lee recommendation_scores con ese JWT (RLS)
 │   └── buscalibre-check.js   # Verificación de link de afiliado Buscalibre
-├── server.js                 # Express local: mismo proxy Anthropic para `npm run dev`
+├── server.js                 # Express local: mismo proxy Anthropic (con la misma validación de JWT) para `npm run dev`
 ├── src/
-│   ├── main.jsx              # Entry: ErrorBoundary raíz + listeners globales de error (overlay rojo)
+│   ├── main.jsx              # Entry: ErrorBoundary raíz + listeners globales de error (overlay rojo SOLO en DEV)
 │   ├── App.jsx               # ⚠️ MONOLITO (~14.900 líneas): casi TODAS las vistas y helpers
 │   ├── supabase.js           # createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 │   ├── theme.js              # PALETTE_LIGHT/DARK + objeto mutable `palette` + resolveTheme
 │   ├── haptics.js / sounds.js# Vibración y efectos de sonido (howler)
-│   ├── services/             # Capa de datos (extraída del monolito, commit 3b3adfd)
-│   │   ├── authService.js    # login/registro/sesión (Supabase Auth) + caché offline de perfil
-│   │   ├── booksService.js   # CRUD books + mapeo dbToBook/bookToDb + caché/cola offline
-│   │   ├── streakService.js  # fetchStreakData, checkStreakOnLoad, fechas locales
-│   │   ├── gemsService.js    # Solo LECTURA de gemas + RPC claim_daily_gems + event buses
-│   │   ├── petService.js     # Mascota: load/create/rename; XP es solo SYNC (server la otorga)
-│   │   ├── listsService.js   # CRUD listas personalizadas (user_lists / user_list_books)
-│   │   └── recommendationService.js # BookTinder: books_curated por género + límite diario de saves
-│   ├── components/           # Componentes extraídos (modales de libro, listas, BookTinder)
-│   ├── pets/                 # PetDisplay, PetHub, PetOnboarding, PetScene, PetLevelUpToast
-│   └── data/cuentos*         # ~20 cuentos clásicos embebidos (dominio público) para "Snacks"
-├── supabase/                 # Migraciones SQL (correr a mano en el SQL Editor)
-│   ├── auth_rls_migration.sql        # RLS de TODAS las tablas core
-│   ├── sprint1_server_authority.sql  # reward_ledger + folio_award + triggers anti-cheat
-│   ├── features_migration.sql        # user_lists + delete_my_account()
-│   └── recommendation_scores.sql     # Tabla que llena el job de Python
+│   ├── index.css             # Tailwind base + estilos globales
+│   ├── services/             # Capa de datos (extraída del monolito, commit 3b3adfd) — 7 servicios, ver §VI
+│   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal,
+│   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal
+│   ├── pets/                 # PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene
+│   ├── data/                 # cuentos.js + cuentos/*.txt: ~23 cuentos de dominio público para "Snacks"
+│   │                         # (los `_raw_*.txt` son material fuente sin procesar)
+│   └── scripts/seed-books.js # Script suelto de seed (no forma parte del bundle)
+│   (no existe `src/pages/`: no hay router, las "páginas" son vistas dentro de App.jsx)
+├── public/                   # Iconos PWA, `logo.png`, `gema.png`, `avatars/avatar-1..10.png`, `pets/` (cat.png, cat-blink.png,
+│                             # cat-video.mp4), `sw-notifications.js` (notificaciones programadas, importado por el SW de Workbox)
+├── supabase/                 # Migraciones SQL (correr a mano en el SQL Editor, EN ESTE ORDEN)
+│   ├── auth_rls_migration.sql            # 1. RLS de TODAS las tablas core (+ policies de Storage)
+│   ├── features_migration.sql            # 2. user_lists + delete_my_account()
+│   ├── recommendation_scores.sql         # 3. Tabla que llena el job de Python
+│   ├── sprint1_server_authority.sql      # 4. reward_ledger + folio_award + triggers anti-cheat
+│   ├── security_patch_reading_logs.sql   # 5. session_id único + rate limit de recompensas de lectura
+│   ├── security_patch_achievements.sql   # 6. Cierra INSERT libre de logros → RPC award_achievement
+│   ├── security_patch_streaks.sql        # 7. Cierra UPDATE libre de user_streaks → RPCs update_streak/freeze
+│   ├── privacy_hardening.sql             # 8. RLS de lectura respeta is_public/amistad; email fuera del SELECT
+│   └── timezone_fix.sql                  # 9. "Hoy" server-side = America/Mexico_City
 ├── scripts/
 │   ├── train_recommender.py  # SVD → top-20 por usuario → upsert a recommendation_scores
-│   └── books-500.json/sql    # Seed del catálogo books_curated
+│   ├── books-500.json/sql    # Seed del catálogo books_curated
+│   ├── books-data.js, generate-500-books.js, find_duplicates.py  # Generación/limpieza del catálogo
 ├── .github/workflows/train-recommender.yml  # Cron 3:00 UTC diario + manual
+├── requirements.txt          # Deps de Python del job de entrenamiento
 ├── vite.config.js            # PWA manifest + estrategias de caché Workbox
 ├── vercel.json               # Cache-Control no-store para index.html/sw.js (¡crítico para PWA!)
-└── .env / .env.example       # VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, ANTHROPIC_API_KEY
+├── generate-icons.mjs        # Genera iconos PWA desde SVG (usa @resvg/resvg-js)
+├── AUDITORIA_FASE1_REPORTE.md / SISTEMA_MASCOTAS_EVOLUTIVAS.md  # Reporte de auditoría de esquema y diseño futuro de mascotas
+└── .env / .env.example       # Ver "Variables de entorno" en §III (⚠️ .env.example está desactualizado)
 ```
 
 **Convenciones:** servicios en `src/services/*Service.js` con named exports; componentes PascalCase; código y comentarios en español; columnas DB en snake_case mapeadas a camelCase en la capa de servicios (`dbToBook`/`bookToDb`).
@@ -79,7 +94,7 @@ FOLIO FINAL/
 - **Sin router**: la navegación es un estado `tab` en `MainApp` (`home | social | library | add | profile`...) + sub-tabs con `SubTabBar`. Deep-links se resuelven leyendo `window.location.search` (ej. `?action=log` abre el modal de registro, `?ref=usuario` abre perfil referido).
 - **Sin state manager**: `useState`/`useEffect` + prop drilling desde `MainApp`, más **event buses** caseros (patrón pub/sub con arrays de listeners): `gemsEventBus`, `gemToastBus`, `petBus`, `achievementBus`. Sirven para que servicios sin acceso a React notifiquen a la UI (toasts de gemas, level-up de mascota, logros desbloqueados).
 - **Tema**: `theme.js` exporta un objeto **mutable** `palette`; `MainApp` hace `Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT)` en cada render. Los componentes leen `palette.xxx` en estilos inline. Preferencia en `localStorage('folio_theme')`: light/dark/system.
-- **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection` que pintan un **overlay rojo de debug** directo en `document.body` (⚠️ activo en producción, ver §XII).
+- **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection`. El **overlay rojo de debug** (div en `document.body`) ahora solo se pinta con `import.meta.env.DEV`; en producción solo hace `console.error`. ⚠️ El fallback de `RootErrorBoundary` (pantalla roja con stack + botón Recargar) sigue siendo el mismo en producción ante un crash de React (ver §XII).
 
 ### Backend (Supabase)
 - **Auth**: email+password, "Confirm email" OFF (sesión inmediata al registrarse). Sesión persistida en localStorage por supabase-js.
@@ -89,11 +104,18 @@ FOLIO FINAL/
   - Triggers: libro terminado → **+50 XP +50 gemas** (idempotente por book id); sesión de lectura → **+2 XP por cada 10 páginas, +5 gemas**.
   - RPCs para lo iniciado por el cliente: `pet_daily_checkin()` (+3 XP, idempotente por día), `claim_daily_gems()` (+5 + bonus consecutivos, gate 20 h, crea fila con bienvenida), `claim_achievement_gems(keys[])` (+10 por logro).
   - `guard_pet_columns()`: trigger que impide al cliente tocar `xp`/`level` de `user_pets` (solo puede renombrar).
+- **Hardening del sprint 2026-09-17** (5 migraciones posteriores, ver §VIII):
+  - `security_patch_reading_logs.sql`: `reading_logs.session_id` (UUID único generado por el cliente, reutilizado en reintentos offline) es el `ref` idempotente del premio; rate limit server-side (máx. 12 logs premiados/día y 4/hora — pasado el tope el log se guarda pero no paga).
+  - `security_patch_achievements.sql`: el cliente ya NO puede insertar en `achievements`; solo la RPC `award_achievement(key)` (revalida la condición real de cada logro en SQL).
+  - `security_patch_streaks.sql`: el cliente ya NO puede escribir `user_streaks`; solo RPCs `update_streak()` (exige un `reading_log` real de hoy y recalcula `total_pages_read` como SUMA real), `reset_monthly_freeze()` y `use_streak_freeze()`.
+  - `privacy_hardening.sql`: `is_public` ahora se hace cumplir en RLS (users/books/user_streaks/achievements: SELECT solo propio, público o amigo aceptado) y `users.email` se excluye del SELECT a nivel de columna.
+  - `timezone_fix.sql`: "hoy" server-side = `(now() AT TIME ZONE 'America/Mexico_City')::date` en `pet_daily_checkin`, `claim_daily_gems`, `update_streak`, freeze; el cliente sigue usando su fecha local (`localDateStr`).
 
 ### APIs externas
 - **Google Books** (`api/books.js`): busca con `langRestrict=es`, si hay <3 resultados repite global y mezcla. `s-maxage=300` en CDN. El cliente (`searchGoogleBooks` en App.jsx) deduplica por título+autor normalizados y cachea 60 s en memoria.
 - **Open Library**: solo portadas (`covers.openlibrary.org`) como fallback, cacheadas por el service worker.
-- **Anthropic**: dos usos — `enrichBook(title, author)` (género/resumen/moodTags en JSON) y `getRecommendations(books, moodAnswers)` (flow "Recomiéndame" por mood). Modelo `claude-sonnet-4-6`, respuesta parseada con `JSON.parse` tras limpiar fences.
+- **Anthropic**: dos usos — `enrichBook(title, author)` (género/resumen/moodTags en JSON) y `getRecommendations(books, moodAnswers)` (flow "Recomiéndame" por mood). Modelo `claude-sonnet-4-6`, respuesta parseada con `JSON.parse` tras limpiar fences. El cliente manda `Authorization: Bearer <access_token>` (helper en App.jsx ~línea 917) y ambas funciones validan el payload del proxy: un 429 o una respuesta sin `content` muestran un mensaje amigable en vez de romper la UI.
+- **Supabase Storage** (buckets creados a mano en el dashboard; sus policies están en `auth_rls_migration.sql`): `avatars` y `covers` (foto/portada de perfil, path `<user_id>.<ext>`, `upsert`) y `post-images` (imagen adjunta a posts).
 
 ### IA/ML colaborativo
 Pipeline en 3 piezas desacopladas (no hay Python en producción):
@@ -104,7 +126,24 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 ### Deployment
 - **Vercel**: proyecto `folio-final` (team `leonblancarte-9639s-projects`). ⚠️ **El repo GitHub NO está conectado a Vercel** (pendiente de vincular Login Connection GitHub↔Vercel): los deploys son manuales con `vercel --prod`. Un `git push` NO deploya.
 - `vercel.json`: `Cache-Control: no-store` para `/`, `index.html`, `sw.js`, `workbox-*` — imprescindible para que la PWA se actualice; los assets con hash sí se cachean agresivamente.
-- Env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (expuestas al cliente, correcto), `ANTHROPIC_API_KEY`, `GOOGLE_BOOKS_API_KEY`, `ADMIN_KEY` (solo server).
+
+### Variables de entorno
+| Variable | Dónde | Uso |
+|---|---|---|
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | cliente + funciones `api/` + `server.js` + GitHub Actions | Expuestas al cliente (correcto); las funciones las usan para validar el JWT del usuario |
+| `ANTHROPIC_API_KEY` | solo server (`api/anthropic.js`, `server.js`) | Proxy Anthropic |
+| `GOOGLE_BOOKS_API_KEY` | solo server (`api/books.js`) | Opcional; sube la cuota de Google Books |
+| `ADMIN_KEY` | solo server | Bypass del proxy Anthropic vía header `x-admin-key` (sin JWT ni rate limit) |
+| `SUPABASE_SERVICE_ROLE_KEY` | SOLO GitHub Actions (secret) | Job de entrenamiento; jamás en Vercel ni en el cliente |
+| `PORT` | `server.js` | Puerto del proxy local (default 3001) |
+
+⚠️ `.env.example` está desactualizado: solo lista `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y `VITE_ANTHROPIC_API_KEY` — el código lee `ANTHROPIC_API_KEY` (sin prefijo `VITE_`, que además expondría la key al bundle) y `.env.example` no menciona `ADMIN_KEY` ni `GOOGLE_BOOKS_API_KEY`.
+
+### Dependencias (package.json)
+- **runtime**: `react`/`react-dom` 18, `@supabase/supabase-js` ^2.105, `lucide-react`, `canvas-confetti`, `howler`, `html2canvas`; `express`, `dotenv` y `concurrently` (solo para `npm run dev`, están en `dependencies` pero no van al bundle).
+- **dev**: `vite` 5, `@vitejs/plugin-react`, `vite-plugin-pwa`, `tailwindcss` 3 + `postcss` + `autoprefixer`, `@resvg/resvg-js` (`generate-icons.mjs`), `pg` (sin uso detectado en el repo).
+- **Python** (`requirements.txt`, solo el job de GitHub Actions): `supabase`, `pandas`, `numpy`, `scipy`, `scikit-surprise`, `fuzzywuzzy`, `python-Levenshtein`.
+- No hay dependencia de email transaccional (Resend/SMTP/etc.): el código no envía emails propios, solo los de Supabase Auth.
 
 ---
 
@@ -114,15 +153,16 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 - UI: `LibraryView` (grid de `BookCard`), `BookDetailModal` (editar, calificar, reseñar, borrar), `AddBookView` + `SearchBookModal` (busca en Google Books) + `BookForm` (manual).
 - Servicios: `booksService.fetchBooks/insertBook/updateBookInDB/deleteBookFromDB`. Estados: `reading | want_to_read | wish | read` (`STATUS_META`).
 - Al agregar, `enrichBook()` (Claude) puede completar género/resumen/moodTags.
-- DB: tabla `books` (por usuario, sin FK a catálogo). RLS: SELECT abierto a autenticados (necesario para perfiles de amigos), escritura solo propia.
+- DB: tabla `books` (por usuario, sin FK a catálogo). RLS: SELECT solo propio, de cuentas públicas (`users.is_public` ≠ false) o de amigos aceptados (`privacy_hardening.sql`); escritura solo propia.
 - Al marcar `read`: trigger `trg_book_finished` otorga +50 XP/+50 gemas (una sola vez por libro), y la UI dispara `BookFinishedCelebration` (confetti, rating rápido, share card).
 
 ### 2. Racha (streak)
 - UI: `DailyReadingBanner` (Home/Feed), `RachaModal`, `ReadingLogModal` (registrar páginas + mood), `FiveMinutesModal` (timer de lectura).
 - Servicio: `streakService.fetchStreakData(userId)` → `{ streak, hasLoggedToday, pagesLoggedToday }` (lee `user_streaks` + `reading_logs` de hoy). `checkStreakOnLoad` decide si la racha está activa o **en PAUSA** (filosofía anti-castigo: nunca se resetea, se congela).
-- **Freeze**: 1 protector/mes (`streak_freezes_remaining`, reset mensual en `loadStreakInfo`); si faltó 1 día y el freeze se usó ayer, la racha sobrevive.
-- Fechas **siempre locales** (`localDateStr`, `daysBetweenLocalDates` parsea a mediodía local para evitar bugs de DST/UTC).
-- DB: `user_streaks` (current_streak, longest_streak, last_log_date, total_pages_read), `reading_logs` (pages_read, mood, log_date). El check-in diario de XP es server-side (`pet_daily_checkin`, idempotente por día).
+- **Freeze**: 1 protector/mes (`streak_freezes_remaining`, reset mensual vía RPC `reset_monthly_freeze` desde `loadStreakInfo`); si faltó 1 día y el freeze se usó ayer, la racha sobrevive.
+- Fechas **locales en el cliente** (`localDateStr`, `daysBetweenLocalDates` parsea a mediodía local para evitar bugs de DST/UTC); el servidor usa fecha de `America/Mexico_City` para los premios y la racha (ver §VIII).
+- **La racha ya no la escribe el cliente**: `logReadingSession` (App.jsx) inserta en `reading_logs` con un `session_id` (`crypto.randomUUID()`) y luego llama a la RPC `update_streak()`, que avanza la racha solo si existe un log real de hoy. El freeze se consume/reasigna con las RPCs `use_streak_freeze()` / `reset_monthly_freeze()` (llamadas desde `loadStreakInfo` en App.jsx, no desde `streakService`).
+- DB: `user_streaks` (current_streak, longest_streak, last_log_date, total_pages_read — solo SELECT para el cliente), `reading_logs` (pages_read, mood, log_date, `session_id` único). El check-in diario de XP es server-side (`pet_daily_checkin`, idempotente por día, fecha México).
 
 ### 3. Mascota (pet)
 - UI: `PetOnboarding` (elegir/nombrar), `PetDisplay` (header), `PetHub` (panel), `PetLevelUpToast`. Un solo tipo actual: gato ("El Sensible"); diseño futuro en `SISTEMA_MASCOTAS_EVOLUTIVAS.md`.
@@ -131,7 +171,7 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 
 ### 4. Gemas
 - Solo se **leen** en el cliente (`loadGems`); toda escritura vía RPCs/triggers. La UI actualmente **no muestra gemas como moneda** (`showGemToast` es no-op; la moneda visible es el XP de la mascota). Se gastan en BookTinder: +5 saves por 5 gemas (`buyExtraSaves` — ⚠️ este único flujo aún descuenta con UPDATE directo del cliente, ver §XII).
-- DB: `user_gems` (SELECT propio; sin INSERT/UPDATE de cliente), `reward_ledger` como auditoría.
+- DB: `user_gems` (SELECT propio; sin INSERT/UPDATE de cliente), `reward_ledger` como auditoría. El premio por sesión de lectura ya no es farmeable: paga una vez por `session_id` y con tope de 12/día y 4/hora.
 
 ### 5. Feed social
 - UI: `FeedView` (posts + `FeedEditorialContent` + `SnacksCarousel`), `PostDraftModal` (borrador al terminar sesión), `PostComments` (+ replies + likes), `QuotePostCard`, `BookPreviewModal` (agregar libro desde post de otro).
@@ -140,7 +180,7 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 - Realtime: suscripciones de Supabase para mensajes/notifs no leídos.
 
 ### 6. Amigos + Chat
-- UI: `FriendsView` (buscar por username, solicitudes, lista), `ChatView` (1:1), `FriendProfileModal` + `CompareProfilesView` + `LiteraryCompatibility` (% de compatibilidad lectora).
+- UI: `FriendsView` (buscar por username, solicitudes, lista; ⚠️ desde `privacy_hardening.sql` las cuentas con `is_public=false` NO aparecen en la búsqueda para quien aún no es su amigo), `ChatView` (1:1), `FriendProfileModal` + `CompareProfilesView` + `LiteraryCompatibility` (% de compatibilidad lectora).
 - DB: `friendships` (user_id, friend_id, status pending/accepted), `conversations` (user1/user2), `messages`. RLS restringe conversaciones/mensajes a las partes.
 
 ### 7. Recomendaciones (3 motores distintos)
@@ -149,13 +189,13 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 3. **Colaborativo SVD** (`CollaborativeRecommendations` → `api/recommendations.js` → `recommendation_scores`): personalizado si ≥3 ratings, si no fallback a mejor valorados.
 
 ### 8. Logros (achievements)
-- Motor client-side `checkAchievements(userId)`: 27 defs en `ACHIEVEMENT_DEFS` (lectura, sesiones, rachas, social, especiales). Consulta 6 tablas en paralelo, compara contra `checks{}`, inserta los nuevos y emite `achievementBus` → `AchievementCelebration` (modal + confetti + compartir). Gemas del logro las paga el server (`claim_achievement_gems`).
+- Motor client-side `checkAchievements(userId)`: 27 defs en `ACHIEVEMENT_DEFS` (lectura, sesiones, rachas, social, especiales). Consulta 6 tablas en paralelo y compara contra `checks{}` para obtener *candidatos*; **el otorgamiento es server-side**: por cada candidato llama a la RPC `award_achievement(key)`, que revalida la condición real en SQL (mismas 27 keys; key desconocida → nunca se otorga) e inserta la fila. Los que devuelve `true` emiten `achievementBus` → `AchievementCelebration` (modal + confetti + compartir). Gemas del logro las paga el server (`claim_achievement_gems`). ⚠️ La lógica de cada logro vive duplicada (JS en `checkAchievements` + SQL en `award_achievement`): si se añade o cambia un logro hay que tocar ambos.
 
 ### 9. Citas (quotes)
 - `SaveQuoteModal`, `QuotesView`, `QuoteDetailModal`, `QuoteShareCard` (html2canvas para exportar imagen), compartir al feed. Tabla `quotes` con `is_public`.
 
 ### 10. Snacks literarios (cuentos)
-- ~20 cuentos de dominio público embebidos en `src/data/cuentos/*.txt` (importados vía `cuentos.js`). `ReaderView` es un lector in-app con progreso. Cero dependencia de red — funciona offline.
+- ~23 cuentos de dominio público embebidos en `src/data/cuentos/*.txt` (importados vía `cuentos.js`). `ReaderView` es un lector in-app con progreso. Cero dependencia de red — funciona offline.
 
 ### 11. Wrapped mensual
 - `WrappedStoryExperience` / `WrappedCard`: resumen tipo Spotify Wrapped del mes (libros, páginas, racha), generado client-side, guardado en `monthly_wraps`, exportable como imagen.
@@ -185,17 +225,20 @@ BookDetailModal "Marcar leído" → updateBookInDB(status='read')
   ├─ [DB trigger] trg_book_finished → folio_award(+50 XP, +50 gemas, ref=book.id)  ← idempotente
   ├─ [UI] BookFinishedCelebration (confetti + rating + share)
   ├─ addPetXP() re-lee user_pets → petBus.emit → PetLevelUpToast si subió
-  ├─ checkAchievements() → nuevos logros → achievementBus → AchievementCelebration
+  ├─ checkAchievements() → candidatos → RPC award_achievement(key) valida en SQL → achievementBus → AchievementCelebration
   │    └─ si es FEED_WORTHY → post automático al feed
   └─ feed: opción de compartir → posts → amigos lo ven → BookPreviewModal → "+ Agregar"
 ```
 
 ### Registrar sesión de lectura
 ```
-ReadingLogModal → INSERT reading_logs + UPDATE user_streaks (racha, páginas)
-  ├─ [DB trigger] trg_reading_logged → +2 XP/10 págs, +5 gemas
+ReadingLogModal → logReadingSession() genera session_id (crypto.randomUUID)
+  ├─ INSERT reading_logs { ..., log_date (local), session_id }   ← 23505 = sesión ya sincronizada → se corta sin duplicar
+  │    └─ [DB trigger] trg_reading_logged → +2 XP/10 págs, +5 gemas (ref = session_id; máx 12/día y 4/hora, luego guarda sin pagar)
+  ├─ RPC update_streak() → el servidor avanza racha y total_pages_read (exige log real de hoy, fecha México)
   ├─ PostDraftModal ofrece compartir la sesión al feed
-  └─ offline → addPendingLog() a localStorage → al volver online, syncPendingLogs()
+  └─ offline → addPendingLog({..., sessionId}) a localStorage → al volver online, syncPendingLogs() reusa el MISMO session_id
+       (un reintento ya sincronizado choca con el UNIQUE y no paga dos veces)
 ```
 
 ### Recomendación colaborativa
@@ -209,7 +252,7 @@ ReadingLogModal → INSERT reading_logs + UPDATE user_streaks (racha, páginas)
 ```
 main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallback caché local)
   → MainApp: fetchBooks (o caché offline) + loadPet + loadGems + claim_daily_gems
-  + checkStreakOnLoad + pet_daily_checkin + realtime subs (mensajes/notifs)
+  + checkStreakOnLoad + pet_daily_checkin + reset_monthly_freeze + realtime subs (mensajes/notifs)
 ```
 
 ---
@@ -219,12 +262,14 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 | Servicio | Exports clave | Llama a | Notas |
 |---|---|---|---|
 | `authService` | `loginWithSupabase`, `registerWithSupabase`, `getSessionUser`, `updateDisplayName`, `logout` | Supabase Auth + `users` | Mapea `nombre`→`name`; caché `folio_auth_user` para offline |
-| `booksService` | `fetchBooks`, `insertBook`, `updateBookInDB`, `deleteBookFromDB`, `dbToBook/bookToDb`, caché/colas offline | `books` | Reintenta sin `total_pages/read_date_precision` si la migración no corrió (`isUnknownColumnError`); UPDATE/DELETE verifican filas afectadas para detectar RLS |
-| `streakService` | `fetchStreakData`, `checkStreakOnLoad`, `localDateStr`, `daysBetweenLocalDates` | `user_streaks`, `reading_logs`, RPC `pet_daily_checkin` | Racha se PAUSA, nunca se resetea |
+| `booksService` | `fetchBooks`, `insertBook`, `updateBookInDB`, `deleteBookFromDB`, `dbToBook`/`bookToDb`, `isUnknownColumnError`, `stripTotalPages`, `readDateLabel`; caché offline: `cacheBooks`/`getCachedBooks`, `cacheProfile`/`getCachedProfile`, `cacheAchievements`/`getCachedAchievements`; colas: `getPendingLogs`/`addPendingLog`, `getPendingPosts`/`addPendingPost` | `books` | Reintenta sin `total_pages/read_date_precision` si la migración no corrió (`isUnknownColumnError`); UPDATE/DELETE verifican filas afectadas para detectar RLS. Los pending logs guardan `sessionId` |
+| `streakService` | `fetchStreakData`, `checkStreakOnLoad`, `localDateStr`, `daysBetweenLocalDates` | `user_streaks`, `reading_logs`, RPC `pet_daily_checkin` | Racha se PAUSA, nunca se resetea. Solo lee; las escrituras de racha/freeze van por RPCs `update_streak`/`use_streak_freeze`/`reset_monthly_freeze` (llamadas desde App.jsx) |
 | `gemsService` | `loadGems`, `claimDailyGems`, `initUserGems`, `gemsEventBus`, `gemToastBus` | `user_gems`, RPC `claim_daily_gems` | Cliente solo lee |
-| `petService` | `loadPet`, `createPet`, `updatePetName`, `addPetXP` (sync), `petBus`, `PET_TYPES` | `user_pets` | `loadPet` distingue null (sin mascota) de undefined (error) para no romper onboarding |
-| `listsService` | CRUD `user_lists` + `addBookToList`/`removeBookFromList` | `user_lists`, `user_list_books` | 23505 tratado como éxito idempotente |
-| `recommendationService` | `getRecommendations`, `getPreferredGenres`, `checkDailyLimit`, `incrementSaveCounter`, `buyExtraSaves`, `GENRE_MAP` | `books_curated`, `daily_save_limits`, `user_gems` | Límite 15/día; expansión de géneros del onboarding |
+| `petService` | `loadPet`, `createPet`, `updatePetName`, `addPetXP` (sync), `petBus`, `PET_TYPES`, `PET_MAX_LEVEL`, `petXpForLevel`, `petImageSrc` | `user_pets` | `loadPet` distingue null (sin mascota) de undefined (error) para no romper onboarding |
+| `listsService` | `fetchUserLists`, `createUserList`, `updateUserList`, `deleteUserList`, `addBookToList`, `removeBookFromList` | `user_lists`, `user_list_books` | 23505 tratado como éxito idempotente |
+| `recommendationService` | `getRecommendations`, `getPreferredGenres`, `checkDailyLimit`, `incrementSaveCounter`, `buyExtraSaves` (⚠️ client-side, ver §XII) | `books_curated`, `daily_save_limits`, `user_gems` | Límite 15/día (`localDateStr` para la fecha); expansión de géneros del onboarding vía `GENRE_MAP` (interno, no exportado) |
+
+Helpers que **siguen en App.jsx** (no en services): `logReadingSession`, `syncPendingLogs`, `checkAchievements`, `enrichBook`, `getRecommendations` (versión Claude/mood, distinta a la de `recommendationService`), `searchGoogleBooks`, `createFeedPost`; `loadStreakInfo` es una función interna de un componente de App.jsx (~línea 9873).
 
 Ejemplo de uso típico:
 ```js
@@ -237,7 +282,7 @@ await insertBook({ title, author, status: "want_to_read" }, user.id);
 
 ## VII. COMPONENTES PRINCIPALES
 
-Todo vive en `App.jsx` salvo lo extraído a `src/components/` y `src/pets/`. Jerarquía:
+Todo vive en `App.jsx` salvo lo extraído a `src/components/` (AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal, ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal) y `src/pets/` (PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene). No existe `src/pages/`. Jerarquía:
 
 ```
 main.jsx → RootErrorBoundary → App
@@ -264,26 +309,33 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 ## VIII. BASE DE DATOS (Supabase)
 
 ### Tablas
-`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar`, `is_public`) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger`.
+`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger`.
 
-### RLS (auth_rls_migration.sql) — modelo general
-- **Lectura social abierta** a `authenticated`: users, books, streaks, pets, achievements, wraps, posts, comments, likes, friendships (necesario para perfiles de amigos y feed). Privadas: quotes (`is_public` o propias), reading_logs, gems, notifications (solo destinatario), messages/conversations (solo las partes), recommendation_scores y reward_ledger (solo propias).
-- **Escritura**: siempre `auth.uid() = user_id` (o partes de la conversación). `user_gems` y `reward_ledger` sin política de escritura → solo SECURITY DEFINER.
+**Vistas:** `users_public` (`security_invoker`, columnas `id, nombre, username, avatar_url, cover_url, bio, is_public`, sin email; creada por `privacy_hardening.sql`, el código actual todavía no la usa). **Columnas añadidas por los parches:** `reading_logs.session_id` (uuid NOT NULL DEFAULT gen_random_uuid(), UNIQUE). **Storage:** buckets `avatars`, `covers`, `post-images` (ver §III).
 
-### Funciones y triggers (sprint1_server_authority.sql)
+### RLS — modelo general (`auth_rls_migration.sql` + parches posteriores)
+- **Lectura con privacidad real** (`privacy_hardening.sql`, reemplaza las antiguas `*_select_auth` abiertas): `users` (`users_select_scoped`), `books` (`books_select_scoped`), `user_streaks` (`streaks_select_scoped`) y `achievements` (`ach_select_scoped`) permiten SELECT solo si eres el dueño, el dueño tiene `is_public` ≠ false (default histórico "público", `COALESCE(is_public,true)`) o hay `friendships.status='accepted'` entre ambos. `users.email` además está revocado a nivel de **columna** (GRANT SELECT explícito sobre todas las demás columnas, calculado al correr la migración: ⚠️ una columna añadida después a `users` NO queda legible hasta re-otorgar el GRANT).
+- **Lectura social abierta** a `authenticated` que se mantiene: pets, wraps, posts, comments, likes, friendships. Privadas: quotes (`is_public` o propias), reading_logs, gems, notifications (solo destinatario), messages/conversations (solo las partes), recommendation_scores y reward_ledger (solo propias).
+- **Escritura**: `auth.uid() = user_id` (o partes de la conversación), EXCEPTO: `user_gems`, `reward_ledger`, **`achievements`** (`ach_write_own` eliminada) y **`user_streaks`** (`streaks_write_own` eliminada), que quedan sin política de escritura → solo SECURITY DEFINER (triggers/RPCs).
+
+### Funciones y triggers (`sprint1_server_authority.sql` + parches de seguridad)
 | Objeto | Qué hace |
 |---|---|
 | `folio_award(user, xp, gems, reason, ref)` | Única puerta de recompensas; idempotente vía reward_ledger; level-up loop (nivel*100, cap 50); REVOKE a clientes |
 | `trg_book_finished` (INSERT/UPDATE books) | status→'read': +50 XP +50 gemas, ref=book id |
-| `trg_reading_logged` (INSERT reading_logs) | +2 XP por cada 10 páginas, +5 gemas |
-| `pet_daily_checkin()` RPC | +3 XP si racha activa; idempotente por día |
-| `claim_daily_gems()` RPC | +5 + bonus consecutivos; gate 20 h; crea fila con bienvenida |
+| `trg_reading_logged` (INSERT reading_logs) | +2 XP por cada 10 páginas, +5 gemas; `ref = session_id` (idempotente); rate limit: >12 logs en el día o >4 en la última hora → el log se guarda pero no paga (`security_patch_reading_logs.sql`) |
+| `pet_daily_checkin()` RPC | +3 XP si racha activa; idempotente por día (día = fecha `America/Mexico_City`) |
+| `claim_daily_gems()` RPC | +5 + bonus consecutivos; gate 20 h; crea fila con bienvenida; fecha México (`timezone_fix.sql`) |
 | `claim_achievement_gems(keys[])` RPC | +10 gemas por logro, idempotente por key |
+| `award_achievement(key)` RPC (`security_patch_achievements.sql`) | Revalida en SQL la condición real de cada uno de los 27 logros contra las tablas del `auth.uid()`; inserta en `achievements`; devuelve `true` si lo otorgó, `false` si ya estaba o no cumple (key desconocida nunca se otorga) |
+| `update_streak()` RPC (`security_patch_streaks.sql`) | Exige un `reading_log` real de hoy (fecha México); avanza `current_streak`/`longest_streak`/`last_log_date`; `total_pages_read` = SUMA real de `reading_logs` |
+| `reset_monthly_freeze()` RPC | Reasigna 1 protector si cambió el mes (México) y quedaban 0 |
+| `use_streak_freeze()` RPC | Consume el protector (`streak_freezes_remaining`=0, `streak_freeze_used_at`=hoy); lanza excepción si no hay disponible |
 | `guard_pet_columns` trigger | Cliente no puede tocar xp/level de user_pets |
 | `delete_my_account()` (features_migration) | Borrado en cascada de la cuenta del usuario autenticado |
 
 ### Índices relevantes
-`reward_ledger_once` (UNIQUE parcial user+reason+ref WHERE ref IS NOT NULL), `recommendation_scores_user_idx`, PKs/uniques (user_pets.user_id UNIQUE, achievements UNIQUE(user_id, key), daily_save_limits onConflict user_id+date).
+`reward_ledger_once` (UNIQUE parcial user+reason+ref WHERE ref IS NOT NULL), `reading_logs_session_id_key` (UNIQUE `session_id`), `recommendation_scores_user_idx`, PKs/uniques (user_pets.user_id UNIQUE, achievements UNIQUE(user_id, key), daily_save_limits onConflict user_id+date).
 
 ---
 
@@ -293,9 +345,11 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 |---|---|---|
 | Google Books | `GET /api/books?q=` | Server añade `GOOGLE_BOOKS_API_KEY` si existe; ES-first; CDN cache 5 min; cliente deduplica y cachea 60 s |
 | Open Library | directo desde el cliente | Solo covers; SW cachea 200 imágenes 30 días |
-| Anthropic | `POST /api/anthropic` | Passthrough del body a `/v1/messages`; rate limit 10 req/min/IP (Map en memoria — se resetea por cold start); bypass con header `x-admin-key` |
-| Supabase Auth | supabase-js | Token en localStorage; realtime channels para chat/notifs |
-| Vercel | `vercel --prod` manual | ⚠️ sin integración Git aún; `vercel.json` controla el caching |
+| Anthropic | `POST /api/anthropic` | Passthrough del body a `/v1/messages`. **Exige `Authorization: Bearer <JWT Supabase>`** (validado con `supabase.auth.getUser`; 401 si falta o es inválido) o el header `x-admin-key` (bypass total, sin JWT ni rate limit). Rate limit 10 req/min/IP, solo para usuarios no-admin (Map en memoria — se resetea por cold start). `server.js` (dev) valida el JWT igual pero sin rate limit |
+| Supabase Auth | supabase-js | Token en localStorage; realtime channels para chat/notifs. El JWT también autentica `/api/anthropic` y `/api/recommendations` |
+| Supabase Storage | supabase-js | Buckets `avatars`, `covers`, `post-images` (URLs públicas; avatar/portada se sobrescriben con `upsert` en `<user_id>.<ext>`) |
+| Email transaccional (Resend, etc.) | — | **No integrado.** No hay código ni dependencia; solo los emails propios de Supabase Auth |
+| Vercel | `vercel --prod` manual | ⚠️ sin integración Git aún; `vercel.json` controla el caching. Sus `rewrites` mencionan `/api/login`, que no existe en `api/` (rewrite muerto, inofensivo) |
 | GitHub Actions | cron diario | Entrena recomendador; secrets: SUPABASE_SERVICE_ROLE_KEY (SOLO aquí, jamás en Vercel/cliente) |
 | PWA/Workbox | vite.config.js | autoUpdate + skipWaiting; NetworkFirst para navegación (timeout 3 s → caché offline); `sw-notifications.js` para notifs programadas |
 
@@ -305,11 +359,11 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 
 1. **Servicios = funciones async con named exports** que devuelven datos o lanzan; el componente decide la UI de error.
 2. **Event buses pub/sub** para cruzar la frontera servicio→UI sin contexto React (`petBus`, `gemsEventBus`, `achievementBus`). Patrón: `bus.on(fn)` devuelve unsubscribe; usar dentro de `useEffect`.
-3. **Offline-first pragmático**: lecturas caen a caché localStorage (`folio_books`, `folio_profile`, `folio_auth_user`); escrituras van a colas (`folio_pending_logs/posts`) y se sincronizan al reconectar (`useOnlineStatus` + `syncPending*`).
+3. **Offline-first pragmático**: lecturas caen a caché localStorage (`folio_books`, `folio_profile`, `folio_auth_user`); escrituras van a colas (`folio_pending_logs/posts`) y se sincronizan al reconectar (`useOnlineStatus` + `syncPending*`). Los logs pendientes conservan su `sessionId`, así que el reintento es idempotente en el servidor.
 4. **Degradación por migraciones pendientes**: los servicios toleran columnas/tablas inexistentes (reintento sin columnas nuevas, warnings con el SQL a correr). Permite deployar frontend antes que la migración.
 5. **Idempotencia en todas las recompensas** (reward_ledger) y en inserts sociales (23505 = éxito).
-6. **Server authority**: cualquier valor "ganable" (XP/gemas/nivel) se decide en Postgres. El cliente solo lee y sincroniza.
-7. **Fechas de racha en hora local**, nunca UTC (`localDateStr`), y parseo a mediodía para aritmética de días.
+6. **Server authority**: cualquier valor "ganable" (XP/gemas/nivel, logros, racha) se decide en Postgres vía RPC/trigger SECURITY DEFINER; las tablas `user_gems`, `reward_ledger`, `achievements` y `user_streaks` no tienen política de escritura para el cliente. El cliente solo lee, calcula *candidatos* (p. ej. `checkAchievements`) y sincroniza.
+7. **Fechas**: el cliente usa hora local, nunca UTC (`localDateStr`), y parseo a mediodía para aritmética de días; el servidor calcula "hoy" en `America/Mexico_City` (`timezone_fix.sql`). ⚠️ Un usuario fuera de la zona horaria de México puede ver desfases de unas horas entre su `log_date` y el "hoy" del servidor.
 8. **IA con contrato JSON estricto**: prompts piden "SOLO JSON válido", se limpian fences y se parsea; sin streaming.
 9. **Naming**: DB snake_case ↔ app camelCase, mapeado únicamente en servicios; español para dominio y UI.
 
@@ -326,36 +380,56 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 
 ## XII. LIMITACIONES CONOCIDAS Y DEUDA TÉCNICA
 
+### Pendiente
+
 1. **App.jsx monolítico (~14.900 líneas)**: la extracción a services/components está a medias. Riesgo de merge conflicts y de recrear bugs tipo `fetchStreakData` (función definida pero no exportada tras mover código). **Regla: al mover código, verificar exports/imports con grep.**
-2. **Overlay rojo de debug en producción** (`main.jsx` líneas 16-29): cualquier `error`/`unhandledrejection` pinta un div rojo persistente fuera de React. Debería condicionarse a `import.meta.env.DEV`.
+2. **⚠️ Foto de portada de perfil sigue fallando en producción** (`handleCoverUpload` en App.jsx ~línea 4306: sube al bucket `covers` y hace `UPDATE users SET cover_url`). El commit `d9d0a03` (invalidar caché `folio_profile`) no lo resolvió. Causa raíz sin diagnosticar; revisar el error exacto que muestra la UI (`Storage error:` vs `DB error:` vs "posible bloqueo de permisos") y las policies del bucket `covers`.
 3. **Vercel sin integración Git**: deploys manuales (`vercel --prod`). El push a GitHub NO deploya. Pendiente: vincular GitHub en vercel.com/account/login-connections y `vercel git connect`.
-4. **`buyExtraSaves` descuenta gemas client-side** (UPDATE directo a `user_gems`) — inconsistente con el lockdown server-authority; hoy probablemente FALLA silenciosamente por RLS (sin política UPDATE para clientes). Migrar a RPC.
-5. **`daily_save_limits` e `incrementSaveCounter` son client-side** — burlables; mover a RPC si importa.
+4. **`buyExtraSaves` descuenta gemas client-side** (UPDATE directo a `user_gems`) — inconsistente con el lockdown server-authority; hoy probablemente FALLA silenciosamente por RLS (sin política UPDATE para clientes). Migrar a RPC SECURITY DEFINER. **SIGUE PENDIENTE.**
+5. **`daily_save_limits` e `incrementSaveCounter` son client-side** — burlables; mover a RPC si importa. (`timezone_fix.sql` solo documenta que el cliente escribe `date` en fecha local.)
 6. **Sin tests** de ningún tipo. Los "tests" son manuales (build + smoke test en navegador).
-7. **Rate limit del proxy Anthropic en memoria** — se resetea con cada cold start de la función; suficiente contra abuso casual, no contra abuso real.
+7. **Rate limit del proxy Anthropic en memoria** — se resetea con cada cold start de la función; suficiente contra abuso casual, no contra abuso real. (Ahora el proxy exige JWT, así que solo usuarios autenticados gastan cuota, pero cualquiera con cuenta puede hacer hasta 10 req/min por IP.)
 8. **Bundle de 1.2 MB** (warning de Vite): sin code-splitting; candidatos obvios: html2canvas ya se separa, faltaría lazy-load de vistas pesadas (Wrapped, BookTinder).
-9. **Datos basura en la raíz del repo**: `temp_*.txt`, `pg*_raw.txt`, `folio.jsx` (versión vieja del monolito), `gema.png.png`, `avatars-grid.png` — candidatos a limpieza/.gitignore.
-10. **Realtime y logros dependen de polling/eventos del cliente**: `checkAchievements` corre en momentos clave, no ante cualquier cambio server-side.
-11. **`users` legible por cualquier autenticado** (SELECT true): necesario para social, pero expone emails si se seleccionan — revisar columnas expuestas o vista pública.
+9. **Higiene residual del repo**: siguen versionados `test_avatar.png`, `test_avatar2.png`, `topleche_dashboard.html` y `crop_avatars.py` en la raíz, y los directorios `.claude/` y `.agents/` (~585 archivos de skills/config de herramientas) — candidatos a limpieza/`.gitignore`. `.env.example` desactualizado (ver §III). `vercel.json` con rewrite a `/api/login` inexistente. `pg` en devDependencies sin uso detectado.
+10. **Lógica de logros duplicada** (JS en `checkAchievements` + SQL en `award_achievement`): riesgo de divergencia al añadir/cambiar logros. Además, `checkAchievements` corre en momentos clave del cliente, no ante cualquier cambio server-side.
+11. **Fallback de `RootErrorBoundary` con estética de debug en producción**: ante un crash de React se muestra pantalla roja con el stack trace y "ERROR CAPTURADO POR BOUNDARY" (el overlay global sí quedó limitado a DEV).
+12. **Cuentas privadas no encontrables**: efecto secundario de `privacy_hardening.sql`; si se quiere búsqueda por username de cuentas privadas habría que usar la vista `users_public` (ya creada, sin uso todavía) con una política/función dedicada.
+13. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
+
+### Resuelto (sprint 2026-09-17, commits `280e7b8`, `d9d0a03`, `8eac60a`)
+
+| Item | Estado | Cómo se resolvió |
+|---|---|---|
+| Bug `fetchStreakData` undefined tras la extracción a services | ✅ RESUELTO 2026-09-17 | Exportado en `streakService` + try/catch con fallback (`280e7b8`) |
+| Overlay rojo de debug en producción | ✅ RESUELTO 2026-09-17 | `showFatalError` en `main.jsx` condicionado a `import.meta.env.DEV`; `enrichBook`/`getRecommendations` validan 429/payload sin `content` |
+| Farmeo infinito de XP/gemas vía `reading_logs` | ✅ RESUELTO 2026-09-17 | `session_id` único como ref idempotente + rate limit 12/día y 4/hora (`security_patch_reading_logs.sql`) |
+| Logros falsificables (INSERT libre en `achievements`) | ✅ RESUELTO 2026-09-17 | Política de escritura eliminada + RPC `award_achievement` (`security_patch_achievements.sql`) |
+| Racha con autoridad del cliente (UPDATE libre en `user_streaks`) | ✅ RESUELTO 2026-09-17 | Política de escritura eliminada + RPCs `update_streak`/`reset_monthly_freeze`/`use_streak_freeze` (`security_patch_streaks.sql`) |
+| Privacidad decorativa (`is_public` sin efecto en la DB) | ✅ RESUELTO 2026-09-17 | RLS `*_select_scoped` por dueño/público/amigo (`privacy_hardening.sql`) |
+| `users` legible por cualquier autenticado, con emails expuestos | ✅ RESUELTO 2026-09-17 | RLS scoped + REVOKE de `users.email` a nivel de columna + vista `users_public` |
+| Zonas horarias mezcladas (UTC servidor vs local cliente) | ✅ RESUELTO 2026-09-17 | "Hoy" server-side = `America/Mexico_City` (`timezone_fix.sql`) |
+| Doble recompensa en sync offline | ✅ RESUELTO 2026-09-17 | El mismo `session_id` viaja en la cola offline; el reintento choca con el UNIQUE |
+| Archivos basura en la raíz (`temp_*.txt`, `pg*_raw.txt`, `folio.jsx`, `gema.png.png`, `avatars-grid.png`, `.env.vercel.tmp`) | ✅ RESUELTO 2026-09-17 | Eliminados/desatados (secreto de `.env.vercel.tmp` ya expirado; ver residuo en Pendiente #9) |
+| Proxy Anthropic sin autenticación | ✅ RESUELTO 2026-09-17 | `api/anthropic.js` y `server.js` exigen JWT de Supabase válido (o `x-admin-key`) |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER
 
 **Leer primero (en orden):**
 1. Este documento.
-2. `supabase/sprint1_server_authority.sql` — el contrato anti-cheat lo explica todo sobre recompensas.
-3. `src/services/` completo (~800 líneas en total, se lee en una sentada).
-4. `MainApp` en App.jsx (línea ~12968) — el hub de estado.
+2. `supabase/sprint1_server_authority.sql` — el contrato anti-cheat lo explica todo sobre recompensas — y luego los 5 parches (`security_patch_*`, `privacy_hardening`, `timezone_fix`).
+3. `src/services/` completo (~800 líneas en total, se lee en una sentada) + `logReadingSession`/`checkAchievements` en App.jsx (~líneas 660-900), que orquestan las RPCs.
+4. `MainApp` en App.jsx (línea ~12982) — el hub de estado.
 
 **Entender antes de tocar código:**
 - XP/gemas/nivel JAMÁS se escriben desde el cliente. Si tu feature premia algo → SQL (trigger/RPC + `folio_award`).
-- Las migraciones SQL se corren A MANO en el SQL Editor de Supabase (no hay CLI configurada).
+- Las migraciones SQL se corren A MANO en el SQL Editor de Supabase (no hay CLI configurada), en el orden numerado de §II. Los parches de seguridad asumen que `sprint1_server_authority.sql` ya corrió (y el de rachas además `security_patch_reading_logs.sql`).
 - Deploy = `vercel --prod` manual (hasta conectar Git).
 - El monolito App.jsx: busca con grep antes de asumir dónde está algo; los `// ============ SECCIÓN ============` son el índice.
 
 **Setup local:**
 ```bash
 npm install
-cp .env.example .env   # llenar VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, ANTHROPIC_API_KEY
+cp .env.example .env   # llenar VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY; y añadir ANTHROPIC_API_KEY (el .env.example trae el nombre viejo VITE_ANTHROPIC_API_KEY, ver §III)
 npm run dev            # levanta proxy Anthropic (3001) + Vite (5173) con concurrently
 ```
 
