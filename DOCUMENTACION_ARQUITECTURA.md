@@ -8,6 +8,7 @@
 - 2026-09-13 — Doc inicial de arquitectura (Fable 5)
 - 2026-09-17 — Sprint fixes críticos: bugs UI, seguridad economía, privacidad, higiene técnica
 - 2026-09-18 — Audit + sincronización con estado actual del código
+- 2026-09-18 — Fixes urgentes: portada, ErrorBoundary, env.example
 
 ---
 
@@ -94,7 +95,7 @@ FOLIO FINAL/
 - **Sin router**: la navegación es un estado `tab` en `MainApp` (`home | social | library | add | profile`...) + sub-tabs con `SubTabBar`. Deep-links se resuelven leyendo `window.location.search` (ej. `?action=log` abre el modal de registro, `?ref=usuario` abre perfil referido).
 - **Sin state manager**: `useState`/`useEffect` + prop drilling desde `MainApp`, más **event buses** caseros (patrón pub/sub con arrays de listeners): `gemsEventBus`, `gemToastBus`, `petBus`, `achievementBus`. Sirven para que servicios sin acceso a React notifiquen a la UI (toasts de gemas, level-up de mascota, logros desbloqueados).
 - **Tema**: `theme.js` exporta un objeto **mutable** `palette`; `MainApp` hace `Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT)` en cada render. Los componentes leen `palette.xxx` en estilos inline. Preferencia en `localStorage('folio_theme')`: light/dark/system.
-- **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection`. El **overlay rojo de debug** (div en `document.body`) ahora solo se pinta con `import.meta.env.DEV`; en producción solo hace `console.error`. ⚠️ El fallback de `RootErrorBoundary` (pantalla roja con stack + botón Recargar) sigue siendo el mismo en producción ante un crash de React (ver §XII).
+- **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection`. El **overlay rojo de debug** (div en `document.body`) ahora solo se pinta con `import.meta.env.DEV`; en producción solo hace `console.error`. `RootErrorBoundary` también condiciona su fallback: en DEV muestra el stack trace rojo; en producción una pantalla amigable "Algo salió mal" con botón Recargar.
 
 ### Backend (Supabase)
 - **Auth**: email+password, "Confirm email" OFF (sesión inmediata al registrarse). Sesión persistida en localStorage por supabase-js.
@@ -131,13 +132,15 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 | Variable | Dónde | Uso |
 |---|---|---|
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | cliente + funciones `api/` + `server.js` + GitHub Actions | Expuestas al cliente (correcto); las funciones las usan para validar el JWT del usuario |
+| `VITE_BUSCALIBRE_AFFILIATE_ID` | cliente (opcional) | ID de afiliado Buscalibre; App.jsx tiene un valor por defecto |
 | `ANTHROPIC_API_KEY` | solo server (`api/anthropic.js`, `server.js`) | Proxy Anthropic |
 | `GOOGLE_BOOKS_API_KEY` | solo server (`api/books.js`) | Opcional; sube la cuota de Google Books |
 | `ADMIN_KEY` | solo server | Bypass del proxy Anthropic vía header `x-admin-key` (sin JWT ni rate limit) |
 | `SUPABASE_SERVICE_ROLE_KEY` | SOLO GitHub Actions (secret) | Job de entrenamiento; jamás en Vercel ni en el cliente |
+| `SUPABASE_SECRET_KEY` | solo `scripts/generate-500-books.js` | Escritura del catálogo curado |
 | `PORT` | `server.js` | Puerto del proxy local (default 3001) |
 
-⚠️ `.env.example` está desactualizado: solo lista `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y `VITE_ANTHROPIC_API_KEY` — el código lee `ANTHROPIC_API_KEY` (sin prefijo `VITE_`, que además expondría la key al bundle) y `.env.example` no menciona `ADMIN_KEY` ni `GOOGLE_BOOKS_API_KEY`.
+`.env.example` está sincronizado con estas variables (con un comentario por cada una). Ojo: el job de Python también acepta `SUPABASE_URL`/`SUPABASE_ANON_KEY` como alternativa a las `VITE_*`.
 
 ### Dependencias (package.json)
 - **runtime**: `react`/`react-dom` 18, `@supabase/supabase-js` ^2.105, `lucide-react`, `canvas-confetti`, `howler`, `html2canvas`; `express`, `dotenv` y `concurrently` (solo para `npm run dev`, están en `dependencies` pero no van al bundle).
@@ -383,20 +386,19 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 ### Pendiente
 
 1. **App.jsx monolítico (~14.900 líneas)**: la extracción a services/components está a medias. Riesgo de merge conflicts y de recrear bugs tipo `fetchStreakData` (función definida pero no exportada tras mover código). **Regla: al mover código, verificar exports/imports con grep.**
-2. **⚠️ Foto de portada de perfil sigue fallando en producción** (`handleCoverUpload` en App.jsx ~línea 4306: sube al bucket `covers` y hace `UPDATE users SET cover_url`). El commit `d9d0a03` (invalidar caché `folio_profile`) no lo resolvió. Causa raíz sin diagnosticar; revisar el error exacto que muestra la UI (`Storage error:` vs `DB error:` vs "posible bloqueo de permisos") y las policies del bucket `covers`.
+2. **⚠️ Foto de portada de perfil sigue fallando en producción** (`handleCoverUpload` en App.jsx ~línea 4306: sube al bucket `covers` y hace `UPDATE users SET cover_url`). El commit `d9d0a03` (invalidar caché `folio_profile`) no lo resolvió. **Hipótesis de permisos por columna DESCARTADA** (2026-09-18): `privacy_hardening.sql` otorga SELECT sobre *todas* las columnas salvo `email` (dinámico), la vista `users_public` que crea en la misma migración ya referencia `cover_url` (si no existiera habría fallado), y `handleAvatarUpload` hace exactamente el mismo `UPDATE ... .select("avatar_url, cover_url, ...")` que la portada. Los 3 buckets (`avatars`, `covers`, `post-images`) existen y son públicos. Sospechosos restantes, todos en la config manual de Storage (no versionada): policies INSERT/UPDATE del bucket `covers` (el `upsert:true` exige ambas), límite de tamaño o `allowed_mime_types` del bucket (las portadas son fotos grandes), o caché de CDN del mismo path tras el `upsert`. Falta el mensaje exacto que muestra la UI (`Storage error:` vs `DB error:` vs "posible bloqueo de permisos").
 3. **Vercel sin integración Git**: deploys manuales (`vercel --prod`). El push a GitHub NO deploya. Pendiente: vincular GitHub en vercel.com/account/login-connections y `vercel git connect`.
 4. **`buyExtraSaves` descuenta gemas client-side** (UPDATE directo a `user_gems`) — inconsistente con el lockdown server-authority; hoy probablemente FALLA silenciosamente por RLS (sin política UPDATE para clientes). Migrar a RPC SECURITY DEFINER. **SIGUE PENDIENTE.**
 5. **`daily_save_limits` e `incrementSaveCounter` son client-side** — burlables; mover a RPC si importa. (`timezone_fix.sql` solo documenta que el cliente escribe `date` en fecha local.)
 6. **Sin tests** de ningún tipo. Los "tests" son manuales (build + smoke test en navegador).
 7. **Rate limit del proxy Anthropic en memoria** — se resetea con cada cold start de la función; suficiente contra abuso casual, no contra abuso real. (Ahora el proxy exige JWT, así que solo usuarios autenticados gastan cuota, pero cualquiera con cuenta puede hacer hasta 10 req/min por IP.)
 8. **Bundle de 1.2 MB** (warning de Vite): sin code-splitting; candidatos obvios: html2canvas ya se separa, faltaría lazy-load de vistas pesadas (Wrapped, BookTinder).
-9. **Higiene residual del repo**: siguen versionados `test_avatar.png`, `test_avatar2.png`, `topleche_dashboard.html` y `crop_avatars.py` en la raíz, y los directorios `.claude/` y `.agents/` (~585 archivos de skills/config de herramientas) — candidatos a limpieza/`.gitignore`. `.env.example` desactualizado (ver §III). `vercel.json` con rewrite a `/api/login` inexistente. `pg` en devDependencies sin uso detectado.
+9. **Higiene residual del repo**: siguen versionados `test_avatar.png`, `test_avatar2.png`, `topleche_dashboard.html` y `crop_avatars.py` en la raíz, y los directorios `.claude/` y `.agents/` (~585 archivos de skills/config de herramientas) — candidatos a limpieza/`.gitignore`. `vercel.json` con rewrite a `/api/login` inexistente. `pg` en devDependencies sin uso detectado.
 10. **Lógica de logros duplicada** (JS en `checkAchievements` + SQL en `award_achievement`): riesgo de divergencia al añadir/cambiar logros. Además, `checkAchievements` corre en momentos clave del cliente, no ante cualquier cambio server-side.
-11. **Fallback de `RootErrorBoundary` con estética de debug en producción**: ante un crash de React se muestra pantalla roja con el stack trace y "ERROR CAPTURADO POR BOUNDARY" (el overlay global sí quedó limitado a DEV).
-12. **Cuentas privadas no encontrables**: efecto secundario de `privacy_hardening.sql`; si se quiere búsqueda por username de cuentas privadas habría que usar la vista `users_public` (ya creada, sin uso todavía) con una política/función dedicada.
-13. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
+11. **Cuentas privadas no encontrables**: efecto secundario de `privacy_hardening.sql`; si se quiere búsqueda por username de cuentas privadas habría que usar la vista `users_public` (ya creada, sin uso todavía) con una política/función dedicada.
+12. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
 
-### Resuelto (sprint 2026-09-17, commits `280e7b8`, `d9d0a03`, `8eac60a`)
+### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 
 | Item | Estado | Cómo se resolvió |
 |---|---|---|
@@ -410,6 +412,8 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | Zonas horarias mezcladas (UTC servidor vs local cliente) | ✅ RESUELTO 2026-09-17 | "Hoy" server-side = `America/Mexico_City` (`timezone_fix.sql`) |
 | Doble recompensa en sync offline | ✅ RESUELTO 2026-09-17 | El mismo `session_id` viaja en la cola offline; el reintento choca con el UNIQUE |
 | Archivos basura en la raíz (`temp_*.txt`, `pg*_raw.txt`, `folio.jsx`, `gema.png.png`, `avatars-grid.png`, `.env.vercel.tmp`) | ✅ RESUELTO 2026-09-17 | Eliminados/desatados (secreto de `.env.vercel.tmp` ya expirado; ver residuo en Pendiente #9) |
+| `RootErrorBoundary` mostraba pantalla roja con stack trace en producción | ✅ RESUELTO 2026-09-18 | Fallback condicionado a `import.meta.env.DEV`; en prod muestra UI amigable "Algo salió mal" + Recargar |
+| `.env.example` desactualizado (`VITE_ANTHROPIC_API_KEY`, sin `ADMIN_KEY`/`GOOGLE_BOOKS_API_KEY`) | ✅ RESUELTO 2026-09-18 | Reescrito con todas las variables reales y un comentario por cada una |
 | Proxy Anthropic sin autenticación | ✅ RESUELTO 2026-09-17 | `api/anthropic.js` y `server.js` exigen JWT de Supabase válido (o `x-admin-key`) |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER
@@ -429,7 +433,7 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 **Setup local:**
 ```bash
 npm install
-cp .env.example .env   # llenar VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY; y añadir ANTHROPIC_API_KEY (el .env.example trae el nombre viejo VITE_ANTHROPIC_API_KEY, ver §III)
+cp .env.example .env   # llenar VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, ANTHROPIC_API_KEY (y opcionales, ver §III)
 npm run dev            # levanta proxy Anthropic (3001) + Vite (5173) con concurrently
 ```
 

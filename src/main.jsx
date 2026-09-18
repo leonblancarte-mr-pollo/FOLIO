@@ -38,14 +38,25 @@ class RootErrorBoundary extends Component {
   componentDidCatch(error, errorInfo) { console.error('Root boundary caught:', error, errorInfo); }
   render() {
     if (this.state.hasError) {
+      if (import.meta.env.DEV) {
+        return (
+          <div style={{ padding: 20, fontFamily: 'monospace', background: '#7A2E2E', color: 'white', minHeight: '100vh' }}>
+            <h2 style={{ marginBottom: 12 }}>ERROR CAPTURADO POR BOUNDARY</h2>
+            <p style={{ marginBottom: 8 }}>{this.state.error?.message}</p>
+            <pre style={{ fontSize: 11, textAlign: 'left', overflow: 'auto', maxHeight: '40vh', background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 4 }}>
+              {this.state.error?.stack}
+            </pre>
+            <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'white', color: '#7A2E2E', cursor: 'pointer', fontSize: 15 }}>
+              Recargar
+            </button>
+          </div>
+        );
+      }
       return (
-        <div style={{ padding: 20, fontFamily: 'monospace', background: '#7A2E2E', color: 'white', minHeight: '100vh' }}>
-          <h2 style={{ marginBottom: 12 }}>ERROR CAPTURADO POR BOUNDARY</h2>
-          <p style={{ marginBottom: 8 }}>{this.state.error?.message}</p>
-          <pre style={{ fontSize: 11, textAlign: 'left', overflow: 'auto', maxHeight: '40vh', background: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 4 }}>
-            {this.state.error?.stack}
-          </pre>
-          <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'white', color: '#7A2E2E', cursor: 'pointer', fontSize: 15 }}>
+        <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', background: '#FAF6F1', color: '#2A1F1A', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          <h2 style={{ marginBottom: 12, fontSize: 22 }}>Algo salió mal</h2>
+          <p style={{ marginBottom: 20, maxWidth: 320, lineHeight: 1.5 }}>Intenta recargar la página. Si el problema continúa, vuelve a intentarlo en unos minutos.</p>
+          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#7A2E2E', color: 'white', cursor: 'pointer', fontSize: 15 }}>
             Recargar
           </button>
         </div>
