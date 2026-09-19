@@ -1,6 +1,6 @@
 # FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-09-18 · Sincronizada con el código en el commit `8eac60a` (audit de documentación).
+> Última actualización: 2026-09-18 · Incluye el fix de signup (`fix_signup_permissions.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -10,6 +10,7 @@
 - 2026-09-18 — Audit + sincronización con estado actual del código
 - 2026-09-18 — Fixes urgentes: portada, ErrorBoundary, env.example
 - 2026-09-18 — Sprint Trueque MVP: DB, RPCs, UI completa, matching, chat, rating
+- 2026-09-18 — Fix bug signup (permission denied users); doc extendido en Word
 
 ---
 
@@ -75,8 +76,12 @@ FOLIO FINAL/
 │   ├── security_patch_streaks.sql        # 7. Cierra UPDATE libre de user_streaks → RPCs update_streak/freeze
 │   ├── privacy_hardening.sql             # 8. RLS de lectura respeta is_public/amistad; email fuera del SELECT
 │   ├── timezone_fix.sql                  # 9. "Hoy" server-side = America/Mexico_City
-│   └── trueque_schema.sql                # 10. Trueque de libros: 7 tablas + RLS + RPCs + bucket + pg_cron
+│   ├── trueque_schema.sql                # 10. Trueque de libros: 7 tablas + RLS + RPCs + bucket + pg_cron
+│   ├── fix_signup_permissions.sql        # 11. Fix signup: policies INSERT/UPDATE de users + GRANT INSERT/UPDATE por columna
+│   └── cleanup_orphan_auth_users.sql     # (opcional) lista/repara/borra cuentas huérfanas de auth.users
+├── DOCUMENTACION_ARQUITECTURA_COMPLETA.docx  # Versión Word extendida (se genera con scripts/generate_docs.py; el .md es la fuente de verdad)
 ├── scripts/
+│   ├── generate_docs.py      # Lee este .md y genera el .docx extendido (pip install python-docx)
 │   ├── train_recommender.py  # SVD → top-20 por usuario → upsert a recommendation_scores
 │   ├── books-500.json/sql    # Seed del catálogo books_curated
 │   ├── books-data.js, generate-500-books.js, find_duplicates.py  # Generación/limpieza del catálogo
@@ -258,9 +263,15 @@ Tab Trueque → TruequeMain carga en paralelo: trueque_status() · user_exchange
 ```
 AuthView → registerWithSupabase()
   1. supabase.auth.signUp (Confirm email OFF → sesión inmediata, auth.uid() ya existe)
-  2. upsert public.users { id: auth.uid(), email, nombre, username }  ← pasa RLS users_insert_self
-     · error 23505 → "username en uso" · si falla → signOut() para no dejar estado a medias
+     · "already registered" → recoverOrphanAccount(): signInWithPassword; si la contraseña coincide y NO hay
+       fila en public.users (cuenta huérfana) crea el perfil y entra; si el perfil ya existe → "Ya existe una cuenta"
+  2. INSERT plano en public.users { id: auth.uid(), email, nombre, username }  ← pasa la policy INSERT (auth.uid() = id)
+     · 23505 por username → "username en uso"; 23505 por PK → ya existía (ok, idempotente)
+     · si falla → signOut() (queda una huérfana en auth.users que el próximo login/registro repara)
   3. App muestra NewUserOnboarding → PetOnboarding → MainApp
+
+Login / arranque: buildAppUser(authUser) lee public.users; si NO hay fila (cuenta huérfana) la auto-crea con
+user_metadata (nombre, username; sufijo si el username ya está tomado) y deja un console.info "[auth] perfil auto-creado".
 ```
 
 ### Terminar un libro (el flujo más rico)
@@ -305,7 +316,7 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 
 | Servicio | Exports clave | Llama a | Notas |
 |---|---|---|---|
-| `authService` | `loginWithSupabase`, `registerWithSupabase`, `getSessionUser`, `updateDisplayName`, `logout` | Supabase Auth + `users` | Mapea `nombre`→`name`; caché `folio_auth_user` para offline |
+| `authService` | `loginWithSupabase`, `registerWithSupabase`, `getSessionUser`, `updateDisplayName`, `logout` | Supabase Auth + `users` | Mapea `nombre`→`name`; caché `folio_auth_user` para offline. **Cuentas huérfanas (2026-09-18):** `buildAppUser` auto-crea el perfil si hay sesión pero no fila en `users` (`autoCreateProfile`, con metadata y sufijo de username si hay colisión); `registerWithSupabase` usa INSERT plano (`insertProfileRow`, ya NO upsert) y, ante "ya registrado", intenta `recoverOrphanAccount` |
 | `booksService` | `fetchBooks`, `insertBook`, `updateBookInDB`, `deleteBookFromDB`, `dbToBook`/`bookToDb`, `isUnknownColumnError`, `stripTotalPages`, `readDateLabel`; caché offline: `cacheBooks`/`getCachedBooks`, `cacheProfile`/`getCachedProfile`, `cacheAchievements`/`getCachedAchievements`; colas: `getPendingLogs`/`addPendingLog`, `getPendingPosts`/`addPendingPost` | `books` | Reintenta sin `total_pages/read_date_precision` si la migración no corrió (`isUnknownColumnError`); UPDATE/DELETE verifican filas afectadas para detectar RLS. Los pending logs guardan `sessionId` |
 | `streakService` | `fetchStreakData`, `checkStreakOnLoad`, `localDateStr`, `daysBetweenLocalDates` | `user_streaks`, `reading_logs`, RPC `pet_daily_checkin` | Racha se PAUSA, nunca se resetea. Solo lee; las escrituras de racha/freeze van por RPCs `update_streak`/`use_streak_freeze`/`reset_monthly_freeze` (llamadas desde App.jsx) |
 | `gemsService` | `loadGems`, `claimDailyGems`, `initUserGems`, `gemsEventBus`, `gemToastBus` | `user_gems`, RPC `claim_daily_gems` | Cliente solo lee |
@@ -381,6 +392,7 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 
 ### RLS — modelo general (`auth_rls_migration.sql` + parches posteriores)
 - **Lectura con privacidad real** (`privacy_hardening.sql`, reemplaza las antiguas `*_select_auth` abiertas): `users` (`users_select_scoped`), `books` (`books_select_scoped`), `user_streaks` (`streaks_select_scoped`) y `achievements` (`ach_select_scoped`) permiten SELECT solo si eres el dueño, el dueño tiene `is_public` ≠ false (default histórico "público", `COALESCE(is_public,true)`) o hay `friendships.status='accepted'` entre ambos. `users.email` además está revocado a nivel de **columna** (GRANT SELECT explícito sobre todas las demás columnas, calculado al correr la migración: ⚠️ una columna añadida después a `users` NO queda legible hasta re-otorgar el GRANT).
+- **Policies de escritura de `users`** (`fix_signup_permissions.sql`, reemplazan a `users_insert_self`/`users_update_own`): INSERT `"Users can create their own profile"` (`WITH CHECK auth.uid() = id`) y UPDATE `"Users can update their own profile"` (`USING`/`WITH CHECK auth.uid() = id`). Además `GRANT INSERT (...)` y `GRANT UPDATE (...)` por columna a `authenticated` sobre todas las columnas de `users` salvo `is_premium` (calculadas dinámicamente). **Lección:** `permission denied for table users` es un error de GRANT, no de RLS (RLS dice "violates row-level security policy"); con GRANTs por columna, un UPSERT (`ON CONFLICT DO UPDATE`) necesita más privilegios que un INSERT plano.
 - **Lectura social abierta** a `authenticated` que se mantiene: pets, wraps, posts, comments, likes, friendships. Privadas: quotes (`is_public` o propias), reading_logs, gems, notifications (solo destinatario), messages/conversations (solo las partes), recommendation_scores y reward_ledger (solo propias).
 - **Escritura**: `auth.uid() = user_id` (o partes de la conversación), EXCEPTO: `user_gems`, `reward_ledger`, **`achievements`** (`ach_write_own` eliminada) y **`user_streaks`** (`streaks_write_own` eliminada), que quedan sin política de escritura → solo SECURITY DEFINER (triggers/RPCs).
 
@@ -473,6 +485,7 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
       - (e) Upsert por pareja: si ya hay un `chatting`, no se toca; un `pending` idéntico se deja igual; un `pending` distinto se cancela y se crea el nuevo.
     - Los usuarios sin zonas nunca son candidatos, y quien busca debe tener zonas (`TRUEQUE_NO_ZONES`).
 11. **Cobro en dos pasos con crédito**: cuando una acción de pago se divide en "cobrar" y "entregar" (dos RPCs llamadas desde el cliente), la primera emite un crédito de un solo uso y la segunda lo consume. Así la segunda no se puede llamar gratis.
+12. **Manejo de cuentas huérfanas en signup**: crear cuenta son dos pasos no atómicos (Auth y luego `public.users`), así que un fallo en el segundo deja una fila en `auth.users` sin perfil. Reglas: (a) el perfil se crea con INSERT plano e idempotente (PK duplicada = éxito), nunca con upsert; (b) `buildAppUser` auto-crea el perfil faltante en cualquier login/arranque; (c) si el registro choca con "ya registrado", se intenta `recoverOrphanAccount` (solo si la contraseña coincide y no hay perfil); (d) `supabase/cleanup_orphan_auth_users.sql` lista/repara/borra las que queden. Cualquier flujo futuro de dos pasos debe seguir el mismo criterio: reintentable y auto-reparable.
 
 ---
 
@@ -534,6 +547,7 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 | `RootErrorBoundary` mostraba pantalla roja con stack trace en producción | ✅ RESUELTO 2026-09-18 | Fallback condicionado a `import.meta.env.DEV`; en prod muestra UI amigable "Algo salió mal" + Recargar |
 | `.env.example` desactualizado (`VITE_ANTHROPIC_API_KEY`, sin `ADMIN_KEY`/`GOOGLE_BOOKS_API_KEY`) | ✅ RESUELTO 2026-09-18 | Reescrito con todas las variables reales y un comentario por cada una |
 | Intercambio de libros entre usuarios | ✅ IMPLEMENTADO 2026-09-18 | Trueque MVP: `trueque_schema.sql` + `truequeService` + `src/components/trueque/` (ver §IV.14) |
+| Cuentas huérfanas en el registro (`permission denied for table users`; cuenta en `auth.users` sin fila en `users`, y el reintento decía "Ya existe una cuenta") | ✅ RESUELTO 2026-09-18 (código) — ⚠️ falta correr `fix_signup_permissions.sql` en Supabase | `supabase/fix_signup_permissions.sql` (policies + GRANT por columna), INSERT plano en vez de upsert, auto-creación de perfil en `buildAppUser` y `recoverOrphanAccount`; limpieza de las ya existentes con `cleanup_orphan_auth_users.sql`. La causa exacta en la BD viva se infirió por análisis estático (no se reprodujo contra Supabase) |
 | Proxy Anthropic sin autenticación | ✅ RESUELTO 2026-09-17 | `api/anthropic.js` y `server.js` exigen JWT de Supabase válido (o `x-admin-key`) |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER
