@@ -9,6 +9,7 @@
 - 2026-09-17 — Sprint fixes críticos: bugs UI, seguridad economía, privacidad, higiene técnica
 - 2026-09-18 — Audit + sincronización con estado actual del código
 - 2026-09-18 — Fixes urgentes: portada, ErrorBoundary, env.example
+- 2026-09-18 — Sprint Trueque MVP: DB, RPCs, UI completa, matching, chat, rating
 
 ---
 
@@ -52,9 +53,11 @@ FOLIO FINAL/
 │   ├── theme.js              # PALETTE_LIGHT/DARK + objeto mutable `palette` + resolveTheme
 │   ├── haptics.js / sounds.js# Vibración y efectos de sonido (howler)
 │   ├── index.css             # Tailwind base + estilos globales
-│   ├── services/             # Capa de datos (extraída del monolito, commit 3b3adfd) — 7 servicios, ver §VI
+│   ├── services/             # Capa de datos (extraída del monolito, commit 3b3adfd) — 8 servicios, ver §VI
+│   ├── config/zones.js       # ZONES_CDMX: las 25 zonas fijas del Trueque (slugs = enum exchange_zone)
 │   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal,
 │   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal
+│   │   └── trueque/          # Trueque de libros: TruequeMain + 10 modales/tarjetas + ui.jsx (ver §VII)
 │   ├── pets/                 # PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene
 │   ├── data/                 # cuentos.js + cuentos/*.txt: ~23 cuentos de dominio público para "Snacks"
 │   │                         # (los `_raw_*.txt` son material fuente sin procesar)
@@ -71,7 +74,8 @@ FOLIO FINAL/
 │   ├── security_patch_achievements.sql   # 6. Cierra INSERT libre de logros → RPC award_achievement
 │   ├── security_patch_streaks.sql        # 7. Cierra UPDATE libre de user_streaks → RPCs update_streak/freeze
 │   ├── privacy_hardening.sql             # 8. RLS de lectura respeta is_public/amistad; email fuera del SELECT
-│   └── timezone_fix.sql                  # 9. "Hoy" server-side = America/Mexico_City
+│   ├── timezone_fix.sql                  # 9. "Hoy" server-side = America/Mexico_City
+│   └── trueque_schema.sql                # 10. Trueque de libros: 7 tablas + RLS + RPCs + bucket + pg_cron
 ├── scripts/
 │   ├── train_recommender.py  # SVD → top-20 por usuario → upsert a recommendation_scores
 │   ├── books-500.json/sql    # Seed del catálogo books_curated
@@ -211,6 +215,43 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 
 ---
 
+### 14. Trueque de libros (MVP, 2026-09-18)
+Intercambio de libros **físicos** entre usuarios de la misma zona de CDMX. Tab `trueque` en `NAV_ITEMS` (icono `Repeat`), renderiza `TruequeMain`.
+
+**Flujo:**
+```
+Tab Trueque → TruequeMain carga en paralelo: trueque_status() · user_exchange_zones · books_offered · books_wanted · get_my_exchange_matches()
+  ├─ sin zonas → ZonesOnboarding (2..3 zonas free / 2..5 Plus) → RPC set_exchange_zones   ("Ahora no" → Home)
+  ├─ Ofrezco: OfferBookModal → INSERT books_offered (+ foto opcional en bucket 'trueque', ruta <uid>/<uuid>.<ext>)
+  ├─ Busco:   WantBookModal  → INSERT books_wanted
+  │     (límites free: 3 ofrecidos / 5 buscados; al llegar → PlusUpsellModal, placeholder sin pago)
+  ├─ "🔍 Buscar matches" → RPC cost_search_matches (−20 gemas, o gratis Plus con tope 10/día) → emite 1 crédito
+  │                      → RPC find_book_matches (consume el crédito, genera matches, devuelve la lista)
+  ├─ MatchCard "Enviar mensaje" → LegalDisclaimerModal (1 vez por match, localStorage `disclaimer_accepted_${match_id}`)
+  │                             → ExchangeChat (RPC send_exchange_message; pending→chatting; polling 8 s; páginas de 50)
+  └─ "Completado" (cualquiera de los dos) → RPC complete_exchange → los libros del match se desactivan
+                                          → RatingModal → RPC rate_exchange (1-5 ★ + reseña opcional)
+```
+
+**Tipos de match** (uno por pareja de usuarios; requiere ≥1 zona compartida):
+- 🟢 **perfecto**: un libro mío está en su "Busco" **y** un libro suyo está en mi "Busco" (o en mi lista "Por leer").
+- 🟡 **parcial**: solo una de las dos direcciones. El libro que falta se muestra como "Por acordar en el chat".
+- **Lista "Por leer"**: los `books` con `status='want_to_read'` cuentan como "Busco"; el match lleva `via_reading_list = true` (no es un tipo aparte).
+
+**Estados del match:** `pending` → (primer mensaje) `chatting` → `completed`. Laterales: `cancelled` (el dueño quitó el libro, o una búsqueda nueva lo reemplazó por otro mientras seguía `pending`) y `expired` (`expires_at` = creación + 14 días).
+
+**Monetización (freemium):** `users.is_premium` = Folio Plus. **No hay pago real**; se activa a mano (`UPDATE users SET is_premium = true WHERE id = '<uuid>'`). Los límites viven en la tabla `trueque_gems_cost`, editable sin redeploy.
+
+**Supuestos tomados en el MVP (ambigüedades del spec → opción más simple):**
+- **Una fila por pareja:** `user_a_id < user_b_id` (orden canónico) y **un solo match vivo por pareja**, con el primer libro que empata de cada lado. Si hay varios libros en común, se negocia en el chat.
+- **Solo título:** el matching compara el título normalizado; el autor se muestra pero no se compara ("Rayuela" de dos ediciones empata).
+- **Cobro de la búsqueda fuera de `folio_award`:** `folio_award` ignora los deltas ≤ 0, así que el cobro de 20 gemas lo hace `cost_search_matches` directo en `user_gems` + una fila negativa en `reward_ledger` (`reason='trueque_search'`).
+- **Crédito de búsqueda:** `find_book_matches` exige un crédito emitido por `cost_search_matches` (tabla interna `trueque_search_credits`, vigencia 10 min). Así no se pueden buscar matches gratis llamando la RPC directo.
+- **Cierre:** cualquiera de los dos participantes puede marcar el intercambio como completado. El "ciclo" queda cerrado cuando existen las 2 calificaciones; `completed` ya es un estado terminal, así que no hay un estado extra.
+- **Colores:** la UI usa `palette` de `theme.js` (accent `#7A2E2E`, bg `#F4EDE0`, Fraunces/EB Garamond) en vez de los hex del spec (`#A02A2A`/`#F5EBD8`), para mantener consistencia con el resto de la app y el modo oscuro.
+- **Chat sin realtime:** el chat del trueque usa polling cada 8 s mientras está abierto; no usa realtime ni notificaciones.
+- **Límites Plus extra:** se añadieron a la config 3 claves que el spec no listaba: `plus_max_wanted` (999), `plus_max_zones` (5) y `plus_daily_searches` (10).
+
 ## V. FLUJOS DE DATOS CRÍTICOS
 
 ### Registro
@@ -271,6 +312,7 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 | `petService` | `loadPet`, `createPet`, `updatePetName`, `addPetXP` (sync), `petBus`, `PET_TYPES`, `PET_MAX_LEVEL`, `petXpForLevel`, `petImageSrc` | `user_pets` | `loadPet` distingue null (sin mascota) de undefined (error) para no romper onboarding |
 | `listsService` | `fetchUserLists`, `createUserList`, `updateUserList`, `deleteUserList`, `addBookToList`, `removeBookFromList` | `user_lists`, `user_list_books` | 23505 tratado como éxito idempotente |
 | `recommendationService` | `getRecommendations`, `getPreferredGenres`, `checkDailyLimit`, `incrementSaveCounter`, `buyExtraSaves` (⚠️ client-side, ver §XII) | `books_curated`, `daily_save_limits`, `user_gems` | Límite 15/día (`localDateStr` para la fecha); expansión de géneros del onboarding vía `GENRE_MAP` (interno, no exportado) |
+| `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50 |
 
 Helpers que **siguen en App.jsx** (no en services): `logReadingSession`, `syncPendingLogs`, `checkAchievements`, `enrichBook`, `getRecommendations` (versión Claude/mood, distinta a la de `recommendationService`), `searchGoogleBooks`, `createFeedPost`; `loadStreakInfo` es una función interna de un componente de App.jsx (~línea 9873).
 
@@ -285,7 +327,7 @@ await insertBook({ title, author, status: "want_to_read" }, user.id);
 
 ## VII. COMPONENTES PRINCIPALES
 
-Todo vive en `App.jsx` salvo lo extraído a `src/components/` (AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal, ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal) y `src/pets/` (PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene). No existe `src/pages/`. Jerarquía:
+Todo vive en `App.jsx` salvo lo extraído a `src/components/` (AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal, ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal) y `src/pets/` (PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene), más `src/components/trueque/` (ver abajo). No existe `src/pages/`. Jerarquía:
 
 ```
 main.jsx → RootErrorBoundary → App
@@ -298,6 +340,7 @@ main.jsx → RootErrorBoundary → App
       ├─ LibraryView → BookCard → BookDetailModal · ListsSection → ListDetailModal
       ├─ AddBookView → SearchBookModal / BookForm · BookTinder · RecommendFlow
       │                · CollaborativeRecommendations · UAMLibraryView
+      ├─ TruequeMain (tab "trueque") → ver árbol del Trueque abajo
       ├─ PerfilWrapper → ProfileView (stats, ReadingHeatmap, AchievementGrid, QuotesView,
       │                  ReadingStatsView, Wrapped, configuración, DeleteAccountModal)
       └─ Overlays globales: PetHub, NotificationsSheet, AmigosSheet, ReadingLogModal,
@@ -307,12 +350,32 @@ main.jsx → RootErrorBoundary → App
 
 Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd`, `onSelectBook`) por props desde `MainApp`; los modales son estado local + render condicional (no hay portal manager).
 
+**`src/components/trueque/`** (props desde `MainApp`: `user`, `gemBalance`, `onGemsChanged` → `loadGems`, `onExit` → Home):
+
+| Componente | Qué renderiza |
+|---|---|
+| `TruequeMain` | Contenedor: zonas (chips editables), botón "Buscar matches" (costo en 💎 o cupo Plus), sub-tabs Ofrezco/Busco/Matches, y dueño de todos los modales |
+| `ZonesOnboarding` | Modal de primera vez (sin cerrar): elegir 2..máx zonas; "Ahora no" vuelve a Home |
+| `ZonesEditor` | Modal para editar zonas; exporta también `ZonePicker` (chips) y `MIN_ZONES` |
+| `OfferBookModal` | Form de libro ofrecido: título, autor, editorial, estado (como nuevo/usado/rayoneado), foto JPG/PNG/WebP ≤ 5 MB |
+| `WantBookModal` | Form de libro buscado: título, autor, editorial |
+| `BookCard` | Tarjeta de libro (foto o placeholder, estado) con borrado en dos toques |
+| `MatchesList` | Agrupa 🟢 perfectos / 🟡 parciales / ✅ completados; estado vacío |
+| `MatchCard` | Otro usuario (avatar, ★ promedio), "Recibes ⇄ Das", zonas compartidas, badge "De tu lista Por leer", días para expirar, botones Enviar mensaje / Calificar |
+| `LegalDisclaimerModal` | Texto legal exacto + checkbox obligatorio "Confirmo que he leído y acepto" |
+| `ExchangeChat` | Chat a pantalla completa: burbujas, mensajes de sistema, "Cargar mensajes anteriores", polling 8 s, botón "Completado" (confirma en 2 toques) |
+| `RatingModal` | 1-5 estrellas + reseña opcional (≤ 500) |
+| `PlusUpsellModal` | CTA placeholder de Folio Plus (botón "Próximamente", sin pago) |
+| `ui.jsx` | Helpers compartidos: `Sheet`, `fieldStyle`, `Label`, `PrimaryButton`, `ErrorText`, `CONDITION_LABELS` |
+
+**Navegación:** `NAV_ITEMS` pasó de 5 a 6 entradas (Trueque entre Social y Perfil). El padding lateral de cada ítem del `BottomNav` bajó de 14 px a 8 px para que las 6 quepan en ~360 px. El botón de Mascota deja de estar exactamente al centro.
+
 ---
 
 ## VIII. BASE DE DATOS (Supabase)
 
 ### Tablas
-`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger`.
+`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger` · **Trueque:** `user_exchange_zones` · `books_offered` · `books_wanted` · `exchange_matches` · `exchange_chats` · `exchange_ratings` · `trueque_gems_cost` (+ interna `trueque_search_credits`).
 
 **Vistas:** `users_public` (`security_invoker`, columnas `id, nombre, username, avatar_url, cover_url, bio, is_public`, sin email; creada por `privacy_hardening.sql`, el código actual todavía no la usa). **Columnas añadidas por los parches:** `reading_logs.session_id` (uuid NOT NULL DEFAULT gen_random_uuid(), UNIQUE). **Storage:** buckets `avatars`, `covers`, `post-images` (ver §III).
 
@@ -336,6 +399,37 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | `use_streak_freeze()` RPC | Consume el protector (`streak_freezes_remaining`=0, `streak_freeze_used_at`=hoy); lanza excepción si no hay disponible |
 | `guard_pet_columns` trigger | Cliente no puede tocar xp/level de user_pets |
 | `delete_my_account()` (features_migration) | Borrado en cascada de la cuenta del usuario autenticado |
+
+### Trueque de libros (`trueque_schema.sql`)
+
+**Enums:** `exchange_zone` (25 slugs, idénticos a `src/config/zones.js`), `exchange_condition` (`como_nuevo`, `usado`, `rayoneado`), `exchange_match_type` (`perfecto`, `parcial`), `exchange_status` (`pending`, `chatting`, `completed`, `cancelled`, `expired`). **Columna nueva:** `users.is_premium boolean NOT NULL DEFAULT false`, protegida por el trigger `guard_users_premium` (SECURITY INVOKER a propósito: si el rol es `authenticated`/`anon`, revierte cualquier cambio; sin GRANT de SELECT para clientes, se lee vía `trueque_status()`).
+
+| Tabla | Columnas | RLS |
+|---|---|---|
+| `user_exchange_zones` | `user_id` FK users CASCADE, `zone exchange_zone`; PK (user_id, zone) | SELECT dueño + contrapartes de un match `pending/chatting/completed`; INSERT/UPDATE/DELETE solo dueño. Trigger: máx. del plan (free 3, Plus 5, tope duro 5) |
+| `books_offered` | `id`, `user_id` FK CASCADE, `title`/`author` (1-200, NOT NULL), `editor`, `condition`, `photo_url`, `is_active`, `created_at`, `title_norm` (GENERATED = `trueque_norm(title)`) | SELECT autenticados si `is_active` (o dueño); escritura solo dueño. Triggers: límite free/Plus en INSERT y en reactivación; costo de publicar si config > 0; cancelar matches vivos al desactivar; bloquear cambio de título/autor en match vivo |
+| `books_wanted` | `id`, `user_id` FK CASCADE, `title`/`author`, `editor`, `is_active`, `created_at`, `title_norm` | Igual que `books_offered` (límite free 5) |
+| `exchange_matches` | `id`, `user_a_id < user_b_id` (FK CASCADE), `match_type`, `book_a_offers`/`book_b_offers` (FK books_offered CASCADE, uno puede ser NULL en parcial), `shared_zones text[]`, `via_reading_list`, `status`, `created_at`, `expires_at` (+14 días) | SELECT solo participantes; sin INSERT/UPDATE/DELETE para clientes (REVOKE + sin policy) → solo RPCs. UNIQUE parcial `exchange_matches_live_unique` (pareja + libros con COALESCE, solo estados vivos/completados) |
+| `exchange_chats` | `id`, `match_id` FK CASCADE, `sender_id`, `message` (1-1000), `is_system`, `created_at` | SELECT solo participantes del match; escritura solo RPC / trigger |
+| `exchange_ratings` | `id`, `match_id`, `rated_by`, `rated_user`, `rating` 1-5 (CHECK), `review` (≤ 500), `created_at`; UNIQUE (match_id, rated_by) | SELECT solo participantes; escritura solo RPC |
+| `trueque_gems_cost` | `key` PK, `value int` — `search_matches_cost` 20, `publish_book_cost` 0, `free_tier_max_offered` 3, `free_tier_max_wanted` 5, `free_tier_max_zones` 3, `plus_max_offered` 999, `plus_max_wanted` 999, `plus_max_zones` 5, `plus_daily_searches` 10 | SELECT autenticados; escritura solo SQL Editor |
+| `trueque_search_credits` (interna) | `id`, `user_id`, `created_at`, `used_at` | Sin policies ni GRANT: solo SECURITY DEFINER |
+
+| RPC (SECURITY DEFINER, `authenticated`) | Qué hace |
+|---|---|
+| `trueque_status()` → jsonb | Plan, límites efectivos, costo de búsqueda, búsquedas de hoy, conteos activos |
+| `set_exchange_zones(text[])` | Reemplazo atómico de zonas; dedup; valida 2..máx del plan y el enum |
+| `cost_search_matches(p_user_id)` → bool | Exige `p_user_id = auth.uid()` y zonas. Plus: gratis con tope diario (`TRUEQUE_RATE_LIMIT`). Free: descuenta 20 gemas atómicamente (`balance >= costo`) + ledger negativo. `false` si no alcanza. Emite un crédito |
+| `find_book_matches(p_user_id)` → TABLE | Consume un crédito (`TRUEQUE_NO_CREDIT` si no hay), expira los vencidos del usuario, genera/actualiza matches y devuelve la lista con los datos del otro usuario (nombre, avatar, ★ promedio), los libros de cada lado y `i_rated` |
+| `get_my_exchange_matches()` → TABLE | Lo mismo pero solo lectura (no descubre ni cobra); oculta vencidos |
+| `send_exchange_message(match, text)` → uuid | Participante + match vivo + no vencido; pending→chatting |
+| `complete_exchange(match)` → bool | Participante; requiere `chatting`; desactiva los libros del match (sus otros matches vivos se cancelan por trigger) |
+| `rate_exchange(match, rating, review)` → uuid | Requiere `completed`; 1 por participante (`TRUEQUE_ALREADY_RATED`) |
+| `cleanup_expired_matches()` → int | NO expuesta a clientes. pg_cron `trueque-cleanup-expired-matches`, `0 9 * * *` UTC = 3:00 AM hora de México |
+
+Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_matches`, `trueque_matches_for`. **Storage:** bucket `trueque` (público, 5 MB, jpeg/png/webp). Lectura pública; INSERT/UPDATE/DELETE solo en objetos cuyo nombre empieza con `<auth.uid()>/`. Todos los errores de negocio son `RAISE EXCEPTION 'TRUEQUE_*'`, y `truequeService` los traduce.
+
+**Borrado de cuenta:** todas las FKs del Trueque son `ON DELETE CASCADE` a `users`, así que `delete_my_account()` (que borra `public.users`) arrastra zonas, libros, matches, chats y ratings sin tocar esa función. Las fotos del bucket `trueque` **no** se borran (ver §XII).
 
 ### Índices relevantes
 `reward_ledger_once` (UNIQUE parcial user+reason+ref WHERE ref IS NOT NULL), `reading_logs_session_id_key` (UNIQUE `session_id`), `recommendation_scores_user_idx`, PKs/uniques (user_pets.user_id UNIQUE, achievements UNIQUE(user_id, key), daily_save_limits onConflict user_id+date).
@@ -368,7 +462,17 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 6. **Server authority**: cualquier valor "ganable" (XP/gemas/nivel, logros, racha) se decide en Postgres vía RPC/trigger SECURITY DEFINER; las tablas `user_gems`, `reward_ledger`, `achievements` y `user_streaks` no tienen política de escritura para el cliente. El cliente solo lee, calcula *candidatos* (p. ej. `checkAchievements`) y sincroniza.
 7. **Fechas**: el cliente usa hora local, nunca UTC (`localDateStr`), y parseo a mediodía para aritmética de días; el servidor calcula "hoy" en `America/Mexico_City` (`timezone_fix.sql`). ⚠️ Un usuario fuera de la zona horaria de México puede ver desfases de unas horas entre su `log_date` y el "hoy" del servidor.
 8. **IA con contrato JSON estricto**: prompts piden "SOLO JSON válido", se limpian fences y se parsea; sin streaming.
-9. **Naming**: DB snake_case ↔ app camelCase, mapeado únicamente en servicios; español para dominio y UI.
+9. **Naming**: DB snake_case ↔ app camelCase, mapeado únicamente en servicios; español para dominio y UI. (Excepción: el Trueque devuelve filas snake_case tal cual desde sus RPCs.)
+10. **Matching del Trueque** (`trueque_generate_matches`):
+    - **Normalización:** `trueque_norm(t)` = `lower` → quitar acentos (`translate`, ñ→n) → todo lo que no sea `[a-z0-9]` se vuelve espacio → colapsar espacios → `trim`. Se guarda como columna GENERATED `title_norm`, indexada, así que el match es una igualdad exacta sobre el índice. Por ejemplo, `"¡Cien Años de Soledad!"` y `"cien anos de soledad"` empatan.
+    - **Algoritmo** (un solo SQL con CTEs, no un loop por usuario):
+      - (a) Candidatos = usuarios con ≥1 zona en común (JOIN sobre `user_exchange_zones`).
+      - (b) `mine` = el primer libro mío activo cuyo `title_norm` está en su "Busco".
+      - (c) `theirs` = el primer libro suyo activo cuyo `title_norm` está en mi "Busco" ∪ mi "Por leer" (se prefiere "Busco").
+      - (d) Ambos → perfecto; solo uno → parcial.
+      - (e) Upsert por pareja: si ya hay un `chatting`, no se toca; un `pending` idéntico se deja igual; un `pending` distinto se cancela y se crea el nuevo.
+    - Los usuarios sin zonas nunca son candidatos, y quien busca debe tener zonas (`TRUEQUE_NO_ZONES`).
+11. **Cobro en dos pasos con crédito**: cuando una acción de pago se divide en "cobrar" y "entregar" (dos RPCs llamadas desde el cliente), la primera emite un crédito de un solo uso y la segunda lo consume. Así la segunda no se puede llamar gratis.
 
 ---
 
@@ -379,6 +483,7 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 - **Monetización**: las gemas ya tienen ledger; un "catálogo de compras" sería tabla `purchases` + RPC SECURITY DEFINER que valide balance y descuente (usar `buyExtraSaves` como referencia de QUÉ NO hacer client-side, ver §XII).
 - **Otro algoritmo de recomendación**: solo tiene que escribir filas en `recommendation_scores` (user_id, book_id, predicted_rating, reason) — `api/recommendations.js` y la UI no cambian. Sustituir/añadir script en `scripts/` y workflow.
 - **Más mascotas**: añadir entradas a `PET_TYPES` en petService (img, title, quote, label) + assets en `public/pets/`; el diseño evolutivo completo está especificado en `SISTEMA_MASCOTAS_EVOLUTIVAS.md`.
+- **Trueque**: cambiar costos o límites = `UPDATE trueque_gems_cost SET value = … WHERE key = …` (sin deploy). Agregar una zona = `ALTER TYPE exchange_zone ADD VALUE 'slug'` + entrada en `src/config/zones.js`. Dar Plus = `UPDATE users SET is_premium = true`.
 - **Extraer vistas del monolito**: mover una vista de App.jsx a `src/components/` siguiendo el patrón del commit `3b3adfd` (imports de servicios + props explícitas).
 
 ## XII. LIMITACIONES CONOCIDAS Y DEUDA TÉCNICA
@@ -397,6 +502,20 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 10. **Lógica de logros duplicada** (JS en `checkAchievements` + SQL en `award_achievement`): riesgo de divergencia al añadir/cambiar logros. Además, `checkAchievements` corre en momentos clave del cliente, no ante cualquier cambio server-side.
 11. **Cuentas privadas no encontrables**: efecto secundario de `privacy_hardening.sql`; si se quiere búsqueda por username de cuentas privadas habría que usar la vista `users_public` (ya creada, sin uso todavía) con una política/función dedicada.
 12. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
+13. **Trueque — TODOs de Sprint 2:**
+    - Migrar zonas fijas a Google Places API (geolocalización real en vez de 25 zonas).
+    - Implementar "Embajadas FOLIO" (lugares aliados verificados; el disclaimer ya las anuncia).
+    - Pago real de Folio Plus: hoy `is_premium` se activa a mano y el CTA es placeholder con precio `$XX`.
+    - Push notifications para matches y mensajes nuevos (hoy el usuario tiene que entrar a la tab; el chat hace polling solo mientras está abierto).
+14. **Trueque — limitaciones conocidas del MVP:**
+    - **Un match vivo por pareja**, con un libro por lado.
+    - **Match solo por título** (no por autor ni ISBN).
+    - **Búsquedas O(usuarios con zona común):** suficiente para el MVP; con miles de usuarios por zona habría que materializar o paginar.
+    - **Fotos huérfanas en Storage:** se quedan en el bucket `trueque` al quitar un libro o borrar la cuenta (no hay limpieza).
+    - **Disclaimer por dispositivo:** la aceptación vive en `localStorage`, así que en otro dispositivo se vuelve a pedir.
+    - **Sin moderación:** no hay botón de reportar usuario ni bloqueo; el reporte es por email a soporte@folio.mx.
+    - **Mensaje de sistema a nombre del dueño:** cuando se cancela un match, el mensaje de sistema del chat usa `sender_id` = dueño del libro (con `is_system = true`).
+    - **pg_cron puede faltar:** si la extensión no está habilitada, el SQL solo emite un NOTICE. La app igual oculta y expira los vencidos al listar y al buscar.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 
@@ -414,13 +533,14 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | Archivos basura en la raíz (`temp_*.txt`, `pg*_raw.txt`, `folio.jsx`, `gema.png.png`, `avatars-grid.png`, `.env.vercel.tmp`) | ✅ RESUELTO 2026-09-17 | Eliminados/desatados (secreto de `.env.vercel.tmp` ya expirado; ver residuo en Pendiente #9) |
 | `RootErrorBoundary` mostraba pantalla roja con stack trace en producción | ✅ RESUELTO 2026-09-18 | Fallback condicionado a `import.meta.env.DEV`; en prod muestra UI amigable "Algo salió mal" + Recargar |
 | `.env.example` desactualizado (`VITE_ANTHROPIC_API_KEY`, sin `ADMIN_KEY`/`GOOGLE_BOOKS_API_KEY`) | ✅ RESUELTO 2026-09-18 | Reescrito con todas las variables reales y un comentario por cada una |
+| Intercambio de libros entre usuarios | ✅ IMPLEMENTADO 2026-09-18 | Trueque MVP: `trueque_schema.sql` + `truequeService` + `src/components/trueque/` (ver §IV.14) |
 | Proxy Anthropic sin autenticación | ✅ RESUELTO 2026-09-17 | `api/anthropic.js` y `server.js` exigen JWT de Supabase válido (o `x-admin-key`) |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER
 
 **Leer primero (en orden):**
 1. Este documento.
-2. `supabase/sprint1_server_authority.sql` — el contrato anti-cheat lo explica todo sobre recompensas — y luego los 5 parches (`security_patch_*`, `privacy_hardening`, `timezone_fix`).
+2. `supabase/sprint1_server_authority.sql` — el contrato anti-cheat lo explica todo sobre recompensas — y luego los 5 parches (`security_patch_*`, `privacy_hardening`, `timezone_fix`) y `trueque_schema.sql`.
 3. `src/services/` completo (~800 líneas en total, se lee en una sentada) + `logReadingSession`/`checkAchievements` en App.jsx (~líneas 660-900), que orquestan las RPCs.
 4. `MainApp` en App.jsx (línea ~12982) — el hub de estado.
 

@@ -60,6 +60,7 @@ import {
   Download,
   Snowflake,
   ExternalLink,
+  Repeat,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName } from "./services/authService.js";
@@ -80,6 +81,7 @@ import { ListDetailModal } from "./components/ListDetailModal.jsx";
 import { ListsSection } from "./components/ListsSection.jsx";
 import { ReadDateModal } from "./components/ReadDateModal.jsx";
 import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
+import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, getAvatarColor, display, body, ts, genrePillStyle } from "./theme.js";
 import { dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, addPendingLog, getPendingPosts, addPendingPost, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB } from "./services/booksService.js";
 import { fetchUserLists, createUserList, updateUserList, deleteUserList, addBookToList, removeBookFromList } from "./services/listsService.js";
@@ -1358,6 +1360,7 @@ const NAV_ITEMS = [
   { id: "explorar", label: "Explorar", icon: Compass },
   { id: "mascota", label: "Mascota", icon: PawPrint },
   { id: "social", label: "Social", icon: MessageCircle },
+  { id: "trueque", label: "Trueque", icon: Repeat },
   { id: "perfil", label: "Perfil", icon: User },
 ];
 
@@ -1522,7 +1525,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
             ) : (
               <div style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                padding: "5px 14px",
+                padding: "5px 8px",
                 borderRadius: "999px",
                 backgroundColor: active ? `${palette.accent}18` : "transparent",
                 transition: "background-color 200ms ease",
@@ -13701,6 +13704,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
+        {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} isOnline={isOnline} /></div>}
         {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSaveQuote={() => openSaveQuote(null)} pet={pet} onRenamePet={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }} /></div>}
       </main>
