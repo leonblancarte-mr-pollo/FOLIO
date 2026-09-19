@@ -42,7 +42,7 @@ MD_PATH = ROOT / "DOCUMENTACION_ARQUITECTURA.md"
 OUT_PATH = ROOT / "DOCUMENTACION_ARQUITECTURA_COMPLETA.docx"
 SQL_DIR = ROOT / "supabase"
 
-DOC_VERSION = "1.1 (extendida)"
+DOC_VERSION = "1.2 (extendida)"
 PENDING_COMMIT = ""   # se rellena con --pending "mensaje" para incluir el commit en curso en el apéndice E
 AUTHOR = "FOLIO Team"
 SERIF = "Georgia"
@@ -198,8 +198,16 @@ class Builder:
             if not part:
                 continue
             if part.startswith("**") and part.endswith("**") and len(part) > 4:
-                r = par.add_run(part[2:-2])
-                set_font(r, SANS, size, bold=True, color=color)
+                for sub in re.split(r"(`[^`]+`)", part[2:-2]):   # `código` dentro de negrita
+                    if not sub:
+                        continue
+                    if sub.startswith("`") and sub.endswith("`") and len(sub) > 2:
+                        r = par.add_run(sub[1:-1])
+                        set_font(r, MONO, (size or 10.5) - 1.5, bold=True, color=RGBColor(0x8A, 0x2B, 0x2B))
+                        shade(r._r.get_or_add_rPr(), "F0F0F0")
+                    else:
+                        r = par.add_run(sub)
+                        set_font(r, SANS, size, bold=True, color=color)
             elif part.startswith("`") and part.endswith("`") and len(part) > 2:
                 r = par.add_run(part[1:-1])
                 set_font(r, MONO, (size or 10.5) - 1.5, color=RGBColor(0x8A, 0x2B, 0x2B))
@@ -644,6 +652,9 @@ INTRO = [
         ["Fix real de cuentas huérfanas", "2026-09-19 (changelog)",
          "El fix anterior solo cubría de forma efectiva el signup. Ahora `ensureUserProfile` repara el perfil faltante en cada login, "
          "sesión guardada y evento `onAuthStateChange`, sin fallar en silencio, y `repair_all_orphan_profiles.sql` repara el histórico."],
+        ["Diagnóstico en producción", "2026-09-19 (changelog)",
+         "`ensureUserProfile` no dejaba rastro en producción y el perfil seguía sin crearse. Se añade instrumentación `[auth-debug]`, "
+         "llamadas explícitas en login/registro/listener, un fallback defensivo al montar `App` y el log de versión del build."],
     ], [0.17, 0.2, 0.63]),
     ("h2", "Estado actual"),
     ("ul", [
@@ -651,6 +662,7 @@ INTRO = [
         "**Backend:** Supabase con RLS en todas las tablas. Las migraciones SQL se corren a mano en el SQL Editor (no hay CLI configurada).",
         "**Seguridad:** XP, nivel, gemas, logros y racha solo se escriben desde Postgres; `is_public` se hace cumplir en RLS; `users.email` está fuera del SELECT de clientes.",
         "**Trueque:** MVP funcional. No hay pago real de Folio Plus (`is_premium` se activa a mano).",
+        "**Bug abierto (2026-09-19):** el auto-perfil de cuentas huérfanas no dejó rastro en producción; hay instrumentación `[auth-debug]` activa (`AUTH_DEBUG` en `authService.js`) a la espera de las trazas de un registro nuevo y de un login.",
         "**Calidad:** sin suite de tests; App.jsx sigue siendo un monolito de ~14.900 líneas (ver sección de deuda técnica).",
     ]),
     ("h2", "Roadmap"),
@@ -808,6 +820,8 @@ export async function setWeeklyGoal(userId, pages) {
         ["429 / respuesta sin `content` de Anthropic", "Rate limit del proxy (10 req/min/IP) o JWT vencido", "Reintenta; revisa `Authorization: Bearer`; ver mensajes amigables en `enrichBook`"],
         ["Cuenta privada no aparece en la búsqueda de amigos", "Efecto esperado de `privacy_hardening.sql`", "Diseñar una función/vista dedicada (`users_public`)"],
         ["`TRUEQUE_*` en la UI del Trueque", "Regla de negocio en SQL (`TRUEQUE_NO_ZONES`, `TRUEQUE_LIMIT_*`, `TRUEQUE_NO_CREDIT`…)", "`truequeService` los traduce a `TruequeError { code }`; ver Apéndice B"],
+        ["No aparece ningún log `[auth]` en producción y el perfil sigue sin crearse", "Bundle viejo servido por el service worker, filtro de niveles en la consola, o la lógica no se ejecuta",
+         "Abre la app en incógnito con DevTools y busca `[auth-debug] Build version`: debe traer `tag: 'auth-debug-1'` (`build` = hora real de compilación; `swControlled` = ¿lo sirve un service worker?). Luego sigue la traza `[auth-debug]` de `ensureUserProfile` (SELECT → INSERT payload → INSERT result)"],
         ["«Ya existe una cuenta con ese email» pero no se puede entrar", "Cuenta huérfana en `auth.users` sin perfil", "Iniciar sesión (se auto-repara) o reintentar el registro con la misma contraseña; en bloque: `repair_all_orphan_profiles.sql`"],
         ["Login OK pero `claim_daily_gems` o el onboarding de mascota fallan con foreign key / «usuario no existe»", "Cuenta huérfana: sin fila en `public.users`. Si el auto-perfil no se crea, mira la consola",
          "Busca `[auth]` en consola: `BLOQUEADO POR RLS`, `SIN PRIVILEGIOS` (corre `fix_signup_permissions.sql`) o el error completo; verifica que el frontend desplegado sea el nuevo (`vercel --prod`); repara en bloque con `repair_all_orphan_profiles.sql`"],
@@ -834,6 +848,7 @@ GLOSSARY = [
     ("`session_id`", "UUID generado por el cliente por sesión de lectura; sirve de `ref` idempotente y sobrevive a reintentos offline."),
     ("Cuenta huérfana", "Usuario que existe en `auth.users` pero no tiene fila en `public.users` (signup que falló a medias). Se auto-repara en login, sesión guardada y `onAuthStateChange`; el histórico, con `repair_all_orphan_profiles.sql`."),
     ("`ensureUserProfile`", "Función de `authService` que comprueba si existe el perfil del usuario y, si falta, lo crea (idempotente, con reintento de username y logs de error explícitos)."),
+    ("`[auth-debug]`", "Prefijo de los logs de diagnóstico de auth (temporales). Se apagan con `AUTH_DEBUG = false` en `authService.js`. `[auth-debug] Build version` (en `main.jsx`) indica qué build corre en el navegador."),
     ("`watchAuthProfile`", "Suscripción a `onAuthStateChange` (`SIGNED_IN` / `INITIAL_SESSION`) que ejecuta `ensureUserProfile`; la monta `App`."),
     ("BookTinder", "Swipe de recomendaciones sobre `books_curated`, límite de 15 guardados/día ampliable con gemas."),
     ("Snacks", "Cuentos de dominio público (~23) embebidos en la app y leídos en `ReaderView`, sin red."),
@@ -1202,7 +1217,7 @@ def build(doc, toc_entries):
 
 # Términos de auth que deben decir lo mismo en el .md y en el .docx (auditoría de coherencia)
 AUTH_TERMS = ["ensureUserProfile", "watchAuthProfile", "repair_all_orphan_profiles.sql", "fix_signup_permissions.sql",
-              "onAuthStateChange", "recoverOrphanAccount", "INITIAL_SESSION"]
+              "onAuthStateChange", "recoverOrphanAccount", "INITIAL_SESSION", "[auth-debug]", "AUTH_DEBUG", "__APP_BUILD__"]
 
 
 def all_docx_text(path):

@@ -23,11 +23,21 @@ let registrationInFlight = false;
 // Devuelve { ok, existed?, usernameTaken?, error? }. Idempotente: si la fila ya existe (PK) es ok.
 async function insertProfileRow({ id, email, nombre, username }, extras = null) {
   const base = { id, email, nombre, username };
-  let { error } = await supabase.from("users").insert(extras ? { ...base, ...extras } : base);
+  const payload = extras ? { ...base, ...extras } : base;
+  dbg("INSERT payload", payload);
+  let { data, error, status } = await supabase.from("users").insert(payload);
+  dbg("INSERT result", { data, error, status });
   const rls = error?.code === "42501" && /row-level security/i.test(error.message || "");
   if (error && extras && !rls && ["42703", "PGRST204", "42501"].includes(error.code)) {
     console.warn("[auth] INSERT con columnas extra rechazado; reintentando solo con las obligatorias:", error.code, error.message);
-    ({ error } = await supabase.from("users").insert(base));
+    dbg("INSERT payload (reintento sin extras)", base);
+    ({ data, error, status } = await supabase.from("users").insert(base));
+    dbg("INSERT result (reintento sin extras)", { data, error, status });
+  }
+  if (error) {
+    console.error("[auth-debug] INSERT failed", { code: error.code, message: error.message, hint: error.hint, details: error.details, status });
+  } else {
+    dbg("Profile created successfully");
   }
   if (!error) return { ok: true };
   if (error.code === "23505") {
@@ -37,6 +47,11 @@ async function insertProfileRow({ id, email, nombre, username }, extras = null) 
   }
   return { ok: false, error };
 }
+
+// TEMPORAL (diagnóstico 2026-09-19): logs verbosos con prefijo [auth-debug].
+// Poner AUTH_DEBUG = false cuando se cierre el diagnóstico de cuentas huérfanas.
+const AUTH_DEBUG = true;
+const dbg = (...args) => { if (AUTH_DEBUG) console.log("[auth-debug]", ...args); };
 
 function errorInfo(err) {
   return { code: err?.code, message: err?.message, details: err?.details, hint: err?.hint };
@@ -71,14 +86,44 @@ function orphanProfileDraft(authUser) {
 //   - checked:false → no se pudo ni verificar (red/permisos de SELECT); no se intentó crear nada.
 //   - ok:false con checked:true → el perfil falta y NO se pudo crear (ya se logueó el motivo).
 async function runEnsureProfile(authUser) {
-  const { data: profile, error } = await supabase
+  dbg("ensureUserProfile called", { userId: authUser.id, email: authUser.email });
+  try {
+    const result = await runEnsureProfileInner(authUser);
+    dbg("ensureUserProfile completed", { ok: result.ok, checked: result.checked, created: result.created });
+    return result;
+  } catch (e) {
+    // Nunca en silencio: una excepción inesperada se registra y se devuelve como "no verificado".
+    console.error("[auth-debug] ensureUserProfile THREW", e);
+    return { ok: false, checked: false, created: false, error: e };
+  }
+}
+
+async function runEnsureProfileInner(authUser) {
+  dbg("Checking profile existence...");
+  const { data: profile, error, status } = await supabase
     .from("users").select("nombre, username").eq("id", authUser.id).maybeSingle();
-  if (error) {
-    console.error(`[auth] No se pudo verificar si existe el perfil de ${authUser.email}:`, errorInfo(error));
+  dbg("Profile check result", { data: profile, error, status });
+
+  // 406 / PGRST116 = "sin filas" → NO es un error: el perfil simplemente no existe (postgrest-js ya lo
+  // normaliza a data:null con maybeSingle, pero se contempla por si cambia el cliente).
+  const noRows = !!error && (status === 406 || error.code === "PGRST116");
+  if (error && !noRows) {
+    const info = { ...errorInfo(error), status };
+    if (status === 401 || status === 403 || error.code === "42501") {
+      console.error(`[auth] SELECT del perfil de ${authUser.email} DENEGADO (RLS/GRANT o sesión sin JWT). No se intenta crear.`, info);
+    } else if (status >= 500) {
+      console.error(`[auth] Error del servidor (${status}) al verificar el perfil de ${authUser.email}.`, info);
+    } else {
+      console.error(`[auth] No se pudo verificar si existe el perfil de ${authUser.email}:`, info);
+    }
     return { ok: false, checked: false, created: false, error };
   }
-  if (profile) return { ok: true, checked: true, created: false, profile };
+  if (profile) {
+    dbg("Profile exists, nothing to do");
+    return { ok: true, checked: true, created: false, profile };
+  }
 
+  dbg("Profile missing, will create");
   console.info("[auth] Auto-creando perfil faltante para user:", authUser.email);
   const { nombre, username: base } = orphanProfileDraft(authUser);
   const email = (authUser.email || "").toLowerCase();
@@ -117,8 +162,9 @@ export function ensureUserProfile(authUser) {
 // Devuelve SIEMPRE la forma { id, name, email } que espera el resto de la app.
 // (public.users guarda `nombre`; aquí lo mapeamos a `name`.)
 // Auto-repara el perfil faltante (cuenta huérfana) en CADA llamada: login, sesión guardada, etc.
-async function buildAppUser(authUser) {
-  const ensured = await ensureUserProfile(authUser);
+async function buildAppUser(authUser, preEnsured = null) {
+  dbg("buildAppUser called", { userId: authUser?.id, reusesEnsureResult: !!preEnsured });
+  const ensured = preEnsured || await ensureUserProfile(authUser);
 
   // No se pudo ni verificar (red/permisos) → caché si el id coincide; si no, no hay usuario.
   if (!ensured.checked) {
@@ -143,12 +189,15 @@ async function buildAppUser(authUser) {
 // - Se ignora durante el registro: ahí el perfil lo crea registerWithSupabase (no se cambia el signup).
 export function watchAuthProfile() {
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    dbg("Auth event received", { event, hasSession: !!session, userId: session?.user?.id });
     if (event !== "SIGNED_IN" && event !== "INITIAL_SESSION") return;
-    if (registrationInFlight || !session?.user) return;
+    if (registrationInFlight) { dbg("Auth event ignored: registro en curso (lo crea registerWithSupabase)", { event }); return; }
+    if (!session?.user) { dbg("Auth event sin usuario: nada que reparar", { event }); return; }
     setTimeout(() => {
       ensureUserProfile(session.user).catch((e) => console.error("[auth] fallo inesperado en el check de perfil:", e));
     }, 0);
   });
+  dbg("Auth watcher registered");
   return () => data?.subscription?.unsubscribe();
 }
 
@@ -158,8 +207,12 @@ export async function loginWithSupabase(email, password) {
     password,
   });
   if (error) return { ok: false, error: "Email o contraseña incorrectos." };
-  // buildAppUser → ensureUserProfile: si la cuenta es huérfana (sin fila en users), crea el perfil aquí mismo.
-  const user = await buildAppUser(data.user);
+  dbg("signIn OK", { userId: data.user?.id, hasSession: !!data.session });
+  // Llamada explícita (2026-09-19, diagnóstico): repara el perfil ANTES de armar el usuario de la app.
+  // buildAppUser reutiliza este resultado (evita un segundo INSERT si el primero falló); los demás
+  // caminos (getSessionUser) lo llaman sin resultado previo y buildAppUser ejecuta ensureUserProfile por sí mismo.
+  const ensured = await ensureUserProfile(data.user);
+  const user = await buildAppUser(data.user, ensured);
   if (!user) return { ok: false, error: "No se pudo cargar el perfil." };
   return { ok: true, user };
 }
@@ -242,6 +295,10 @@ async function registerImpl({ name, username, email, password }) {
     return { ok: false, error: msg };
   }
 
+  // Verificación explícita (diagnóstico): confirma que la fila quedó creada. No altera el resultado del alta.
+  dbg("signUp OK, verificando perfil", { userId: authData.user.id, hasSession: !!authData.session });
+  await ensureUserProfile(authData.user);
+
   const user = { id: authData.user.id, email: emailLower, name: name.trim() };
   cacheAuthUser(user);
   return { ok: true, user };
@@ -267,6 +324,7 @@ export async function logout() {
 // Carga la sesión actual al abrir la app. Devuelve { id, name, email } o null.
 export async function getSessionUser() {
   const { data: { session } } = await supabase.auth.getSession();
+  dbg("getSessionUser", { hasSession: !!session, userId: session?.user?.id });
   if (!session) return null;
   return await buildAppUser(session.user);
 }

@@ -1,6 +1,6 @@
 # FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-09-19 · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-09-19 (instrumentación `[auth-debug]` incluida) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -12,6 +12,7 @@
 - 2026-09-18 — Sprint Trueque MVP: DB, RPCs, UI completa, matching, chat, rating
 - 2026-09-18 — Fix bug signup (permission denied users); doc extendido en Word
 - 2026-09-19 — Fix real de cuentas huérfanas: auto-reparación en login + onAuthStateChange + script de reparación masiva
+- 2026-09-19 — Debug logs verbosos en ensureUserProfile + llamadas explícitas + fallback defensivo en App.jsx
 
 ---
 
@@ -347,6 +348,15 @@ Helpers que **siguen en App.jsx** (no en services): `logReadingSession`, `syncPe
 - **Signup:** sin cambios de comportamiento (INSERT plano + `recoverOrphanAccount`); solo se envuelve con `registrationInFlight`.
 - **Reparación de las ya existentes:** `supabase/repair_all_orphan_profiles.sql` (idempotente) crea el perfil de todas las huérfanas de golpe.
 
+**Instrumentación de diagnóstico `[auth-debug]` (2026-09-19, TEMPORAL).** Tras reportarse en producción que `ensureUserProfile` no dejaba ningún log y el perfil seguía sin crearse (errores FK `user_pets_user_id_fkey` / `books_user_id_fkey`), se añadió trazabilidad completa; se apaga con `AUTH_DEBUG = false` en `authService.js`:
+
+- `ensureUserProfile`: `called {userId,email}` → `Checking profile existence...` → `Profile check result {data,error,status}` → `Profile exists` **o** `Profile missing, will create` → `INSERT payload` → `INSERT result {data,error,status}` → `Profile created successfully` **o** `console.error INSERT failed {code,message,hint,details,status}` → `ensureUserProfile completed`. Una excepción inesperada se registra como `ensureUserProfile THREW` (nunca se traga).
+- `watchAuthProfile`: `Auth watcher registered` y, por **cada** evento, `Auth event received {event,hasSession,userId}`; también avisa si ignora un evento (registro en curso / sin usuario).
+- **Llamadas explícitas:** `loginWithSupabase` llama a `ensureUserProfile(data.user)` justo tras `signInWithPassword` y pasa el resultado a `buildAppUser(authUser, preEnsured)` (evita un segundo INSERT si el primero falló); `buildAppUser` la llama por sí mismo cuando no recibe resultado (sesión guardada); `registerWithSupabase` la llama tras crear el perfil como verificación (no altera el resultado del alta); el listener la llama en `SIGNED_IN`/`INITIAL_SESSION`.
+- **Fallback defensivo en `App.jsx`:** al montarse, antes de `getSessionUser`, lee la sesión y, si existe, llama `ensureUserProfile` (log `Defensive check on App mount`).
+- **Versión del build en consola (`main.jsx`):** `[auth-debug] Build version: { build, tag: 'auth-debug-1', loadedAt, swControlled }`. `build` es la hora REAL de compilación (`__APP_BUILD__`, inyectada con `define` en `vite.config.js`); `loadedAt` es solo la hora de carga; `swControlled` indica si un service worker sirve la página. Si no aparece `tag: 'auth-debug-1'`, el navegador está ejecutando un bundle viejo.
+- **Verificación del perfil (SELECT):** `406`/`PGRST116` se trata como «no existe» (no es error); `401`/`403`/`42501` → error específico «SELECT DENEGADO» y NO se intenta crear; `5xx` → error de servidor; ninguno lanza excepción para no romper el login (el usuario ve «No se pudo cargar el perfil» si no hay caché).
+
 Ejemplo de uso típico:
 ```js
 const { streak, hasLoggedToday, pagesLoggedToday } = await fetchStreakData(user.id);
@@ -550,6 +560,8 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
     - **Sin moderación:** no hay botón de reportar usuario ni bloqueo; el reporte es por email a soporte@folio.mx.
     - **Mensaje de sistema a nombre del dueño:** cuando se cancela un match, el mensaje de sistema del chat usa `sender_id` = dueño del libro (con `is_system = true`).
     - **pg_cron puede faltar:** si la extensión no está habilitada, el SQL solo emite un NOTICE. La app igual oculta y expira los vencidos al listar y al buscar.
+
+15. **Bug `ensureUserProfile` no se ejecutaba (o no dejaba rastro) en producción — logs añadidos para diagnóstico 2026-09-19. ABIERTO.** Síntoma reportado: tras `vercel --prod` + hard refresh + login, ningún log `[auth]` y errores FK al crear mascota/agregar libro (perfil ausente en `public.users`; hubo que crearlo a mano con SQL). Revisión estática del código: **descartadas** la hipótesis del 406 (con 0 filas `maybeSingle()` devuelve `data:null` sin error en postgrest-js 2.105; el 406 solo aparece con >1 filas), condiciones de entorno (`import.meta.env.DEV`; el bundle no elimina `console.*`: `vite.config.js` no usa `drop_console`/`pure`), y el «catch silencioso» (todas las ramas de error hacen `console.error`). El bundle de `dist/` sí contiene la lógica nueva. Quedan sin descartar: bundle viejo servido por el service worker (Workbox `precache` + `navigateFallback`/`CacheFirst` de `/assets/`) o filtro de consola; por eso se añadió el log de versión de build. **Cómo cerrarlo:** abrir la app en incógnito con DevTools, buscar `[auth-debug] Build version` (debe traer `tag: 'auth-debug-1'`), y compartir la traza `[auth-debug]` de un registro nuevo y de un login de `leon.blancarte@gmail.com`. Al cerrar el diagnóstico: `AUTH_DEBUG = false` y quitar el bloque del fallback defensivo si resulta redundante.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 

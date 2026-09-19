@@ -63,7 +63,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
-import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile } from "./services/authService.js";
+import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
 import confetti from "canvas-confetti";
 import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
 import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
@@ -14839,6 +14839,12 @@ export default function App() {
     }
     (async () => {
       try {
+        // Fallback defensivo (diagnóstico 2026-09-19): si hay sesión guardada, garantizar el perfil ANTES de
+        // cualquier otra query a public.users (getSessionUser/buildAppUser lo vuelve a comprobar).
+        console.log("[auth-debug] Defensive check on App mount");
+        const { data: { session: mountSession } } = await supabase.auth.getSession();
+        console.log("[auth-debug] Defensive check: session", { hasSession: !!mountSession, userId: mountSession?.user?.id });
+        if (mountSession?.user) await ensureUserProfile(mountSession.user);
         const u = await getSessionUser();
         if (u) {
           setUser(u);

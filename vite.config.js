@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Hora real del build (la muestra main.jsx en consola para saber qué código corre en producción).
+  define: { __APP_BUILD__: JSON.stringify(new Date().toISOString()) },
   plugins: [
     react(),
     VitePWA({

@@ -3,6 +3,15 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// Diagnóstico 2026-09-19: confirma qué build corre en el navegador. `build` es la hora REAL en que se compiló
+// (inyectada por vite.config.js); `loadedAt` es solo la hora de carga. `swControlled` = ¿lo sirve un service worker?
+console.log('[auth-debug] Build version:', {
+  build: typeof __APP_BUILD__ !== 'undefined' ? __APP_BUILD__ : 'dev',
+  tag: 'auth-debug-1',
+  loadedAt: new Date().toISOString(),
+  swControlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+});
+
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(regs => {
     regs.forEach(reg => {
