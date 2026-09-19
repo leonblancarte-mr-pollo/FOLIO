@@ -1,6 +1,6 @@
 # FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-09-18 · Incluye el fix de signup (`fix_signup_permissions.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-09-19 · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -11,6 +11,7 @@
 - 2026-09-18 — Fixes urgentes: portada, ErrorBoundary, env.example
 - 2026-09-18 — Sprint Trueque MVP: DB, RPCs, UI completa, matching, chat, rating
 - 2026-09-18 — Fix bug signup (permission denied users); doc extendido en Word
+- 2026-09-19 — Fix real de cuentas huérfanas: auto-reparación en login + onAuthStateChange + script de reparación masiva
 
 ---
 
@@ -78,7 +79,8 @@ FOLIO FINAL/
 │   ├── timezone_fix.sql                  # 9. "Hoy" server-side = America/Mexico_City
 │   ├── trueque_schema.sql                # 10. Trueque de libros: 7 tablas + RLS + RPCs + bucket + pg_cron
 │   ├── fix_signup_permissions.sql        # 11. Fix signup: policies INSERT/UPDATE de users + GRANT INSERT/UPDATE por columna
-│   └── cleanup_orphan_auth_users.sql     # (opcional) lista/repara/borra cuentas huérfanas de auth.users
+│   ├── cleanup_orphan_auth_users.sql     # (opcional) lista/repara/borra cuentas huérfanas de auth.users
+│   └── repair_all_orphan_profiles.sql    # 12. Repara en bloque TODAS las cuentas huérfanas (idempotente; usernames duplicados con sufijo)
 ├── DOCUMENTACION_ARQUITECTURA_COMPLETA.docx  # Versión Word extendida (se genera con scripts/generate_docs.py; el .md es la fuente de verdad)
 ├── scripts/
 │   ├── generate_docs.py      # Lee este .md y genera el .docx extendido (pip install python-docx)
@@ -270,8 +272,16 @@ AuthView → registerWithSupabase()
      · si falla → signOut() (queda una huérfana en auth.users que el próximo login/registro repara)
   3. App muestra NewUserOnboarding → PetOnboarding → MainApp
 
-Login / arranque: buildAppUser(authUser) lee public.users; si NO hay fila (cuenta huérfana) la auto-crea con
-user_metadata (nombre, username; sufijo si el username ya está tomado) y deja un console.info "[auth] perfil auto-creado".
+Login / arranque / sesión guardada (auto-reparación de perfiles huérfanos, 2026-09-19):
+  login:            signInWithPassword ─► buildAppUser ─► ensureUserProfile ─► ¿fila en users?
+  sesión guardada:  getSessionUser     ─► buildAppUser ─► ensureUserProfile ─┤   sí ─► sigue normal
+  evento de sesión: onAuthStateChange(SIGNED_IN | INITIAL_SESSION)          ─┤   no ─► INSERT {id, email, nombre, username,
+                    ─► ensureUserProfile (diferido con setTimeout)               is_public:true, onboarding_completed:false}
+  · username: user_metadata.username → parte del email; si choca (23505) → sufijo aleatorio, hasta 3 reintentos
+  · nombre:   user_metadata.nombre → full_name → name → parte del email
+  · logs: console.info "[auth] Auto-creando perfil faltante para user: <email>" y "[auth] Perfil auto-creado exitosamente";
+          si el INSERT falla, console.error con el motivo (RLS / GRANT → correr fix_signup_permissions.sql / otro)
+  · si no se pudo crear el perfil el login NO se bloquea (modo degradado, usuario con `profileMissing: true`) pero queda el error en consola
 ```
 
 ### Terminar un libro (el flujo más rico)
@@ -316,7 +326,7 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 
 | Servicio | Exports clave | Llama a | Notas |
 |---|---|---|---|
-| `authService` | `loginWithSupabase`, `registerWithSupabase`, `getSessionUser`, `updateDisplayName`, `logout` | Supabase Auth + `users` | Mapea `nombre`→`name`; caché `folio_auth_user` para offline. **Cuentas huérfanas (2026-09-18):** `buildAppUser` auto-crea el perfil si hay sesión pero no fila en `users` (`autoCreateProfile`, con metadata y sufijo de username si hay colisión); `registerWithSupabase` usa INSERT plano (`insertProfileRow`, ya NO upsert) y, ante "ya registrado", intenta `recoverOrphanAccount` |
+| `authService` | `loginWithSupabase`, `registerWithSupabase`, `getSessionUser`, `updateDisplayName`, `logout`, `ensureUserProfile`, `watchAuthProfile` | Supabase Auth + `users` | Mapea `nombre`→`name`; caché `folio_auth_user` para offline. **Auto-reparación de perfiles (2026-09-19):** exporta también `ensureUserProfile` y `watchAuthProfile`; `buildAppUser` (login y sesión guardada) y el listener `onAuthStateChange` crean el perfil faltante de una cuenta huérfana (detalle abajo). `registerWithSupabase` usa INSERT plano (`insertProfileRow`, ya NO upsert) y, ante "ya registrado", intenta `recoverOrphanAccount` |
 | `booksService` | `fetchBooks`, `insertBook`, `updateBookInDB`, `deleteBookFromDB`, `dbToBook`/`bookToDb`, `isUnknownColumnError`, `stripTotalPages`, `readDateLabel`; caché offline: `cacheBooks`/`getCachedBooks`, `cacheProfile`/`getCachedProfile`, `cacheAchievements`/`getCachedAchievements`; colas: `getPendingLogs`/`addPendingLog`, `getPendingPosts`/`addPendingPost` | `books` | Reintenta sin `total_pages/read_date_precision` si la migración no corrió (`isUnknownColumnError`); UPDATE/DELETE verifican filas afectadas para detectar RLS. Los pending logs guardan `sessionId` |
 | `streakService` | `fetchStreakData`, `checkStreakOnLoad`, `localDateStr`, `daysBetweenLocalDates` | `user_streaks`, `reading_logs`, RPC `pet_daily_checkin` | Racha se PAUSA, nunca se resetea. Solo lee; las escrituras de racha/freeze van por RPCs `update_streak`/`use_streak_freeze`/`reset_monthly_freeze` (llamadas desde App.jsx) |
 | `gemsService` | `loadGems`, `claimDailyGems`, `initUserGems`, `gemsEventBus`, `gemToastBus` | `user_gems`, RPC `claim_daily_gems` | Cliente solo lee |
@@ -326,6 +336,16 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 | `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50 |
 
 Helpers que **siguen en App.jsx** (no en services): `logReadingSession`, `syncPendingLogs`, `checkAchievements`, `enrichBook`, `getRecommendations` (versión Claude/mood, distinta a la de `recommendationService`), `searchGoogleBooks`, `createFeedPost`; `loadStreakInfo` es una función interna de un componente de App.jsx (~línea 9873).
+
+**`authService` — flujos de auto-reparación de perfiles (2026-09-19).** Una cuenta huérfana es un usuario de `auth.users` sin fila en `public.users` (los FKs de gemas, mascota, etc. apuntan a `users`, así que sin perfil fallan `claim_daily_gems` y el onboarding de mascota). Piezas:
+
+- `ensureUserProfile(authUser)` (exportada): hace `SELECT` de `users` por id y, si no hay fila, la crea con `insertProfileRow` (INSERT plano de `id, email, nombre, username` + `is_public: true, onboarding_completed: false`; `is_premium` y `created_at` los pone la BD por default, y `is_premium` además lo fuerza a `false` el trigger `guard_users_premium`). Si la BD rechaza las columnas extra (columna inexistente o sin GRANT) reintenta solo con las 4 obligatorias. Llamadas concurrentes para el mismo usuario comparten una sola promesa (`ensureInFlight`).
+- **Login** (`loginWithSupabase` → `buildAppUser` → `ensureUserProfile`) y **sesión guardada** (`getSessionUser` → `buildAppUser`): la reparación ocurre siempre antes de devolver el usuario a la app.
+- **`watchAuthProfile()`** (exportada; la monta `App` en su `useEffect` inicial y la cancela al desmontar): suscribe `supabase.auth.onAuthStateChange` y en `SIGNED_IN` / `INITIAL_SESSION` ejecuta `ensureUserProfile`, diferido con `setTimeout(0)` (supabase-js desaconseja llamar a Supabase dentro del callback). Se ignora mientras corre `registerWithSupabase` (`registrationInFlight`) para no adelantarse al signup.
+- **Username duplicado (23505 por username):** se reintenta con sufijo aleatorio de 4 caracteres, hasta 3 reintentos. 23505 por PK = el perfil ya existía (creado en paralelo) → éxito.
+- **Errores, nunca en silencio:** `console.error` distingue RLS (`42501` + "row-level security"), falta de GRANT (`42501` "permission denied" → indica correr `fix_signup_permissions.sql`) y cualquier otro error con `code/message/details/hint`. Si el `SELECT` inicial falla (red/permisos) no se intenta crear nada y se cae al caché `folio_auth_user`.
+- **Signup:** sin cambios de comportamiento (INSERT plano + `recoverOrphanAccount`); solo se envuelve con `registrationInFlight`.
+- **Reparación de las ya existentes:** `supabase/repair_all_orphan_profiles.sql` (idempotente) crea el perfil de todas las huérfanas de golpe.
 
 Ejemplo de uso típico:
 ```js
@@ -485,7 +505,8 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
       - (e) Upsert por pareja: si ya hay un `chatting`, no se toca; un `pending` idéntico se deja igual; un `pending` distinto se cancela y se crea el nuevo.
     - Los usuarios sin zonas nunca son candidatos, y quien busca debe tener zonas (`TRUEQUE_NO_ZONES`).
 11. **Cobro en dos pasos con crédito**: cuando una acción de pago se divide en "cobrar" y "entregar" (dos RPCs llamadas desde el cliente), la primera emite un crédito de un solo uso y la segunda lo consume. Así la segunda no se puede llamar gratis.
-12. **Manejo de cuentas huérfanas en signup**: crear cuenta son dos pasos no atómicos (Auth y luego `public.users`), así que un fallo en el segundo deja una fila en `auth.users` sin perfil. Reglas: (a) el perfil se crea con INSERT plano e idempotente (PK duplicada = éxito), nunca con upsert; (b) `buildAppUser` auto-crea el perfil faltante en cualquier login/arranque; (c) si el registro choca con "ya registrado", se intenta `recoverOrphanAccount` (solo si la contraseña coincide y no hay perfil); (d) `supabase/cleanup_orphan_auth_users.sql` lista/repara/borra las que queden. Cualquier flujo futuro de dos pasos debe seguir el mismo criterio: reintentable y auto-reparable.
+12. **Manejo de cuentas huérfanas en signup**: crear cuenta son dos pasos no atómicos (Auth y luego `public.users`), así que un fallo en el segundo deja una fila en `auth.users` sin perfil. Reglas: (a) el perfil se crea con INSERT plano e idempotente (PK duplicada = éxito), nunca con upsert; (b) si el registro choca con "ya registrado", se intenta `recoverOrphanAccount` (solo si la contraseña coincide y no hay perfil); (c) `supabase/cleanup_orphan_auth_users.sql` lista/repara/borra las que queden.
+13. **Auto-reparación de perfiles huérfanos** (patrón reutilizable, 2026-09-19): cuando una entidad depende de dos pasos no atómicos, no basta con arreglarla en el flujo de alta; hay que **verificar y reparar en cada punto de entrada**. Receta: (a) una función idempotente `ensureX(...)` que comprueba y crea lo que falte (`ensureUserProfile`); (b) se invoca en **todos** los caminos que dejan sesión: login, sesión guardada y el evento `onAuthStateChange` (`SIGNED_IN`/`INITIAL_SESSION`); (c) deduplicar llamadas concurrentes con una promesa en vuelo; (d) reintentar colisiones de unicidad con sufijo aleatorio (máx. 3) y tratar la PK duplicada como éxito; (e) **nunca fallar en silencio**: `console.error` que distinga RLS, GRANT y otros errores, y degradar (dejar entrar marcado) en vez de bloquear; (f) acompañarla de un script SQL de reparación masiva e idempotente (`repair_all_orphan_profiles.sql`) para el histórico. Dentro de callbacks de `onAuthStateChange` no se llama a Supabase de forma síncrona: diferir con `setTimeout(0)`.
 
 ---
 
@@ -547,7 +568,7 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 | `RootErrorBoundary` mostraba pantalla roja con stack trace en producción | ✅ RESUELTO 2026-09-18 | Fallback condicionado a `import.meta.env.DEV`; en prod muestra UI amigable "Algo salió mal" + Recargar |
 | `.env.example` desactualizado (`VITE_ANTHROPIC_API_KEY`, sin `ADMIN_KEY`/`GOOGLE_BOOKS_API_KEY`) | ✅ RESUELTO 2026-09-18 | Reescrito con todas las variables reales y un comentario por cada una |
 | Intercambio de libros entre usuarios | ✅ IMPLEMENTADO 2026-09-18 | Trueque MVP: `trueque_schema.sql` + `truequeService` + `src/components/trueque/` (ver §IV.14) |
-| Cuentas huérfanas en el registro (`permission denied for table users`; cuenta en `auth.users` sin fila en `users`, y el reintento decía "Ya existe una cuenta") | ✅ RESUELTO 2026-09-18 (código) — ⚠️ falta correr `fix_signup_permissions.sql` en Supabase | `supabase/fix_signup_permissions.sql` (policies + GRANT por columna), INSERT plano en vez de upsert, auto-creación de perfil en `buildAppUser` y `recoverOrphanAccount`; limpieza de las ya existentes con `cleanup_orphan_auth_users.sql`. La causa exacta en la BD viva se infirió por análisis estático (no se reprodujo contra Supabase) |
+| Cuentas huérfanas en el registro (`permission denied for table users`; cuenta en `auth.users` sin fila en `users`, y el reintento decía "Ya existe una cuenta") | ✅ COMPLETAMENTE RESUELTO 2026-09-19 (código y scripts; ⚠️ pendiente de verificar en producción: correr `fix_signup_permissions.sql` y `repair_all_orphan_profiles.sql` en Supabase y desplegar con `vercel --prod`) | **Fix 2026-09-18:** `supabase/fix_signup_permissions.sql` (policies + GRANT por columna), INSERT plano en vez de upsert, `recoverOrphanAccount` en el registro. **Fix 2026-09-19:** `ensureUserProfile` en login, sesión guardada y `onAuthStateChange` (`watchAuthProfile`), con reintento de username, logs de error explícitos y `supabase/repair_all_orphan_profiles.sql` para reparar en bloque. **Nota:** el fix del 09-18 solo cubría de forma efectiva el signup: su chequeo en `buildAppUser` fallaba sin ruido cuando el INSERT era rechazado, no se ejecutaba en el evento de sesión y no había reparación masiva del histórico; el del 09-19 cubre login e initial session y no falla en silencio. La causa exacta en la BD viva se infirió por análisis estático; la lógica se validó con tests contra un Supabase simulado, no contra la BD real |
 | Proxy Anthropic sin autenticación | ✅ RESUELTO 2026-09-17 | `api/anthropic.js` y `server.js` exigen JWT de Supabase válido (o `x-admin-key`) |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER

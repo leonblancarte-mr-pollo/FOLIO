@@ -63,7 +63,7 @@ import {
   Repeat,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
-import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName } from "./services/authService.js";
+import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile } from "./services/authService.js";
 import confetti from "canvas-confetti";
 import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
 import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
@@ -14857,6 +14857,9 @@ export default function App() {
         setAuthLoaded(true);
       }
     })();
+    // Auto-repara el perfil faltante (cuenta huérfana) en SIGNED_IN / INITIAL_SESSION.
+    const stopWatchingProfile = watchAuthProfile();
+    return () => stopWatchingProfile();
   }, []);
 
   async function handleLogin(u, isNew = false) {

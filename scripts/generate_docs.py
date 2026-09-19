@@ -10,6 +10,10 @@ apéndices, y genera DOCUMENTACION_ARQUITECTURA_COMPLETA.docx en la raíz del re
 Uso:
     pip install python-docx
     python scripts/generate_docs.py
+    python scripts/generate_docs.py --pending "mensaje del commit"   # añade el commit en curso al apéndice E
+
+Al terminar verifica la coherencia .md <-> .docx (encabezados, migraciones SQL, términos de auth)
+y sale con código 1 si hay divergencias.
 
 El .md sigue siendo la fuente de verdad: NO edites el .docx a mano, regéneralo.
 Los apéndices A (tablas creadas por SQL), B (firmas de RPC) y D (fechas de migraciones)
@@ -38,7 +42,8 @@ MD_PATH = ROOT / "DOCUMENTACION_ARQUITECTURA.md"
 OUT_PATH = ROOT / "DOCUMENTACION_ARQUITECTURA_COMPLETA.docx"
 SQL_DIR = ROOT / "supabase"
 
-DOC_VERSION = "1.0 (extendida)"
+DOC_VERSION = "1.1 (extendida)"
+PENDING_COMMIT = ""   # se rellena con --pending "mensaje" para incluir el commit en curso en el apéndice E
 AUTHOR = "FOLIO Team"
 SERIF = "Georgia"
 SANS = "Calibri"
@@ -634,8 +639,11 @@ INTRO = [
          "Sincronización de la documentación con el código, fixes de portada/ErrorBoundary/.env.example y el MVP del Trueque de libros "
          "de punta a punta (DB, RPCs, UI, docs)."],
         ["Fix de signup", "2026-09-18 (changelog)",
-         "Se corrige el bug «permission denied for table users» del registro, se añade auto-reparación de cuentas huérfanas y esta "
-         "versión extendida de la documentación en Word."],
+         "Se corrige el bug «permission denied for table users» del registro (INSERT plano, policies y GRANT por columna) y se añade "
+         "esta versión extendida de la documentación en Word."],
+        ["Fix real de cuentas huérfanas", "2026-09-19 (changelog)",
+         "El fix anterior solo cubría de forma efectiva el signup. Ahora `ensureUserProfile` repara el perfil faltante en cada login, "
+         "sesión guardada y evento `onAuthStateChange`, sin fallar en silencio, y `repair_all_orphan_profiles.sql` repara el histórico."],
     ], [0.17, 0.2, 0.63]),
     ("h2", "Estado actual"),
     ("ul", [
@@ -648,7 +656,7 @@ INTRO = [
     ("h2", "Roadmap"),
     ("p", "El roadmap sale de la sección de deuda técnica y de los TODOs de Sprint 2 del documento fuente; no es un compromiso de fechas."),
     ("table", ["Prioridad", "Item", "Origen"], [
-        ["Corto plazo", "Correr `fix_signup_permissions.sql` en Supabase y limpiar cuentas huérfanas", "Fix de signup"],
+        ["Corto plazo", "Correr `fix_signup_permissions.sql` y `repair_all_orphan_profiles.sql` en Supabase y desplegar (`vercel --prod`)", "Fix de huérfanas"],
         ["Corto plazo", "Conectar GitHub ↔ Vercel para deploy automático", "Deuda #3"],
         ["Corto plazo", "Mover `buyExtraSaves` y `daily_save_limits` a RPCs SECURITY DEFINER", "Deuda #4 y #5"],
         ["Medio plazo", "Suite mínima de tests (servicios y RPCs críticas) y code-splitting del bundle (1.2 MB)", "Deuda #6 y #8"],
@@ -800,7 +808,9 @@ export async function setWeeklyGoal(userId, pages) {
         ["429 / respuesta sin `content` de Anthropic", "Rate limit del proxy (10 req/min/IP) o JWT vencido", "Reintenta; revisa `Authorization: Bearer`; ver mensajes amigables en `enrichBook`"],
         ["Cuenta privada no aparece en la búsqueda de amigos", "Efecto esperado de `privacy_hardening.sql`", "Diseñar una función/vista dedicada (`users_public`)"],
         ["`TRUEQUE_*` en la UI del Trueque", "Regla de negocio en SQL (`TRUEQUE_NO_ZONES`, `TRUEQUE_LIMIT_*`, `TRUEQUE_NO_CREDIT`…)", "`truequeService` los traduce a `TruequeError { code }`; ver Apéndice B"],
-        ["«Ya existe una cuenta con ese email» pero no se puede entrar", "Cuenta huérfana en `auth.users` sin perfil", "Reintentar el registro con la misma contraseña (se auto-repara) o login; o `cleanup_orphan_auth_users.sql`"],
+        ["«Ya existe una cuenta con ese email» pero no se puede entrar", "Cuenta huérfana en `auth.users` sin perfil", "Iniciar sesión (se auto-repara) o reintentar el registro con la misma contraseña; en bloque: `repair_all_orphan_profiles.sql`"],
+        ["Login OK pero `claim_daily_gems` o el onboarding de mascota fallan con foreign key / «usuario no existe»", "Cuenta huérfana: sin fila en `public.users`. Si el auto-perfil no se crea, mira la consola",
+         "Busca `[auth]` en consola: `BLOQUEADO POR RLS`, `SIN PRIVILEGIOS` (corre `fix_signup_permissions.sql`) o el error completo; verifica que el frontend desplegado sea el nuevo (`vercel --prod`); repara en bloque con `repair_all_orphan_profiles.sql`"],
     ], [0.24, 0.36, 0.40]),
 ]
 
@@ -822,7 +832,9 @@ GLOSSARY = [
     ("SECURITY DEFINER", "Modo de función que se ejecuta con los privilegios de su dueño; permite escribir en tablas que el cliente no puede tocar."),
     ("RPC", "Llamada a una función de Postgres desde el cliente con `supabase.rpc('nombre', { ... })`."),
     ("`session_id`", "UUID generado por el cliente por sesión de lectura; sirve de `ref` idempotente y sobrevive a reintentos offline."),
-    ("Cuenta huérfana", "Usuario que existe en `auth.users` pero no tiene fila en `public.users` (signup que falló a medias). El sistema la auto-repara."),
+    ("Cuenta huérfana", "Usuario que existe en `auth.users` pero no tiene fila en `public.users` (signup que falló a medias). Se auto-repara en login, sesión guardada y `onAuthStateChange`; el histórico, con `repair_all_orphan_profiles.sql`."),
+    ("`ensureUserProfile`", "Función de `authService` que comprueba si existe el perfil del usuario y, si falta, lo crea (idempotente, con reintento de username y logs de error explícitos)."),
+    ("`watchAuthProfile`", "Suscripción a `onAuthStateChange` (`SIGNED_IN` / `INITIAL_SESSION`) que ejecuta `ensureUserProfile`; la monta `App`."),
     ("BookTinder", "Swipe de recomendaciones sobre `books_curated`, límite de 15 guardados/día ampliable con gemas."),
     ("Snacks", "Cuentos de dominio público (~23) embebidos en la app y leídos en `ReaderView`, sin red."),
     ("Wrapped", "Resumen mensual estilo Spotify (libros, páginas, racha), exportable como imagen."),
@@ -885,8 +897,9 @@ MatchCard ─► LegalDisclaimerModal ─► ExchangeChat ─► complete_exchan
     ],
     "V": [
         ("p", "Los flujos críticos son los que cruzan más capas. Tres invariantes ayudan a razonar sobre ellos: (1) el `id` de `public.users` es siempre el `auth.uid()`; (2) todo premio es idempotente; (3) las escrituras offline se encolan y reintentan con el mismo identificador."),
-        ("h3", "Diagrama de estados del registro (con reparación de cuentas huérfanas)"),
-        ("code", '''signUp OK ──► INSERT perfil OK ──────────────► onboarding ✔
+        ("h3", "Diagramas de auth: registro y auto-reparación de cuentas huérfanas"),
+        ("code", '''REGISTRO
+signUp OK ──► INSERT perfil OK ──────────────► onboarding ✔
    │             │
    │             └─ falla (p. ej. permisos) ──► signOut ──► cuenta HUÉRFANA en auth.users
    │
@@ -894,9 +907,19 @@ MatchCard ─► LegalDisclaimerModal ─► ExchangeChat ─► complete_exchan
                               ├─ perfil existe ──► «Ya existe una cuenta»
                               └─ perfil NO existe ──► INSERT perfil ──► entra ✔ (recuperada)
 
-login/arranque ──► buildAppUser: ¿fila en users?
-                     ├─ sí ──► ok
-                     └─ no ──► autoCreateProfile (metadata; sufijo si el username choca) ──► ok'''),
+AUTO-REPARACIÓN (2026-09-19) — se ejecuta en TODOS los caminos que dejan sesión
+login ───────────────► buildAppUser ─┐
+sesión guardada ─────► buildAppUser ─┼─► ensureUserProfile(authUser)   (una sola promesa por usuario)
+onAuthStateChange ───► setTimeout(0)─┘        │
+ (SIGNED_IN | INITIAL_SESSION; se ignora       ├─ SELECT falla ─► console.error, NO crea; usa caché o null
+  mientras corre el registro)                  ├─ hay fila ─────► ok
+                                               └─ no hay fila ──► INSERT {id, email, nombre, username,
+                                                                          is_public:true, onboarding_completed:false}
+                                                    ├─ username duplicado ─► sufijo aleatorio, máx. 3 reintentos
+                                                    ├─ PK duplicada ───────► ok (creado en paralelo)
+                                                    └─ RLS / GRANT / otro ─► console.error específico;
+                                                                             login degradado (profileMissing)'''),
+        ("note", "**Por qué en todos los caminos:** con un solo punto de reparación (el alta) una cuenta huérfana con sesión guardada nunca se arreglaba, y el onboarding de mascota y `claim_daily_gems` fallaban por FK contra `users`. El histórico se repara en bloque con `supabase/repair_all_orphan_profiles.sql`."),
     ],
     "VI": [
         ("p", "La capa de servicios nació de extraer código del monolito (commit `3b3adfd`). Su contrato: funciones async con named exports que **devuelven datos o lanzan**; no muestran UI. Los helpers que aún están en App.jsx (`logReadingSession`, `checkAchievements`, `enrichBook`, `searchGoogleBooks`, `createFeedPost`…) son candidatos naturales a moverse aquí."),
@@ -927,13 +950,13 @@ export async function fetchBooks(userId) {
                         ¿triggers BEFORE/AFTER?   ── p. ej. guard_users_premium, guard_pet_columns
                               ▼
                           fila escrita'''),
-        ("note", "**Caso de estudio (signup, septiembre 2026):** `privacy_hardening.sql` revocó SELECT sobre `users` y lo re-otorgó por columna (sin `email`). El registro usaba un UPSERT, que necesita más privilegios que un INSERT; el error resultante fue `permission denied for table users` (capa 1), no una violación de RLS (capa 2). La corrección fue doble: INSERT plano en el cliente y `fix_signup_permissions.sql` con policies explícitas más GRANT INSERT/UPDATE por columna. Ver también el patrón «Manejo de cuentas huérfanas» en el capítulo de patrones."),
+        ("note", "**Caso de estudio (signup, septiembre 2026):** `privacy_hardening.sql` revocó SELECT sobre `users` y lo re-otorgó por columna (sin `email`). El registro usaba un UPSERT, que necesita más privilegios que un INSERT; el error resultante fue `permission denied for table users` (capa 1), no una violación de RLS (capa 2). La corrección fue doble: INSERT plano en el cliente y `fix_signup_permissions.sql` con policies explícitas más GRANT INSERT/UPDATE por columna. Ver también los patrones 12 y 13 (cuentas huérfanas y auto-reparación) en el capítulo de patrones."),
     ],
     "IX": [
         ("p", "Ninguna integración externa se llama con secretos desde el navegador: o pasan por `api/*` (Anthropic, Google Books) o usan la anon key con RLS (Supabase). Las únicas llamadas directas son públicas y de solo lectura (Open Library para portadas)."),
     ],
     "X": [
-        ("p", "Los patrones son las «reglas del juego» del código. Si vas a romper alguno, tiene que ser a propósito y quedar documentado. Los más importantes son el 5 (idempotencia), el 6 (server authority) y el 12 (cuentas huérfanas)."),
+        ("p", "Los patrones son las «reglas del juego» del código. Si vas a romper alguno, tiene que ser a propósito y quedar documentado. Los más importantes son el 5 (idempotencia), el 6 (server authority) y el 13 (auto-reparación de perfiles huérfanos)."),
         ("code", '''// Patrón 2 — event bus
 const unsub = petBus.on((evt) => setPetToast(evt));   // dentro de useEffect
 return () => unsub();
@@ -1037,6 +1060,7 @@ MIGRATIONS = [
     (10, "trueque_schema.sql", "2026-09-19", "Trueque: 7 tablas + RLS + RPCs + bucket + pg_cron; `users.is_premium`."),
     (11, "fix_signup_permissions.sql", "2026-09-18", "Fix del signup: policies INSERT/UPDATE de `users` y GRANT INSERT/UPDATE por columna."),
     ("—", "cleanup_orphan_auth_users.sql", "2026-09-18", "Opcional: lista, repara o borra cuentas huérfanas de `auth.users`."),
+    (12, "repair_all_orphan_profiles.sql", "2026-09-19", "Repara en bloque TODAS las cuentas huérfanas (perfil desde `raw_user_meta_data`, usernames duplicados con sufijo). Idempotente."),
 ]
 
 
@@ -1114,8 +1138,8 @@ def appendix_d(b):
     rows.sort(key=lambda r: (r[0], str(r[1])))
     b.table(["Fecha", "Orden de ejecución", "Archivo", "Qué hace"],
             [[d, str(o), f"`{f}`", desc] for d, o, f, desc in rows], [0.12, 0.13, 0.3, 0.45])
-    b.note("La fecha es la del commit que añadió el archivo. `fix_signup_permissions.sql` y `cleanup_orphan_auth_users.sql` usan la fecha del "
-           "changelog (2026-09-18) hasta que se comiteen. Antes de una migración destructiva (`auth_rls_migration.sql` bloque 0) haz respaldo.")
+    b.note("La fecha es la del commit que añadió el archivo. `fix_signup_permissions.sql`, `cleanup_orphan_auth_users.sql` y `repair_all_orphan_profiles.sql` usan la fecha del "
+           "changelog hasta que se comiteen. Antes de una migración destructiva (`auth_rls_migration.sql` bloque 0) haz respaldo.")
 
 
 def build(doc, toc_entries):
@@ -1166,13 +1190,66 @@ def build(doc, toc_entries):
     # Historial reciente de git (solo si hay repo)
     log = git("log", "-15", "--format=%ad|%h|%s", "--date=short")
     if log:
+        rows = [ln.split("|", 2) for ln in log.splitlines()]
+        if PENDING_COMMIT:   # el .docx se genera ANTES de comitearse: refleja el commit en curso
+            rows.insert(0, [datetime.date.today().isoformat(), "(este commit)", PENDING_COMMIT])
+            rows = rows[:15]
         b.app = None
         b.begin_appendix("E", "Últimos commits del repositorio")
-        b.table(["Fecha", "Commit", "Mensaje"], [ln.split("|", 2) for ln in log.splitlines()], [0.13, 0.12, 0.75])
+        b.table(["Fecha", "Commit", "Mensaje"], rows, [0.13, 0.12, 0.75])
     return b.headings
 
 
+# Términos de auth que deben decir lo mismo en el .md y en el .docx (auditoría de coherencia)
+AUTH_TERMS = ["ensureUserProfile", "watchAuthProfile", "repair_all_orphan_profiles.sql", "fix_signup_permissions.sql",
+              "onAuthStateChange", "recoverOrphanAccount", "INITIAL_SESSION"]
+
+
+def all_docx_text(path):
+    d = Document(path)
+    parts = [p.text for p in d.paragraphs]
+    for t in d.tables:
+        for row in t.rows:
+            parts.extend(c.text for c in row.cells)
+    return "\n".join(parts)
+
+
+def verify_sync():
+    """Comprueba que el .docx refleje el .md: encabezados, migraciones SQL y términos de auth. Devuelve nº de problemas."""
+    md = MD_PATH.read_text(encoding="utf-8")
+    text = all_docx_text(OUT_PATH)
+    flat = re.sub(r"\s+", " ", text.replace("`", ""))
+    problems = []
+    for m in re.finditer(r"^#{2,4}\s+(.*)$", md, re.M):
+        raw = m.group(1).strip()
+        if raw.upper() == "CHANGELOG":
+            continue
+        title = re.sub(r"^(?:[IVX]+\.|\d+\.)\s+", "", raw).replace("`", "")
+        if nice_title(title).lower() not in flat.lower() and title.lower() not in flat.lower():
+            problems.append(f"encabezado del .md ausente en el .docx: {raw}")
+    for f in sorted(set(re.findall(r"\b([a-z_0-9]+\.sql)\b", md))):
+        if f not in flat:
+            problems.append(f"migración del .md ausente en el .docx: {f}")
+    for line in re.findall(r"^- (20\d\d-\d\d-\d\d) — (.*)$", md, re.M)[-1:]:
+        if line[1][:40].replace("`", "") not in flat:
+            problems.append(f"última línea del CHANGELOG del .md ausente en el .docx: {line[0]}")
+    for term in AUTH_TERMS:
+        in_md, in_docx = term in md, term in flat
+        if in_md != in_docx:
+            problems.append(f"auth: «{term}» {'está en el .md pero no en el .docx' if in_md else 'está en el .docx pero no en el .md'}")
+    for pr in problems:
+        print("DESINCRONIZADO:", pr, file=sys.stderr)
+    print("Coherencia .md <-> .docx: " + ("OK" if not problems else f"{len(problems)} problema(s)"))
+    return len(problems)
+
+
 def main():
+    global PENDING_COMMIT, OUT_PATH
+    if "--out" in sys.argv:   # p. ej. para validar sin pisar el .docx de la raíz
+        OUT_PATH = Path(sys.argv[sys.argv.index("--out") + 1]).resolve()
+    if "--pending" in sys.argv:
+        i = sys.argv.index("--pending")
+        PENDING_COMMIT = sys.argv[i + 1] if i + 1 < len(sys.argv) else "(sin commitear)"
     if not MD_PATH.exists():
         sys.exit(f"No se encontró {MD_PATH}")
     # Pasada 1: recolecta los encabezados para el índice estático del TOC.
@@ -1185,6 +1262,8 @@ def main():
     except PermissionError:
         sys.exit(f"No se pudo escribir {OUT_PATH.name}: ciérralo en Word y vuelve a correr el script.")
     print(f"OK -> {OUT_PATH}  ({len(headings)} encabezados)")
+    if verify_sync():
+        sys.exit(1)
 
 
 if __name__ == "__main__":
