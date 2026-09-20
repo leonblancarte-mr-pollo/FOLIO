@@ -89,6 +89,9 @@ import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } fro
 import { PET_MAX_LEVEL, petXpForLevel, PET_TYPES, petImageSrc, petBus, loadPet, createPet, updatePetName, addPetXP } from "./services/petService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData } from "./services/streakService.js";
 
+// Logs de depuración: solo en desarrollo (en producción la consola queda limpia). Los logs críticos usan console.* directo.
+const devLog = import.meta.env.DEV ? (...args) => console.log(...args) : () => {};
+
 // ============ AFFILIATE ============
 const BUSCALIBRE_AFFILIATE_ID = import.meta.env.VITE_BUSCALIBRE_AFFILIATE_ID || "ac4c19281310afaacacd";
 
@@ -494,7 +497,7 @@ async function fetchFeed(userId) {
 
   const friendIds = (fs || []).map((f) => (f.user_id === userId ? f.friend_id : f.user_id));
   const allIds = [userId, ...friendIds];
-  console.log("[fetchFeed] userId:", userId, "allIds:", allIds);
+  devLog("[fetchFeed] userId:", userId, "allIds:", allIds);
 
   const { data: posts, error: postsError } = await supabase
     .from("posts")
@@ -507,7 +510,7 @@ async function fetchFeed(userId) {
     console.error("[fetchFeed] Error al leer posts:", postsError);
     throw postsError;
   }
-  console.log("[fetchFeed] posts recibidos:", posts?.length ?? 0);
+  devLog("[fetchFeed] posts recibidos:", posts?.length ?? 0);
   if (!posts || posts.length === 0) return [];
 
   const bookIds = [...new Set(posts.filter((p) => p.book_id).map((p) => p.book_id))];
@@ -634,15 +637,15 @@ async function createFeedPost({ userId, type, bookId, action, content, imageUrl,
   if (pagesRead !== undefined) payload.pages_read = pagesRead || null;
   if (minutesRead !== undefined) payload.minutes_read = minutesRead || null;
   // quote_id stored in content as JSON — no schema column required
-  console.log("[createFeedPost] insertando:", payload);
-  console.log("[createFeedPost] User ID:", userId);
+  devLog("[createFeedPost] insertando:", payload);
+  devLog("[createFeedPost] User ID:", userId);
   const { error } = await supabase.from("posts").insert(payload);
   if (error) {
     console.error("[createFeedPost] error:", error);
     console.error("[createFeedPost] message:", error?.message, "| code:", error?.code, "| details:", error?.details);
     throw error;
   }
-  console.log("[createFeedPost] OK");
+  devLog("[createFeedPost] OK");
 }
 
 async function createComment({ postId, userId, content }) {
@@ -926,7 +929,6 @@ async function enrichBook(title, author) {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
       max_tokens: 600,
       messages: [
         {
@@ -1020,7 +1022,6 @@ Responde SOLO con JSON válido (sin markdown, sin texto extra):
     method: "POST",
     headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
       max_tokens: 2000,
       messages: [{ role: "user", content: prompt }],
     }),
@@ -1080,12 +1081,12 @@ async function searchGoogleBooks(query) {
   if (!query.trim()) return [];
   const key = query.trim().toLowerCase();
   const cached = _gbSearchCache.get(key);
-  if (cached && Date.now() - cached.ts < GB_CACHE_TTL) { console.log('[books] cache hit', key, cached.results.length); return cached.results; }
+  if (cached && Date.now() - cached.ts < GB_CACHE_TTL) { devLog('[books] cache hit', key, cached.results.length); return cached.results; }
 
   const q = encodeURIComponent(query.trim());
-  console.log('[books] fetch /api/books?q=', q);
+  devLog('[books] fetch /api/books?q=', q);
   const d = await gbFetch(`/api/books?q=${q}`);
-  console.log('[books] raw response:', JSON.stringify(d).slice(0, 300));
+  if (import.meta.env.DEV) devLog('[books] raw response:', JSON.stringify(d).slice(0, 300));
   const items = d.items || [];
 
   const processed = items.map(mapGBItem);
@@ -1806,12 +1807,12 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
 
   useEffect(() => {
     if (!query.trim() || query.trim().length < 2) { setResults([]); setLoading(false); return; }
-    console.log('[SearchBookModal] buscando:', query.trim());
+    devLog('[SearchBookModal] buscando:', query.trim());
     setLoading(true); setError("");
     const timer = setTimeout(async () => {
       try {
         const res = await searchGoogleBooks(query.trim());
-        console.log('[SearchBookModal] resultados:', res?.length, res);
+        devLog('[SearchBookModal] resultados:', res?.length, res);
         setResults(res);
       } catch (err) {
         console.error('[SearchBookModal] error:', err);
@@ -2344,7 +2345,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
     setBuscalibreIsbn(null);
 
     async function check() {
-      console.log('[Buscalibre] check() START — book.id:', book?.id, 'book.isbn:', book?.isbn);
+      devLog('[Buscalibre] check() START — book.id:', book?.id, 'book.isbn:', book?.isbn);
 
       // Build candidate ISBNs: book.isbn first, then from Google Books (skipping nulls)
       const candidates = [];
@@ -2352,29 +2353,29 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
 
       try {
         const hits = await searchGoogleBooks(`${book.title} ${book.author}`);
-        console.log('[Buscalibre] Google Books hits:', hits.length, '— ISBNs:', hits.map(h => h.isbn));
+        devLog('[Buscalibre] Google Books hits:', hits.length, '— ISBNs:', hits.map(h => h.isbn));
         hits.forEach(h => { if (h.isbn && !candidates.includes(h.isbn)) candidates.push(h.isbn); });
       } catch (e) {
         console.warn('[Buscalibre] Google Books fallback failed:', e);
       }
 
-      console.log('[Buscalibre] candidates:', candidates);
+      devLog('[Buscalibre] candidates:', candidates);
 
       if (!candidates.length || cancelled) {
-        console.log('[Buscalibre] No ISBN candidates found, aborting.');
+        devLog('[Buscalibre] No ISBN candidates found, aborting.');
         return;
       }
 
       for (const isbn of candidates.slice(0, 4)) {
         if (cancelled) return;
         try {
-          console.log('[Buscalibre] Checking ISBN:', isbn);
+          devLog('[Buscalibre] Checking ISBN:', isbn);
           const r = await fetch(`/api/buscalibre-check?isbn=${encodeURIComponent(isbn)}`);
           const d = await r.json();
-          console.log('[Buscalibre] Response for', isbn, ':', d);
+          devLog('[Buscalibre] Response for', isbn, ':', d);
           if (d.available === true) {
             if (!cancelled) {
-              console.log('[Buscalibre] AVAILABLE — setting state, isbn:', isbn);
+              devLog('[Buscalibre] AVAILABLE — setting state, isbn:', isbn);
               setIsAvailableInBuscalibre(true);
               setBuscalibreIsbn(isbn);
             }
@@ -2385,7 +2386,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
         }
       }
 
-      console.log('[Buscalibre] No available ISBN found after checking all candidates.');
+      devLog('[Buscalibre] No available ISBN found after checking all candidates.');
       if (!cancelled) setIsAvailableInBuscalibre(false);
     }
 
@@ -8113,9 +8114,9 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
       if (!comment) { console.warn("[notif] like_comment: comment not found in state for id", commentId); }
       else if (comment.user_id !== user.id) {
         const notifPayload = { user_id: comment.user_id, actor_id: user.id, type: "like_comment", comment_id: commentId, read: false };
-        console.log("[like-insert-pre] Inserting into notifications:", notifPayload);
+        devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
         supabase.from("notifications").insert(notifPayload)
-          .then(({ data, error, count }) => { console.log("[like-insert-post] Result:", { data, error, count }); });
+          .then(({ data, error, count }) => { devLog("[like-insert-post] Result:", { data, error, count }); });
       }
     }
   }
@@ -8142,9 +8143,9 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
       await createComment({ postId, userId: user.id, content: text.trim() });
       if (postOwnerId && postOwnerId !== user.id) {
         const notifPayload = { user_id: postOwnerId, actor_id: user.id, type: "comment", post_id: postId, read: false };
-        console.log("[like-insert-pre] Inserting into notifications:", notifPayload);
+        devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
         supabase.from("notifications").insert(notifPayload)
-          .then(({ data, error, count }) => { console.log("[like-insert-post] Result:", { data, error, count }); });
+          .then(({ data, error, count }) => { devLog("[like-insert-post] Result:", { data, error, count }); });
       }
       setText("");
       await loadComments();
@@ -8937,7 +8938,7 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
     if (sharing || shared) return;
     setShareError("");
     setSharing(true);
-    console.log("Intentando crear post:", {
+    devLog("Intentando crear post:", {
       tipo: "reading_session",
       bookId: book.id,
       pagesRead: pages,
@@ -9940,20 +9941,20 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     try {
       const { data: fs, error: fsErr } = await supabase.from("friendships").select("user_id, friend_id").eq("status", "accepted").or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
       if (fsErr) throw fsErr;
-      if (!fs || fs.length === 0) { console.log("[friendsReading] no friendships"); setHasFriends(false); return; }
+      if (!fs || fs.length === 0) { devLog("[friendsReading] no friendships"); setHasFriends(false); return; }
       setHasFriends(true);
       const friendIds = [...new Set(fs.map(f => f.user_id === user.id ? f.friend_id : f.user_id))];
-      console.log("[friendsReading] friendIds:", friendIds);
+      devLog("[friendsReading] friendIds:", friendIds);
       const [{ data: rbooks, error: bErr }, { data: profiles }] = await Promise.all([
         supabase.from("books").select("id, title, author, cover_url, user_id").in("user_id", friendIds).eq("status", "reading").limit(8),
         supabase.from("users").select("id, nombre, avatar_url").in("id", friendIds),
       ]);
       if (bErr) console.error("[friendsReading] books error:", bErr);
-      console.log("[friendsReading] rbooks:", rbooks?.length, "profiles:", profiles?.length);
+      devLog("[friendsReading] rbooks:", rbooks?.length, "profiles:", profiles?.length);
       const pm = {};
       (profiles || []).forEach(p => { pm[p.id] = p; });
       const items = (rbooks || []).filter(b => pm[b.user_id]).map(b => ({ book: b, friend: pm[b.user_id] }));
-      console.log("[friendsReading] items:", items.length);
+      devLog("[friendsReading] items:", items.length);
       setFriendsReading(items);
     } catch (e) { console.error("[friendsReading] error:", e); }
   }
@@ -10034,9 +10035,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       if (!post) { console.warn("[notif] like_post: post not found in state for id", postId); }
       else if (post.user_id !== user.id) {
         const notifPayload = { user_id: post.user_id, actor_id: user.id, type: "like_post", post_id: postId, read: false };
-        console.log("[like-insert-pre] Inserting into notifications:", notifPayload);
+        devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
         supabase.from("notifications").insert(notifPayload)
-          .then(({ data, error, count }) => { console.log("[like-insert-post] Result:", { data, error, count }); });
+          .then(({ data, error, count }) => { devLog("[like-insert-post] Result:", { data, error, count }); });
       }
     }
   }
@@ -10370,7 +10371,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         null
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem", animation: "feedFadeIn 200ms ease-out" }}>
-          {posts.forEach(p => { if (p.type === 'reading_session') { console.log('READING SESSION POST COMPLETO:', JSON.stringify(p)); } }) || null}
+          {posts.forEach(p => { if (import.meta.env.DEV && p.type === 'reading_session') { devLog('READING SESSION POST COMPLETO:', JSON.stringify(p)); } }) || null}
           {posts.map((post) => {
             const commentsOpen = openComments.has(post.id);
             const isFinished = post.type === "book_update" && post.action === "finished";
@@ -10479,7 +10480,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             if (isReadingSession) {
               const sesPages = post.pages_read || post.pagesRead || 0;
               const sesMinutes = post.minutes_read || post.minutesRead || null;
-              console.log('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
+              devLog('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
               return (
                 <div key={post.id} id={`post-${post.id}`}
                   className="feed-post-item"
@@ -13103,7 +13104,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
     refreshPendingCount();
     refreshUnreadMessages();
     refreshUnreadNotifs();
-    debugNotifications();
+    if (import.meta.env.DEV) debugNotifications();   // volcado de depuración: solo en dev (evita un SELECT * en producción)
     checkStreakOnLoad(user.id);
 
     // Retroactive achievements — run once per user via localStorage flag
@@ -13174,9 +13175,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       .select("*")
       .order("created_at", { ascending: false })
       .limit(20);
-    console.log("[NOTIF DEBUG] Todos los registros en notifications:", JSON.stringify(data, null, 2));
-    console.log("[NOTIF DEBUG] Error en debug SELECT:", error);
-    console.log("[NOTIF DEBUG] user.id del usuario actual:", user.id);
+    devLog("[NOTIF DEBUG] Todos los registros en notifications:", JSON.stringify(data, null, 2));
+    devLog("[NOTIF DEBUG] Error en debug SELECT:", error);
+    devLog("[NOTIF DEBUG] user.id del usuario actual:", user.id);
   }
 
   async function saveBookRating(bookId, rating, review) {
@@ -14841,9 +14842,9 @@ export default function App() {
       try {
         // Fallback defensivo (diagnóstico 2026-09-19): si hay sesión guardada, garantizar el perfil ANTES de
         // cualquier otra query a public.users (getSessionUser/buildAppUser lo vuelve a comprobar).
-        console.log("[auth-debug] Defensive check on App mount");
+        devLog("[auth-debug] Defensive check on App mount");
         const { data: { session: mountSession } } = await supabase.auth.getSession();
-        console.log("[auth-debug] Defensive check: session", { hasSession: !!mountSession, userId: mountSession?.user?.id });
+        devLog("[auth-debug] Defensive check: session", { hasSession: !!mountSession, userId: mountSession?.user?.id });
         if (mountSession?.user) await ensureUserProfile(mountSession.user);
         const u = await getSessionUser();
         if (u) {

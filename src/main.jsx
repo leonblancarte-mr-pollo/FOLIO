@@ -5,7 +5,7 @@ import App from './App.jsx'
 
 // Diagnóstico 2026-09-19: confirma qué build corre en el navegador. `build` es la hora REAL en que se compiló
 // (inyectada por vite.config.js); `loadedAt` es solo la hora de carga. `swControlled` = ¿lo sirve un service worker?
-console.log('[auth-debug] Build version:', {
+if (import.meta.env.DEV) console.log('[auth-debug] Build version:', {
   build: typeof __APP_BUILD__ !== 'undefined' ? __APP_BUILD__ : 'dev',
   tag: 'auth-debug-1',
   loadedAt: new Date().toISOString(),

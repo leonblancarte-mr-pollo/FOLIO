@@ -35,7 +35,7 @@ async function insertProfileRow({ id, email, nombre, username }, extras = null) 
     dbg("INSERT result (reintento sin extras)", { data, error, status });
   }
   if (error) {
-    console.error("[auth-debug] INSERT failed", { code: error.code, message: error.message, hint: error.hint, details: error.details, status });
+    console.error("[auth] INSERT failed", { code: error.code, message: error.message, hint: error.hint, details: error.details, status });
   } else {
     dbg("Profile created successfully");
   }
@@ -49,8 +49,8 @@ async function insertProfileRow({ id, email, nombre, username }, extras = null) 
 }
 
 // TEMPORAL (diagnóstico 2026-09-19): logs verbosos con prefijo [auth-debug].
-// Poner AUTH_DEBUG = false cuando se cierre el diagnóstico de cuentas huérfanas.
-const AUTH_DEBUG = true;
+// Apagado (false) tras cerrar el diagnóstico (sprint de higiene 2026-09-19). Ponerlo en true para depurar auth.
+const AUTH_DEBUG = false;
 const dbg = (...args) => { if (AUTH_DEBUG) console.log("[auth-debug]", ...args); };
 
 function errorInfo(err) {
@@ -93,7 +93,7 @@ async function runEnsureProfile(authUser) {
     return result;
   } catch (e) {
     // Nunca en silencio: una excepción inesperada se registra y se devuelve como "no verificado".
-    console.error("[auth-debug] ensureUserProfile THREW", e);
+    console.error("[auth] ensureUserProfile THREW", e);
     return { ok: false, checked: false, created: false, error: e };
   }
 }

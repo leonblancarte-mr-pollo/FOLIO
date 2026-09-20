@@ -42,7 +42,7 @@ MD_PATH = ROOT / "DOCUMENTACION_ARQUITECTURA.md"
 OUT_PATH = ROOT / "DOCUMENTACION_ARQUITECTURA_COMPLETA.docx"
 SQL_DIR = ROOT / "supabase"
 
-DOC_VERSION = "1.2 (extendida)"
+DOC_VERSION = "1.3 (extendida)"
 PENDING_COMMIT = ""   # se rellena con --pending "mensaje" para incluir el commit en curso en el apéndice E
 AUTHOR = "FOLIO Team"
 SERIF = "Georgia"
@@ -655,6 +655,9 @@ INTRO = [
         ["Diagnóstico en producción", "2026-09-19 (changelog)",
          "`ensureUserProfile` no dejaba rastro en producción y el perfil seguía sin crearse. Se añade instrumentación `[auth-debug]`, "
          "llamadas explícitas en login/registro/listener, un fallback defensivo al montar `App` y el log de versión del build."],
+        ["Sprint de higiene", "2026-09-19 (changelog)",
+         "Se apagan los logs de debug en producción (`AUTH_DEBUG = false`, `devLog` solo en DEV), se limpia el repo (archivos sueltos, `.claude/` y "
+         "`.agents/` fuera del control de versiones), se elimina un rewrite muerto de `vercel.json` y el modelo de Claude pasa a la env var `ANTHROPIC_MODEL`."],
     ], [0.17, 0.2, 0.63]),
     ("h2", "Estado actual"),
     ("ul", [
@@ -662,7 +665,7 @@ INTRO = [
         "**Backend:** Supabase con RLS en todas las tablas. Las migraciones SQL se corren a mano en el SQL Editor (no hay CLI configurada).",
         "**Seguridad:** XP, nivel, gemas, logros y racha solo se escriben desde Postgres; `is_public` se hace cumplir en RLS; `users.email` está fuera del SELECT de clientes.",
         "**Trueque:** MVP funcional. No hay pago real de Folio Plus (`is_premium` se activa a mano).",
-        "**Bug abierto (2026-09-19):** el auto-perfil de cuentas huérfanas no dejó rastro en producción; hay instrumentación `[auth-debug]` activa (`AUTH_DEBUG` en `authService.js`) a la espera de las trazas de un registro nuevo y de un login.",
+        "**Bug abierto (2026-09-19):** el auto-perfil de cuentas huérfanas no dejó rastro en producción; hay instrumentación `[auth-debug]` disponible (`AUTH_DEBUG` en `authService.js`) a la espera de las trazas de un registro nuevo y de un login. Desde el sprint de higiene esos logs están apagados (`AUTH_DEBUG = false`); se reactivan poniéndolo en `true`.",
         "**Calidad:** sin suite de tests; App.jsx sigue siendo un monolito de ~14.900 líneas (ver sección de deuda técnica).",
     ]),
     ("h2", "Roadmap"),
@@ -821,7 +824,7 @@ export async function setWeeklyGoal(userId, pages) {
         ["Cuenta privada no aparece en la búsqueda de amigos", "Efecto esperado de `privacy_hardening.sql`", "Diseñar una función/vista dedicada (`users_public`)"],
         ["`TRUEQUE_*` en la UI del Trueque", "Regla de negocio en SQL (`TRUEQUE_NO_ZONES`, `TRUEQUE_LIMIT_*`, `TRUEQUE_NO_CREDIT`…)", "`truequeService` los traduce a `TruequeError { code }`; ver Apéndice B"],
         ["No aparece ningún log `[auth]` en producción y el perfil sigue sin crearse", "Bundle viejo servido por el service worker, filtro de niveles en la consola, o la lógica no se ejecuta",
-         "Abre la app en incógnito con DevTools y busca `[auth-debug] Build version`: debe traer `tag: 'auth-debug-1'` (`build` = hora real de compilación; `swControlled` = ¿lo sirve un service worker?). Luego sigue la traza `[auth-debug]` de `ensureUserProfile` (SELECT → INSERT payload → INSERT result)"],
+         "Los logs `[auth-debug]` están apagados en producción: pon `AUTH_DEBUG = true` en `authService.js` y despliega (el log `Build version` de `main.jsx` es solo de desarrollo; quita su condición `import.meta.env.DEV` si necesitas confirmar el build). Luego sigue la traza de `ensureUserProfile` (SELECT → INSERT payload → INSERT result)"],
         ["«Ya existe una cuenta con ese email» pero no se puede entrar", "Cuenta huérfana en `auth.users` sin perfil", "Iniciar sesión (se auto-repara) o reintentar el registro con la misma contraseña; en bloque: `repair_all_orphan_profiles.sql`"],
         ["Login OK pero `claim_daily_gems` o el onboarding de mascota fallan con foreign key / «usuario no existe»", "Cuenta huérfana: sin fila en `public.users`. Si el auto-perfil no se crea, mira la consola",
          "Busca `[auth]` en consola: `BLOQUEADO POR RLS`, `SIN PRIVILEGIOS` (corre `fix_signup_permissions.sql`) o el error completo; verifica que el frontend desplegado sea el nuevo (`vercel --prod`); repara en bloque con `repair_all_orphan_profiles.sql`"],
@@ -848,7 +851,9 @@ GLOSSARY = [
     ("`session_id`", "UUID generado por el cliente por sesión de lectura; sirve de `ref` idempotente y sobrevive a reintentos offline."),
     ("Cuenta huérfana", "Usuario que existe en `auth.users` pero no tiene fila en `public.users` (signup que falló a medias). Se auto-repara en login, sesión guardada y `onAuthStateChange`; el histórico, con `repair_all_orphan_profiles.sql`."),
     ("`ensureUserProfile`", "Función de `authService` que comprueba si existe el perfil del usuario y, si falta, lo crea (idempotente, con reintento de username y logs de error explícitos)."),
-    ("`[auth-debug]`", "Prefijo de los logs de diagnóstico de auth (temporales). Se apagan con `AUTH_DEBUG = false` en `authService.js`. `[auth-debug] Build version` (en `main.jsx`) indica qué build corre en el navegador."),
+    ("`[auth-debug]`", "Prefijo de los logs de diagnóstico de auth (temporales). Están apagados por defecto (`AUTH_DEBUG = false` en `authService.js`); `[auth-debug] Build version` (en `main.jsx`) solo se imprime en desarrollo."),
+    ("`devLog`", "Helper de `App.jsx` que solo imprime con `import.meta.env.DEV`; en producción es una función vacía, así la consola queda limpia."),
+    ("`ANTHROPIC_MODEL`", "Variable de entorno del servidor con el modelo de Claude que usa el proxy `/api/anthropic` (por defecto `claude-sonnet-4-6`)."),
     ("`watchAuthProfile`", "Suscripción a `onAuthStateChange` (`SIGNED_IN` / `INITIAL_SESSION`) que ejecuta `ensureUserProfile`; la monta `App`."),
     ("BookTinder", "Swipe de recomendaciones sobre `books_curated`, límite de 15 guardados/día ampliable con gemas."),
     ("Snacks", "Cuentos de dominio público (~23) embebidos en la app y leídos en `ReaderView`, sin red."),
@@ -1053,6 +1058,7 @@ ENV_VARS = [
     ("VITE_SUPABASE_ANON_KEY", "Cliente + servidor + Actions", "Sí", "Key anon/public. Pública; la seguridad la da RLS. Las funciones `api/*` la usan con el JWT del usuario."),
     ("VITE_BUSCALIBRE_AFFILIATE_ID", "Cliente", "No", "ID de afiliado de Buscalibre; App.jsx trae un valor por defecto."),
     ("ANTHROPIC_API_KEY", "Solo servidor", "Sí (para IA)", "Clave del proxy `/api/anthropic` y `server.js`. Sin prefijo VITE_: jamás al navegador."),
+    ("ANTHROPIC_MODEL", "Solo servidor", "No", "Modelo de Claude del proxy `/api/anthropic` (y de `server.js` en local). Por defecto `claude-sonnet-4-6`. El cliente no lo elige; solo `x-admin-key` puede pasar `model` en el body."),
     ("ADMIN_KEY", "Solo servidor", "No", "Bypass del proxy Anthropic con el header `x-admin-key` (sin JWT ni rate limit). Usar un valor largo y aleatorio."),
     ("GOOGLE_BOOKS_API_KEY", "Solo servidor", "No", "Sube la cuota de `/api/books`; funciona sin ella."),
     ("SUPABASE_SERVICE_ROLE_KEY", "Solo GitHub Actions (secret)", "Solo para el job", "Salta RLS. Solo para entrenar el recomendador y seeds. Jamás en Vercel ni con prefijo VITE_."),
@@ -1217,7 +1223,7 @@ def build(doc, toc_entries):
 
 # Términos de auth que deben decir lo mismo en el .md y en el .docx (auditoría de coherencia)
 AUTH_TERMS = ["ensureUserProfile", "watchAuthProfile", "repair_all_orphan_profiles.sql", "fix_signup_permissions.sql",
-              "onAuthStateChange", "recoverOrphanAccount", "INITIAL_SESSION", "[auth-debug]", "AUTH_DEBUG", "__APP_BUILD__"]
+              "onAuthStateChange", "recoverOrphanAccount", "INITIAL_SESSION", "[auth-debug]", "AUTH_DEBUG", "__APP_BUILD__", "ANTHROPIC_MODEL", "devLog"]
 
 
 def all_docx_text(path):

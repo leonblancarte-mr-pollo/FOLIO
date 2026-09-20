@@ -6,6 +6,8 @@ const app = express();
 app.use(express.json({ limit: "25mb" })); // base64 images can be large
 
 const API_KEY = process.env.ANTHROPIC_API_KEY;
+// Igual que api/anthropic.js: el modelo lo decide el servidor (ANTHROPIC_MODEL, fallback claude-sonnet-4-6).
+const DEFAULT_MODEL = "claude-sonnet-4-6";
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
@@ -31,7 +33,10 @@ app.post("/api/anthropic", async (req, res) => {
         "x-api-key": API_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify({
+        ...req.body,
+        model: (isAdmin && req.body?.model) || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      }),
     });
     const data = await upstream.json();
     res.status(upstream.status).json(data);

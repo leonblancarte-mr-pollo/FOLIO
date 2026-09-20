@@ -4,6 +4,10 @@ const rateLimitStore = new Map();
 const WINDOW_MS = 60 * 1000;
 const MAX_FREE = 10;
 
+// Modelo de Claude: lo decide el SERVIDOR (env ANTHROPIC_MODEL). El cliente ya no lo envía;
+// si lo enviara, se ignora (salvo con x-admin-key), así nadie puede pedir un modelo más caro.
+const DEFAULT_MODEL = "claude-sonnet-4-6";
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
 
@@ -87,7 +91,10 @@ export default async function handler(req, res) {
         "x-api-key": API_KEY,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify({
+        ...req.body,
+        model: (isAdmin && req.body?.model) || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      }),
     });
     const data = await upstream.json();
     res.status(upstream.status).json(data);

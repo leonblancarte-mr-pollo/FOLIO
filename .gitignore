@@ -8,3 +8,10 @@ dist/
 .env.vercel.tmp
 __pycache__/
 *.pyc
+
+# Archivos sueltos / herramientas locales (no forman parte del producto)
+test_avatar*.png
+topleche_dashboard.html
+crop_avatars.py
+.claude/
+.agents/
