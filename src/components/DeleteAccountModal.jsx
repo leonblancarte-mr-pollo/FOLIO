@@ -15,6 +15,7 @@ function DeleteAccountModal({ onClose, onDeleted }) {
     if (!canDelete || deleting) return;
     setDeleting(true);
     setErr("");
+    // TODO(audit): mover a un servicio de cuenta (hoy es la única llamada directa a Supabase en components/ fuera del Trueque).
     const { error } = await supabase.rpc("delete_my_account");
     if (error) {
       console.error("[CUENTA] delete_my_account error:", error);
@@ -22,7 +23,7 @@ function DeleteAccountModal({ onClose, onDeleted }) {
       setDeleting(false);
       return;
     }
-    try { localStorage.clear(); } catch {}
+    try { localStorage.clear(); } catch { /* localStorage bloqueado: la cuenta ya se borró */ }
     onDeleted();
   }
 
@@ -39,17 +40,17 @@ function DeleteAccountModal({ onClose, onDeleted }) {
               Se borrarán <strong>para siempre</strong> tus libros, frases, listas, rachas, mascota, mensajes y todo tu perfil. Esta acción no se puede deshacer.
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <button onClick={onClose} style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: palette.accent, color: "#fff", cursor: "pointer", ...display, fontSize: "0.98rem", fontWeight: 600 }}>
+              <button onClick={onClose} style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: palette.accent, color: palette.onAccent, cursor: "pointer", ...display, fontSize: "0.98rem", fontWeight: 600 }}>
                 Conservar mi cuenta
               </button>
-              <button onClick={() => setStep(2)} style={{ width: "100%", padding: "0.8rem", borderRadius: 12, border: `1.5px solid #c0392b55`, backgroundColor: "transparent", color: "#c0392b", cursor: "pointer", ...body, fontSize: "0.9rem", fontWeight: 600 }}>
+              <button onClick={() => setStep(2)} style={{ width: "100%", padding: "0.8rem", borderRadius: 12, border: `1.5px solid ${palette.danger}55`, backgroundColor: "transparent", color: palette.danger, cursor: "pointer", ...body, fontSize: "0.9rem", fontWeight: 600 }}>
                 Sí, quiero eliminarla
               </button>
             </div>
           </>
         ) : (
           <>
-            <p style={{ ...display, fontSize: "1.15rem", fontWeight: 700, color: "#c0392b", marginBottom: "0.6rem" }}>Última confirmación</p>
+            <p style={{ ...display, fontSize: "1.15rem", fontWeight: 700, color: palette.danger, marginBottom: "0.6rem" }}>Última confirmación</p>
             <p style={{ ...body, fontSize: "0.92rem", color: palette.inkSoft, lineHeight: 1.5, marginBottom: "1rem" }}>
               Escribe <strong>ELIMINAR</strong> para borrar tu cuenta definitivamente.
             </p>
@@ -58,14 +59,14 @@ function DeleteAccountModal({ onClose, onDeleted }) {
               autoFocus
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="ELIMINAR"
-              style={{ width: "100%", padding: "0.75rem 0.9rem", borderRadius: 10, border: `1.5px solid ${canDelete ? "#c0392b" : palette.border}`, backgroundColor: palette.bgCard, color: palette.ink, ...body, fontSize: "1rem", textAlign: "center", letterSpacing: "0.1em", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem" }}
+              style={{ width: "100%", padding: "0.75rem 0.9rem", borderRadius: 10, border: `1.5px solid ${canDelete ? "${palette.danger}" : palette.border}`, backgroundColor: palette.bgCard, color: palette.ink, ...body, fontSize: "1rem", textAlign: "center", letterSpacing: "0.1em", outline: "none", boxSizing: "border-box", marginBottom: "0.75rem" }}
             />
-            {err && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", marginBottom: "0.6rem" }}>{err}</p>}
+            {err && <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginBottom: "0.6rem" }}>{err}</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               <button
                 onClick={handleDelete}
                 disabled={!canDelete || deleting}
-                style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: canDelete ? "#c0392b" : palette.border, color: canDelete ? "#fff" : palette.inkFaint, cursor: canDelete && !deleting ? "pointer" : "default", ...display, fontSize: "0.98rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
+                style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: canDelete ? palette.danger : palette.border, color: canDelete ? palette.onAccent : palette.inkFaint, cursor: canDelete && !deleting ? "pointer" : "default", ...display, fontSize: "0.98rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
               >
                 {deleting && <Loader2 size={16} className="animate-spin" />}
                 {deleting ? "Eliminando…" : "Eliminar mi cuenta"}

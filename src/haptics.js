@@ -11,5 +11,5 @@ export const HAPTIC = {
 export function haptic(pattern) {
   if (typeof window === 'undefined') return;
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-  try { navigator.vibrate?.(pattern); } catch {}
+  try { navigator.vibrate?.(pattern); } catch { /* vibración no soportada */ }
 }

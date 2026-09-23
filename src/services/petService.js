@@ -1,6 +1,9 @@
 import { supabase } from "../supabase.js";
 
 // ============ PET (MASCOTA) ============
+// Contrato de errores: degrada en vez de lanzar (loadPet → undefined, createPet → { __error },
+// updatePetName / addPetXP → null) y siempre deja el motivo en consola con prefijo [PET].
+// Devuelve la fila cruda de user_pets (pet_type, pet_name…): excepción documentada en §X.
 const PET_MAX_LEVEL = 50;
 const petXpForLevel = (level) => level * 100; // XP necesario para salir del nivel actual
 const PET_TYPES = {
@@ -30,8 +33,7 @@ async function loadPet(userId) {
   try {
     const { data, error } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
     if (error) {
-      console.warn("[PET] loadPet error (¿existe la tabla user_pets?):", error.message,
-        "\n→ Ejecuta el SQL en Supabase: CREATE TABLE user_pets (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES users(id) ON DELETE CASCADE UNIQUE NOT NULL, pet_type text NOT NULL DEFAULT 'gato', pet_name text DEFAULT 'Mi compañero', xp int DEFAULT 0, level int DEFAULT 1, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()); ALTER TABLE user_pets DISABLE ROW LEVEL SECURITY;");
+      console.warn("[PET] loadPet error (¿existe la tabla user_pets? ¿corrieron auth_rls_migration.sql y sprint1_server_authority.sql?):", error.message);
       return undefined;
     }
     if (data) _lastKnownPetLevel = data.level; // semilla para detectar level-ups
@@ -58,7 +60,7 @@ async function createPet(userId, { petType = "gato", petName = "Mi compañero" }
       }
       console.error("[PET] createPet ERROR:", error.code, error.message,
         error.code === "42501"
-          ? "\n→ RLS está bloqueando. Ejecuta en Supabase: ALTER TABLE user_pets DISABLE ROW LEVEL SECURITY;"
+          ? "\n→ Permiso denegado: revisa las policies de user_pets (auth_rls_migration.sql). No desactives RLS: user_pets depende de guard_pet_columns."
           : error.code === "23503"
           ? "\n→ Foreign key: user_id no existe en la tabla users."
           : "");
@@ -97,7 +99,8 @@ async function addPetXP(userId, amount) {
   if (!userId) return null;
   try {
     const { data: pet, error } = await supabase.from("user_pets").select("*").eq("user_id", userId).maybeSingle();
-    if (error || !pet) return null;
+    if (error) { console.error("[PET] addPetXP sync: no se pudo leer user_pets:", error.message); return null; }
+    if (!pet) return null;
     const leveledUp = _lastKnownPetLevel !== null && pet.level > _lastKnownPetLevel;
     _lastKnownPetLevel = pet.level;
     console.log(`[PET XP] sync: level ${pet.level}, xp ${pet.xp}, leveledUp: ${leveledUp}`);

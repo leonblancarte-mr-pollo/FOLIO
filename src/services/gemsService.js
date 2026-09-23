@@ -22,7 +22,8 @@ async function initUserGems(_userId) {
   // Server-side: claim_daily_gems crea la fila con la bienvenida (+5) si no
   // existe. El cliente ya no puede insertar en user_gems (RLS lo bloquea).
   try {
-    await supabase.rpc("claim_daily_gems");
+    const { error } = await supabase.rpc("claim_daily_gems");
+    if (error) console.warn("[GEMS] initUserGems rpc:", error.message);
   } catch (e) {
     console.warn("[GEMS] initUserGems rpc:", e?.message);
   }

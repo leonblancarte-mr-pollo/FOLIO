@@ -57,7 +57,7 @@ function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDelet
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
             <h2 style={{ ...display, fontWeight: 700, fontSize: "1.35rem", color: palette.ink, margin: 0 }}>{list.name}</h2>
             <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem", ...body, fontSize: "0.72rem", color: palette.inkFaint, backgroundColor: palette.bgSoft, padding: "0.15rem 0.55rem", borderRadius: 999 }}>
-              {list.is_public ? "Pública" : <><Lock size={10} /> Privada</>}
+              {list.isPublic ? "Pública" : <><Lock size={10} /> Privada</>}
             </span>
           </div>
           {list.description && (
@@ -103,8 +103,8 @@ function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDelet
           initial={list}
           onClose={() => setEditOpen(false)}
           onSave={async ({ name, description, isPublic }) => {
-            await updateUserList(list.id, userId, { name, description: description || null, is_public: isPublic });
-            onChanged({ ...list, name, description, is_public: isPublic });
+            await updateUserList(list.id, userId, { name, description: description || null, isPublic });
+            onChanged({ ...list, name, description, isPublic });
             setEditOpen(false);
           }}
         />
@@ -112,7 +112,5 @@ function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDelet
     </div>
   );
 }
-
-// ============ FECHA DE LECTURA FLEXIBLE ============
 
 export { ListDetailModal };

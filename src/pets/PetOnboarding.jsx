@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { palette, body, display, FONT_LINK } from "../theme.js";
+import { palette, BRAND, body, display, FONT_LINK } from "../theme.js";
 import { PET_TYPES, createPet } from "../services/petService.js";
 import { PetDisplay } from "./PetDisplay.jsx";
 
@@ -21,7 +21,7 @@ function PetOnboarding({ user, onComplete }) {
     if (pet && pet.__error) {
       const code = pet.__error.code;
       setErrMsg(
-        code === "42501" ? "No se pudo guardar: RLS está bloqueando. Desactiva RLS de user_pets en Supabase."
+        code === "42501" ? "No se pudo guardar tu mascota por un problema de permisos. Intenta de nuevo en unos minutos."
         : code === "23503" ? "No se pudo guardar: el usuario no existe en la base de datos."
         : `No se pudo guardar tu mascota (${code || "error"}). Intenta de nuevo.`
       );
@@ -67,7 +67,7 @@ function PetOnboarding({ user, onComplete }) {
             className="btn-press"
             style={{
               marginTop: "1.75rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: "pointer",
-              background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", color: "#fff",
+              background: BRAND.gradient, color: palette.onAccent,
               fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
             }}
           >
@@ -97,7 +97,7 @@ function PetOnboarding({ user, onComplete }) {
               className="btn-press"
               style={{
                 marginTop: "1rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: saving ? "default" : "pointer",
-                background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", color: "#fff",
+                background: BRAND.gradient, color: palette.onAccent,
                 fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
                 opacity: saving ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
               }}
@@ -106,7 +106,7 @@ function PetOnboarding({ user, onComplete }) {
               {saving ? "Guardando…" : "Confirmar"}
             </button>
             {errMsg && (
-              <p style={{ ...body, fontSize: "0.82rem", color: "#C0392B", marginTop: "0.75rem", textAlign: "center", lineHeight: 1.35 }}>{errMsg}</p>
+              <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginTop: "0.75rem", textAlign: "center", lineHeight: 1.35 }}>{errMsg}</p>
             )}
           </div>
         )}

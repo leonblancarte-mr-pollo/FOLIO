@@ -6,7 +6,7 @@ import { palette, body, display } from "../theme.js";
 function ListFormModal({ initial, onSave, onClose }) {
   const [name, setName] = useState(initial?.name || "");
   const [description, setDescription] = useState(initial?.description || "");
-  const [isPublic, setIsPublic] = useState(initial ? !!initial.is_public : true);
+  const [isPublic, setIsPublic] = useState(initial ? !!initial.isPublic : true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -59,11 +59,11 @@ function ListFormModal({ initial, onSave, onClose }) {
               </button>
             ))}
           </div>
-          {err && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", margin: 0 }}>{err}</p>}
+          {err && <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, margin: 0 }}>{err}</p>}
           <button
             onClick={save}
             disabled={!name.trim() || saving}
-            style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: name.trim() ? palette.accent : palette.border, color: name.trim() ? "#fff" : palette.inkFaint, cursor: name.trim() && !saving ? "pointer" : "default", ...display, fontSize: "1rem", fontWeight: 600, marginTop: "0.25rem" }}
+            style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: name.trim() ? palette.accent : palette.border, color: name.trim() ? palette.onAccent : palette.inkFaint, cursor: name.trim() && !saving ? "pointer" : "default", ...display, fontSize: "1rem", fontWeight: 600, marginTop: "0.25rem" }}
           >
             {saving ? "Guardando…" : initial ? "Guardar cambios" : "Crear lista"}
           </button>

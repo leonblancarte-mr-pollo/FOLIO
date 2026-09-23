@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
 import { Bookmark, BookOpen, Eye, CheckCircle } from "lucide-react";
 import BookCoverImage from "./BookCoverImage.jsx";
-
-const P = {
-  bg: "#F4EDE0", ink: "#2A1F1A", inkSoft: "#5C4A3F", inkFaint: "#8B7B6E",
-  accent: "#7A2E2E", border: "#D4C9B5",
-};
+import { palette, BRAND, STATUS_COLORS } from "../theme.js";
 const serif = { fontFamily: "Fraunces, serif" };
 const body  = { fontFamily: "'EB Garamond', serif" };
 
+// Mismos colores de estado que el resto de la app (theme.js → STATUS_COLORS).
 const STATUS_OPTIONS = [
-  { id: "want_to_read", label: "Por leer",     icon: Bookmark,    desc: "Lo añado a mi lista de lectura",  color: "#7A2E2E", bg: "#F5EAEA", border: "#E0BCBC" },
-  { id: "reading",      label: "Leyendo",       icon: BookOpen,    desc: "Lo estoy leyendo ahora mismo",    color: "#3D7A5C", bg: "#EAF5EF", border: "#A8D4BC" },
-  { id: "wish",         label: "Quiero leer",   icon: Eye,         desc: "En mi lista de deseos",           color: "#1B3A4B", bg: "#E5EFF5", border: "#A8C4D4" },
-  { id: "read",         label: "Leído",         icon: CheckCircle, desc: "Ya lo terminé",                   color: "#5C4A3F", bg: "#F0EBE5", border: "#C8B8A8" },
-];
+  { id: "want_to_read", label: "Por leer",     icon: Bookmark,    desc: "Lo añado a mi lista de lectura" },
+  { id: "reading",      label: "Leyendo",       icon: BookOpen,    desc: "Lo estoy leyendo ahora mismo" },
+  { id: "wish",         label: "Quiero leer",   icon: Eye,         desc: "En mi lista de deseos" },
+  { id: "read",         label: "Leído",         icon: CheckCircle, desc: "Ya lo terminé" },
+].map((o) => ({ ...o, color: STATUS_COLORS[o.id] }));
 
 export default function ReadingStatusModal({ book, onConfirm, onClose }) {
   const [selected, setSelected] = useState("want_to_read");
@@ -59,7 +56,7 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
         style={{
           position: "relative", zIndex: 1,
           width: "100%", maxWidth: 480, margin: "0 auto",
-          backgroundColor: P.bg,
+          backgroundColor: palette.bg,
           borderRadius: "24px 24px 0 0",
           padding: "0 1.25rem 2.5rem",
           boxShadow: "0 -8px 40px rgba(42,31,26,0.18)",
@@ -69,7 +66,7 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Handle */}
-        <div style={{ width: 40, height: 4, backgroundColor: P.border, borderRadius: 2, margin: "14px auto 1.25rem" }} />
+        <div style={{ width: 40, height: 4, backgroundColor: palette.border, borderRadius: 2, margin: "14px auto 1.25rem" }} />
 
         {/* Book mini preview */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.85rem", marginBottom: "1.4rem" }}>
@@ -78,7 +75,7 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
             overflow: "hidden", boxShadow: "0 3px 10px rgba(0,0,0,0.18)",
           }}>
             <BookCoverImage
-              coverUrl={book.cover_url}
+              coverUrl={book.coverUrl}
               title={book.title}
               author={book.author}
               genres={book.genres}
@@ -86,14 +83,14 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
             />
           </div>
           <div style={{ minWidth: 0 }}>
-            <p style={{ ...serif, fontSize: "1rem", fontWeight: 700, fontStyle: "italic", color: P.ink, lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <p style={{ ...serif, fontSize: "1rem", fontWeight: 700, fontStyle: "italic", color: palette.ink, lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {book.title}
             </p>
-            <p style={{ ...body, fontSize: "0.88rem", color: P.inkSoft, margin: "2px 0 0" }}>{book.author}</p>
+            <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, margin: "2px 0 0" }}>{book.author}</p>
           </div>
         </div>
 
-        <p style={{ ...serif, fontSize: "1.05rem", fontWeight: 700, color: P.ink, marginBottom: "0.9rem" }}>
+        <p style={{ ...serif, fontSize: "1.05rem", fontWeight: 700, color: palette.ink, marginBottom: "0.9rem" }}>
           ¿Cómo quieres guardarlo?
         </p>
 
@@ -109,8 +106,8 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
                 style={{
                   width: "100%", padding: "0.8rem 1rem",
                   borderRadius: 14,
-                  border: `2px solid ${active ? opt.color : P.border}`,
-                  backgroundColor: active ? opt.bg : "transparent",
+                  border: `2px solid ${active ? opt.color : palette.border}`,
+                  backgroundColor: active ? `${opt.color}14` : "transparent",
                   cursor: "pointer",
                   display: "flex", alignItems: "center", gap: "0.85rem",
                   transition: "border-color 140ms ease, background-color 140ms ease",
@@ -119,17 +116,17 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
               >
                 <div style={{
                   width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                  backgroundColor: active ? opt.color : "#E8E0D6",
+                  backgroundColor: active ? opt.color : palette.bgSoft,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "background-color 140ms ease",
                 }}>
-                  <Icon size={17} color={active ? "#fff" : P.inkFaint} strokeWidth={active ? 2.2 : 1.6} />
+                  <Icon size={17} color={active ? palette.onAccent : palette.inkFaint} strokeWidth={active ? 2.2 : 1.6} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ ...serif, fontSize: "0.97rem", fontWeight: 600, color: active ? opt.color : P.ink, margin: 0 }}>
+                  <p style={{ ...serif, fontSize: "0.97rem", fontWeight: 600, color: active ? opt.color : palette.ink, margin: 0 }}>
                     {opt.label}
                   </p>
-                  <p style={{ ...body, fontSize: "0.82rem", color: P.inkFaint, margin: 0 }}>{opt.desc}</p>
+                  <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, margin: 0 }}>{opt.desc}</p>
                 </div>
                 {active && (
                   <div style={{
@@ -138,7 +135,7 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
                     display: "flex", alignItems: "center", justifyContent: "center",
                   }}>
                     <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                      <path d="M2 5.5l2.5 2.5 4.5-4.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2 5.5l2.5 2.5 4.5-4.5" stroke={palette.onAccent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 )}
@@ -153,8 +150,8 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
           style={{
             width: "100%", padding: "1rem",
             borderRadius: 14, border: "none",
-            background: "linear-gradient(135deg, #7A2E2E 0%, #A4493D 100%)",
-            color: "#fff", cursor: "pointer",
+            background: BRAND.gradientFab,
+            color: palette.onAccent, cursor: "pointer",
             ...serif, fontSize: "1.05rem", fontWeight: 600,
             boxShadow: "0 4px 18px rgba(122,46,46,0.35)",
           }}

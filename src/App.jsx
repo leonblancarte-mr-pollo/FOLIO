@@ -19,13 +19,10 @@ import {
   Check,
   Search,
   Share2,
-  BarChart3,
   TrendingUp,
   Award,
-  Copy,
   Heart,
   PlusCircle,
-  LogOut,
   User,
   Users,
   MessageCircle,
@@ -49,7 +46,6 @@ import {
   Lock,
   ChevronDown,
   BookCheck,
-  RotateCcw,
   Clock,
   ImagePlus,
   Bell,
@@ -65,73 +61,43 @@ import {
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
 import confetti from "canvas-confetti";
-import { CUENTOS, CUENTOS_MAP } from "./data/cuentos.js";
-import { playBookFinished, playAchievementSound, playReadingSession } from "./sounds.js";
+import { CUENTOS } from "./data/cuentos.js";
+import { playBookFinished, playReadingSession } from "./sounds.js";
 import { haptic, HAPTIC } from "./haptics.js";
 import BookTinder from "./components/BookTinder.jsx";
 import BookCoverImage from "./components/BookCoverImage.jsx";
-import { PET_SIZE_PX, PetDisplay } from "./pets/PetDisplay.jsx";
+import { PetDisplay } from "./pets/PetDisplay.jsx";
 import { PetOnboarding } from "./pets/PetOnboarding.jsx";
 import { PetLevelUpToast } from "./pets/PetLevelUpToast.jsx";
-import { PetScene } from "./pets/PetScene.jsx";
 import { PetHub } from "./pets/PetHub.jsx";
 import { AddToListSheet } from "./components/AddToListSheet.jsx";
-import { ListFormModal } from "./components/ListFormModal.jsx";
-import { ListDetailModal } from "./components/ListDetailModal.jsx";
 import { ListsSection } from "./components/ListsSection.jsx";
 import { ReadDateModal } from "./components/ReadDateModal.jsx";
 import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
-import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, getAvatarColor, display, body, ts, genrePillStyle } from "./theme.js";
-import { dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, addPendingLog, getPendingPosts, addPendingPost, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB } from "./services/booksService.js";
-import { fetchUserLists, createUserList, updateUserList, deleteUserList, addBookToList, removeBookFromList } from "./services/listsService.js";
+import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, ts, genrePillStyle, genreColor } from "./theme.js";
+import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
-import { PET_MAX_LEVEL, petXpForLevel, PET_TYPES, petImageSrc, petBus, loadPet, createPet, updatePetName, addPetXP } from "./services/petService.js";
-import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData } from "./services/streakService.js";
+import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
+import { localDateStr, checkStreakOnLoad, fetchStreakData, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
+import { fetchQuotes, fetchQuotesForBook, insertQuote, updateQuoteInDB, deleteQuoteFromDB, toggleQuoteFavorite, setQuotePublic } from "./services/quotesService.js";
+import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
+import { logReadingSession, syncPendingLogs } from "./services/readingService.js";
+import { ACHIEVEMENT_DEFS, achievementBus, checkAchievements } from "./services/achievementsService.js";
+import { enrichBook, getMoodRecommendations } from "./services/aiService.js";
+import { searchGoogleBooks } from "./services/googleBooksService.js";
+import { fetchCollaborativeRecommendations } from "./services/recommendationService.js";
+import { MONTHS_ES, generateMonthWrap, generateAnnualWrap } from "./services/wrapsService.js";
+import { devLog } from "./services/devLog.js";
 
-// Logs de depuración: solo en desarrollo (en producción la consola queda limpia). Los logs críticos usan console.* directo.
-const devLog = import.meta.env.DEV ? (...args) => console.log(...args) : () => {};
+// Texto seguro para interpolar en un filtro PostgREST `.or(...)`: comas, paréntesis y
+// comodines escritos por el usuario romperían (o alterarían) el filtro.
+function sanitizeSearchTerm(value) {
+  return (value || "").replace(/[,()%*\\]/g, " ").replace(/\s+/g, " ").trim();
+}
 
 // ============ AFFILIATE ============
 const BUSCALIBRE_AFFILIATE_ID = import.meta.env.VITE_BUSCALIBRE_AFFILIATE_ID || "ac4c19281310afaacacd";
-
-// (movido a src/theme.js)
-
-// ============ ACHIEVEMENT DEFINITIONS ============
-const ACHIEVEMENT_DEFS = [
-  // Lectura
-  { key: "first_book_added",  name: "Primera página",      desc: "Agregaste tu primer libro",                        emoji: "📖", cat: "Lectura"  },
-  { key: "first_book_read",   name: "Lector nato",          desc: "Terminaste tu primer libro",                       emoji: "✅", cat: "Lectura"  },
-  { key: "first_review",      name: "Crítico",              desc: "Escribiste tu primera reseña",                     emoji: "✍️", cat: "Lectura"  },
-  { key: "rated_5_books",     name: "Bibliófilo",           desc: "Calificaste 5 libros",                             emoji: "⭐", cat: "Lectura"  },
-  { key: "marathon_reader",   name: "Maratón",              desc: "Leíste 3 libros en un mes",                        emoji: "🏃", cat: "Lectura"  },
-  { key: "speed_reader",      name: "Velocista",            desc: "Leíste 5 libros en un mes",                        emoji: "⚡", cat: "Lectura"  },
-  { key: "explorer",          name: "Explorador",           desc: "Leíste libros de 3 géneros distintos",             emoji: "🧭", cat: "Lectura"  },
-  { key: "genre_master",      name: "Maestro",              desc: "Leíste libros de 5 géneros distintos",             emoji: "🎭", cat: "Lectura"  },
-  { key: "collector_10",      name: "Coleccionista",        desc: "10 libros en tu biblioteca",                       emoji: "📚", cat: "Lectura"  },
-  { key: "collector_50",      name: "Biblioteca",           desc: "50 libros en tu biblioteca",                       emoji: "🏛️", cat: "Lectura"  },
-  // Sesiones
-  { key: "first_log",         name: "Primer día",           desc: "Registraste tu primera sesión",                    emoji: "📅", cat: "Sesiones" },
-  { key: "sessions_30",       name: "Café y letras",        desc: "30 sesiones registradas",                          emoji: "☕", cat: "Sesiones" },
-  { key: "pages_100",         name: "Centurión",            desc: "100 páginas leídas",                               emoji: "💯", cat: "Sesiones" },
-  { key: "pages_1000",        name: "Mil páginas",          desc: "1,000 páginas leídas",                             emoji: "🌟", cat: "Sesiones" },
-  { key: "pages_10000",       name: "Leyenda",              desc: "10,000 páginas leídas",                            emoji: "👑", cat: "Sesiones" },
-  { key: "big_session",       name: "Sin parar",            desc: "100+ páginas en una sola sesión",                  emoji: "📖", cat: "Sesiones" },
-  { key: "night_owl",         name: "Búho",                 desc: "5 sesiones registradas después de las 10pm",       emoji: "🦉", cat: "Sesiones" },
-  // Rachas
-  { key: "streak_7",          name: "Racha de fuego",       desc: "7 días consecutivos leyendo",                      emoji: "🔥", cat: "Rachas"   },
-  { key: "streak_30",         name: "Imparable",            desc: "30 días consecutivos leyendo",                     emoji: "💎", cat: "Rachas"   },
-  { key: "streak_90",         name: "Trimestre lector",     desc: "90 días consecutivos",                             emoji: "🏅", cat: "Rachas"   },
-  // Red social
-  { key: "first_comment",     name: "Social",               desc: "Hiciste tu primer comentario",                     emoji: "💬", cat: "Social"   },
-  { key: "comments_10",       name: "Conversador",          desc: "10 comentarios en total",                          emoji: "🗣️", cat: "Social"   },
-  { key: "first_friend",      name: "Conector",             desc: "Agregaste tu primer amigo",                        emoji: "🤝", cat: "Social"   },
-  { key: "friends_5",         name: "Popular",              desc: "Tienes 5 amigos en Folio",                         emoji: "👥", cat: "Social"   },
-  { key: "first_message",     name: "Mensajero",            desc: "Enviaste tu primer mensaje de chat",               emoji: "💌", cat: "Social"   },
-  // Especiales
-  { key: "top_reader",        name: "Top lector",           desc: "Leíste más que todos tus amigos este mes",         emoji: "🏆", cat: "Especial" },
-  { key: "uam_book",          name: "Universitario lector", desc: "Agregaste un libro de la Biblioteca UAM",          emoji: "🎓", cat: "Especial" },
-];
 
 const ACHIEVEMENT_ICON_MAP = {
   first_book_added: BookOpen,    first_book_read: BookmarkCheck, first_review: PenLine,
@@ -174,8 +140,6 @@ const ACHIEVEMENT_CONDITION_MAP = {
   top_reader:        "Lee más que todos tus amigos en un mes",
   uam_book:          "Agrega un libro de la Biblioteca UAM",
 };
-
-const MONTHS_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 function isLastDayOfMonth() {
   const now = new Date();
@@ -334,8 +298,6 @@ function LoadingEntertainment({ label = "Cargando…" }) {
 // La autenticación vive en src/services/authService.js (Supabase Auth).
 // La sesión la maneja Supabase; public.users es la tabla de PERFIL (id = auth.uid()).
 
-// (movido a src/services/booksService.js)
-
 // ============ ONLINE STATUS HOOK ============
 function useOnlineStatus() {
   const [isOnline, setIsOnline] = useState(true);
@@ -352,416 +314,6 @@ function useOnlineStatus() {
   return isOnline;
 }
 
-// (movido a src/services/booksService.js)
-
-// ============ QUOTES CRUD ============
-async function fetchQuotes(userId) {
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("*, books(title, author, cover_url)")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data || []).map(q => ({
-    ...q,
-    bookTitle: q.books?.title || null,
-    bookAuthor: q.books?.author || null,
-    bookCoverUrl: q.books?.cover_url || null,
-  }));
-}
-
-async function fetchQuotesForBook(userId, bookId) {
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("book_id", bookId)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-async function insertQuote(q, userId) {
-  const { data, error } = await supabase
-    .from("quotes")
-    .insert({
-      user_id: userId,
-      book_id: q.bookId || null,
-      text: q.text.trim(),
-      page_number: q.pageNumber || null,
-      mood: q.mood || null,
-      tags: [],
-      is_favorite: false,
-      is_public: q.isPublic || false,
-    })
-    .select("*, books(title, author, cover_url)")
-    .single();
-  if (error) throw error;
-  return {
-    ...data,
-    bookTitle: data.books?.title || null,
-    bookAuthor: data.books?.author || null,
-    bookCoverUrl: data.books?.cover_url || null,
-  };
-}
-
-async function updateQuoteInDB(q, userId) {
-  const { error } = await supabase
-    .from("quotes")
-    .update({
-      text: q.text.trim(),
-      book_id: q.book_id || null,
-      page_number: q.page_number || null,
-      mood: q.mood || null,
-      is_favorite: q.is_favorite,
-    })
-    .eq("id", q.id)
-    .eq("user_id", userId);
-  if (error) throw error;
-}
-
-async function deleteQuoteFromDB(id, userId) {
-  const { error } = await supabase
-    .from("quotes")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId);
-  if (error) throw error;
-}
-
-async function toggleQuoteFavorite(id, userId, isFavorite) {
-  const { error } = await supabase
-    .from("quotes")
-    .update({ is_favorite: isFavorite })
-    .eq("id", id)
-    .eq("user_id", userId);
-  if (error) throw error;
-}
-
-// (movido a src/services/listsService.js)
-
-// ============ MESSAGING HELPERS ============
-async function getOrCreateConversation(userId, friendId) {
-  const { data: c1 } = await supabase
-    .from("conversations").select("id")
-    .eq("user1_id", userId).eq("user2_id", friendId).maybeSingle();
-  if (c1) return c1.id;
-  const { data: c2 } = await supabase
-    .from("conversations").select("id")
-    .eq("user1_id", friendId).eq("user2_id", userId).maybeSingle();
-  if (c2) return c2.id;
-  const [a, b] = [userId, friendId].sort();
-  const { data, error } = await supabase
-    .from("conversations")
-    .insert({ user1_id: a, user2_id: b })
-    .select("id").single();
-  if (error) {
-    const { data: r } = await supabase
-      .from("conversations").select("id")
-      .eq("user1_id", a).eq("user2_id", b).maybeSingle();
-    return r?.id;
-  }
-  return data.id;
-}
-
-async function markConversationRead(conversationId, userId) {
-  await supabase
-    .from("messages")
-    .update({ read_at: new Date().toISOString() })
-    .eq("conversation_id", conversationId)
-    .neq("sender_id", userId)
-    .is("read_at", null);
-}
-
-async function getUnreadMessagesCount(userId) {
-  const { data: convs } = await supabase
-    .from("conversations").select("id")
-    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
-  if (!convs || convs.length === 0) return 0;
-  const { count } = await supabase
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .in("conversation_id", convs.map((c) => c.id))
-    .neq("sender_id", userId)
-    .is("read_at", null);
-  return count || 0;
-}
-
-// ============ FEED HELPERS ============
-async function fetchFeed(userId) {
-  const { data: fs } = await supabase
-    .from("friendships")
-    .select("user_id, friend_id")
-    .eq("status", "accepted")
-    .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-
-  const friendIds = (fs || []).map((f) => (f.user_id === userId ? f.friend_id : f.user_id));
-  const allIds = [userId, ...friendIds];
-  devLog("[fetchFeed] userId:", userId, "allIds:", allIds);
-
-  const { data: posts, error: postsError } = await supabase
-    .from("posts")
-    .select("id, type, action, content, image_url, created_at, user_id, book_id, pages_read, minutes_read")
-    .in("user_id", allIds)
-    .order("created_at", { ascending: false })
-    .limit(60);
-
-  if (postsError) {
-    console.error("[fetchFeed] Error al leer posts:", postsError);
-    throw postsError;
-  }
-  devLog("[fetchFeed] posts recibidos:", posts?.length ?? 0);
-  if (!posts || posts.length === 0) return [];
-
-  const bookIds = [...new Set(posts.filter((p) => p.book_id).map((p) => p.book_id))];
-  let bookMap = {};
-  if (bookIds.length > 0) {
-    const { data: bks } = await supabase
-      .from("books")
-      .select("id, title, author, cover_url, rating, review, status")
-      .in("id", bookIds);
-    (bks || []).forEach((b) => { bookMap[b.id] = b; });
-  }
-
-  const authorIds = [...new Set(posts.map((p) => p.user_id))];
-  const { data: authors } = await supabase.from("users").select("id, nombre, username, avatar_url, cover_url, bio").in("id", authorIds);
-
-  const authorMap = {};
-  (authors || []).forEach((a) => { authorMap[a.id] = { ...a }; });
-
-  return posts.map((p) => {
-    let type = p.type;
-    let quote = null;
-
-    // Detect quote posts embedded in "text" type (avoids DB type constraints)
-    if (p.content) {
-      try {
-        const parsed = JSON.parse(p.content);
-        if (parsed.__folio_type === "quote") {
-          type = "quote";
-          quote = parsed;
-        }
-      } catch { /* not JSON, regular text post */ }
-    }
-
-    return {
-      ...p,
-      type,
-      book: p.book_id ? bookMap[p.book_id] : null,
-      author: authorMap[p.user_id] || { nombre: "Usuario", username: "" },
-      quote,
-    };
-  });
-}
-
-async function fetchComments(postId) {
-  const { data: comments } = await supabase
-    .from("comments")
-    .select("id, post_id, user_id, content, created_at")
-    .eq("post_id", postId)
-    .order("created_at", { ascending: true });
-
-  if (!comments || comments.length === 0) return [];
-
-  const authorIds = [...new Set(comments.map((c) => c.user_id))];
-  const { data: authors } = await supabase.from("users").select("id, nombre, username, avatar_url").in("id", authorIds);
-  const authorMap = {};
-  (authors || []).forEach((a) => { authorMap[a.id] = { ...a }; });
-
-  const commentIds = comments.map((c) => c.id);
-  const { data: allReplies } = await supabase
-    .from("comment_replies")
-    .select("id, comment_id, user_id, content, created_at")
-    .in("comment_id", commentIds)
-    .order("created_at", { ascending: true });
-
-  let replyAuthorMap = {};
-  if (allReplies && allReplies.length > 0) {
-    const replyAuthorIds = [...new Set(allReplies.map((r) => r.user_id))];
-    const { data: replyAuthors } = await supabase.from("users").select("id, nombre, username, avatar_url").in("id", replyAuthorIds);
-    (replyAuthors || []).forEach((a) => { replyAuthorMap[a.id] = a; });
-  }
-
-  const repliesByComment = {};
-  (allReplies || []).forEach((r) => {
-    if (!repliesByComment[r.comment_id]) repliesByComment[r.comment_id] = [];
-    repliesByComment[r.comment_id].push({ ...r, author: replyAuthorMap[r.user_id] || { nombre: "Usuario" } });
-  });
-
-  return comments.map((c) => ({
-    ...c,
-    author: authorMap[c.user_id] || { nombre: "Usuario" },
-    replies: repliesByComment[c.id] || [],
-  }));
-}
-
-async function compressAndUploadPostImage(file, userId) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objUrl = URL.createObjectURL(file);
-    img.onload = async () => {
-      URL.revokeObjectURL(objUrl);
-      const MAX_W = 1200;
-      let w = img.width, h = img.height;
-      if (w > MAX_W) { h = Math.round(h * MAX_W / w); w = MAX_W; }
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      canvas.toBlob(async (blob) => {
-        if (!blob) return reject(new Error("Canvas toBlob failed"));
-        const filename = `${userId}_${Date.now()}.jpg`;
-        const { error } = await supabase.storage.from("post-images").upload(filename, blob, { contentType: "image/jpeg", upsert: false });
-        if (error) return reject(error);
-        const { data: urlData } = supabase.storage.from("post-images").getPublicUrl(filename);
-        resolve(urlData.publicUrl);
-      }, "image/jpeg", 0.85);
-    };
-    img.onerror = reject;
-    img.src = objUrl;
-  });
-}
-
-async function createFeedPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead, quoteId }) {
-  if (!navigator.onLine) {
-    addPendingPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead });
-    return;
-  }
-  const payload = {
-    user_id: userId,
-    type,
-    book_id: bookId || null,
-    content: content || null,
-    image_url: imageUrl || null,
-  };
-  if (action !== undefined) payload.action = action || null;
-  if (pagesRead !== undefined) payload.pages_read = pagesRead || null;
-  if (minutesRead !== undefined) payload.minutes_read = minutesRead || null;
-  // quote_id stored in content as JSON — no schema column required
-  devLog("[createFeedPost] insertando:", payload);
-  devLog("[createFeedPost] User ID:", userId);
-  const { error } = await supabase.from("posts").insert(payload);
-  if (error) {
-    console.error("[createFeedPost] error:", error);
-    console.error("[createFeedPost] message:", error?.message, "| code:", error?.code, "| details:", error?.details);
-    throw error;
-  }
-  devLog("[createFeedPost] OK");
-}
-
-async function createComment({ postId, userId, content }) {
-  const { error } = await supabase.from("comments").insert({ post_id: postId, user_id: userId, content });
-  if (error) throw error;
-}
-
-async function createReply({ commentId, userId, content }) {
-  const { error } = await supabase.from("comment_replies").insert({ comment_id: commentId, user_id: userId, content });
-  if (error) throw error;
-}
-
-async function deleteFeedPost(postId, userId) {
-  const { error } = await supabase.from("posts").delete().eq("id", postId).eq("user_id", userId);
-  if (error) throw error;
-}
-
-// (movido a src/services/streakService.js)
-
-function newClientUuid() {
-  return (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId }) {
-  const sid = sessionId || newClientUuid();
-  if (!navigator.onLine) {
-    addPendingLog({ userId, bookId, pagesRead: pagesRead || null, mood, date: localDateStr(), sessionId: sid });
-    return;
-  }
-  const today = localDateStr();
-
-  const { error: logError } = await supabase.from("reading_logs").insert({
-    user_id: userId,
-    book_id: bookId,
-    pages_read: pagesRead || null,
-    mood,
-    log_date: today,
-    session_id: sid,
-  });
-  if (logError) {
-    if (logError.code === "23505") {
-      // Esta sesión ya se sincronizó antes (reintento offline duplicado): no
-      // repetir el post/racha, ya se hicieron la primera vez.
-      return;
-    }
-    throw logError;
-  }
-
-  if (pagesRead > 0 && bookId) {
-    createFeedPost({ userId, type: 'reading_session', bookId, content: '', pagesRead, imageUrl: null }).catch(() => {});
-  }
-
-  // La racha ya no la escribe el cliente: el servidor la avanza (RPC
-  // SECURITY DEFINER) validando que exista este reading_log real de hoy.
-  const { error: streakErr } = await supabase.rpc("update_streak");
-  if (streakErr) console.error("[streak] update_streak falló:", streakErr.message);
-
-  // Pet XP por páginas leídas: +2 XP por cada 10 páginas
-  const pagesXp = Math.floor((pagesRead || 0) / 10) * 2;
-  if (pagesXp > 0) {
-    addPetXP(userId, pagesXp).catch(() => {});
-  }
-}
-
-// ============ OFFLINE SYNC ============
-async function syncPendingLogs() {
-  const logs = getPendingLogs();
-  if (logs.length === 0) return 0;
-  let synced = 0;
-  const remaining = [];
-  for (const log of logs) {
-    try {
-      await logReadingSession({ userId: log.userId, bookId: log.bookId, pagesRead: log.pagesRead, mood: log.mood, sessionId: log.sessionId });
-      synced++;
-    } catch {
-      remaining.push(log);
-    }
-  }
-  try { localStorage.setItem("folio_pending_logs", JSON.stringify(remaining)); } catch {}
-  if (remaining.length === 0) localStorage.removeItem("folio_pending_logs");
-  return synced;
-}
-
-async function syncPendingPosts() {
-  const posts = getPendingPosts();
-  if (posts.length === 0) return 0;
-  let synced = 0;
-  const remaining = [];
-  for (const post of posts) {
-    const { _id, ...payload } = post;
-    try {
-      await createFeedPost(payload);
-      synced++;
-    } catch {
-      remaining.push(post);
-    }
-  }
-  try { localStorage.setItem("folio_pending_posts", JSON.stringify(remaining)); } catch {}
-  if (remaining.length === 0) localStorage.removeItem("folio_pending_posts");
-  return synced;
-}
-
-// ============ ACHIEVEMENT ENGINE ============
-let _achievementListeners = [];
-const achievementBus = {
-  emit: (keys) => { if (keys.length > 0) _achievementListeners.forEach(fn => fn(keys)); },
-  on: (fn) => {
-    _achievementListeners.push(fn);
-    return () => { _achievementListeners = _achievementListeners.filter(f => f !== fn); };
-  },
-};
-
-// (movido a src/services/gemsService.js)
-
-// (movido a src/services/petService.js)
-
 function canShowInviteCard() {
   const last = localStorage.getItem("folio_invite_peak_date");
   return last !== new Date().toISOString().slice(0, 10);
@@ -770,388 +322,20 @@ function markInviteCardShown() {
   localStorage.setItem("folio_invite_peak_date", new Date().toISOString().slice(0, 10));
 }
 
-const FEED_WORTHY_ACHIEVEMENTS = new Set([
-  "streak_7", "streak_30", "streak_90", "speed_reader",
-  "top_reader", "pages_1000", "pages_10000", "friends_5",
-]);
-
-async function checkAchievements(userId, userName, { silent = false } = {}) {
-  try {
-    // Early exit if achievements table doesn't exist yet
-    const { data: alreadyUnlocked, error: achTableErr } = await supabase
-      .from("achievements").select("achievement_key").eq("user_id", userId);
-    if (achTableErr) {
-      console.warn("[checkAchievements] achievements table not ready:", achTableErr.message,
-        "\n→ Ejecuta el SQL en Supabase: CREATE TABLE achievements (id uuid DEFAULT gen_random_uuid() PRIMARY KEY, user_id uuid REFERENCES users(id) ON DELETE CASCADE, achievement_key text NOT NULL, unlocked_at timestamptz DEFAULT now(), UNIQUE(user_id, achievement_key)); ALTER TABLE achievements ENABLE ROW LEVEL SECURITY; CREATE POLICY \"ach_open\" ON achievements FOR ALL USING (true) WITH CHECK (true);");
-      return [];
-    }
-    const unlockedSet = new Set((alreadyUnlocked || []).map(a => a.achievement_key));
-
-    const monthStart = new Date();
-    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-    const monthStr = monthStart.toISOString();
-
-    // Books query without is_uam_book to avoid column-not-exists errors
-    const [
-      { data: books },
-      { data: streak },
-      { data: logs },
-      { data: comments },
-      { data: friendships },
-      { data: messages },
-    ] = await Promise.all([
-      supabase.from("books").select("id,status,rating,review,genre,finished_at").eq("user_id", userId),
-      supabase.from("user_streaks").select("current_streak,total_pages_read").eq("user_id", userId).maybeSingle(),
-      supabase.from("reading_logs").select("id,pages_read,logged_at").eq("user_id", userId),
-      supabase.from("comments").select("id").eq("user_id", userId),
-      supabase.from("friendships").select("id").or(`user_id.eq.${userId},friend_id.eq.${userId}`).eq("status", "accepted"),
-      supabase.from("messages").select("id").eq("sender_id", userId).limit(1),
-    ]);
-
-    const allBooks    = books || [];
-    const allLogs     = logs  || [];
-    const readBooks   = allBooks.filter(b => b.status === "read");
-    const thisMonth   = readBooks.filter(b => b.finished_at && b.finished_at >= monthStr);
-    const totalPages  = streak?.total_pages_read || 0;
-    const curStreak   = streak?.current_streak   || 0;
-    const genresRead  = new Set(readBooks.filter(b => b.genre).map(b => b.genre));
-
-    // is_uam_book check — separate query so column-missing doesn't break everything
-    let hasUamBook = false;
-    const { count: uamCount, error: uamErr } = await supabase
-      .from("books").select("id", { count: "exact", head: true })
-      .eq("user_id", userId).eq("is_uam_book", true);
-    if (!uamErr) hasUamBook = (uamCount || 0) > 0;
-
-    const checks = {
-      first_book_added: allBooks.length >= 1,
-      first_book_read:  readBooks.length >= 1,
-      first_review:     allBooks.some(b => b.review && b.review.length > 10),
-      rated_5_books:    allBooks.filter(b => b.rating > 0).length >= 5,
-      marathon_reader:  thisMonth.length >= 3,
-      speed_reader:     thisMonth.length >= 5,
-      explorer:         genresRead.size >= 3,
-      genre_master:     genresRead.size >= 5,
-      collector_10:     allBooks.length >= 10,
-      collector_50:     allBooks.length >= 50,
-      first_log:        allLogs.length >= 1,
-      sessions_30:      allLogs.length >= 30,
-      pages_100:        totalPages >= 100,
-      pages_1000:       totalPages >= 1000,
-      pages_10000:      totalPages >= 10000,
-      big_session:      allLogs.some(l => (l.pages_read || 0) >= 100),
-      night_owl:        allLogs.filter(l => new Date(l.logged_at).getHours() >= 22).length >= 5,
-      streak_7:         curStreak >= 7,
-      streak_30:        curStreak >= 30,
-      streak_90:        curStreak >= 90,
-      first_comment:    (comments || []).length >= 1,
-      comments_10:      (comments || []).length >= 10,
-      first_friend:     (friendships || []).length >= 1,
-      friends_5:        (friendships || []).length >= 5,
-      first_message:    (messages || []).length >= 1,
-      uam_book:         hasUamBook,
-      top_reader:       unlockedSet.has("top_reader"),
-    };
-
-    // top_reader: expensive per-friend query
-    if (!unlockedSet.has("top_reader") && thisMonth.length > 0) {
-      const { data: fs } = await supabase.from("friendships")
-        .select("user_id,friend_id").eq("status","accepted")
-        .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
-      const fids = (fs || []).map(f => f.user_id === userId ? f.friend_id : f.user_id);
-      if (fids.length > 0) {
-        let isTop = true;
-        for (const fid of fids) {
-          const { count } = await supabase.from("books")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", fid).eq("status","read").gte("finished_at", monthStr);
-          if ((count || 0) >= thisMonth.length) { isTop = false; break; }
-        }
-        checks.top_reader = isTop;
-      }
-    }
-
-    const candidateKeys = Object.entries(checks)
-      .filter(([k, v]) => v && !unlockedSet.has(k))
-      .map(([k]) => k);
-
-    if (candidateKeys.length === 0) return [];
-
-    // El servidor revalida cada condición real antes de otorgar (RPC
-    // SECURITY DEFINER); el cliente ya no puede insertar logros directo.
-    const grantedKeys = [];
-    for (const key of candidateKeys) {
-      const { data: granted, error: rpcErr } = await supabase.rpc("award_achievement", { p_key: key });
-      if (rpcErr) { console.error("[checkAchievements] award_achievement error:", key, rpcErr.message); continue; }
-      if (granted) grantedKeys.push(key);
-    }
-    if (grantedKeys.length === 0) return [];
-
-    // Auto feed post for notable achievements
-    for (const key of grantedKeys) {
-      if (FEED_WORTHY_ACHIEVEMENTS.has(key)) {
-        const def = ACHIEVEMENT_DEFS.find(a => a.key === key);
-        if (def) {
-          await supabase.from("posts").insert({
-            user_id: userId, type: "achievement",
-            content: `${def.emoji} "${def.name}" — ${def.desc}`,
-          });
-        }
-      }
-    }
-
-    console.log(`[checkAchievements] ✓ ${grantedKeys.length} nuevo(s): ${grantedKeys.join(", ")}`);
-    if (!silent) {
-      achievementBus.emit(grantedKeys);
-      playAchievementSound(grantedKeys);
-      if (grantedKeys.length > 0) {
-        const isStreak = grantedKeys.some(k => ['streak_7','streak_30','streak_90'].includes(k));
-        haptic(isStreak ? HAPTIC.STREAK_MILESTONE : HAPTIC.ACHIEVEMENT);
-      }
-    }
-    return grantedKeys;
-  } catch (err) {
-    console.error("[checkAchievements] unexpected error:", err);
-    return [];
-  }
-}
-
-// ============ AI HELPERS ============
-async function authHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) throw new Error("Debes iniciar sesión de nuevo para usar esta función.");
-  return { Authorization: `Bearer ${token}` };
-}
-
-async function enrichBook(title, author) {
-  const response = await fetch("/api/anthropic", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({
-      max_tokens: 600,
-      messages: [
-        {
-          role: "user",
-          content: `Para el libro "${title}" de ${author}, responde SOLO con JSON válido (sin markdown, sin texto extra):
-{
-  "genre": "género principal en español, en una palabra o dos máximo (ej: terror, filosofía, novela, ensayo, ficción, ciencia ficción, romance, biografía, desarrollo personal, poesía, historia, autoayuda, fantasía, etc.)",
-  "summary": "resumen breve de 2-3 oraciones en español, sin spoilers grandes",
-  "moodTags": ["3-5 etiquetas de mood en español, ej: contemplativo, intenso, ligero, melancólico"]
-}
-
-Si no conoces el libro con seguridad, haz tu mejor estimación basada en el título y autor.`,
-        },
-      ],
-    }),
-  });
-  if (response.status === 429) {
-    throw new Error("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.");
-  }
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !Array.isArray(data?.content)) {
-    throw new Error("No se pudo obtener la información del libro. Intenta de nuevo.");
-  }
-  const text = data.content.find((b) => b.type === "text")?.text || "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
-}
-
-async function getRecommendations(books, moodAnswers) {
-  const readBooks = books.filter((b) => b.status === "read");
-  const availableBooks = books.filter((b) => b.status !== "read");
-
-  const tasteSection =
-    readBooks.length > 0
-      ? "LIBROS QUE EL USUARIO YA LEYÓ (úsalos para entender sus gustos, NO los recomiendes):\n" +
-        readBooks
-          .map(
-            (b) =>
-              `- "${b.title}" por ${b.author}${b.rating ? ` — calificación: ${b.rating}/5` : ""}${
-                b.genre ? ` [${b.genre}]` : ""
-              }${b.review ? ` — Reseña: "${b.review.slice(0, 200)}"` : ""}`
-          )
-          .join("\n")
-      : "(Aún no ha marcado libros como leídos. Basa las recomendaciones en su mood y en lo que tiene en su biblioteca.)";
-
-  const availableSection =
-    availableBooks.length > 0
-      ? "LIBROS DISPONIBLES PARA RECOMENDAR DE SU BIBLIOTECA:\n" +
-        availableBooks
-          .map(
-            (b) =>
-              `- "${b.title}" por ${b.author} [${STATUS_META[b.status].label}]${
-                b.rating ? ` (calif. tentativa: ${b.rating}/5)` : ""
-              }${b.genre ? ` [${b.genre}]` : ""}${b.summary ? ` — ${b.summary}` : ""}`
-          )
-          .join("\n")
-      : "(El usuario no tiene libros pendientes en su biblioteca.)";
-
-  const prompt = `Eres un recomendador de libros perspicaz y cálido. Conoces literatura clásica, contemporánea, en español y otros idiomas, ficción y no ficción.
-
-${tasteSection}
-
-${availableSection}
-
-EL MOOD ACTUAL DEL USUARIO:
-- Cómo se siente: ${moodAnswers.mood}
-- Tipo de sesión deseada: ${moodAnswers.time}
-- Nivel de desafío: ${moodAnswers.challenge}
-- Zona de confort: ${moodAnswers.openness}
-${moodAnswers.extra ? `- Algo adicional: ${moodAnswers.extra}` : ""}
-
-Tu trabajo es recomendar dos grupos de libros:
-
-1. **fromLibrary**: 2-3 libros de su biblioteca disponible (de la lista DISPONIBLES). NUNCA recomiendes libros que ya leyó (los listados en LEÍDOS). Si no hay libros disponibles, deja el array vacío.
-
-2. **newSuggestions**: 2-3 libros NUEVOS que NO están en su biblioteca y que NO ha leído. Basa las sugerencias en sus gustos demostrados y su mood actual. TEN MUY EN CUENTA la zona de confort: si quiere algo parecido a lo que le ha gustado, quédate dentro de sus géneros y estilos habituales; si quiere salir de su zona, propón algo genuinamente diferente o inesperado para él.
-
-Para cada recomendación explica en 2-3 oraciones por qué encaja, conectando con su mood o con sus lecturas previas. Habla de tú al usuario, en tono cálido y literario, sin clichés.
-
-Responde SOLO con JSON válido (sin markdown, sin texto extra):
-{
-  "fromLibrary": [
-    { "title": "título exacto del libro", "author": "autor", "reason": "por qué encaja" }
-  ],
-  "newSuggestions": [
-    { "title": "título", "author": "autor", "genre": "género en una palabra", "summary": "resumen breve de 1-2 oraciones", "reason": "por qué encaja según sus gustos y mood" }
-  ]
-}`;
-
-  const response = await fetch("/api/anthropic", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({
-      max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  if (response.status === 429) {
-    throw new Error("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.");
-  }
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !Array.isArray(data?.content)) {
-    throw new Error("No se pudieron generar recomendaciones. Intenta de nuevo.");
-  }
-  const text = data.content.find((b) => b.type === "text")?.text || "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
-}
-
 // ============ HELPERS ============
 const STATUS_META = {
-  reading: { label: "Leyendo", icon: BookOpen, color: "#A4493D" },
-  want_to_read: { label: "Por leer", icon: Bookmark, color: "#B8720A" },
-  wish: { label: "Quiero leer", icon: Heart, color: "#8A4A6A" },
-  read: { label: "Leído", icon: BookmarkCheck, color: "#5C6B3D" },
+  reading: { label: STATUS_LABELS.reading, icon: BookOpen, color: STATUS_COLORS.reading },
+  want_to_read: { label: STATUS_LABELS.want_to_read, icon: Bookmark, color: STATUS_COLORS.want_to_read },
+  wish: { label: STATUS_LABELS.wish, icon: Heart, color: STATUS_COLORS.wish },
+  read: { label: STATUS_LABELS.read, icon: BookmarkCheck, color: STATUS_COLORS.read },
 };
 
-// ============ GOOGLE BOOKS ============
-const _gbSearchCache = new Map();
-const GB_CACHE_TTL = 60_000;
-
-function normTitle(s) {
-  return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
-}
-
-function mapGBItem(item) {
-  const vi = item.volumeInfo || {};
-  return {
-    gbId: item.id || '',
-    title: vi.title || 'Sin título',
-    author: (vi.authors || [])[0] || 'Autor desconocido',
-    year: vi.publishedDate?.substring(0, 4) || null,
-    coverUrl: vi.imageLinks?.thumbnail?.replace('http://', 'https://') || null,
-    isbn: (vi.industryIdentifiers?.find(i => i.type === 'ISBN_13') || vi.industryIdentifiers?.[0])?.identifier || null,
-    pageCount: vi.pageCount || null,
-    description: vi.description || '',
-    genre: vi.categories?.[0] || null,
-    publisher: vi.publisher || null,
-    language: vi.language || null,
-  };
-}
-
-async function gbFetch(url) {
-  const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!r.ok) throw new Error('GB API error');
-  return r.json();
-}
-
-async function searchGoogleBooks(query) {
-  if (!query.trim()) return [];
-  const key = query.trim().toLowerCase();
-  const cached = _gbSearchCache.get(key);
-  if (cached && Date.now() - cached.ts < GB_CACHE_TTL) { devLog('[books] cache hit', key, cached.results.length); return cached.results; }
-
-  const q = encodeURIComponent(query.trim());
-  devLog('[books] fetch /api/books?q=', q);
-  const d = await gbFetch(`/api/books?q=${q}`);
-  if (import.meta.env.DEV) devLog('[books] raw response:', JSON.stringify(d).slice(0, 300));
-  const items = d.items || [];
-
-  const processed = items.map(mapGBItem);
-
-  // Deduplicate: same normalized title+author -> keep the one with a cover
-  const seen = new Map();
-  const deduped = [];
-  for (const book of processed) {
-    const dk = normTitle(book.title) + '|' + normTitle(book.author);
-    const prev = seen.get(dk);
-    if (!prev) {
-      seen.set(dk, book);
-      deduped.push(book);
-    } else if (!prev.coverUrl && book.coverUrl) {
-      const idx = deduped.indexOf(prev);
-      if (idx !== -1) deduped[idx] = book;
-      seen.set(dk, book);
-    }
-  }
-
-  const results = deduped.slice(0, 12);
-  _gbSearchCache.set(key, { ts: Date.now(), results });
-  return results;
-}
-
 // ============ COMPONENTS ============
-
-const COVER_PALETTES = [
-  { bg: "#7A2E2E", fg: "#F5EDE0", accent: "#E8A84A" },
-  { bg: "#1B3A4B", fg: "#E8F2FA", accent: "#E8A84A" },
-  { bg: "#5C6B3D", fg: "#EBF5E4", accent: "#E8C86A" },
-  { bg: "#5C1A5C", fg: "#F5E8F5", accent: "#E8A84A" },
-  { bg: "#3D5A6C", fg: "#E8F0F7", accent: "#F0C060" },
-  { bg: "#8A3A1F", fg: "#F5EDE8", accent: "#F5E0B0" },
-  { bg: "#544875", fg: "#EDE8F5", accent: "#E8B86D" },
-  { bg: "#C8924A", fg: "#2A1F1A", accent: "#7A2E2E" },
-  { bg: "#1F3933", fg: "#E4F0EC", accent: "#E8C86A" },
-  { bg: "#6B2B3E", fg: "#F5E8EC", accent: "#E8C86A" },
-  { bg: "#2A3D14", fg: "#EBF0E4", accent: "#F0C060" },
-  { bg: "#0D3350", fg: "#E4EFF8", accent: "#E8A84A" },
-];
 
 function hashString(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
   return h;
-}
-
-function genreColor(genre) {
-  const g = (genre || "").toLowerCase();
-  if (g.includes("novela") || g.includes("ficción") || g.includes("fiction") || g.includes("narrativa"))
-    return { color: "#1B3A4B", backgroundColor: "#1B3A4B1A" };
-  if (g.includes("filosofía") || g.includes("ensayo") || g.includes("philosophy"))
-    return { color: "#5C6B3D", backgroundColor: "#5C6B3D1A" };
-  if (g.includes("terror") || g.includes("horror") || g.includes("thriller") || g.includes("misterio"))
-    return { color: "#7A2E2E", backgroundColor: "#7A2E2E1A" };
-  if (g.includes("romance") || g.includes("amor") || g.includes("poesía") || g.includes("poetry"))
-    return { color: "#7A3D4E", backgroundColor: "#A26B7A1A" };
-  if (g.includes("historia") || g.includes("history") || g.includes("biografía") || g.includes("memoir"))
-    return { color: "#8A5A1A", backgroundColor: "#C8924A1A" };
-  if (g.includes("ciencia") || g.includes("sci-fi") || g.includes("tecnología") || g.includes("divulgación"))
-    return { color: "#1F3933", backgroundColor: "#1F39331A" };
-  if (g.includes("autoayuda") || g.includes("desarrollo") || g.includes("psicología") || g.includes("bienestar"))
-    return { color: "#544875", backgroundColor: "#5448751A" };
-  return { color: palette.inkFaint, backgroundColor: palette.bgSoft };
 }
 
 function BookCoverPlaceholder({ title = "", author = "", width = 56, height = 80, style = {} }) {
@@ -1271,8 +455,8 @@ function StarRating({ value, onChange, size = 16, readOnly = false }) {
         >
           <Star
             size={size}
-            fill={n <= value ? "#E07B1A" : "transparent"}
-            color={n <= value ? "#E07B1A" : palette.border}
+            fill={n <= value ? palette.amberRich : "transparent"}
+            color={n <= value ? palette.amberRich : palette.border}
             strokeWidth={1.5}
           />
         </button>
@@ -1407,7 +591,7 @@ function SubTabBar({ tabs, active, onChange }) {
   );
 }
 
-function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, pet, onOpenPet }) {
+function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, onOpenPet }) {
   return (
     <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}`, paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -1420,12 +604,12 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
             fontSize: "2rem",
             lineHeight: 1,
             letterSpacing: "-0.02em",
-            color: palette.bg === PALETTE_DARK.bg ? "#F5EDE0" : "#A44B3F",
+            color: palette.bg === PALETTE_DARK.bg ? palette.ink : palette.accentSoft,
             userSelect: "none",
           }}
         >f</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: "3px", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "999px", padding: "3px 10px 3px 8px", fontFamily: "system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 600, color: palette.amber ?? "#C8924A" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "3px", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "999px", padding: "3px 10px 3px 8px", fontFamily: "system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 600, color: palette.amber }}>
             💎 {gemBalance ?? 0}
           </span>
           <button
@@ -1436,7 +620,7 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
           >
             <Bell size={22} color={palette.inkSoft} strokeWidth={1.8} />
             {unreadNotifs > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: "999px", fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "system-ui, sans-serif" }}>
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: "999px", fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "system-ui, sans-serif" }}>
                 {unreadNotifs > 9 ? "9+" : unreadNotifs}
               </span>
             )}
@@ -1460,7 +644,7 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
                   padding: "0.4rem 1rem", borderRadius: "999px",
                   border: `1px solid ${active ? (isAdd ? palette.accent + "55" : palette.accent + "55") : "transparent"}`,
                   backgroundColor: active ? (isAdd ? palette.accent : palette.accent) : "transparent",
-                  color: active ? "#fff" : palette.inkSoft,
+                  color: active ? palette.onAccent : palette.inkSoft,
                   cursor: "pointer", ...display, fontSize: "0.85rem", fontWeight: active ? 600 : 400,
                   whiteSpace: "nowrap", transition: "all 0.15s",
                 }}
@@ -1468,7 +652,7 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <Icon size={13} strokeWidth={active ? 2.5 : 2} />
                   {badge > 0 && (
-                    <span style={{ position: "absolute", top: -5, right: -7, backgroundColor: "#e53e3e", color: "#fff", borderRadius: "999px", fontSize: "0.5rem", fontWeight: 700, minWidth: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", fontFamily: "system-ui, sans-serif" }}>
+                    <span style={{ position: "absolute", top: -5, right: -7, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: "999px", fontSize: "0.5rem", fontWeight: 700, minWidth: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", fontFamily: "system-ui, sans-serif" }}>
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
@@ -1479,12 +663,12 @@ function AppHeader({ tab, setTab, user, onLogout, pendingCount, unreadMessages, 
           })}
         </div>
       </div>
-      <div style={{ height: 2, background: "linear-gradient(to right, #7A2E2E, #C8924A55, transparent)" }} />
+      <div style={{ height: 2, background: `linear-gradient(to right, ${BRAND.wine}, ${BRAND.amber}55, transparent)` }} />
     </header>
   );
 }
 
-function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onAddPress, pet, onOpenPet }) {
+function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }) {
   return (
     <nav
       className="sm:hidden fixed bottom-0 left-0 right-0 z-20 flex items-center"
@@ -1512,7 +696,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
             {isCenter ? (
               <div style={{
                 width: 52, height: 52, borderRadius: "50%",
-                background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)",
+                background: BRAND.gradient,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 boxShadow: "0 4px 14px rgba(122, 46, 46, 0.4)",
                 marginBottom: 1, overflow: "hidden",
@@ -1520,7 +704,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
                 {pet ? (
                   <img src={petImageSrc(pet.pet_type)} alt="" className="pet-sprite-img" style={{ width: 42, height: 42, objectFit: "contain", display: "block" }} />
                 ) : (
-                  <PawPrint size={24} color="#fff" strokeWidth={2.5} />
+                  <PawPrint size={24} color={palette.onAccent} strokeWidth={2.5} />
                 )}
               </div>
             ) : (
@@ -1532,14 +716,14 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
                 transition: "background-color 200ms ease",
               }}>
                 <span style={{ position: "relative", display: "inline-flex" }}>
-                  <Icon size={21} strokeWidth={active ? 2.2 : 1.8} color={active ? palette.accent : "#8A7B6E"} style={{ transition: "color 200ms ease" }} />
+                  <Icon size={21} strokeWidth={active ? 2.2 : 1.8} color={active ? palette.accent : palette.inkFaint} style={{ transition: "color 200ms ease" }} />
                   {badge > 0 && (
-                    <span style={{ position: "absolute", top: -4, right: -6, backgroundColor: "#e53e3e", color: "#fff", borderRadius: "999px", fontSize: "0.5rem", fontWeight: 700, minWidth: 13, height: 13, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", fontFamily: "system-ui, sans-serif" }}>
+                    <span style={{ position: "absolute", top: -4, right: -6, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: "999px", fontSize: "0.5rem", fontWeight: 700, minWidth: 13, height: 13, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", fontFamily: "system-ui, sans-serif" }}>
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
                 </span>
-                <span style={{ fontFamily: "Fraunces, serif", fontSize: "11px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.accent : "#8A7B6E", transition: "color 200ms ease" }}>{t.label}</span>
+                <span style={{ fontFamily: "Fraunces, serif", fontSize: "11px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.accent : palette.inkFaint, transition: "color 200ms ease" }}>{t.label}</span>
               </div>
             )}
           </button>
@@ -1746,7 +930,7 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
                 fontSize: "14px",
                 fontWeight: active ? 600 : 400,
                 backgroundColor: active ? palette.accent : palette.bgSoft,
-                color: active ? "#FFFFFF" : palette.inkSoft,
+                color: active ? palette.onAccent : palette.inkSoft,
                 border: `1px solid ${active ? palette.accent : palette.borderSoft}`,
                 minHeight: 34,
                 cursor: "pointer",
@@ -1884,7 +1068,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
               { id: "wish",         label: "Quiero leer" },
               { id: "read",         label: "Leído" },
             ].map(({ id, label }) => (
-              <button key={id} onClick={() => setPickedStatus(id)} style={{ padding: "0.5rem 1.1rem", borderRadius: "999px", border: `1.5px solid ${pickedStatus === id ? palette.accent : palette.border}`, backgroundColor: pickedStatus === id ? palette.accent : palette.bgCard, color: pickedStatus === id ? "#FFFFFF" : palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: pickedStatus === id ? 600 : 400, cursor: "pointer", transition: "all 0.12s" }}>
+              <button key={id} onClick={() => setPickedStatus(id)} style={{ padding: "0.5rem 1.1rem", borderRadius: "999px", border: `1.5px solid ${pickedStatus === id ? palette.accent : palette.border}`, backgroundColor: pickedStatus === id ? palette.accent : palette.bgCard, color: pickedStatus === id ? palette.onAccent : palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: pickedStatus === id ? 600 : 400, cursor: "pointer", transition: "all 0.12s" }}>
                 {label}
               </button>
             ))}
@@ -1986,7 +1170,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
                       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.15rem", flexWrap: "wrap" }}>
                         {book.year && <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", color: palette.inkFaint }}>{book.year}</span>}
                         {inBuscalibre && (
-                          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "10px", fontWeight: 600, color: "#2D6A4F", backgroundColor: "#D8F3DC", borderRadius: "4px", padding: "1px 5px", lineHeight: 1.4 }}>
+                          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "10px", fontWeight: 600, color: palette.success, backgroundColor: palette.bgSoft, borderRadius: "4px", padding: "1px 5px", lineHeight: 1.4 }}>
                             ✓ Buscalibre
                           </span>
                         )}
@@ -2023,7 +1207,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
   );
 }
 
-function AddBookView({ onAdd, setTab, isOnline = true }) {
+function AddBookView({ onAdd, setTab }) {
   const [mode, setMode] = useState("search");
   const [error, setError] = useState("");
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
@@ -2154,7 +1338,7 @@ function BookForm({ form, setForm, onReadSelected }) {
     width: "100%",
     padding: "12px 16px",
     backgroundColor: palette.bgCard,
-    border: `1.5px solid #D4C8BC`,
+    border: `1.5px solid ${palette.border}`,
     borderRadius: "10px",
     fontSize: "1rem",
     color: palette.ink,
@@ -2164,7 +1348,7 @@ function BookForm({ form, setForm, onReadSelected }) {
   const labelStyle = {
     ...display,
     fontSize: "0.78rem",
-    color: "#8A7B6E",
+    color: palette.inkFaint,
     fontWeight: 500,
     marginBottom: "0.3rem",
     display: "block",
@@ -2265,7 +1449,7 @@ function BookForm({ form, setForm, onReadSelected }) {
                   fontSize: "0.88rem",
                   fontWeight: active ? 600 : 400,
                   backgroundColor: active ? meta.color : "transparent",
-                  color: active ? "#fff" : palette.inkSoft,
+                  color: active ? palette.onAccent : palette.inkSoft,
                   border: `1px solid ${active ? meta.color : palette.border}`,
                 }}
               >
@@ -2335,7 +1519,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
 
   useEffect(() => {
     if (!userId || !book?.id) return;
-    fetchQuotesForBook(userId, book.id).then(setBookQuotes).catch(() => {});
+    fetchQuotesForBook(userId, book.id).then(setBookQuotes).catch((err) => console.error("[quotes] no se pudieron cargar las frases del libro:", err));
   }, [userId, book?.id]);
 
   useEffect(() => {
@@ -2603,7 +1787,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
                   style={{
                     ...display,
                     fontSize: "0.78rem",
-                    color: "#8A7B6E",
+                    color: palette.inkFaint,
                     fontWeight: 500,
                     display: "block",
                     marginBottom: "0.4rem",
@@ -2626,7 +1810,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
                   style={{
                     ...display,
                     fontSize: "0.78rem",
-                    color: "#8A7B6E",
+                    color: palette.inkFaint,
                     fontWeight: 500,
                     display: "block",
                     marginBottom: "0.4rem",
@@ -2762,8 +1946,6 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
   );
 }
 
-// (movido a src/components/ (AddToListSheet, ListFormModal, ListDetailModal, ReadDateModal, ListsSection))
-
 // Recomendaciones colaborativas (Matrix Factorization / SVD híbrido).
 // Vive por separado de RecommendFlow (el quiz por mood, más abajo) para no
 // tocar su lógica: se monta arriba, en el tab "Para ti", y si falla o no
@@ -2780,18 +1962,10 @@ function CollaborativeRecommendations({ user, onAdd }) {
 
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (!token) { if (!cancelled) setItems([]); return; }
-
-        const res = await fetch(`/api/recommendations?userId=${user.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`status ${res.status}`);
-        const data = await res.json();
+        const data = await fetchCollaborativeRecommendations();
         if (cancelled) return;
-        setItems(data.items || []);
-        setPersonalized(!!data.personalized);
+        setItems(data.items);
+        setPersonalized(data.personalized);
       } catch (err) {
         console.warn("[CollaborativeRecommendations] fallback silencioso:", err.message);
         if (!cancelled) setItems([]);
@@ -2810,12 +1984,12 @@ function CollaborativeRecommendations({ user, onAdd }) {
       genre: item.genres?.[0] || "",
       summary: "",
       moodTags: [],
-      coverUrl: item.cover_url || null,
+      coverUrl: item.coverUrl || null,
       rating: 0,
       review: "",
       addedAt: Date.now(),
     });
-    setAddedIds((prev) => new Set([...prev, item.book_id]));
+    setAddedIds((prev) => new Set([...prev, item.bookId]));
   }
 
   if (items === null) {
@@ -2840,11 +2014,11 @@ function CollaborativeRecommendations({ user, onAdd }) {
       </p>
       <div style={{ display: "flex", gap: "0.9rem", overflowX: "auto", paddingBottom: "0.4rem" }}>
         {items.map((item) => {
-          const added = addedIds.has(item.book_id);
+          const added = addedIds.has(item.bookId);
           return (
-            <div key={item.book_id} style={{ width: 130, flexShrink: 0 }}>
+            <div key={item.bookId} style={{ width: 130, flexShrink: 0 }}>
               <div style={{ position: "relative", width: 130, height: 180, borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 14px rgba(0,0,0,0.14)" }}>
-                <BookCoverImage coverUrl={item.cover_url} title={item.title} author={item.author} genres={item.genres} compact={false} />
+                <BookCoverImage coverUrl={item.coverUrl} title={item.title} author={item.author} genres={item.genres} compact={false} />
               </div>
               <p style={{ ...display, fontSize: "0.85rem", fontWeight: 700, color: palette.ink, marginTop: "0.4rem", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
                 {item.title}
@@ -2903,7 +2077,7 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
     setError("");
     try {
       const ans = answersOverride ?? answers;
-      const res = await getRecommendations(books, ans);
+      const res = await getMoodRecommendations(books, ans);
       setResults(res);
     } catch (e) {
       console.error(e);
@@ -2995,7 +2169,7 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
               style={{
                 ...display,
                 fontSize: "0.85rem",
-                color: "#8A7B6E",
+                color: palette.inkFaint,
                 fontWeight: 500,
                 marginBottom: "0.75rem",
               }}
@@ -3144,7 +2318,7 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
                         fontSize: "0.85rem",
                         fontWeight: 500,
                         backgroundColor: isAdded ? "transparent" : palette.mauve,
-                        color: isAdded ? palette.mauve : "#fff",
+                        color: isAdded ? palette.mauve : palette.onAccent,
                         border: `1px solid ${palette.mauve}`,
                         opacity: isAdded ? 0.7 : 1,
                         cursor: isAdded ? "default" : "pointer",
@@ -3219,9 +2393,9 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
     padding: "12px 24px",
     borderRadius: "24px",
     minWidth: "160px",
-    border: selected ? "none" : `1px solid #D4C9B5`,
-    backgroundColor: selected ? "#6B1E2A" : palette.bgSoft,
-    color: selected ? "#FFFFFF" : palette.ink,
+    border: selected ? "none" : `1px solid ${palette.border}`,
+    backgroundColor: selected ? BRAND.wineDeep : palette.bgSoft,
+    color: selected ? palette.onAccent : palette.ink,
     fontFamily: "'EB Garamond', serif",
     fontSize: "15px",
     fontWeight: 500,
@@ -3378,7 +2552,7 @@ function AuthView({ onLogin }) {
     width: "100%",
     padding: "12px 16px",
     backgroundColor: palette.bgSoft,
-    border: `1.5px solid #D4C8BC`,
+    border: `1.5px solid ${palette.border}`,
     borderRadius: "10px",
     fontSize: "1rem",
     color: palette.ink,
@@ -3389,7 +2563,7 @@ function AuthView({ onLogin }) {
   const labelStyle = {
     ...display,
     fontSize: "0.78rem",
-    color: "#8A7B6E",
+    color: palette.inkFaint,
     fontWeight: 500,
     marginBottom: "0.3rem",
     display: "block",
@@ -3447,7 +2621,7 @@ function AuthView({ onLogin }) {
         const ref = localStorage.getItem("folio_ref");
         if (!ref) return null;
         return (
-          <div style={{ width: "100%", maxWidth: 420, marginBottom: "1rem", padding: "0.7rem 1rem", backgroundColor: "#C8924A14", border: "1px solid #C8924A40", borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <div style={{ width: "100%", maxWidth: 420, marginBottom: "1rem", padding: "0.7rem 1rem", backgroundColor: `${BRAND.amber}14`, border: `1px solid ${BRAND.amber}40`, borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <span style={{ fontSize: "1.1rem" }}>👋</span>
             <p style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft, margin: 0 }}>
               <strong style={{ color: palette.ink }}>@{ref}</strong> te invitó a Folio
@@ -3567,7 +2741,7 @@ function AuthView({ onLogin }) {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder={mode === "register" ? "Mínimo 4 caracteres" : "Tu contraseña"}
+                placeholder={mode === "register" ? "Mínimo 6 caracteres" : "Tu contraseña"}
                 style={inputStyle}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
                 onKeyDown={(e) => { if (e.key === "Enter" && mode === "login") handleSubmit(); }}
@@ -3613,7 +2787,7 @@ function AuthView({ onLogin }) {
               minHeight: "48px",
               padding: "0.9rem",
               backgroundColor: loading ? palette.inkSoft : palette.accent,
-              color: "#FFFFFF",
+              color: palette.onAccent,
               borderRadius: "12px",
               fontWeight: 600,
               fontSize: "1rem",
@@ -3695,7 +2869,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
   useEffect(() => {
     if (!def) return;
     const end = Date.now() + 2000;
-    const colors = ["#7A2E2E", "#C8924A", "#A26B7A", "#1B3A4B", "#5C6B3D"];
+    const colors = [...BRAND.confetti.slice(0, 2), PALETTE_LIGHT.mauve, PALETTE_LIGHT.slate, PALETTE_LIGHT.sage];
     (function frame() {
       confetti({ particleCount: 6, angle: 60, spread: 55, origin: { x: 0 }, colors });
       confetti({ particleCount: 6, angle: 120, spread: 55, origin: { x: 1 }, colors });
@@ -3769,8 +2943,8 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
           onClick={onClose}
           style={{
             ...display, fontWeight: 600, fontSize: "0.95rem",
-            background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)",
-            color: "#fff", border: "none", borderRadius: "999px",
+            background: BRAND.gradient,
+            color: palette.onAccent, border: "none", borderRadius: "999px",
             padding: "0.75rem 2rem", cursor: "pointer", width: "100%",
             boxShadow: "0 4px 16px rgba(122,46,46,0.35)",
             marginBottom: "0.65rem",
@@ -3787,7 +2961,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
               <div style={{
                 width: 36, height: 36, borderRadius: "50%",
                 backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center",
-                color: "#fff", ...display, fontSize: "0.9rem", fontWeight: 700, flexShrink: 0,
+                color: palette.onAccent, ...display, fontSize: "0.9rem", fontWeight: 700, flexShrink: 0,
               }}>
                 {(userName || "?")[0].toUpperCase()}
               </div>
@@ -3803,7 +2977,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
               onClick={handlePeakInvite}
               style={{
                 ...display, fontWeight: 600, fontSize: "0.9rem",
-                backgroundColor: palette.accent, color: "#fff",
+                backgroundColor: palette.accent, color: palette.onAccent,
                 border: "none", borderRadius: "999px",
                 padding: "0.65rem 0", width: "100%",
                 cursor: "pointer", marginBottom: "0.4rem",
@@ -3861,8 +3035,8 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
         style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bg, borderRadius: "1.25rem 1.25rem 0 0", padding: "1.75rem 1.5rem 2rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.2)", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0.85rem" }}>
-          <div style={{ width: 76, height: 76, borderRadius: "50%", background: isUnlocked ? "linear-gradient(135deg, #7A2E2E, #C8924A)" : palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isUnlocked ? "0 6px 24px rgba(122,46,46,0.3)" : "none" }}>
-            <IconComp size={34} color={isUnlocked ? "#fff" : palette.inkFaint} strokeWidth={1.5} />
+          <div style={{ width: 76, height: 76, borderRadius: "50%", background: isUnlocked ? BRAND.gradient : palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isUnlocked ? "0 6px 24px rgba(122,46,46,0.3)" : "none" }}>
+            <IconComp size={34} color={isUnlocked ? palette.onAccent : palette.inkFaint} strokeWidth={1.5} />
           </div>
           <div>
             <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2 }}>{def.name}</p>
@@ -3870,8 +3044,8 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
               {isUnlocked ? `Desbloqueado el ${dateStr}` : "Aún no desbloqueado"}
             </p>
           </div>
-          <div style={{ backgroundColor: isUnlocked ? "#C8924A10" : palette.bgSoft, border: `1px solid ${isUnlocked ? "#C8924A30" : palette.borderSoft}`, borderRadius: 12, padding: "0.85rem 1.1rem", width: "100%", textAlign: "left" }}>
-            <p style={{ ...display, fontSize: "0.75rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.3rem" }}>
+          <div style={{ backgroundColor: isUnlocked ? `${BRAND.amber}10` : palette.bgSoft, border: `1px solid ${isUnlocked ? "${BRAND.amber}30" : palette.borderSoft}`, borderRadius: 12, padding: "0.85rem 1.1rem", width: "100%", textAlign: "left" }}>
+            <p style={{ ...display, fontSize: "0.75rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.3rem" }}>
               {isUnlocked ? "Lo conseguiste así" : "Qué necesitas"}
             </p>
             <p style={{ ...body, fontSize: "0.9rem", color: palette.ink, lineHeight: 1.5 }}>
@@ -3923,7 +3097,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
             <span style={{ ...display, fontSize: "0.85rem", fontWeight: 600, color: palette.amber }}>{pct}%</span>
           </div>
           <div style={{ height: 7, backgroundColor: palette.bgSoft, borderRadius: "999px", overflow: "hidden" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: "linear-gradient(90deg, #7A2E2E, #C8924A)", borderRadius: "999px", transition: "width 0.5s ease" }} />
+            <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${BRAND.wine}, ${BRAND.amber})`, borderRadius: "999px", transition: "width 0.5s ease" }} />
           </div>
         </div>
       )}
@@ -3931,7 +3105,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
         const defs = toShow.filter((d) => d.cat === cat);
         return (
           <div key={cat} style={{ marginBottom: "1.1rem" }}>
-            <p style={{ ...display, fontSize: "0.75rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.5rem" }}>{cat}</p>
+            <p style={{ ...display, fontSize: "0.75rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.5rem" }}>{cat}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
               {defs.map((def) => {
                 const isUnlocked = !!unlockedMap[def.key];
@@ -3954,12 +3128,12 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
                     onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = isUnlocked ? "0 2px 6px rgba(200,146,74,0.15)" : "none"; }}
                   >
                     {!isUnlocked && (
-                      <Lock size={10} color="#C5B9A8" style={{ position: "absolute", top: 5, right: 5 }} />
+                      <Lock size={10} color={palette.border} style={{ position: "absolute", top: 5, right: 5 }} />
                     )}
                     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "0.25rem", height: "1.6rem" }}>
-                      <IconComp size={28} color={isUnlocked ? "#C8842B" : "#C5B9A8"} strokeWidth={1.5} />
+                      <IconComp size={28} color={isUnlocked ? palette.amber : palette.border} strokeWidth={1.5} />
                     </div>
-                    <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.6rem", color: isUnlocked ? palette.ink : "#B0A898", fontWeight: isUnlocked ? 600 : 400, lineHeight: 1.2, marginBottom: "0.1rem" }}>
+                    <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.6rem", color: isUnlocked ? palette.ink : palette.inkFaint, fontWeight: isUnlocked ? 600 : 400, lineHeight: 1.2, marginBottom: "0.1rem" }}>
                       {def.name}
                     </p>
                     {isUnlocked && date && (
@@ -3981,14 +3155,11 @@ const DAY_HEADERS_ES = ["D", "L", "M", "Mi", "J", "V", "S"];
 
 function getCalColor(pages) {
   if (!pages || pages === 0) return null;
-  const dark = palette.bg === PALETTE_DARK.bg;
-  const cols = dark
-    ? [null, "#1e3a12", "#2d5a1a", "#3d8f1f", "#5bc234"]
-    : [null, "#D4E6C3", "#9DC07F", "#5C8A3E", "#3D6B28"];
-  if (pages <= 5)  return cols[1];
-  if (pages <= 15) return cols[2];
-  if (pages <= 30) return cols[3];
-  return cols[4];
+  const cols = palette.bg === PALETTE_DARK.bg ? HEATMAP_COLORS.dark : HEATMAP_COLORS.light;
+  if (pages <= 5)  return cols[0];
+  if (pages <= 15) return cols[1];
+  if (pages <= 30) return cols[2];
+  return cols[3];
 }
 
 function ReadingHeatmap({ userId }) {
@@ -4144,8 +3315,8 @@ function ReadingHeatmap({ userId }) {
                     fontSize: "0.78rem",
                     fontWeight: isToday ? 700 : 400,
                     color: bg
-                      ? (darkBg ? "#fff" : palette.ink)
-                      : (isFuture ? "#D4C9B5" : palette.inkFaint),
+                      ? (darkBg ? palette.onAccent : palette.ink)
+                      : (isFuture ? palette.border : palette.inkFaint),
                     lineHeight: 1,
                     userSelect: "none",
                   }}>
@@ -4162,10 +3333,7 @@ function ReadingHeatmap({ userId }) {
               {activeDaysThisMonth} {activeDaysThisMonth === 1 ? "día activo" : "días activos"} este mes
             </span>
             <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              {(palette.bg === PALETTE_DARK.bg
-                ? ["#1e3a12","#2d5a1a","#3d8f1f","#5bc234"]
-                : ["#D4E6C3","#9DC07F","#5C8A3E","#3D6B28"]
-              ).map(c => (
+              {(palette.bg === PALETTE_DARK.bg ? HEATMAP_COLORS.dark : HEATMAP_COLORS.light).map(c => (
                 <div key={c} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: c, flexShrink: 0 }} />
               ))}
             </div>
@@ -4177,9 +3345,8 @@ function ReadingHeatmap({ userId }) {
 }
 
 // ============ PROFILE VIEW ============
-// (movido a src/components/DeleteAccountModal.jsx)
 
-function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, theme = 'system', setTheme, pet, onRenamePet }) {
+function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme = 'system', setTheme }) {
   const [profile, setProfile] = useState({ username: "", bio: "", avatarUrl: null, coverUrl: null });
   const [displayName, setDisplayName] = useState(user.name || "");
   const [loading, setLoading] = useState(true);
@@ -4266,8 +3433,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
     setGeneratingWrap(true);
     try {
       const wrap = type === "annual"
-        ? await generateAnnualWrap(user.id, user.name, year)
-        : await generateMonthWrap(user.id, user.name, month, year);
+        ? await generateAnnualWrap(user.id, year)
+        : await generateMonthWrap(user.id, month, year);
       setWraps(prev => {
         const filtered = prev.filter(w => !(w.month === wrap.month && w.year === wrap.year && w.wrap_type === wrap.wrap_type));
         return [wrap, ...filtered];
@@ -4374,7 +3541,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
     width: "100%",
     padding: "12px 16px",
     backgroundColor: palette.bgCard,
-    border: `1.5px solid #D4C8BC`,
+    border: `1.5px solid ${palette.border}`,
     borderRadius: "10px",
     fontSize: "1rem",
     color: palette.ink,
@@ -4384,7 +3551,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
   const labelStyle = {
     ...display,
     fontSize: "0.78rem",
-    color: "#8A7B6E",
+    color: palette.inkFaint,
     fontWeight: 500,
     marginBottom: "0.3rem",
     display: "block",
@@ -4413,15 +3580,6 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
     ratedBooks.length > 0
       ? (ratedBooks.reduce((s, b) => s + b.rating, 0) / ratedBooks.length).toFixed(1)
       : null;
-  const byYear = {};
-  readBooks.forEach((b) => {
-    if (b.finishedAt) {
-      const yr = new Date(b.finishedAt).getFullYear();
-      byYear[yr] = (byYear[yr] || 0) + 1;
-    }
-  });
-  const yearEntries = Object.entries(byYear).sort((a, b) => Number(a[0]) - Number(b[0]));
-  const maxYearCount = yearEntries.length > 0 ? Math.max(...yearEntries.map(([, v]) => v)) : 0;
   const genreCounts = {};
   books.forEach((b) => {
     if (b.genre) {
@@ -4440,7 +3598,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
     <div style={{ maxWidth: "56rem", margin: "0 auto", paddingBottom: "2rem" }}>
 
       {/* ── Cover banner ── */}
-      <div style={{ position: "relative", height: 180, background: profile.coverUrl ? "none" : "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)" }}>
+      <div style={{ position: "relative", height: 180, background: profile.coverUrl ? "none" : BRAND.gradient }}>
         {profile.coverUrl && (
           <img src={profile.coverUrl} alt="portada" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         )}
@@ -4451,16 +3609,16 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
           onClick={() => !uploading && fileInput.current?.click()}
           className="group"
         >
-          <div style={{ padding: 3, borderRadius: "50%", background: "linear-gradient(135deg, #7A2E2E, #C8924A)", boxShadow: "0 4px 18px rgba(122,46,46,0.45)", border: `4px solid ${palette.bg}` }}>
+          <div style={{ padding: 3, borderRadius: "50%", background: BRAND.gradient, boxShadow: "0 4px 18px rgba(122,46,46,0.45)", border: `4px solid ${palette.bg}` }}>
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt="avatar" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: "#FFFFFF", fontFamily: "Fraunces, serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
             <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "rgba(42,31,26,0.45)" }}>
-              {uploading ? <Loader2 size={20} color="#fff" className="animate-spin" /> : <Camera size={18} color="#fff" />}
+              {uploading ? <Loader2 size={20} color={palette.onAccent} className="animate-spin" /> : <Camera size={18} color={palette.onAccent} />}
             </div>
           </div>
         </div>
@@ -4469,7 +3627,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
         <button
           onClick={() => coverFileInput.current?.click()}
           disabled={uploadingCover}
-          style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: "0.3rem", backgroundColor: "rgba(42,31,26,0.55)", backdropFilter: "blur(6px)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", borderRadius: "999px", padding: "0.35rem 0.75rem", cursor: "pointer", fontSize: "0.78rem", ...display, fontWeight: 500 }}
+          style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: "0.3rem", backgroundColor: "rgba(42,31,26,0.55)", backdropFilter: "blur(6px)", color: palette.onAccent, border: "1px solid rgba(255,255,255,0.25)", borderRadius: "999px", padding: "0.35rem 0.75rem", cursor: "pointer", fontSize: "0.78rem", ...display, fontWeight: 500 }}
         >
           {uploadingCover ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
           {uploadingCover ? "Subiendo…" : "Cambiar portada"}
@@ -4492,17 +3650,17 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
         {streak && streak.current_streak > 0 ? (
           <div className="streak-banner-active" style={{
             borderRadius: "14px", padding: "1rem 1.25rem",
-            background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)",
+            background: BRAND.gradient,
             display: "flex", alignItems: "center", gap: "1rem",
           }}>
             <Flame
               size={36}
-              color="#F4EDE0"
+              color={BRAND.cream}
               className={streak.current_streak > 7 ? "fire-pulse" : ""}
               style={{ flexShrink: 0 }}
             />
             <div style={{ flex: 1 }}>
-              <p style={{ ...display, fontWeight: 800, fontSize: "1.6rem", color: "#F4EDE0", lineHeight: 1, marginBottom: "0.15rem" }}>
+              <p style={{ ...display, fontWeight: 800, fontSize: "1.6rem", color: BRAND.cream, lineHeight: 1, marginBottom: "0.15rem" }}>
                 {streak.current_streak} {streak.current_streak === 1 ? "día" : "días"} de racha
               </p>
               <p style={{ ...body, fontSize: "0.82rem", color: "rgba(244,237,224,0.75)" }}>
@@ -4511,7 +3669,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
             </div>
             {streak.total_pages_read > 0 && (
               <div style={{ textAlign: "center", flexShrink: 0, backgroundColor: "rgba(244,237,224,0.15)", borderRadius: "10px", padding: "0.5rem 0.8rem" }}>
-                <p style={{ ...display, fontWeight: 800, fontSize: "1.2rem", color: "#F4EDE0", lineHeight: 1 }}>
+                <p style={{ ...display, fontWeight: 800, fontSize: "1.2rem", color: BRAND.cream, lineHeight: 1 }}>
                   {streak.total_pages_read.toLocaleString("es")}
                 </p>
                 <p style={{ ...body, fontSize: "0.65rem", color: "rgba(244,237,224,0.7)", marginTop: "0.1rem" }}>páginas</p>
@@ -4593,11 +3751,11 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
               </div>
             </div>
             {error && <p style={{ ...ts.body15, color: palette.accent, fontStyle: "italic", marginTop: "0.75rem" }}>{error}</p>}
-            {success && <p style={{ ...ts.body15, color: "#5a7a5a", fontStyle: "italic", marginTop: "0.75rem" }}>{success}</p>}
+            {success && <p style={{ ...ts.body15, color: palette.success, fontStyle: "italic", marginTop: "0.75rem" }}>{success}</p>}
             <button
               onClick={async () => { const ok = await handleSave(); if (ok) setTimeout(() => setEditModalOpen(false), 800); }}
               disabled={saving}
-              style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : "#FFFFFF", border: "none", borderRadius: "12px", fontSize: "1rem", fontFamily: "Fraunces, serif", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
+              style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : palette.onAccent, border: "none", borderRadius: "12px", fontSize: "1rem", fontFamily: "Fraunces, serif", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
             >
               {saving ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -4662,9 +3820,9 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
             {[
-              { label: "Leídos",   value: readBooks.length,    numColor: "#5C6B3D", bg: "#5C6B3D0D" },
-              { label: "Leyendo",  value: readingBooks.length, numColor: "#A4493D", bg: "#C8924A0D" },
-              { label: "Por leer", value: wantBooks.length,    numColor: "#1B3A4B", bg: "#1B3A4B0D" },
+              { label: "Leídos",   value: readBooks.length,    numColor: palette.sage, bg: `${palette.sage}0D` },
+              { label: "Leyendo",  value: readingBooks.length, numColor: palette.accentSoft, bg: `${BRAND.amber}0D` },
+              { label: "Por leer", value: wantBooks.length,    numColor: palette.slate, bg: `${palette.slate}0D` },
               { label: "En total", value: books.length,        numColor: palette.ink, bg: palette.bgCard },
             ].map(({ label, value, numColor, bg }) => (
               <div
@@ -4687,8 +3845,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
           {streak && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.5rem" }}>
               {[
-                { label: "Racha actual", value: `${streak.current_streak || 0}`, unit: "días", numColor: "#7A2E2E", bg: "#C8924A0D" },
-                { label: "Mejor racha",  value: `${streak.longest_streak  || 0}`, unit: "días", numColor: "#8A5A1A", bg: palette.bgCard },
+                { label: "Racha actual", value: `${streak.current_streak || 0}`, unit: "días", numColor: BRAND.wine, bg: `${BRAND.amber}0D` },
+                { label: "Mejor racha",  value: `${streak.longest_streak  || 0}`, unit: "días", numColor: palette.amberInk, bg: palette.bgCard },
               ].map(({ label, value, unit, numColor, bg }) => (
                 <div key={label} style={{ backgroundColor: bg, borderRadius: "14px", padding: "1rem", display: "flex", flexDirection: "column", justifyContent: "flex-end", minHeight: "88px" }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", marginBottom: "0.4rem" }}>
@@ -4706,8 +3864,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
           {avgRating && (
             <div
               style={{
-                backgroundColor: "#C8924A14",
-                border: "1px solid #C8924A28",
+                backgroundColor: `${BRAND.amber}14`,
+                border: `1px solid ${BRAND.amber}28`,
                 borderRadius: "12px",
                 padding: "0.9rem 1rem",
                 display: "flex",
@@ -4716,9 +3874,9 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
                 marginBottom: "1.5rem",
               }}
             >
-              <Star size={20} color="#E07B1A" fill="#E07B1A" />
+              <Star size={20} color={palette.amberRich} fill={palette.amberRich} />
               <div>
-                <span style={{ ...display, fontSize: "1.5rem", fontWeight: 800, color: "#8A5A1A" }}>{avgRating}</span>
+                <span style={{ ...display, fontSize: "1.5rem", fontWeight: 800, color: palette.amberInk }}>{avgRating}</span>
                 <span style={{ ...body, fontSize: "0.84rem", color: palette.inkSoft, marginLeft: "0.4rem" }}>
                   promedio · {ratedBooks.length} {ratedBooks.length === 1 ? "calificación" : "calificaciones"}
                 </span>
@@ -4854,20 +4012,20 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
               disabled={generatingWrap}
               style={{
                 width: "100%", minHeight: "80px", padding: "1.1rem 1.25rem",
-                background: "linear-gradient(120deg, #6B1E2A 0%, #7A2E2E 40%, #C8924A 100%)",
+                background: BRAND.gradientWrappedCta,
                 borderRadius: 14, border: "none", cursor: "pointer",
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 boxShadow: "0 4px 20px rgba(107,30,42,0.35)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-                <span className="sparkle-anim"><Sparkles size={20} color="#F4EDE0" /></span>
+                <span className="sparkle-anim"><Sparkles size={20} color={BRAND.cream} /></span>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", fontWeight: 500, color: "rgba(244,237,224,0.65)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.2rem" }}>{year}</div>
-                  <div style={{ fontFamily: "Fraunces, serif", fontSize: "1.1rem", fontWeight: 700, fontStyle: "italic", color: "#F4EDE0" }}>Wrapped</div>
+                  <div style={{ fontFamily: "Fraunces, serif", fontSize: "1.1rem", fontWeight: 700, fontStyle: "italic", color: BRAND.cream }}>Wrapped</div>
                 </div>
               </div>
-              <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 700, color: "#F4EDE0" }}>
+              <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 700, color: BRAND.cream }}>
                 {generatingWrap ? "Generando…" : annualWrap ? "Ver mi Wrapped →" : "Generar →"}
               </span>
             </button>
@@ -4876,7 +4034,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
       })()}
 
       {activeWrap && (
-        <WrappedStoryExperience wrap={activeWrap} userName={user.name} onClose={() => setActiveWrap(null)} />
+        <WrappedStoryExperience wrap={activeWrap} onClose={() => setActiveWrap(null)} />
       )}
 
       {/* Mis listas */}
@@ -4952,7 +4110,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, setTab, onLogout
         <button onClick={onLogout} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.82rem", color: palette.inkFaint }}>
           Cerrar sesión
         </button>
-        <button onClick={() => setDeleteModalOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.78rem", color: "#c0392b", opacity: 0.75 }}>
+        <button onClick={() => setDeleteModalOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.78rem", color: palette.danger, opacity: 0.75 }}>
           Eliminar cuenta
         </button>
       </div>
@@ -4987,18 +4145,23 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
 
   useEffect(() => {
     let channelRef = null;
+    let cancelled = false;
     async function init() {
       setLoading(true);
       const id = await getOrCreateConversation(user.id, friend.id);
+      if (cancelled) return;
       setConvId(id);
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("messages")
         .select("*")
         .eq("conversation_id", id)
         .order("created_at", { ascending: true });
+      if (error) console.error("[chat] no se pudieron cargar los mensajes:", error.message);
+      if (cancelled) return;
       setMessages(data || []);
       await markConversationRead(id, user.id);
+      if (cancelled) return;
       onMessagesRead?.();
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -5025,8 +4188,11 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
         })
         .subscribe();
     }
-    init();
-    return () => { if (channelRef) supabase.removeChannel(channelRef); };
+    init().catch((err) => console.error("[chat] init falló:", err));
+    return () => {
+      cancelled = true;
+      if (channelRef) supabase.removeChannel(channelRef);
+    };
   }, [friend.id]);
 
   useEffect(() => {
@@ -5050,15 +4216,20 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
     };
     setMessages((prev) => [...prev, tempMsg]);
     try {
+      // TODO(audit): checkAchievements corre antes de que exista el mensaje, así que
+      // "first_message" se evalúa con datos viejos (se otorga en el siguiente envío).
       checkAchievements(user.id, user.name);
-      const { data: saved } = await supabase
+      const { data: saved, error: sendErr } = await supabase
         .from("messages")
         .insert({ conversation_id: convId, sender_id: user.id, content })
         .select()
         .single();
+      if (sendErr) throw sendErr;
       if (saved) setMessages((prev) => prev.map((m) => m.id === tempId ? saved : m));
-      await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
-    } catch {
+      const { error: convErr } = await supabase.from("conversations").update({ last_message_at: new Date().toISOString() }).eq("id", convId);
+      if (convErr) console.error("[chat] no se pudo actualizar last_message_at:", convErr.message);
+    } catch (err) {
+      console.error("[chat] no se pudo enviar el mensaje:", err?.message || err);
       setMessages((prev) => prev.filter((m) => m.id !== tempId));
       setText(content);
     } finally {
@@ -5181,9 +4352,9 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
                       style={{
                         padding: "0.5rem 0.85rem",
                         borderRadius: mine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                        backgroundColor: mine ? palette.accent : "#FFFFFF",
+                        backgroundColor: mine ? palette.accent : palette.bgCard,
                         border: mine ? "none" : `1px solid ${palette.borderSoft}`,
-                        color: mine ? "#F4EDE0" : palette.ink,
+                        color: mine ? BRAND.cream : palette.ink,
                         ...body,
                         fontSize: "0.95rem",
                         lineHeight: 1.45,
@@ -5315,7 +4486,7 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
               height: 38,
               borderRadius: "50%",
               backgroundColor: text.trim() ? palette.accent : palette.bgSoft,
-              color: text.trim() ? "#F4EDE0" : palette.inkFaint,
+              color: text.trim() ? BRAND.cream : palette.inkFaint,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -5346,21 +4517,6 @@ function monthKey(b) {
   const d = bookFinishedDate(b);
   if (!d || isNaN(d)) return null;
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function readingStreak(books) {
-  const readB = books.filter((b) => b.status === "read");
-  const months = new Set(readB.map(monthKey).filter(Boolean));
-  let count = 0;
-  const now = new Date();
-  let y = now.getFullYear(), m = now.getMonth() + 1;
-  for (let i = 0; i < 120; i++) {
-    const key = `${y}-${String(m).padStart(2, "0")}`;
-    if (!months.has(key)) break;
-    count++;
-    m--; if (m === 0) { m = 12; y--; }
-  }
-  return count;
 }
 
 const MONTH_ABBR = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -5415,8 +4571,6 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
   const fAvg     = fRated.length ? fRated.reduce((s, b) => s + b.rating, 0) / fRated.length : 0;
   const uGenres  = new Set([...uRead, ...uReading].filter((b) => b.genre).map((b) => b.genre));
   const fGenres  = new Set([...fRead, ...fReading].filter((b) => b.genre).map((b) => b.genre));
-  const uStreak  = readingStreak(userBooks);
-  const fStreak  = readingStreak(friendBooks);
 
   const uMonths  = booksPerMonth(userBooks);
   const fMonths  = booksPerMonth(friendBooks);
@@ -5435,8 +4589,8 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
   const friendName = (friend.name || friend.nombre || "Amigo").split(" ")[0];
   const userName   = (user.name || "Tú").split(" ")[0];
 
-  const U_COLOR = "#7A2E2E";
-  const F_COLOR = "#1B3A4B";
+  const U_COLOR = BRAND.wine;
+  const F_COLOR = palette.slate;
 
   function ColHeader({ name, avatarUrl, initials, color }) {
     return (
@@ -5444,7 +4598,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
         {avatarUrl ? (
           <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: `3px solid ${color}` }} />
         ) : (
-          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
         )}
         <span style={{ ...display, fontSize: "0.82rem", fontWeight: 600, color: palette.ink }}>{name}</span>
       </div>
@@ -5474,7 +4628,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
     );
   }
 
-  const secLabel = { ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.65rem" };
+  const secLabel = { ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.65rem" };
 
   const uInitials = (user.name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   const fInitials = (friend.name || friend.nombre || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -5687,7 +4841,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
 
 // ── Expanded stat drawer ─────────────────────────────────────────────────────
 function StatExpandedView({ stat, friendBooks, friendName, onClose }) {
-  const secLabel = { ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.65rem" };
+  const secLabel = { ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.65rem" };
 
   let books = [];
   let title = "";
@@ -5838,8 +4992,6 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
     friendRating: fBookMap[`${norm(b.title)}::${norm(b.author)}`]?.rating,
   }));
 
-  const trunc = (s, n = 11) => s && s.length > n ? s.slice(0, n) + "…" : s;
-
   if (userRead.length === 0 && friendRead.length === 0) return null;
 
   return (
@@ -5847,7 +4999,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
       {/* Score header */}
       <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
         <div style={{ flex: 1 }}>
-          <p style={{ ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.25rem" }}>Compatibilidad literaria</p>
+          <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.25rem" }}>Compatibilidad literaria</p>
           <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, lineHeight: 1.3 }}>{label}</p>
         </div>
         <div style={{ textAlign: "center", flexShrink: 0 }}>
@@ -5857,41 +5009,41 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
 
       {/* Score bar */}
       <div style={{ height: 6, backgroundColor: palette.bgSoft, borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ width: `${score}%`, height: "100%", background: "linear-gradient(90deg, #7A2E2E, #C8924A)", borderRadius: 999, transition: "width 0.6s ease" }} />
+        <div style={{ width: `${score}%`, height: "100%", background: `linear-gradient(90deg, ${BRAND.wine}, ${BRAND.amber})`, borderRadius: 999, transition: "width 0.6s ease" }} />
       </div>
 
       {/* Venn diagram */}
       {(uGenres.size > 0 || fGenres.size > 0) && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", width: "100%", paddingLeft: 4, paddingRight: 4 }}>
-            <p style={{ ...body, fontSize: "0.72rem", color: "#7A2E2E", fontWeight: 600 }}>Tú</p>
-            <p style={{ ...body, fontSize: "0.72rem", color: "#1B3A4B", fontWeight: 600, textAlign: "right" }}>{friendName}</p>
+            <p style={{ ...body, fontSize: "0.72rem", color: BRAND.wine, fontWeight: 600 }}>Tú</p>
+            <p style={{ ...body, fontSize: "0.72rem", color: palette.slate, fontWeight: 600, textAlign: "right" }}>{friendName}</p>
           </div>
           <svg viewBox="0 0 320 110" width="100%" style={{ maxWidth: 320, overflow: "visible" }}>
             <defs>
               <clipPath id="lc-left"><circle cx="120" cy="55" r="62" /></clipPath>
               <clipPath id="lc-right"><circle cx="200" cy="55" r="62" /></clipPath>
             </defs>
-            <circle cx="120" cy="55" r="62" fill="#7A2E2E" fillOpacity="0.15" stroke="#7A2E2E" strokeOpacity="0.5" strokeWidth="1.5" />
-            <circle cx="200" cy="55" r="62" fill="#1B3A4B" fillOpacity="0.15" stroke="#1B3A4B" strokeOpacity="0.5" strokeWidth="1.5" />
-            <circle cx="200" cy="55" r="62" fill="#C8924A" fillOpacity="0.28" clipPath="url(#lc-left)" />
+            <circle cx="120" cy="55" r="62" fill={BRAND.wine} fillOpacity="0.15" stroke={BRAND.wine} strokeOpacity="0.5" strokeWidth="1.5" />
+            <circle cx="200" cy="55" r="62" fill={palette.slate} fillOpacity="0.15" stroke={palette.slate} strokeOpacity="0.5" strokeWidth="1.5" />
+            <circle cx="200" cy="55" r="62" fill={BRAND.amber} fillOpacity="0.28" clipPath="url(#lc-left)" />
             {onlyU.slice(0, 2).map((g, i) => (
-              <text key={g} x="75" y={42 + i * 16} textAnchor="middle" fontSize="9" fill="#7A2E2E" fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
+              <text key={g} x="75" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={BRAND.wine} fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
             ))}
             {topCommon.slice(0, 2).map((g, i) => (
-              <text key={g} x="160" y={42 + i * 16} textAnchor="middle" fontSize="9" fill="#8A5A1A" fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
+              <text key={g} x="160" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.amberInk} fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
             ))}
             {onlyF.slice(0, 2).map((g, i) => (
-              <text key={g} x="245" y={42 + i * 16} textAnchor="middle" fontSize="9" fill="#1B3A4B" fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
+              <text key={g} x="245" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.slate} fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
             ))}
             {onlyU.length === 0 && uGenres.size === 0 && (
-              <text x="75" y="57" textAnchor="middle" fontSize="8" fill="#7A2E2E99" fontFamily="EB Garamond, serif" fontStyle="italic">sin géneros</text>
+              <text x="75" y="57" textAnchor="middle" fontSize="8" fill={`${BRAND.wine}99`} fontFamily="EB Garamond, serif" fontStyle="italic">sin géneros</text>
             )}
             {topCommon.length === 0 && (
-              <text x="160" y="57" textAnchor="middle" fontSize="8" fill="#8A5A1A99" fontFamily="EB Garamond, serif" fontStyle="italic">ninguno</text>
+              <text x="160" y="57" textAnchor="middle" fontSize="8" fill={`${palette.amberInk}99`} fontFamily="EB Garamond, serif" fontStyle="italic">ninguno</text>
             )}
             {onlyF.length === 0 && fGenres.size === 0 && (
-              <text x="245" y="57" textAnchor="middle" fontSize="8" fill="#1B3A4B99" fontFamily="EB Garamond, serif" fontStyle="italic">sin géneros</text>
+              <text x="245" y="57" textAnchor="middle" fontSize="8" fill={`${palette.slate}99`} fontFamily="EB Garamond, serif" fontStyle="italic">sin géneros</text>
             )}
           </svg>
 
@@ -5901,7 +5053,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
               <p style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginBottom: "0.3rem" }}>Solo tú:</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
                 {onlyU.map((g) => (
-                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: "#F5EAEA", color: "#7A2E2E", border: "1px solid #E8C8C8", borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
+                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: `${palette.accent}14`, color: palette.accent, border: `1px solid ${palette.accent}40`, borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
                 ))}
               </div>
             </div>
@@ -5911,7 +5063,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
               <p style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginBottom: "0.3rem" }}>En común:</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
                 {topCommon.map((g) => (
-                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: "#FBF0E5", color: "#7A4A1A", border: "1px solid #E0C498", borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
+                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: `${palette.amber}1A`, color: palette.amberInk, border: `1px solid ${palette.amber}55`, borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
                 ))}
               </div>
             </div>
@@ -5921,7 +5073,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
               <p style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginBottom: "0.3rem" }}>Solo {friendName}:</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
                 {onlyF.map((g) => (
-                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: "#E5EEF3", color: "#1B3A4B", border: "1px solid #A8C4D4", borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
+                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: `${palette.slate}14`, color: palette.slate, border: `1px solid ${palette.slate}40`, borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
                 ))}
               </div>
             </div>
@@ -5932,7 +5084,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
       {/* Books in common */}
       {commonBooksDisplay.length > 0 && (
         <div>
-          <p style={{ ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.6rem" }}>
+          <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.6rem" }}>
             Libros en común ({commonBooksRaw.length})
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -6095,15 +5247,17 @@ function FriendProfileModal({ friend, user, onClose }) {
     && friend.id !== user?.id
     && !userFriendIds.has(friend.id);
 
-  const secLabel = { ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.5rem" };
+  const secLabel = { ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.5rem" };
 
   async function sendRequestToFriendOfFriend(toId) {
-    await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
+    const { error } = await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
+    if (error && error.code !== "23505") { console.error("[amigos] no se pudo enviar la solicitud:", error.message); return; }
     setSentToFriendOfFriend((prev) => new Set([...prev, toId]));
   }
 
   async function handleAddMainFriend() {
-    await supabase.from("friendships").insert({ user_id: user.id, friend_id: friend.id, status: "pending" });
+    const { error } = await supabase.from("friendships").insert({ user_id: user.id, friend_id: friend.id, status: "pending" });
+    if (error && error.code !== "23505") { console.error("[amigos] no se pudo enviar la solicitud:", error.message); return; }
     setMainRequestSent(true);
   }
 
@@ -6145,21 +5299,21 @@ function FriendProfileModal({ friend, user, onClose }) {
         style={{ backgroundColor: palette.bg, maxHeight: "92vh", boxShadow: "0 -4px 40px rgba(42,31,26,0.18)" }}
       >
         {/* Cover banner */}
-        <div style={{ position: "relative", height: 140, background: friend.cover_url ? "none" : "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", borderRadius: "1.25rem 1.25rem 0 0", overflow: "visible", flexShrink: 0 }}>
+        <div style={{ position: "relative", height: 140, background: friend.cover_url ? "none" : BRAND.gradient, borderRadius: "1.25rem 1.25rem 0 0", overflow: "visible", flexShrink: 0 }}>
           {friend.cover_url && (
             <img src={friend.cover_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "1.25rem 1.25rem 0 0", display: "block" }} />
           )}
-          <div style={{ position: "absolute", bottom: -38, left: 20, padding: 3, borderRadius: "50%", background: "linear-gradient(135deg, #7A2E2E, #C8924A)", boxShadow: "0 4px 16px rgba(122,46,46,0.4)", border: `4px solid ${palette.bg}` }}>
+          <div style={{ position: "absolute", bottom: -38, left: 20, padding: 3, borderRadius: "50%", background: BRAND.gradient, boxShadow: "0 4px 16px rgba(122,46,46,0.4)", border: `4px solid ${palette.bg}` }}>
             {friend.avatar_url ? (
               <img src={friend.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: "#FFFFFF", fontFamily: "Fraunces, serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
           </div>
           <button onClick={onClose} style={{ position: "absolute", top: 10, right: 12, backgroundColor: "rgba(42,31,26,0.5)", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" }}>
-            <X size={16} color="#fff" />
+            <X size={16} color={palette.onAccent} />
           </button>
         </div>
 
@@ -6185,13 +5339,13 @@ function FriendProfileModal({ friend, user, onClose }) {
           <div style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: "0.75rem" }}>
             {(userPendingIds.has(friend.id) || mainRequestSent) ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", padding: "0.65rem 1rem" }}>
-                <Check size={14} color="#5C8A4A" />
+                <Check size={14} color={palette.success} />
                 <span style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft }}>Solicitud enviada</span>
               </div>
             ) : (
               <button
                 onClick={handleAddMainFriend}
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "12px", padding: "0.75rem 1rem", cursor: "pointer", ...display, fontSize: "0.95rem", fontWeight: 600 }}
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "12px", padding: "0.75rem 1rem", cursor: "pointer", ...display, fontSize: "0.95rem", fontWeight: 600 }}
               >
                 <UserPlus size={16} />
                 Agregar como amigo
@@ -6227,9 +5381,9 @@ function FriendProfileModal({ friend, user, onClose }) {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                   <StatCard label="leídos" value={readBooks.length} statKey="read" color={palette.accent} />
                   <StatCard label="en total" value={friendBooks.length} statKey="all" color={palette.ink} />
-                  {avgF && <StatCard label="promedio ★" value={avgF} statKey="rating" color="#C8924A" />}
-                  {readingBooks.length > 0 && <StatCard label="leyendo" value={readingBooks.length} statKey="reading" color="#1B3A4B" />}
-                  {wantBooks.length > 0 && <StatCard label="por leer" value={wantBooks.length} statKey="want" color="#5C6B3D" />}
+                  {avgF && <StatCard label="promedio ★" value={avgF} statKey="rating" color={BRAND.amber} />}
+                  {readingBooks.length > 0 && <StatCard label="leyendo" value={readingBooks.length} statKey="reading" color={palette.slate} />}
+                  {wantBooks.length > 0 && <StatCard label="por leer" value={wantBooks.length} statKey="want" color={palette.sage} />}
                 </div>
                 <RatingDistribution books={friendBooks} />
 
@@ -6242,14 +5396,14 @@ function FriendProfileModal({ friend, user, onClose }) {
                     ].map(({ label, value }) => (
                       <div key={label} style={{
                         flex: 1, position: "relative", overflow: "hidden",
-                        background: "linear-gradient(90deg, #3D8B37 0%, #5CAE4A 100%)",
+                        background: FRIEND_STREAK_GRADIENT,
                         borderRadius: 12, padding: "0.75rem 0.75rem",
                         boxShadow: "0 4px 14px rgba(61,139,55,0.22)",
                       }}>
                         <div style={{ position: "absolute", top: -20, right: -20, width: 70, height: 70, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                           <div>
-                            <div style={{ ...display, fontSize: "2rem", fontWeight: 800, color: "#fff", lineHeight: 1 }}>{value}</div>
+                            <div style={{ ...display, fontSize: "2rem", fontWeight: 800, color: palette.onAccent, lineHeight: 1 }}>{value}</div>
                             <div style={{ ...body, fontSize: "0.68rem", color: "rgba(255,255,255,0.75)", marginTop: "0.1rem" }}>días</div>
                           </div>
                           <Flame size={20} color="rgba(255,255,255,0.7)" />
@@ -6398,7 +5552,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                               <p style={{ ...display, fontSize: "0.82rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fof.nombre}</p>
                               {fof.username && <p style={{ ...body, fontSize: "0.7rem", color: palette.inkFaint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{fof.username}</p>}
                               {isMyFriend ? (
-                                <span style={{ ...body, fontSize: "0.68rem", color: "#5C8A4A" }}>✓ Amigos</span>
+                                <span style={{ ...body, fontSize: "0.68rem", color: palette.success }}>✓ Amigos</span>
                               ) : isPending ? (
                                 <span style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint }}>Enviado</span>
                               ) : (
@@ -6525,7 +5679,9 @@ function InviteShareModal({ message, url, onClose }) {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
-    } catch {}
+    } catch (err) {
+      console.warn("[invite] no se pudo copiar el link:", err);
+    }
   }
 
   const encoded = encodeURIComponent(`${message}\n${url}`);
@@ -6555,7 +5711,7 @@ function InviteShareModal({ message, url, onClose }) {
           </span>
           <button
             onClick={copyLink}
-            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.75rem", backgroundColor: copied ? palette.sage : palette.accent, color: "#fff", border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
+            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.75rem", backgroundColor: copied ? palette.sage : palette.accent, color: palette.onAccent, border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
           >
             {copied ? "¡Copiado! ✓" : "Copiar"}
           </button>
@@ -6567,7 +5723,7 @@ function InviteShareModal({ message, url, onClose }) {
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: "#25D366", color: "#fff", borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.whatsapp, color: palette.onAccent, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
           >
             WhatsApp
           </a>
@@ -6575,7 +5731,7 @@ function InviteShareModal({ message, url, onClose }) {
             href={twUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: "#000", color: "#fff", borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.x, color: palette.onAccent, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
           >
             Twitter / X
           </a>
@@ -6610,8 +5766,8 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
     if (pct >= 0.95 && !finished) {
       setFinished(true);
       setTimeout(() => setShowModal(true), 400);
-      confetti({ particleCount: 60, spread: 70, origin: { y: 0.4 }, colors: ["#7A2E2E", "#C8924A", "#F4EDE0"] });
-      logReadingSession({ userId: user.id, bookId: null, pagesRead: 1, mood: null }).catch(() => {});
+      confetti({ particleCount: 60, spread: 70, origin: { y: 0.4 }, colors: [BRAND.wine, BRAND.amber, BRAND.cream] });
+      logReadingSession({ userId: user.id, bookId: null, pagesRead: 1, mood: null }).catch((err) => console.error("[reading] no se pudo registrar la lectura del cuento:", err));
     }
   }
 
@@ -6626,7 +5782,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
         setShareStatus("¡Copiado! ✓");
         setTimeout(() => setShareStatus(""), 2500);
       }
-    } catch {}
+    } catch { /* share cancelado o portapapeles no disponible */ }
   }
 
   function handleAddToLibrary() {
@@ -6669,7 +5825,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
           </p>
           <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, margin: 0 }}>{cuento.autor}</p>
         </div>
-        <span style={{ ...body, fontSize: "0.75rem", color: pct >= 95 ? "#5C6B3D" : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
+        <span style={{ ...body, fontSize: "0.75rem", color: pct >= 95 ? palette.sage : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
           {pct >= 95 ? "✓ Leído" : `${pct}%`}
         </span>
       </div>
@@ -6744,7 +5900,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
               style={{
                 width: "100%", padding: "0.82rem", borderRadius: "10px",
                 backgroundColor: addedToLibrary ? "transparent" : palette.ink,
-                color: addedToLibrary ? palette.inkFaint : "#fff",
+                color: addedToLibrary ? palette.inkFaint : palette.onAccent,
                 border: addedToLibrary ? `1px solid ${palette.border}` : "none",
                 ...body, fontSize: "0.92rem", fontWeight: 600, cursor: addedToLibrary ? "default" : "pointer",
                 marginBottom: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
@@ -6790,7 +5946,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
     }
   }
 
-  const ink = dark ? "#F4EDE0" : palette.ink;
+  const ink = dark ? BRAND.cream : palette.ink;
   const inkFaint = dark ? "rgba(244,237,224,0.4)" : palette.inkFaint;
   const bg = dark ? "rgba(244,237,224,0.06)" : palette.bgCard;
   const borderColor = dark ? "rgba(122,46,46,0.5)" : "rgba(122,46,46,0.22)";
@@ -6813,7 +5969,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
           <div style={{
             width: 44, height: 44, borderRadius: "50%",
             backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", ...display, fontSize: "1.1rem", fontWeight: 700, flexShrink: 0,
+            color: palette.onAccent, ...display, fontSize: "1.1rem", fontWeight: 700, flexShrink: 0,
           }}>
             {(userInitial || "?").toString().toUpperCase()}
           </div>
@@ -6829,7 +5985,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
           onClick={handleInvite}
           style={{
             ...display, fontSize: "0.95rem", fontWeight: 600,
-            backgroundColor: palette.accent, color: "#fff",
+            backgroundColor: palette.accent, color: palette.onAccent,
             border: "none", borderRadius: "999px",
             padding: "0.7rem 0", width: "100%",
             cursor: "pointer", marginBottom: "0.45rem",
@@ -6855,7 +6011,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
 }
 
 // ============ FRIENDS VIEW ============
-function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNotifsRead, isOnline = true }) {
+function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true }) {
   const [subtab, setSubtab] = useState("amigos");
   const [query, setQuery] = useState("");
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
@@ -6875,9 +6031,8 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
   const [incomingPendingIds, setIncomingPendingIds] = useState(new Set());
   const [conversations, setConversations] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
-  const [activityFeed, setActivityFeed] = useState([]);
-  const [loadingActivity, setLoadingActivity] = useState(false);
   const debounceRef = useRef(null);
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   async function handleFriendsInvite() {
     const username = user.username || user.name || "Alguien";
@@ -7012,78 +6167,22 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
     }
   }
 
-  async function loadActivity() {
-    if (friends.length === 0) return;
-    setLoadingActivity(true);
-    const fIds = friends.map((r) => r.friendId);
-
-    const [{ data: posts }, { data: achs }] = await Promise.all([
-      supabase.from("posts").select("id, user_id, type, action, content, created_at, book_id, pages_read, minutes_read")
-        .in("user_id", fIds).order("created_at", { ascending: false }).limit(50),
-      supabase.from("achievements").select("user_id, achievement_key, unlocked_at")
-        .in("user_id", fIds).order("unlocked_at", { ascending: false }).limit(30),
-    ]);
-
-    // Fetch book titles for posts that have book_id
-    const bookIds = [...new Set((posts || []).filter((p) => p.book_id).map((p) => p.book_id))];
-    const bookMap = {};
-    if (bookIds.length > 0) {
-      const { data: booksData } = await supabase.from("books").select("id, title, author, rating, status").in("id", bookIds);
-      (booksData || []).forEach((b) => { bookMap[b.id] = b; });
-    }
-
-    const profileMap = {};
-    friends.forEach((r) => { profileMap[r.friendId] = r.profile; });
-
-    const events = [];
-
-    (posts || []).forEach((p) => {
-      const profile = profileMap[p.user_id];
-      if (!profile) return;
-      const book = bookMap[p.book_id];
-      let action = "", icon = "plus";
-      if (p.type === "book_update" && p.action === "started") { action = `empezó a leer${book ? ` "${book.title}"` : ""}`; icon = "open"; }
-      else if (p.type === "book_update" && p.action === "finished") {
-        const stars = book?.rating > 0 ? " " + "★".repeat(book.rating) : "";
-        action = `terminó${book ? ` "${book.title}"` : ""}${stars}`; icon = "check";
-      } else if (p.type === "text") { action = "publicó en el feed"; icon = "plus"; }
-      else return;
-      events.push({ id: `post-${p.id}`, ts: p.created_at, profile, action, icon, profileId: p.user_id });
-    });
-
-    const achDefMap = {};
-    ACHIEVEMENT_DEFS.forEach((d) => { achDefMap[d.key] = d; });
-    (achs || []).forEach((a) => {
-      const profile = profileMap[a.user_id];
-      const def = achDefMap[a.achievement_key];
-      if (!profile || !def) return;
-      events.push({ id: `ach-${a.user_id}-${a.achievement_key}`, ts: a.unlocked_at, profile, action: `desbloqueó "${def.name}"`, icon: "award", profileId: a.user_id });
-    });
-
-    events.sort((a, b) => (b.ts || "").localeCompare(a.ts || ""));
-    setActivityFeed(events.slice(0, 50));
-    setLoadingActivity(false);
-  }
-
-  useEffect(() => {
-    if (subtab === "actividad" && friends.length > 0 && activityFeed.length === 0) {
-      loadActivity();
-    }
-  }, [subtab, friends.length]);
-
   function handleQueryChange(e) {
     const val = e.target.value;
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!val.trim()) { setSearchResults([]); return; }
     debounceRef.current = setTimeout(async () => {
+      const term = sanitizeSearchTerm(val);
+      if (!term) { setSearchResults([]); return; }
       setSearching(true);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("users")
         .select("id, nombre, username, bio, avatar_url, cover_url")
-        .or(`username.ilike.%${val.trim()}%,nombre.ilike.%${val.trim()}%`)
+        .or(`username.ilike.%${term}%,nombre.ilike.%${term}%`)
         .neq("id", user.id)
         .limit(10);
+      if (error) console.error("[amigos] búsqueda de usuarios falló:", error.message);
       setSearchResults(data || []);
       setSearching(false);
     }, 300);
@@ -7091,8 +6190,14 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
 
   async function sendRequest(toId) {
     setActionLoading((p) => ({ ...p, [toId]: true }));
-    await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
-    await supabase.from("notifications").insert({ user_id: toId, actor_id: user.id, type: "friend_request", related_id: user.id, read: false });
+    const { error } = await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
+    if (error && error.code !== "23505") {
+      console.error("[amigos] no se pudo enviar la solicitud:", error.message);
+      setActionLoading((p) => ({ ...p, [toId]: false }));
+      return;
+    }
+    const { error: notifErr } = await supabase.from("notifications").insert({ user_id: toId, actor_id: user.id, type: "friend_request", related_id: user.id, read: false });
+    if (notifErr) console.error("[notif] friend_request no se pudo crear:", notifErr.message);
     setSentRequestIds((prev) => new Set([...prev, toId]));
     setActionLoading((p) => ({ ...p, [toId]: false }));
     checkAchievements(user.id, user.name);
@@ -7100,15 +6205,17 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
 
   async function acceptRequest(row) {
     setActionLoading((p) => ({ ...p, [row.id]: true }));
-    await supabase.from("friendships").update({ status: "accepted" }).eq("id", row.id);
+    const { error } = await supabase.from("friendships").update({ status: "accepted" }).eq("id", row.id);
+    if (error) console.error("[amigos] no se pudo aceptar la solicitud:", error.message);
     setActionLoading((p) => ({ ...p, [row.id]: false }));
     await loadFriends();
-    checkAchievements(user.id, user.name);
+    if (!error) checkAchievements(user.id, user.name);
   }
 
   async function rejectRequest(row) {
     setActionLoading((p) => ({ ...p, [row.id]: true }));
-    await supabase.from("friendships").delete().eq("id", row.id);
+    const { error } = await supabase.from("friendships").delete().eq("id", row.id);
+    if (error) console.error("[amigos] no se pudo rechazar la solicitud:", error.message);
     setActionLoading((p) => ({ ...p, [row.id]: false }));
     await loadFriends();
   }
@@ -7133,7 +6240,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
           width: size,
           height: size,
           backgroundColor: getAvatarColor(profile.id || profile.nombre),
-          color: "#FFFFFF",
+          color: palette.onAccent,
           fontFamily: "Fraunces, serif",
           fontSize: size * 0.35,
           fontWeight: 600,
@@ -7149,29 +6256,11 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
     flex: 1,
     padding: "12px 16px",
     backgroundColor: palette.bgCard,
-    border: `1.5px solid #D4C8BC`,
+    border: `1.5px solid ${palette.border}`,
     borderRadius: "10px",
     fontSize: "1rem",
     color: palette.ink,
     outline: "none",
-  };
-
-  const rowStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: "0.75rem",
-    backgroundColor: palette.bgCard,
-    border: `1px solid ${palette.borderSoft}`,
-    borderRadius: 8,
-    padding: "0.65rem 0.85rem",
-  };
-
-  const sectionLabel = {
-    ...display,
-    fontSize: "0.78rem",
-    color: "#8A7B6E",
-    fontWeight: 500,
-    marginBottom: "0.6rem",
   };
 
   if (!isOnline) {
@@ -7259,12 +6348,12 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
                       <span style={{ ...body, fontSize: "0.76rem", color: palette.inkFaint, flexShrink: 0 }}>Enviada ✓</span>
                     ) : hasIncoming ? (
                       <button onClick={() => { const row = pending.find((r) => r.user_id === u.id); if (row) acceptRequest(row); }}
-                        style={{ ...display, fontSize: "0.76rem", padding: "0.3rem 0.7rem", backgroundColor: palette.sage, color: "#fff", borderRadius: "20px", fontWeight: 500, flexShrink: 0, border: "none", cursor: "pointer" }}>
+                        style={{ ...display, fontSize: "0.76rem", padding: "0.3rem 0.7rem", backgroundColor: palette.sage, color: palette.onAccent, borderRadius: "20px", fontWeight: 500, flexShrink: 0, border: "none", cursor: "pointer" }}>
                         Aceptar
                       </button>
                     ) : (
                       <button onClick={() => sendRequest(u.id)} disabled={!!actionLoading[u.id]}
-                        style={{ ...display, fontSize: "0.76rem", padding: "0.3rem 0.75rem", backgroundColor: palette.accent, color: "#fff", borderRadius: "20px", fontWeight: 500, opacity: actionLoading[u.id] ? 0.6 : 1, flexShrink: 0, border: "none", cursor: "pointer" }}>
+                        style={{ ...display, fontSize: "0.76rem", padding: "0.3rem 0.75rem", backgroundColor: palette.accent, color: palette.onAccent, borderRadius: "20px", fontWeight: 500, opacity: actionLoading[u.id] ? 0.6 : 1, flexShrink: 0, border: "none", cursor: "pointer" }}>
                         {actionLoading[u.id] ? "…" : "Agregar"}
                       </button>
                     )}
@@ -7363,7 +6452,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
             <>
               {pending.length > 0 && (
                 <div>
-                  <p style={{ ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.6rem" }}>Recibidas</p>
+                  <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.6rem" }}>Recibidas</p>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                     {pending.map((row) => (
                       <div key={row.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", padding: "0.75rem" }}>
@@ -7374,11 +6463,11 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
                         </div>
                         <div style={{ display: "flex", gap: "0.4rem" }}>
                           <button onClick={() => acceptRequest(row)} disabled={!!actionLoading[row.id]}
-                            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.35rem 0.75rem", backgroundColor: "#5C6B3D", color: "#fff", borderRadius: "20px", border: "none", cursor: "pointer", opacity: actionLoading[row.id] ? 0.6 : 1 }}>
+                            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.35rem 0.75rem", backgroundColor: palette.sage, color: palette.onAccent, borderRadius: "20px", border: "none", cursor: "pointer", opacity: actionLoading[row.id] ? 0.6 : 1 }}>
                             Aceptar
                           </button>
                           <button onClick={() => rejectRequest(row)} disabled={!!actionLoading[row.id]}
-                            style={{ ...display, fontSize: "0.78rem", fontWeight: 500, padding: "0.35rem 0.75rem", backgroundColor: "transparent", color: "#9B2C2C", borderRadius: "20px", border: "1.5px solid #9B2C2C", cursor: "pointer", opacity: actionLoading[row.id] ? 0.6 : 1 }}>
+                            style={{ ...display, fontSize: "0.78rem", fontWeight: 500, padding: "0.35rem 0.75rem", backgroundColor: "transparent", color: palette.danger, borderRadius: "20px", border: `1.5px solid ${palette.danger}`, cursor: "pointer", opacity: actionLoading[row.id] ? 0.6 : 1 }}>
                             Rechazar
                           </button>
                         </div>
@@ -7389,7 +6478,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
               )}
               {sentPending.length > 0 && (
                 <div>
-                  <p style={{ ...display, fontSize: "0.78rem", color: "#8A7B6E", fontWeight: 500, marginBottom: "0.6rem" }}>Enviadas</p>
+                  <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.6rem" }}>Enviadas</p>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                     {sentPending.map((row) => (
                       <div key={row.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", padding: "0.75rem" }}>
@@ -7398,7 +6487,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
                           <p style={{ ...display, fontSize: "0.92rem", fontWeight: 600, color: palette.ink }}>{row.profile.nombre}</p>
                           {row.profile.username && <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>@{row.profile.username}</p>}
                         </div>
-                        <span style={{ ...body, fontSize: "0.75rem", color: "#8A5A1A", backgroundColor: "#FBF0E5", border: "1px solid #E0C498", borderRadius: "20px", padding: "3px 10px", flexShrink: 0 }}>Pendiente</span>
+                        <span style={{ ...body, fontSize: "0.75rem", color: palette.amberInk, backgroundColor: `${palette.amber}1A`, border: `1px solid ${palette.amber}55`, borderRadius: "20px", padding: "3px 10px", flexShrink: 0 }}>Pendiente</span>
                       </div>
                     ))}
                   </div>
@@ -7442,7 +6531,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, unreadNotifs, onNo
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem", flexShrink: 0 }}>
                     {tsLabel && <span style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint }}>{tsLabel}</span>}
                     {unread > 0 && (
-                      <span style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: "#1B3A4B", color: "#fff", fontSize: "0.65rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>
+                      <span style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: palette.slate, color: palette.onAccent, fontSize: "0.65rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>
                     )}
                   </div>
                 </button>
@@ -7483,8 +6572,6 @@ function AmigosSheet({ user, onClose, onPendingChange, onMessagesRead }) {
           user={user}
           onPendingChange={onPendingChange}
           onMessagesRead={onMessagesRead}
-          unreadNotifs={0}
-          onNotifsRead={() => {}}
           isOnline={true}
         />
       </div>
@@ -7503,140 +6590,18 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
             <Users size={18} color={palette.inkSoft} />
             <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, fontWeight: 600 }}>Amigos</span>
             {pendingCount > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
             )}
           </button>
           <button onClick={onOpenNotifs} aria-label="Notificaciones" className="btn-press" style={{ position: "relative", background: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem", display: "flex" }}>
             <Bell size={18} color={palette.inkSoft} />
             {unreadNotifs > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: "#e53e3e", color: "#fff", borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unreadNotifs > 9 ? "9+" : unreadNotifs}</span>
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unreadNotifs > 9 ? "9+" : unreadNotifs}</span>
             )}
           </button>
         </div>
       </div>
       <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} />
-    </div>
-  );
-}
-
-function NotificationsPanel({ user, onNotifsRead }) {
-  const [notifs, setNotifs] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadNotifs();
-  }, []);
-
-  async function loadNotifs() {
-    setLoading(true);
-    try {
-      const { data } = await supabase
-        .from("notifications")
-        .select("id, type, read, created_at, post_id, comment_id, actor_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (!data || data.length === 0) { setNotifs([]); setLoading(false); return; }
-      const actorIds = [...new Set(data.map(n => n.actor_id))];
-      const { data: actors } = await supabase.from("users").select("id, nombre, avatar_url").in("id", actorIds);
-      const actorMap = {};
-      (actors || []).forEach(a => { actorMap[a.id] = a; });
-      const postIds = data.filter(n => n.post_id).map(n => n.post_id);
-      const commentIds = data.filter(n => n.comment_id).map(n => n.comment_id);
-      const [postsRes, commentsRes] = await Promise.all([
-        postIds.length > 0 ? supabase.from("posts").select("id, content, type").in("id", postIds) : { data: [] },
-        commentIds.length > 0 ? supabase.from("comments").select("id, content").in("id", commentIds) : { data: [] },
-      ]);
-      const postMap = {};
-      (postsRes.data || []).forEach(p => { postMap[p.id] = p; });
-      const commentMap = {};
-      (commentsRes.data || []).forEach(c => { commentMap[c.id] = c; });
-      setNotifs(data.map(n => ({ ...n, actor: actorMap[n.actor_id] || { nombre: "Usuario", avatar_url: null }, post: n.post_id ? postMap[n.post_id] : null, comment: n.comment_id ? commentMap[n.comment_id] : null })));
-    } catch {}
-    setLoading(false);
-  }
-
-  async function markAllRead() {
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-    setNotifs(prev => prev.map(n => ({ ...n, read: true })));
-    onNotifsRead?.();
-  }
-
-  async function markRead(id) {
-    await supabase.from("notifications").update({ read: true }).eq("id", id);
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    onNotifsRead?.();
-  }
-
-  const unreadCount = notifs.filter(n => !n.read).length;
-
-  if (loading) return <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin" color={palette.inkFaint} /></div>;
-
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
-        <p style={{ ...display, fontWeight: 700, fontSize: "1.05rem", color: palette.ink }}>
-          Notificaciones{unreadCount > 0 ? ` (${unreadCount})` : ""}
-        </p>
-        {unreadCount > 0 && (
-          <button onClick={markAllRead} style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, background: "none", border: `1px solid ${palette.border}`, borderRadius: "999px", padding: "0.25rem 0.75rem", cursor: "pointer" }}>
-            Marcar todo leído
-          </button>
-        )}
-      </div>
-      {notifs.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-          <Bell size={32} color={palette.border} style={{ margin: "0 auto 0.75rem" }} />
-          <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>No tienes notificaciones aún.</p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          {notifs.map((n) => {
-            const preview = n.type === "like_comment"
-              ? n.comment?.content
-              : (n.post?.type === "achievement" ? "una publicación de logro" : n.post?.content);
-            const previewText = (preview || "").slice(0, 60) + ((preview || "").length > 60 ? "…" : "");
-            const label = n.type === "like_post" ? "le dio like a tu publicación" : "le dio like a tu comentario";
-            return (
-              <button
-                key={n.id}
-                onClick={() => markRead(n.id)}
-                style={{
-                  display: "flex", alignItems: "flex-start", gap: "0.65rem",
-                  backgroundColor: n.read ? "transparent" : `${palette.amber}18`,
-                  borderTop: "none", borderLeft: "none", borderRight: "none",
-                  borderBottom: `1px solid ${palette.borderSoft}`,
-                  padding: "0.75rem 0.25rem",
-                  textAlign: "left", cursor: "pointer", width: "100%",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = palette.bgSoft; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = e.currentTarget.dataset.read === "1" ? "transparent" : `${palette.amber}18`; }}
-                data-read={n.read ? "1" : "0"}
-              >
-                <div style={{ position: "relative", flexShrink: 0 }}>
-                  <FriendAvatar profile={{ ...n.actor, nombre: n.actor?.nombre || 'Usuario' }} size={34} />
-                  <span style={{ position: "absolute", bottom: -2, right: -2, backgroundColor: "#E74C3C", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Heart size={8} color="#fff" fill="#fff" />
-                  </span>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ ...body, fontSize: "0.85rem", color: palette.ink, lineHeight: 1.4, marginBottom: "0.15rem" }}>
-                    <span style={{ fontWeight: 700 }}>{n.actor?.nombre || 'Usuario'}</span>{" "}
-                    <span style={{ color: palette.inkSoft }}>{label}</span>
-                  </p>
-                  {previewText && (
-                    <p style={{ ...body, fontSize: "0.77rem", color: palette.inkFaint, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      "{previewText}"
-                    </p>
-                  )}
-                </div>
-                <span style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, flexShrink: 0, paddingTop: "0.15rem" }}>{timeAgo(n.created_at)}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
@@ -7700,7 +6665,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
     <>
       <div onClick={handleClose} style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.4)", zIndex: 1000, animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }} />
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "65vh", backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0", zIndex: 1001, display: "flex", flexDirection: "column", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}>
-        <div style={{ width: 40, height: 4, backgroundColor: "#D4C9B5", borderRadius: 2, margin: "12px auto 0", flexShrink: 0 }} />
+        <div style={{ width: 40, height: 4, backgroundColor: palette.border, borderRadius: 2, margin: "12px auto 0", flexShrink: 0 }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", flexShrink: 0 }}>
           <span style={{ fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, color: palette.ink }}>Notificaciones</span>
           {notifications.length > 0 && (
@@ -7742,9 +6707,9 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                       onNavigate?.(notif.post_id, notif.type === "like_comment");
                     }
                   }}
-                  style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 8px", backgroundColor: notif.read ? "transparent" : "#FDF8F3", borderRadius: 10, marginBottom: 4, cursor: "pointer" }}
+                  style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 8px", backgroundColor: notif.read ? "transparent" : palette.unreadBg, borderRadius: 10, marginBottom: 4, cursor: "pointer" }}
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: "#6B4C3B", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: getAvatarColor(actor.id || actorName), display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
                     {actor.avatar_url ? (
                       <img src={actor.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} alt="" />
                     ) : initials}
@@ -7893,7 +6858,7 @@ function UAMLibraryView({ books, onAdd }) {
                     <span style={{ ...display, fontSize: "0.68rem", color: palette.inkFaint, backgroundColor: palette.bg, border: `1px solid ${palette.borderSoft}`, padding: "0.1rem 0.5rem", borderRadius: "999px" }}>
                       {uamBook.area}
                     </span>
-                    <span style={{ ...display, fontSize: "0.68rem", fontWeight: 700, color: available ? "#2d7a4f" : "#b83232", letterSpacing: "0.02em" }}>
+                    <span style={{ ...display, fontSize: "0.68rem", fontWeight: 700, color: available ? palette.success : palette.danger, letterSpacing: "0.02em" }}>
                       {available ? "● Disponible" : "● Prestado"}
                     </span>
                   </div>
@@ -7959,7 +6924,7 @@ function Avatar({ author, size = 36 }) {
         backgroundColor: getAvatarColor(author?.id || author?.nombre || author?.name || ""),
         display: "flex", alignItems: "center", justifyContent: "center",
         flexShrink: 0, overflow: "hidden",
-        fontSize: size * 0.38, fontWeight: 700, color: "white",
+        fontSize: size * 0.38, fontWeight: 700, color: palette.onAccent,
         ...display,
       }}
     >
@@ -8022,7 +6987,7 @@ function PostDraftModal({ pendingPost, user, onPublish, onSkip }) {
           style={{ ...body, width: "100%", padding: "0.65rem 0.9rem", borderRadius: "8px", border: `1px solid ${palette.border}`, backgroundColor: palette.bg, color: palette.ink, fontSize: "0.95rem", resize: "none", marginBottom: "0.75rem", boxSizing: "border-box", outline: "none" }}
         />
         {publishError && (
-          <p style={{ ...body, fontSize: "0.82rem", color: "#dc2626", marginBottom: "0.75rem" }}>⚠️ {publishError}</p>
+          <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginBottom: "0.75rem" }}>⚠️ {publishError}</p>
         )}
         <div style={{ display: "flex", gap: "0.6rem", justifyContent: "flex-end" }}>
           <button onClick={onSkip} style={{ ...display, fontSize: "0.88rem", color: palette.inkSoft, backgroundColor: "transparent", border: `1px solid ${palette.border}`, padding: "0.5rem 1rem", borderRadius: "999px", cursor: "pointer" }}>
@@ -8050,21 +7015,21 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
       <span style={{ position: "relative", display: "inline-flex", width: size, height: size, flexShrink: 0 }}>
         <Heart
           size={size}
-          color="#8A7B6E"
+          color={palette.inkFaint}
           fill="none"
           strokeWidth={1.8}
           style={{ position: "absolute", opacity: liked ? 0 : 1, transition: "opacity 120ms ease" }}
         />
         <Heart
           size={size}
-          color="#E74C3C"
-          fill="#E74C3C"
+          color={palette.like}
+          fill={palette.like}
           strokeWidth={0}
           className={animating ? "like-bounce" : ""}
           style={{ position: "absolute", opacity: liked ? 1 : 0, transition: "opacity 120ms ease" }}
         />
       </span>
-      {count > 0 && <span style={{ fontSize: size <= 14 ? "0.72rem" : "0.82rem", color: "#8A7B6E", fontFamily: "'EB Garamond', serif", lineHeight: 1 }}>{count}</span>}
+      {count > 0 && <span style={{ fontSize: size <= 14 ? "0.72rem" : "0.82rem", color: palette.inkFaint, fontFamily: "'EB Garamond', serif", lineHeight: 1 }}>{count}</span>}
     </button>
   );
 }
@@ -8098,7 +7063,9 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
         const liked = {};
         (myL || []).forEach(l => { liked[l.comment_id] = true; });
         setCommentLiked(liked);
-      } catch {}
+      } catch (err) {
+        console.error("[likes] no se pudieron cargar los likes de comentarios:", err);
+      }
     }
   }
 
@@ -8106,17 +7073,23 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
     const alreadyLiked = !!commentLiked[commentId];
     setCommentLiked(prev => ({ ...prev, [commentId]: !alreadyLiked }));
     setCommentLikeCounts(prev => ({ ...prev, [commentId]: Math.max(0, (prev[commentId] || 0) + (alreadyLiked ? -1 : 1)) }));
+    const revert = ({ error }) => {
+      if (!error || error.code === "23505") return;
+      console.error("[likes] like de comentario no se guardó:", error.message);
+      setCommentLiked(prev => ({ ...prev, [commentId]: alreadyLiked }));
+      setCommentLikeCounts(prev => ({ ...prev, [commentId]: Math.max(0, (prev[commentId] || 0) + (alreadyLiked ? 1 : -1)) }));
+    };
     if (alreadyLiked) {
-      supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", user.id).then();
+      supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", user.id).then(revert);
     } else {
-      supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.id }).then();
+      supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.id }).then(revert);
       const comment = comments.find(c => c.id === commentId);
       if (!comment) { console.warn("[notif] like_comment: comment not found in state for id", commentId); }
       else if (comment.user_id !== user.id) {
         const notifPayload = { user_id: comment.user_id, actor_id: user.id, type: "like_comment", comment_id: commentId, read: false };
         devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
         supabase.from("notifications").insert(notifPayload)
-          .then(({ data, error, count }) => { devLog("[like-insert-post] Result:", { data, error, count }); });
+          .then(({ error }) => { if (error) console.error("[notif] no se pudo crear la notificación:", error.message); });
       }
     }
   }
@@ -8128,6 +7101,9 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments", filter: `post_id=eq.${postId}` },
         () => loadComments())
       .subscribe();
+    // TODO(audit): este canal escucha TODAS las respuestas de la app (comment_replies no tiene
+    // post_id para filtrar), así que cada hilo abierto se recarga con respuestas de otros posts.
+    // Requiere columna/vista nueva en el esquema.
     const replyCh = supabase
       .channel(`replies:${postId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "comment_replies" },
@@ -8145,7 +7121,7 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
         const notifPayload = { user_id: postOwnerId, actor_id: user.id, type: "comment", post_id: postId, read: false };
         devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
         supabase.from("notifications").insert(notifPayload)
-          .then(({ data, error, count }) => { devLog("[like-insert-post] Result:", { data, error, count }); });
+          .then(({ error }) => { if (error) console.error("[notif] no se pudo crear la notificación:", error.message); });
       }
       setText("");
       await loadComments();
@@ -8258,11 +7234,12 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
 
 function BookPreviewModal({ post, onClose, onAdd }) {
   const book = post?.book;
-  if (!book) return null;
+  // Los hooks van antes del return condicional (reglas de hooks: mismo orden en cada render).
   const [isClosing, setIsClosing] = useState(false);
-  function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  if (!book) return null;
+  function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
 
   async function handleAdd() {
     if (!onAdd || adding || added) return;
@@ -8355,13 +7332,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   // Phase: 0=sin racha, 1=1-3d, 2=4-7d, 3=8+d
   const phase = days >= 8 ? 3 : days >= 4 ? 2 : days >= 1 ? 1 : 0;
 
-  const PHASES = [
-    { g0: "#E8A82B", g1: "#F4C430", rgb: "232,168,43",  border: "#E8A82B" },
-    { g0: "#E8A82B", g1: "#F4C430", rgb: "232,168,43",  border: "#E8A82B" },
-    { g0: "#5CAE4A", g1: "#B8D44A", rgb: "92,174,74",   border: "#5CAE4A" },
-    { g0: "#C84B8A", g1: "#7A2E5E", rgb: "200,75,138",  border: "#C84B8A" },
-  ];
-  const cfg = PHASES[phase];
+  const cfg = STREAK_PHASES[phase];
 
   // Danger: racha activa, sin leer hoy, hora nocturna
   const hour = new Date().getHours();
@@ -8381,7 +7352,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   const prevGoalRef = useRef(goalReached);
   useEffect(() => {
     if (goalReached && !prevGoalRef.current && typeof confetti === "function") {
-      confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: ["#FFD700", "#FFA500", "#fff", cfg.g0] });
+      confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: [BRAND.gold, BRAND.goldDeep, palette.onAccent, cfg.g0] });
       setTimeout(() => confetti({ particleCount: 35, spread: 55, origin: { y: 0.28 } }), 650);
     }
     prevGoalRef.current = goalReached;
@@ -8441,15 +7412,15 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           <div style={{ position: "relative", flexShrink: 0 }}>
             <Flame
               size={fireSize}
-              color="#fff"
+              color={palette.onAccent}
               strokeWidth={phase >= 2 ? 1.5 : 2}
               style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.28))", display: "block" }}
             />
             {phase === 3 && (
               <>
-                <span className="sparkle-orbit" style={{ position: "absolute", top: -10, right: -8, fontSize: 13, color: "#FFD700", lineHeight: 1 }}>✦</span>
-                <span className="sparkle-orbit" style={{ position: "absolute", bottom: -4, left: -10, fontSize: 10, color: "#FFD700", lineHeight: 1 }}>✦</span>
-                <span className="sparkle-orbit" style={{ position: "absolute", top: 2, left: -12, fontSize: 9, color: "#FFE066", lineHeight: 1, opacity: 0.8 }}>✦</span>
+                <span className="sparkle-orbit" style={{ position: "absolute", top: -10, right: -8, fontSize: 13, color: BRAND.gold, lineHeight: 1 }}>✦</span>
+                <span className="sparkle-orbit" style={{ position: "absolute", bottom: -4, left: -10, fontSize: 10, color: BRAND.gold, lineHeight: 1 }}>✦</span>
+                <span className="sparkle-orbit" style={{ position: "absolute", top: 2, left: -12, fontSize: 9, color: BRAND.goldLight, lineHeight: 1, opacity: 0.8 }}>✦</span>
               </>
             )}
             {phase === 2 && (
@@ -8464,7 +7435,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
                 <span style={{
                   fontFamily: "Fraunces, serif", fontWeight: 800,
                   fontSize: "clamp(32px, 8vw, 44px)",
-                  color: "#fff", lineHeight: 0.9,
+                  color: palette.onAccent, lineHeight: 0.9,
                   textShadow: "0 2px 10px rgba(0,0,0,0.22)",
                   letterSpacing: "-1.5px",
                 }}>
@@ -8491,7 +7462,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             backgroundColor: "rgba(255,255,255,0.18)",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
-            color: "#fff",
+            color: palette.onAccent,
             border: "1.5px solid rgba(255,255,255,0.7)",
             borderRadius: "22px",
             padding: "10px 18px",
@@ -8509,7 +7480,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           <div style={{
             height: "100%",
             width: `${pct}%`,
-            background: goalReached ? "#FFD700" : "rgba(255,255,255,0.62)",
+            background: goalReached ? BRAND.gold : "rgba(255,255,255,0.62)",
             boxShadow: goalReached ? "0 0 8px rgba(255,215,0,0.75)" : "none",
             transition: "width 600ms ease-out, background 400ms ease, box-shadow 400ms ease",
           }} />
@@ -8542,7 +7513,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             </button>
             <button
               onClick={() => { onFreeze?.(); setShowFreezeModal(false); }}
-              style={{ ...body, flex: 1, fontSize: "0.9rem", fontWeight: 700, backgroundColor: "#3A8FD6", color: "#fff", border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
+              style={{ ...body, flex: 1, fontSize: "0.9rem", fontWeight: 700, backgroundColor: palette.freeze, color: palette.onAccent, border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
             >
               <Snowflake size={14} style={{ marginRight: "0.35rem" }} /> Congelar
             </button>
@@ -8563,6 +7534,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
   const [selectedBook, setSelectedBook] = useState(initialBook || null);
   const [pages, setPages] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     supabase.from("books").select("id, title, author, cover_url")
@@ -8582,6 +7554,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
   async function handleMoodSelect(mood) {
     if (saving) return;
     setSaving(true);
+    setSaveError("");
     try {
       await logReadingSession({
         userId: user.id,
@@ -8595,10 +7568,12 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
       // insertar el reading_log; aquí solo se refleja en la UI.
       gemsEventBus.emit(5);
       gemToastBus.emit(5, "+5 gemas");
-    } catch (err) { console.error("Error registrando sesión:", err); }
-    finally {
-      setSaving(false);
       onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0 });
+    } catch (err) {
+      console.error("[reading] Error registrando sesión:", err);
+      setSaveError("No se pudo registrar la sesión. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -8637,7 +7612,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
                 </p>
                 <button
                   onClick={() => { onClose(); onGoToAdd?.(); }}
-                  style={{ ...display, color: "#FFFFFF", backgroundColor: palette.accent, border: "none", borderRadius: "12px", padding: "0.75rem 1.5rem", minHeight: "48px", cursor: "pointer", fontWeight: 600 }}
+                  style={{ ...display, color: palette.onAccent, backgroundColor: palette.accent, border: "none", borderRadius: "12px", padding: "0.75rem 1.5rem", minHeight: "48px", cursor: "pointer", fontWeight: 600 }}
                 >
                   Ir a Agregar
                 </button>
@@ -8680,7 +7655,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
               Paso 2 de 3 · <em style={{ color: palette.inkSoft }}>{selectedBook?.title}</em>
             </p>
             {pagesLoggedToday > 0 && (
-              <div style={{ backgroundColor: "#C8924A14", border: "1px solid #C8924A30", borderRadius: 10, padding: "0.55rem 0.85rem", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div style={{ backgroundColor: `${BRAND.amber}14`, border: `1px solid ${BRAND.amber}30`, borderRadius: 10, padding: "0.55rem 0.85rem", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                 <Flame size={15} color={palette.amber} strokeWidth={2} />
                 <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft }}>
                   Ya llevas <strong style={{ color: palette.amber }}>{pagesLoggedToday} páginas</strong> hoy — ¿cuántas más leíste?
@@ -8748,6 +7723,9 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
                 </button>
               ))}
             </div>
+            {saveError && (
+              <p style={{ ...body, fontSize: "0.85rem", color: palette.danger, marginTop: "1rem", textAlign: "center" }}>{saveError}</p>
+            )}
           </>
         )}
       </div>
@@ -8755,7 +7733,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
   );
 }
 
-function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog }) {
+function FiveMinutesModal({ books, onClose, onGoToLog }) {
   const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 200); }
   const [selectedBook, setSelectedBook] = useState(books.length === 1 ? books[0] : null);
@@ -8813,7 +7791,7 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
                     {b.coverUrl ? (
                       <img src={b.coverUrl} alt="" style={{ width: 48, height: 70, objectFit: "cover", borderRadius: 4, flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.18)" }} />
                     ) : (
-                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
                         {(b.title || "?")[0]}
                       </div>
                     )}
@@ -8834,7 +7812,7 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
                 {selectedBook.coverUrl ? (
                   <img src={selectedBook.coverUrl} alt="" style={coverStyle} />
                 ) : (
-                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: "#fff", fontFamily: "Fraunces, serif", fontSize: 36, fontWeight: 700 }}>
+                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: 36, fontWeight: 700 }}>
                     {(selectedBook.title || "?")[0]}
                   </div>
                 )}
@@ -8851,7 +7829,7 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
                 <button
                   key={m}
                   onClick={() => setMinutes(m)}
-                  style={{ borderRadius: 20, padding: "0.6rem 1.25rem", border: `1.5px solid ${minutes === m ? palette.accent : palette.border}`, backgroundColor: minutes === m ? palette.accent : "transparent", color: minutes === m ? "#fff" : palette.inkSoft, ...display, fontSize: "0.92rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+                  style={{ borderRadius: 20, padding: "0.6rem 1.25rem", border: `1.5px solid ${minutes === m ? palette.accent : palette.border}`, backgroundColor: minutes === m ? palette.accent : "transparent", color: minutes === m ? palette.onAccent : palette.inkSoft, ...display, fontSize: "0.92rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
                 >
                   {m} min
                 </button>
@@ -8890,7 +7868,7 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
           <>
             <button
               onClick={startTimer}
-              style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: "#fff", border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
+              style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
             >
               Empezar a leer →
             </button>
@@ -8915,7 +7893,7 @@ function FiveMinutesModal({ books, user, pagesLoggedToday, onClose, onGoToLog })
         {phase === "done" && (
           <button
             onClick={() => onGoToLog(minutes)}
-            style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: "#fff", border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
+            style={{ width: "100%", borderRadius: 14, padding: "1rem", backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...display, fontSize: "1rem", fontWeight: 700, cursor: "pointer" }}
           >
             Registrar páginas
           </button>
@@ -8983,7 +7961,7 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
         <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, textAlign: "center", marginBottom: "1.5rem" }}>Aparecerá en el feed de tus amigos</p>
 
         {/* Preview card */}
-        <div style={{ backgroundColor: palette.bg, border: `1px solid #4CAF5040`, borderLeft: `4px solid #4CAF50`, borderRadius: 12, padding: "14px 14px 12px", marginBottom: "1.25rem" }}>
+        <div style={{ backgroundColor: palette.bg, border: `1px solid ${palette.session}40`, borderLeft: `4px solid ${palette.session}`, borderRadius: 12, padding: "14px 14px 12px", marginBottom: "1.25rem" }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
             {coverSrc ? (
               <img src={coverSrc} alt="" style={{ width: 44, height: 64, objectFit: "cover", borderRadius: 5, flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.15)" }} />
@@ -8991,15 +7969,15 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
               <BookCoverPlaceholder title={book.title} author={book.author} width={44} height={64} />
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "0.72rem", color: "#4CAF50", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.2rem" }}>Sesión de lectura</p>
+              <p style={{ ...body, fontSize: "0.72rem", color: palette.session, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "0.2rem" }}>Sesión de lectura</p>
               <p style={{ ...display, fontSize: "0.95rem", fontWeight: 700, color: palette.ink, marginBottom: "0.1rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
               <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, fontStyle: "italic", marginBottom: "0.65rem" }}>{book.author}</p>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ backgroundColor: "#4CAF5018", border: "1px solid #4CAF5035", borderRadius: 20, padding: "2px 10px", ...body, fontSize: "0.78rem", color: "#2E7D32", fontWeight: 600 }}>
+                <span style={{ backgroundColor: `${palette.session}18`, border: `1px solid ${palette.session}35`, borderRadius: 20, padding: "2px 10px", ...body, fontSize: "0.78rem", color: palette.sessionInk, fontWeight: 600 }}>
                   {pages} {pages === 1 ? "página" : "páginas"}
                 </span>
                 {minutes && (
-                  <span style={{ backgroundColor: "#1B3A4B18", border: "1px solid #1B3A4B30", borderRadius: 20, padding: "2px 10px", ...body, fontSize: "0.78rem", color: "#1B3A4B", fontWeight: 600 }}>
+                  <span style={{ backgroundColor: `${palette.slate}18`, border: `1px solid ${palette.slate}30`, borderRadius: 20, padding: "2px 10px", ...body, fontSize: "0.78rem", color: palette.slate, fontWeight: 600 }}>
                     {minutes} min
                   </span>
                 )}
@@ -9021,12 +7999,12 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
         <button
           onClick={handleShare}
           disabled={sharing || shared}
-          style={{ ...display, width: "100%", padding: "0.9rem", borderRadius: 14, fontSize: "1rem", fontWeight: 700, backgroundColor: shared ? "#2E7D32" : "#4CAF50", color: "#fff", border: "none", cursor: (sharing || shared) ? "default" : "pointer", opacity: sharing ? 0.7 : 1, marginBottom: "0.6rem", transition: "background 0.2s" }}
+          style={{ ...display, width: "100%", padding: "0.9rem", borderRadius: 14, fontSize: "1rem", fontWeight: 700, backgroundColor: shared ? palette.sessionInk : palette.session, color: palette.onAccent, border: "none", cursor: (sharing || shared) ? "default" : "pointer", opacity: sharing ? 0.7 : 1, marginBottom: "0.6rem", transition: "background 0.2s" }}
         >
           {shared ? "¡Publicado! ✓" : sharing ? "Compartiendo…" : "Compartir en mi feed"}
         </button>
         {shareError && (
-          <p style={{ ...body, fontSize: "0.82rem", color: "#C62828", backgroundColor: "#FFEBEE", border: "1px solid #EF9A9A", borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "0.6rem", lineHeight: 1.4 }}>
+          <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, backgroundColor: palette.dangerSoft, border: `1px solid ${palette.dangerBorder}`, borderRadius: 8, padding: "0.6rem 0.85rem", marginBottom: "0.6rem", lineHeight: 1.4 }}>
             ⚠️ {shareError}
           </p>
         )}
@@ -9043,14 +8021,14 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
 
 function FeedSkeleton() {
   const shimmer = {
-    background: "linear-gradient(90deg, #E8E0D5 25%, #DDD5C8 50%, #E8E0D5 75%)",
+    background: `linear-gradient(90deg, ${palette.border} 25%, ${palette.borderSoft} 50%, ${palette.border} 75%)`,
     backgroundSize: "400px 100%",
     animation: "shimmer 1.5s infinite",
   };
   return (
     <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
       {[1, 2, 3].map(i => (
-        <div key={i} style={{ backgroundColor: "#F0EBE3", borderRadius: "16px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div key={i} style={{ backgroundColor: palette.bgSoft, borderRadius: "16px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <div style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0, ...shimmer }} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -9065,68 +8043,6 @@ function FeedSkeleton() {
     </div>
   );
 }
-
-const GENRE_CATEGORIES = [
-  { key: "ciencia-ficcion", label: "Ciencia Ficción", emoji: "🚀", keywords: ["ciencia ficcion", "ciencia ficción", "distopia", "distopía", "sci-fi", "ficción científica", "ciencia-ficción"] },
-  { key: "terror", label: "Terror", emoji: "👁️", keywords: ["terror", "horror", "suspenso", "thriller psicologico", "thriller psicológico"] },
-  { key: "romance", label: "Romance", emoji: "💙", keywords: ["romance", "romantico", "romántico", "drama"] },
-  { key: "filosofia", label: "Filosofía", emoji: "🌀", keywords: ["filosofia", "filosofía", "reflexion", "reflexión", "ensayo"] },
-  { key: "aventura", label: "Aventura", emoji: "⚔️", keywords: ["aventura", "accion", "acción", "thriller"] },
-  { key: "negocios", label: "Negocios", emoji: "💡", keywords: ["negocios", "desarrollo personal", "autoayuda", "emprendimiento", "finanzas"] },
-];
-
-const EDITORIAL_STORIES = {
-  "ciencia-ficcion": [
-    { id: "sc1", title: "La pata de mono", author: "W.W. Jacobs", url: "https://ciudadseva.com/texto/la-pata-de-mono/", minutes: 12, genre: "Distopía", desc: "Cuidado con lo que deseas." },
-    { id: "sc2", title: "El ruido del trueno", author: "Ray Bradbury", url: "https://ciudadseva.com/texto/un-sonido-de-trueno/", minutes: 10, genre: "Ciencia Ficción", desc: "Un viaje en el tiempo y una decisión que lo cambia todo." },
-    { id: "sc3", title: "El hombre ilustrado (prólogo)", author: "Ray Bradbury", url: "https://ciudadseva.com/texto/el-hombre-ilustrado/", minutes: 8, genre: "Ciencia Ficción", desc: "Tatuajes que cobran vida cuando anochece." },
-  ],
-  "terror": [
-    { id: "te1", title: "No tengo boca y debo gritar", author: "Harlan Ellison", url: "https://ciudadseva.com/texto/no-tengo-boca-y-debo-gritar/", minutes: 20, genre: "Terror", desc: "El cuento de ciencia ficción más perturbador jamás escrito." },
-    { id: "te2", title: "El almohadón de plumas", author: "Horacio Quiroga", url: "https://ciudadseva.com/texto/el-almohadon-de-plumas/", minutes: 8, genre: "Terror", desc: "Una historia de amor con un secreto perturbador." },
-    { id: "te3", title: "La señal", author: "Amparo Dávila", url: "https://ciudadseva.com/texto/la-senal/", minutes: 10, genre: "Terror", desc: "La autora mexicana del terror que deberías conocer." },
-  ],
-  "romance": [
-    { id: "ro1", title: "La noche de los feos", author: "Mario Benedetti", url: "https://ciudadseva.com/texto/la-noche-de-los-feos/", minutes: 5, genre: "Romance", desc: "El cuento de amor más honesto que vas a leer." },
-    { id: "ro2", title: "Continuidad de los parques", author: "Julio Cortázar", url: "https://ciudadseva.com/texto/continuidad-de-los-parques/", minutes: 3, genre: "Drama", desc: "El lector que no sabe que es el personaje." },
-    { id: "ro3", title: "El otro círculo", author: "Mario Benedetti", url: "https://ciudadseva.com/texto/el-otro-circulo/", minutes: 8, genre: "Drama", desc: "Algunas decisiones no tienen vuelta atrás." },
-  ],
-  "filosofia": [
-    { id: "fi1", title: "La noche boca arriba", author: "Julio Cortázar", url: "https://ciudadseva.com/texto/la-noche-boca-arriba/", minutes: 15, genre: "Filosofía", desc: "¿Cuál de las dos realidades es el sueño?" },
-    { id: "fi2", title: "Las babas del diablo", author: "Julio Cortázar", url: "https://ciudadseva.com/texto/las-babas-del-diablo/", minutes: 15, genre: "Filosofía", desc: "Una foto que esconde algo que nadie debería ver." },
-    { id: "fi3", title: "El guardagujas", author: "Juan José Arreola", url: "https://ciudadseva.com/texto/el-guardagujas/", minutes: 10, genre: "Reflexión", desc: "El mexicano que reinventó el cuento latinoamericano." },
-  ],
-  "aventura": [
-    { id: "av1", title: "Los asesinos", author: "Ernest Hemingway", url: "https://ciudadseva.com/texto/los-asesinos/", minutes: 10, genre: "Aventura", desc: "Puro diálogo. Pura tensión. Como una película." },
-    { id: "av2", title: "En el bosque", author: "Ryūnosuke Akutagawa", url: "https://ciudadseva.com/texto/en-el-bosque/", minutes: 12, genre: "Aventura", desc: "La misma historia contada por 7 personas distintas." },
-    { id: "av3", title: "El Sur", author: "Jorge Luis Borges", url: "https://ciudadseva.com/texto/el-sur/", minutes: 15, genre: "Aventura", desc: "Un hombre que viaja al pasado sin saberlo." },
-  ],
-  "negocios": [
-    { id: "ne1", title: "Hábitos Atómicos (cap. 1)", author: "James Clear", url: "https://www.amazon.com.mx/Habitos-atomicos/dp/6075694536", minutes: 10, genre: "Negocios", desc: "El libro de no-ficción más vendido de los últimos años." },
-    { id: "ne2", title: "El hombre más rico de Babilonia (cap. 1)", author: "George Clason", url: "https://ciudadseva.com/texto/el-hombre-mas-rico-de-babilonia/", minutes: 12, genre: "Negocios", desc: "Finanzas personales contadas como fábula." },
-    { id: "ne3", title: "El monje que vendió su Ferrari (cap. 1)", author: "Robin Sharma", url: "https://www.amazon.com.mx/monje-vendio-su-Ferrari/dp/8401379", minutes: 10, genre: "Negocios", desc: "El libro que cambió la vida de millones." },
-  ],
-};
-
-function getEditorialStories(books) {
-  const userGenres = [...new Set(books.map(b => (b.genre || "").toLowerCase()).filter(Boolean))];
-  const matchedKeys = new Set();
-  for (const cat of GENRE_CATEGORIES) {
-    if (userGenres.some(g => cat.keywords.some(k => g.includes(k) || k.includes(g)))) {
-      matchedKeys.add(cat.key);
-    }
-  }
-  const defaultKeys = ["ciencia-ficcion", "romance", "filosofia"];
-  const keys = matchedKeys.size > 0 ? [...matchedKeys] : defaultKeys;
-  return keys.flatMap(k => {
-    const cat = GENRE_CATEGORIES.find(c => c.key === k);
-    return (EDITORIAL_STORIES[k] || []).map(s => ({ ...s, catEmoji: cat?.emoji || "📖" }));
-  });
-}
-
-const CUENTO_TITLE_MAP = Object.fromEntries(
-  CUENTOS.map(c => [c.titulo.toLowerCase(), c])
-);
 
 // Cuento del día — el primero no leído a partir del índice del día.
 function getCuentoDelDia() {
@@ -9162,7 +8078,7 @@ function SnacksHero({ onRead }) {
       background: isDark
         ? `linear-gradient(135deg, ${palette.bgCard} 0%, rgba(200,79,79,0.08) 100%)`
         : "linear-gradient(135deg, rgba(164,75,63,0.07) 0%, rgba(200,146,74,0.06) 100%)",
-      border: `1px solid ${isDark ? "#4a3830" : "rgba(164,75,63,0.2)"}`,
+      border: `1px solid ${isDark ? palette.border : "rgba(164,75,63,0.2)"}`,
       borderRadius: 18,
       padding: "1.35rem 1.25rem 1.1rem",
       marginBottom: "1.5rem",
@@ -9201,12 +8117,12 @@ function SnacksHero({ onRead }) {
               const ids = new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]'));
               ids.add(cuento.id);
               localStorage.setItem('folio_read_cuentos', JSON.stringify([...ids]));
-            } catch {}
+            } catch { /* localStorage no disponible: no marcar como leído no rompe nada */ }
             onRead(cuento);
           }}
           style={{
             fontFamily: "Fraunces, serif", fontSize: "0.92rem", fontWeight: 700,
-            backgroundColor: palette.accent, color: "#F5EDE0",
+            backgroundColor: palette.accent, color: BRAND.cream,
             border: "none", borderRadius: 12, padding: "0.75rem 1.5rem",
             cursor: "pointer", width: "100%",
             transition: "transform 150ms cubic-bezier(0.23,1,0.32,1)",
@@ -9272,124 +8188,6 @@ function SnacksCarousel({ onRead }) {
   );
 }
 
-function FeedEditorialContent({ books, onAdd, onInvite, onRead }) {
-  const [addedIds, setAddedIds] = useState(new Set());
-  const stories = getEditorialStories(books);
-
-  function isInLibrary(story) {
-    return addedIds.has(story.id) || books.some(b => b.title.toLowerCase() === story.title.toLowerCase());
-  }
-
-  function getCuento(story) {
-    return CUENTO_TITLE_MAP[story.title.toLowerCase()] || null;
-  }
-
-  function handleAdd(story) {
-    if (isInLibrary(story)) return;
-    setAddedIds(prev => new Set([...prev, story.id]));
-    onAdd({
-      id: crypto.randomUUID(),
-      title: story.title,
-      author: story.author,
-      status: "reading",
-      genre: story.genre,
-      summary: "",
-      rating: 0,
-      review: "",
-      coverUrl: null,
-      moodTags: [],
-      addedAt: Date.now(),
-      finishedAt: null,
-    });
-  }
-
-  const timeLabel = (s) => s.time ? s.time : `~${s.minutes} min`;
-
-  return (
-    <div>
-      <p style={{ ...display, fontSize: "1.05rem", color: palette.ink, marginBottom: "0.9rem", fontWeight: 600 }}>
-        Para empezar a leer hoy
-      </p>
-      <div style={{ display: "flex", gap: "0.85rem", overflowX: "auto", paddingBottom: "0.75rem", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-        {stories.map((story) => {
-          const added = isInLibrary(story);
-          return (
-            <div key={story.id} style={{
-              flexShrink: 0, width: "280px",
-              backgroundColor: palette.bgCard,
-              border: `1px solid ${palette.border}`,
-              borderRadius: "14px",
-              padding: "1.1rem",
-              display: "flex", flexDirection: "column", gap: "0.4rem",
-            }}>
-              <span style={{ fontSize: "1.6rem", lineHeight: 1, marginBottom: "0.1rem" }}>{story.catEmoji}</span>
-              <p style={{ ...display, fontSize: "1rem", color: palette.ink, fontWeight: 700, lineHeight: 1.25, margin: 0 }}>
-                {story.title}
-              </p>
-              <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.85rem", color: palette.inkSoft, margin: 0 }}>
-                {story.author}
-              </p>
-              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, margin: 0, lineHeight: 1.4 }}>
-                {story.desc}
-              </p>
-              <span style={{
-                ...body, fontSize: "0.72rem", fontWeight: 600,
-                backgroundColor: palette.bgSoft, color: palette.inkSoft,
-                borderRadius: "20px", padding: "0.2rem 0.6rem",
-                alignSelf: "flex-start", marginTop: "0.15rem",
-              }}>
-                {timeLabel(story)}
-              </span>
-              <div style={{ display: "flex", gap: "0.45rem", marginTop: "auto", paddingTop: "0.65rem" }}>
-                <button
-                  onClick={() => {
-                    const cuento = getCuento(story);
-                    if (cuento && onRead) {
-                      onRead(cuento);
-                    } else {
-                      window.open(story.url, "_blank", "noopener,noreferrer");
-                    }
-                  }}
-                  style={{ ...body, flex: 1, fontSize: "0.8rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem" }}
-                >
-                  {getCuento(story) ? "Leer en Folio →" : "Leer ahora →"}
-                </button>
-                <button
-                  onClick={() => handleAdd(story)}
-                  disabled={added}
-                  style={{ ...body, flex: 1, fontSize: "0.78rem", fontWeight: 600, backgroundColor: "transparent", color: added ? palette.inkFaint : palette.ink, border: `1px solid ${added ? palette.border : palette.ink}`, borderRadius: "8px", padding: "0.5rem 0", cursor: added ? "default" : "pointer", transition: "color 150ms, border-color 150ms" }}
-                >
-                  {added ? "✓ Agregado" : "+ Biblioteca"}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{
-        marginTop: "1.1rem",
-        backgroundColor: palette.bgCard,
-        border: `1px solid ${palette.border}`,
-        borderRadius: "14px",
-        padding: "1.1rem 1.25rem",
-      }}>
-        <p style={{ ...display, fontSize: "1rem", color: palette.ink, margin: "0 0 0.2rem" }}>
-          Invita a un amigo y lean juntos
-        </p>
-        <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>
-          Comparte tu link personal de Folio
-        </p>
-        <button
-          onClick={onInvite}
-          style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}
-        >
-          Invitar amigo
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ============ QUOTE POST CARD (feed) ============
 function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsOpen, doubleTapId, onLike, onToggleComments, onAuthorClick, children }) {
   const quote = post.quote;
@@ -9400,9 +8198,7 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
   const moodLabel = MOOD_OPTIONS.find(m => m.key === quote?.mood)?.label;
   const isDark = palette.bg === PALETTE_DARK.bg;
 
-  const cardBg = isDark
-    ? "linear-gradient(155deg, #2a1f1a 0%, #1a1210 50%, #3d1a1a 100%)"
-    : "linear-gradient(155deg, #2A1F1A 0%, #4A2525 55%, #7A2E2E 100%)";
+  const cardBg = isDark ? QUOTE_POSTER_GRADIENTS.dark : QUOTE_POSTER_GRADIENTS.light;
 
   return (
     <div
@@ -9480,7 +8276,7 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
         {/* Double-tap heart overlay */}
         {doubleTapId === post.id && (
           <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-            <Heart size={60} color="#E74C3C" fill="#E74C3C" strokeWidth={0} />
+            <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
           </div>
         )}
       </div>
@@ -9539,13 +8335,13 @@ function RachaModal({ streak, onClose }) {
     : "Lector de élite. Tu disciplina es tu superpoder.";
   return (
     <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ background: "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)", padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
-        <Flame size={48} color="#F4EDE0" style={{ margin: "0 auto" }} className={cur > 7 ? "fire-pulse" : ""} />
-        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "3rem", color: "#fff", lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
+      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ background: BRAND.gradient, padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
+        <Flame size={48} color={BRAND.cream} style={{ margin: "0 auto" }} className={cur > 7 ? "fire-pulse" : ""} />
+        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "3rem", color: palette.onAccent, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
         <p style={{ ...display, fontSize: "1rem", color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
         <p style={{ ...body, fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", marginTop: "0.3rem" }}>Mejor racha: {best} {best === 1 ? "día" : "días"}</p>
-        <p style={{ ...body, fontSize: "0.92rem", color: "#fff", lineHeight: 1.4, marginTop: "1.25rem" }}>{msg}</p>
-        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.95)", color: "#7A2E2E", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem" }}>
+        <p style={{ ...body, fontSize: "0.92rem", color: palette.onAccent, lineHeight: 1.4, marginTop: "1.25rem" }}>{msg}</p>
+        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.95)", color: BRAND.wine, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem" }}>
           ¡A leer!
         </button>
       </div>
@@ -9575,8 +8371,8 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
         )}
         {cuento && (
           <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.85rem" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: "linear-gradient(135deg, #7A2E2E, #C8924A)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Sparkles size={20} color="#fff" />
+            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: BRAND.gradient, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Sparkles size={20} color={palette.onAccent} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "0.72rem", color: palette.amber, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
@@ -9628,11 +8424,12 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
     const ids = books.filter((b) => b.status === "reading").map((b) => b.id);
     if (ids.length === 0) { setBookProgress({}); return; }
     supabase.from("reading_logs").select("book_id, pages_read").eq("user_id", user.id).in("book_id", ids)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) { console.error("[home] no se pudo calcular el progreso:", error.message); return; }
         const m = {};
         (data || []).forEach((r) => { if (r.book_id) m[r.book_id] = (m[r.book_id] || 0) + (r.pages_read || 0); });
         setBookProgress(m);
-      }).catch(() => {});
+      });
   }, [user.id, isOnline, books.map((b) => b.id).join(","), progressNonce]);
 
   const sectionTitle = { ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink, marginBottom: "0.7rem" };
@@ -9650,7 +8447,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         const ids = new Set(JSON.parse(localStorage.getItem("folio_read_cuentos") || "[]"));
         ids.add(cuento.id);
         localStorage.setItem("folio_read_cuentos", JSON.stringify([...ids]));
-      } catch {}
+      } catch { /* localStorage no disponible: no marcar como leído no rompe nada */ }
       setActiveReader(cuento);
     }
   }
@@ -9666,14 +8463,14 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
       <button
         onClick={() => setRachaOpen(true)}
         className="btn-press"
-        style={{ width: "100%", textAlign: "left", marginBottom: "1.25rem", padding: "1.25rem 1.4rem", borderRadius: 20, cursor: "pointer", border: "none", background: cur > 0 ? "linear-gradient(135deg, #7A2E2E 0%, #C8924A 100%)" : palette.bgCard, boxShadow: cur > 0 ? "0 8px 28px rgba(122,46,46,0.3)" : "none", display: "flex", alignItems: "center", gap: "1.1rem", ...(cur > 0 ? {} : { borderWidth: 1, borderStyle: "dashed", borderColor: palette.border }) }}
+        style={{ width: "100%", textAlign: "left", marginBottom: "1.25rem", padding: "1.25rem 1.4rem", borderRadius: 20, cursor: "pointer", border: "none", background: cur > 0 ? BRAND.gradient : palette.bgCard, boxShadow: cur > 0 ? "0 8px 28px rgba(122,46,46,0.3)" : "none", display: "flex", alignItems: "center", gap: "1.1rem", ...(cur > 0 ? {} : { borderWidth: 1, borderStyle: "dashed", borderColor: palette.border }) }}
       >
-        <Flame size={44} color={cur > 0 ? "#F4EDE0" : palette.inkFaint} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
+        <Flame size={44} color={cur > 0 ? BRAND.cream : palette.inkFaint} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           {cur > 0 ? (
             <>
-              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "2.6rem", color: "#F4EDE0", lineHeight: 1 }}>{cur}</p>
-              <p style={{ ...display, fontSize: "0.95rem", color: "#F4EDE0", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
+              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "2.6rem", color: BRAND.cream, lineHeight: 1 }}>{cur}</p>
+              <p style={{ ...display, fontSize: "0.95rem", color: BRAND.cream, fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: "rgba(244,237,224,0.75)", marginTop: "0.15rem" }}>Mejor: {best} {best === 1 ? "día" : "días"}</p>
             </>
           ) : (
@@ -9689,7 +8486,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
       <button
         onClick={() => setLeerOpen(true)}
         className="btn-press"
-        style={{ width: "100%", marginBottom: "1.5rem", padding: "1.15rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: "#fff", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.15rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)" }}
+        style={{ width: "100%", marginBottom: "1.5rem", padding: "1.15rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: palette.onAccent, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.15rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)" }}
       >
         Leer ahora →
       </button>
@@ -9820,7 +8617,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [timerMinutes, setTimerMinutes] = useState(null);
   const [shareSession, setShareSession] = useState(null);
   const [feedState, setFeedState] = useState('loading');
-  const [hasFriends, setHasFriends] = useState(null);
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -9860,7 +8656,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   useEffect(() => {
     if (!pendingNavigation) return;
     const { postId, openComments: shouldOpenComments } = pendingNavigation;
-    setTimeout(() => {
+    const t = setTimeout(() => {
       const el = document.getElementById(`post-${postId}`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -9872,7 +8668,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       }
       onNavigationDone?.();
     }, 300);
+    return () => clearTimeout(t);
   }, [pendingNavigation]);
+
+  // Libera el blob del preview de imagen al cambiarlo, cancelarlo o salir del feed.
+  useEffect(() => () => { if (postImagePreview) URL.revokeObjectURL(postImagePreview); }, [postImagePreview]);
 
   async function loadStreakInfo() {
     let s = null, logged = false, pages = 0;
@@ -9887,7 +8687,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         const currentMonth = new Date().getMonth() + 1;
         const needsReset = s.last_freeze_reset_month !== currentMonth && (s.streak_freezes_remaining ?? 1) < 1;
         if (needsReset) {
-          const { data: updated } = await supabase.rpc("reset_monthly_freeze");
+          const updated = await resetMonthlyFreeze();
           if (updated) s = updated;
         }
       } catch (err) {
@@ -9903,13 +8703,18 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     try {
       const { count } = await supabase.from("reading_logs").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("log_date", yStr);
       setLoggedYesterday((count || 0) > 0);
-    } catch {}
+    } catch (err) {
+      console.error("[streak] no se pudo revisar la lectura de ayer:", err);
+    }
   }
 
   async function applyFreeze() {
-    const { data: updated, error } = await supabase.rpc("use_streak_freeze");
-    if (error) { console.error("[streak] use_streak_freeze falló:", error.message); return; }
-    if (updated) setStreak(updated);
+    try {
+      const updated = await applyStreakFreeze();
+      if (updated) setStreak(updated);
+    } catch (err) {
+      console.error("[streak] use_streak_freeze falló:", err?.message || err);
+    }
   }
 
   function scheduleNotifSW() {
@@ -9941,8 +8746,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     try {
       const { data: fs, error: fsErr } = await supabase.from("friendships").select("user_id, friend_id").eq("status", "accepted").or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
       if (fsErr) throw fsErr;
-      if (!fs || fs.length === 0) { devLog("[friendsReading] no friendships"); setHasFriends(false); return; }
-      setHasFriends(true);
+      if (!fs || fs.length === 0) { devLog("[friendsReading] no friendships"); return; }
       const friendIds = [...new Set(fs.map(f => f.user_id === user.id ? f.friend_id : f.user_id))];
       devLog("[friendsReading] friendIds:", friendIds);
       const [{ data: rbooks, error: bErr }, { data: profiles }] = await Promise.all([
@@ -10027,17 +8831,23 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     const alreadyLiked = likedPosts.has(postId);
     setLikedPosts(prev => { const next = new Set(prev); alreadyLiked ? next.delete(postId) : next.add(postId); return next; });
     setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 0) + (alreadyLiked ? -1 : 1)) }));
+    const revert = ({ error }) => {
+      if (!error || error.code === "23505") return;
+      console.error("[likes] like de post no se guardó:", error.message);
+      setLikedPosts(prev => { const next = new Set(prev); alreadyLiked ? next.add(postId) : next.delete(postId); return next; });
+      setLikeCounts(prev => ({ ...prev, [postId]: Math.max(0, (prev[postId] || 0) + (alreadyLiked ? 1 : -1)) }));
+    };
     if (alreadyLiked) {
-      supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", user.id).then();
+      supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", user.id).then(revert);
     } else {
-      supabase.from("post_likes").insert({ post_id: postId, user_id: user.id }).then();
+      supabase.from("post_likes").insert({ post_id: postId, user_id: user.id }).then(revert);
       const post = posts.find(p => p.id === postId);
       if (!post) { console.warn("[notif] like_post: post not found in state for id", postId); }
       else if (post.user_id !== user.id) {
         const notifPayload = { user_id: post.user_id, actor_id: user.id, type: "like_post", post_id: postId, read: false };
         devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
         supabase.from("notifications").insert(notifPayload)
-          .then(({ data, error, count }) => { devLog("[like-insert-post] Result:", { data, error, count }); });
+          .then(({ error }) => { if (error) console.error("[notif] no se pudo crear la notificación:", error.message); });
       }
     }
   }
@@ -10097,7 +8907,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     .sort((a, b) => b.finishedAt - a.finishedAt)[0];
   const wantToReadCount = books.filter(b => b.status === "want_to_read").length;
   let motivationalPhrase = "";
-  const s = streak || 0;
+  const s = streak?.current_streak || 0;
   if (s >= 7) {
     motivationalPhrase = `Llevas ${s} días seguidos. Eso ya es un hábito.`;
   } else if (s >= 3) {
@@ -10147,7 +8957,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             </button>
             <button
               onClick={requestNotifPermission}
-              style={{ ...body, fontSize: "0.82rem", fontWeight: 700, backgroundColor: palette.ink, color: "#fff", border: "none", borderRadius: "8px", padding: "0.45rem 1rem", cursor: "pointer" }}
+              style={{ ...body, fontSize: "0.82rem", fontWeight: 700, backgroundColor: palette.ink, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.45rem 1rem", cursor: "pointer" }}
             >
               Activar notificaciones
             </button>
@@ -10204,11 +9014,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
                     ) : (
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600 }}>
                         {(friend.nombre || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                     )}
-                    <div className="pulse-dot" style={{ position: "absolute", bottom: 1, right: 1, width: 8, height: 8, borderRadius: "50%", backgroundColor: "#4CAF50", border: "2px solid white" }} />
+                    <div className="pulse-dot" style={{ position: "absolute", bottom: 1, right: 1, width: 8, height: 8, borderRadius: "50%", backgroundColor: palette.session, border: `2px solid ${palette.bgCard}` }} />
                   </div>
                   <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
                     {displayName}
@@ -10222,7 +9032,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
       {/* Popover para strip de amigos */}
       {openPopover && (() => {
-        const { rect, book, friend } = openPopover;
+        const { rect, book } = openPopover;
         const popW = 200;
         const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popW / 2, window.innerWidth - popW - 8));
         const bottom = window.innerHeight - rect.top + 12;
@@ -10307,14 +9117,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 <img src={postImagePreview} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, display: "block" }} />
                 <button
                   onClick={() => { setPostImageFile(null); setPostImagePreview(null); }}
-                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", backgroundColor: palette.ink, color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}
+                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", backgroundColor: palette.ink, color: palette.onAccent, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}
                 >
                   ✕
                 </button>
               </div>
             )}
             {postError && (
-              <p style={{ ...body, fontSize: "0.82rem", color: "#dc2626", marginBottom: "0.5rem" }}>⚠️ {postError}</p>
+              <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginBottom: "0.5rem" }}>⚠️ {postError}</p>
             )}
             <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.75rem" }}>
               {/* Image picker */}
@@ -10352,11 +9162,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
       {/* Lista de posts */}
       {feedState === 'error' ? (
-        <div style={{ backgroundColor: "#fef2f2", border: "1px solid #fca5a5", borderRadius: "12px", padding: "1rem 1.25rem", marginBottom: "1rem", color: "#991b1b", ...body, fontSize: "0.88rem" }}>
+        <div style={{ backgroundColor: palette.dangerSoft, border: `1px solid ${palette.dangerBorder}`, borderRadius: "12px", padding: "1rem 1.25rem", marginBottom: "1rem", color: palette.dangerInk, ...body, fontSize: "0.88rem" }}>
           <p style={{ marginBottom: "0.75rem" }}>⚠️ {feedError || "No se pudo cargar el feed."}</p>
           <button
             onClick={() => { setFeedState('loading'); loadFeed(); }}
-            style={{ backgroundColor: "#991b1b", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", ...body, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
+            style={{ backgroundColor: palette.dangerInk, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", ...body, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
           >
             Reintentar
           </button>
@@ -10371,7 +9181,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         null
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem", animation: "feedFadeIn 200ms ease-out" }}>
-          {posts.forEach(p => { if (import.meta.env.DEV && p.type === 'reading_session') { devLog('READING SESSION POST COMPLETO:', JSON.stringify(p)); } }) || null}
           {posts.map((post) => {
             const commentsOpen = openComments.has(post.id);
             const isFinished = post.type === "book_update" && post.action === "finished";
@@ -10389,13 +9198,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   border: `1px solid ${palette.amber}40`,
                   borderRadius: "14px",
                   padding: "18px 16px 14px",
-                  boxShadow: highlightedPost === post.id ? "0 2px 10px rgba(200,146,74,0.13), 0 0 0 2px #7A2E2E" : "0 2px 10px rgba(200,146,74,0.13)",
+                  boxShadow: highlightedPost === post.id ? `0 2px 10px rgba(200,146,74,0.13), 0 0 0 2px ${BRAND.wine}` : "0 2px 10px rgba(200,146,74,0.13)",
                   transition: "box-shadow 200ms ease",
                 }}>
                   {/* Sparkles decorativos */}
-                  <span style={{ position: "absolute", top: 10, right: 18, fontSize: 11, opacity: 0.3, color: "#C8924A", pointerEvents: "none" }}>✦</span>
-                  <span style={{ position: "absolute", top: 22, right: 36, fontSize: 8, opacity: 0.25, color: "#C8924A", pointerEvents: "none" }}>✦</span>
-                  <span style={{ position: "absolute", bottom: 14, right: 22, fontSize: 9, opacity: 0.2, color: "#C8924A", pointerEvents: "none" }}>✦</span>
+                  <span style={{ position: "absolute", top: 10, right: 18, fontSize: 11, opacity: 0.3, color: BRAND.amber, pointerEvents: "none" }}>✦</span>
+                  <span style={{ position: "absolute", top: 22, right: 36, fontSize: 8, opacity: 0.25, color: BRAND.amber, pointerEvents: "none" }}>✦</span>
+                  <span style={{ position: "absolute", bottom: 14, right: 22, fontSize: 9, opacity: 0.2, color: BRAND.amber, pointerEvents: "none" }}>✦</span>
 
                   {/* Header: autor + "desbloqueó un logro" */}
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
@@ -10421,9 +9230,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {/* Ícono central grande */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0.25rem 0 0.75rem" }}>
                     <div className="achieve-icon-enter" style={{ position: "relative", marginBottom: "0.75rem" }}>
-                      <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: "#C8924A", opacity: 0.15, position: "absolute", inset: 0 }} />
+                      <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: BRAND.amber, opacity: 0.15, position: "absolute", inset: 0 }} />
                       <div style={{ width: 72, height: 72, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                        <AchIcon size={34} color="#C8924A" strokeWidth={1.8} />
+                        <AchIcon size={34} color={BRAND.amber} strokeWidth={1.8} />
                       </div>
                     </div>
                     {achDef ? (
@@ -10439,12 +9248,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {/* Doble tap overlay */}
                   {doubleTapPost === post.id && (
                     <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-                      <Heart size={60} color="#E74C3C" fill="#E74C3C" strokeWidth={0} />
+                      <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
                     </div>
                   )}
 
                   {/* Footer: likes + comentarios */}
-                  <div style={{ borderTop: "1px solid #E8D5A8", paddingTop: "0.65rem", marginTop: "0.1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
+                  <div style={{ borderTop: `1px solid ${palette.amber}40`, paddingTop: "0.65rem", marginTop: "0.1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
                     <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={16} />
                     <button onClick={() => toggleComments(post.id)} style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
                       <MessageCircle size={14} strokeWidth={2} />
@@ -10485,11 +9294,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 <div key={post.id} id={`post-${post.id}`}
                   className="feed-post-item"
                   onClick={() => handleDoubleTap(post.id)}
-                  style={{ position: "relative", overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid #4CAF5030`, borderLeft: `4px solid #4CAF50`, borderRadius: "14px", padding: "18px", boxShadow: highlightedPost === post.id ? "0 2px 8px rgba(76,175,80,0.10), 0 0 0 2px #7A2E2E" : "0 2px 8px rgba(76,175,80,0.10)", cursor: "default", transition: "box-shadow 200ms ease" }}
+                  style={{ position: "relative", overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid ${palette.session}30`, borderLeft: `4px solid ${palette.session}`, borderRadius: "14px", padding: "18px", boxShadow: highlightedPost === post.id ? `0 2px 8px rgba(76,175,80,0.10), 0 0 0 2px ${BRAND.wine}` : "0 2px 8px rgba(76,175,80,0.10)", cursor: "default", transition: "box-shadow 200ms ease" }}
                 >
                   {doubleTapPost === post.id && (
                     <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-                      <Heart size={60} color="#E74C3C" fill="#E74C3C" strokeWidth={0} />
+                      <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
                     </div>
                   )}
                   {/* Header */}
@@ -10534,12 +9343,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {(sesPages > 0 || sesMinutes > 0) && (
                     <div style={{ display: "flex", gap: "8px", marginTop: "10px", marginBottom: "12px", flexWrap: "wrap" }}>
                       {sesPages > 0 && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#E8F0E3", color: "#3D6B28", borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: palette.bgSoft, color: palette.sessionInk, borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
                           📖 {sesPages} {sesPages === 1 ? "página" : "páginas"}
                         </span>
                       )}
                       {sesMinutes > 0 && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: "#FDF3DC", color: "#8B6200", borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: palette.warnBg, color: palette.warnInk, borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
                           ⏱ {sesMinutes} min
                         </span>
                       )}
@@ -10561,7 +9370,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               );
             }
 
-            const accentBorder = isFinished ? "#7A2E2E" : isStarted ? "#C8924A" : "#1B3A4B";
+            const accentBorder = isFinished ? BRAND.wine : isStarted ? BRAND.amber : palette.slate;
             const shadowColor = isFinished ? "rgba(122,46,46,0.13)" : isStarted ? "rgba(200,146,74,0.15)" : "rgba(27,58,75,0.12)";
             return (
               <div key={post.id} id={`post-${post.id}`}
@@ -10574,14 +9383,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   borderLeft: `4px solid ${accentBorder}`,
                   borderRadius: "14px",
                   padding: "18px",
-                  boxShadow: highlightedPost === post.id ? `0 2px 8px ${shadowColor}, 0 0 0 2px #7A2E2E` : `0 2px 8px ${shadowColor}`,
+                  boxShadow: highlightedPost === post.id ? `0 2px 8px ${shadowColor}, 0 0 0 2px ${BRAND.wine}` : `0 2px 8px ${shadowColor}`,
                   cursor: "default",
                   transition: "box-shadow 200ms ease",
                 }}>
                 {/* Doble tap overlay */}
                 {doubleTapPost === post.id && (
                   <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-                    <Heart size={60} color="#E74C3C" fill="#E74C3C" strokeWidth={0} />
+                    <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
                   </div>
                 )}
                 {/* Celebración para libros terminados */}
@@ -10647,7 +9456,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       <p style={{ ...display, fontWeight: 700, fontStyle: "italic", fontSize: "1.05rem", color: palette.ink, marginBottom: "0.15rem", lineHeight: 1.25 }}>{post.book.title}</p>
                       <p style={{ ...body, fontStyle: "italic", fontSize: "0.84rem", color: palette.inkSoft, marginBottom: "0.3rem" }}>{post.book.author}</p>
                       {isFinished && post.book.rating > 0 && (
-                        <p style={{ fontSize: "0.85rem", color: "#E07B1A", letterSpacing: "0.05em" }}>
+                        <p style={{ fontSize: "0.85rem", color: palette.amberRich, letterSpacing: "0.05em" }}>
                           {"★".repeat(post.book.rating)}{"☆".repeat(5 - post.book.rating)}
                         </p>
                       )}
@@ -10743,8 +9552,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       {showTimerModal && readingBooks.length > 0 && (
         <FiveMinutesModal
           books={readingBooks}
-          user={user}
-          pagesLoggedToday={pagesLoggedToday}
           onClose={() => setShowTimerModal(false)}
           onGoToLog={(mins) => { setTimerMinutes(mins || null); setShowTimerModal(false); setShowLogModal(true); }}
         />
@@ -10767,7 +9574,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         >
           <button
             onClick={() => setLightboxImage(null)}
-            style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}
+            style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.onAccent }}
           >
             <X size={18} />
           </button>
@@ -10808,8 +9615,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           }}>
             <div style={{ width: 36, height: 4, backgroundColor: palette.border, borderRadius: 999, margin: "0 auto 1.25rem" }} />
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.65rem" }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "#FEE2E2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Trash2 size={18} color="#DC2626" strokeWidth={2} />
+              <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: palette.dangerSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Trash2 size={18} color={palette.danger} strokeWidth={2} />
               </div>
               <div>
                 <p style={{ ...display, fontWeight: 700, fontSize: "1rem", color: palette.ink }}>¿Borrar este post?</p>
@@ -10822,7 +9629,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 disabled={deleting}
                 style={{
                   width: "100%", padding: "0.85rem", borderRadius: 12,
-                  backgroundColor: "#DC2626", color: "#fff",
+                  backgroundColor: palette.danger, color: palette.onAccent,
                   border: "none", cursor: deleting ? "default" : "pointer",
                   ...display, fontSize: "0.97rem", fontWeight: 600,
                   opacity: deleting ? 0.7 : 1,
@@ -10896,12 +9703,12 @@ function ReadingStatsView({ books }) {
   const fiveStars = read.filter((b) => b.rating === 5).length;
 
   const stats = [
-    { label: "Leídos",          value: read.length,                          Icon: BookCheck,  iconColor: "#5C6B3D", bg: "#5C6B3D08", accent: "#5C6B3D", border: "#5C6B3D22" },
-    { label: "Leyendo",         value: reading.length,                       Icon: BookOpen,   iconColor: "#C8842B", bg: "#C8842B08", accent: "#7A2E2E", border: "#C8842B22" },
-    { label: "Por leer",        value: want.length,                          Icon: Bookmark,   iconColor: "#64748B", bg: "#64748B08", accent: "#1B3A4B", border: "#64748B22" },
-    { label: "Total",           value: books.length,                         Icon: Library,    iconColor: "#6B1E2A", bg: "#6B1E2A08", accent: "#2A1F1A", border: "#6B1E2A22" },
-    { label: "Valoración media",value: avgRating ? `${avgRating} ★` : "—",  Icon: Star,       iconColor: "#C8842B", bg: "#C8842B08", accent: "#8A5A1A", border: "#C8842B22" },
-    { label: "Cinco estrellas", value: fiveStars,                            Icon: Award,      iconColor: "#C8842B", bg: "#C8842B08", accent: "#6B2B3E", border: "#C8842B22" },
+    { label: "Leídos",          value: read.length,                          Icon: BookCheck,  iconColor: palette.sage, bg: `${palette.sage}08`, accent: palette.sage, border: `${palette.sage}22` },
+    { label: "Leyendo",         value: reading.length,                       Icon: BookOpen,   iconColor: palette.amber, bg: `${palette.amber}08`, accent: BRAND.wine, border: `${palette.amber}22` },
+    { label: "Por leer",        value: want.length,                          Icon: Bookmark,   iconColor: palette.slate, bg: `${palette.slate}08`, accent: palette.slate, border: `${palette.slate}22` },
+    { label: "Total",           value: books.length,                         Icon: Library,    iconColor: BRAND.wineDeep, bg: `${BRAND.wineDeep}08`, accent: BRAND.ink, border: `${BRAND.wineDeep}22` },
+    { label: "Valoración media",value: avgRating ? `${avgRating} ★` : "—",  Icon: Star,       iconColor: palette.amber, bg: `${palette.amber}08`, accent: palette.amberInk, border: `${palette.amber}22` },
+    { label: "Cinco estrellas", value: fiveStars,                            Icon: Award,      iconColor: palette.amber, bg: `${palette.amber}08`, accent: BRAND.wineDeep, border: `${palette.amber}22` },
   ];
 
   return (
@@ -10995,7 +9802,7 @@ function SaveQuoteModal({ books, userId, onClose, onSaved, defaultBookId }) {
           __folio_type: "quote",
           text: q.text,
           mood: q.mood || null,
-          page_number: q.page_number || null,
+          page_number: q.pageNumber || null,
           bookTitle: q.bookTitle || null,
           bookAuthor: q.bookAuthor || null,
         });
@@ -11087,14 +9894,14 @@ function SaveQuoteModal({ books, userId, onClose, onSaved, defaultBookId }) {
               </div>
             </div>
             <div style={{ width: 38, height: 22, borderRadius: "999px", backgroundColor: shareToFeed ? palette.accent : palette.border, position: "relative", transition: "background-color 200ms ease", flexShrink: 0 }}>
-              <div style={{ position: "absolute", top: 3, left: shareToFeed ? 19 : 3, width: 16, height: 16, borderRadius: "50%", backgroundColor: "#fff", boxShadow: "0 1px 4px rgba(0,0,0,0.25)", transition: "left 200ms ease" }} />
+              <div style={{ position: "absolute", top: 3, left: shareToFeed ? 19 : 3, width: 16, height: 16, borderRadius: "50%", backgroundColor: palette.onAccent, boxShadow: "0 1px 4px rgba(0,0,0,0.25)", transition: "left 200ms ease" }} />
             </div>
           </button>
 
           <button
             onClick={handleSave}
             disabled={!text.trim() || saving}
-            style={{ width: "100%", ...display, fontSize: "1rem", fontWeight: 600, color: "#fff", backgroundColor: (!text.trim() || saving) ? palette.border : palette.accent, border: "none", borderRadius: "10px", padding: "0.85rem", cursor: (!text.trim() || saving) ? "not-allowed" : "pointer", transition: "background-color 150ms ease", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}
+            style={{ width: "100%", ...display, fontSize: "1rem", fontWeight: 600, color: palette.onAccent, backgroundColor: (!text.trim() || saving) ? palette.border : palette.accent, border: "none", borderRadius: "10px", padding: "0.85rem", cursor: (!text.trim() || saving) ? "not-allowed" : "pointer", transition: "background-color 150ms ease", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}
           >
             {saving ? <Loader2 size={17} style={{ animation: "spin 1s linear infinite" }} /> : <Sparkles size={16} />}
             {saving ? "Guardando..." : shareToFeed ? "Guardar y compartir" : "Guardar frase"}
@@ -11129,23 +9936,23 @@ function QuoteCard({ quote, onPress, onToggleFavorite, onShareToFeed }) {
                 </p>
               )}
               <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
-                {quote.page_number && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.inkFaint }}>Pág. {quote.page_number}</span>}
+                {quote.pageNumber && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.inkFaint }}>Pág. {quote.pageNumber}</span>}
                 {moodLabel && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.accent, backgroundColor: palette.accent + "15", borderRadius: "999px", padding: "0.12rem 0.45rem" }}>{moodLabel}</span>}
-                {quote.is_public && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.65rem", color: palette.inkFaint, display: "flex", alignItems: "center", gap: "0.2rem" }}>✓ En feed</span>}
+                {quote.isPublic && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.65rem", color: palette.inkFaint, display: "flex", alignItems: "center", gap: "0.2rem" }}>✓ En feed</span>}
               </div>
             </div>
             <button
               onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
               style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", flexShrink: 0 }}
             >
-              <Heart size={18} fill={quote.is_favorite ? "#E74C3C" : "none"} strokeWidth={1.8} color={quote.is_favorite ? "#E74C3C" : palette.inkFaint} />
+              <Heart size={18} fill={quote.isFavorite ? palette.like : "none"} strokeWidth={1.8} color={quote.isFavorite ? palette.like : palette.inkFaint} />
             </button>
           </div>
         </div>
       </button>
 
       {/* Share to feed strip */}
-      {!quote.is_public && onShareToFeed && (
+      {!quote.isPublic && onShareToFeed && (
         <button
           onClick={onShareToFeed}
           style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", padding: "0.5rem", borderTop: `1px solid ${palette.borderSoft}`, background: "none", border: "none", cursor: "pointer", fontFamily: "system-ui, sans-serif", fontSize: "0.75rem", fontWeight: 500, color: palette.inkFaint, transition: "color 150ms ease" }}
@@ -11160,12 +9967,12 @@ function QuoteCard({ quote, onPress, onToggleFavorite, onShareToFeed }) {
 
 function QuoteShareCard({ quote, cardRef }) {
   return (
-    <div ref={cardRef} style={{ width: "320px", background: "linear-gradient(155deg, #F5EFE3 0%, #C9976A 55%, #7A2E2E 100%)", borderRadius: "20px", padding: "2.5rem 2rem 1.75rem", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: "1rem", minHeight: "380px" }}>
+    <div ref={cardRef} style={{ width: "320px", background: BRAND.gradientShareCard, borderRadius: "20px", padding: "2.5rem 2rem 1.75rem", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: "1rem", minHeight: "380px" }}>
       <div style={{ position: "absolute", top: -60, right: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
       <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>FOLIO</p>
       <div style={{ fontFamily: "Georgia, serif", fontSize: "4rem", lineHeight: 0.9, color: "rgba(42,31,26,0.18)", margin: 0 }}>"</div>
-      <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "1.15rem", lineHeight: 1.62, color: "#2A1F1A", margin: 0, flex: 1 }}>
+      <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "1.15rem", lineHeight: 1.62, color: BRAND.ink, margin: 0, flex: 1 }}>
         {(quote.text || "").length > 220 ? (quote.text || "").slice(0, 220) + "…" : quote.text}
       </p>
       {quote.bookTitle && (
@@ -11220,12 +10027,12 @@ function QuoteShareModal({ quote, onClose }) {
           <button
             onClick={handleShare}
             disabled={generating}
-            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "10px", padding: "0.75rem 1.5rem", cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
+            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "10px", padding: "0.75rem 1.5rem", cursor: generating ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}
           >
             {generating ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={16} />}
             {shared ? "¡Listo!" : generating ? "Generando..." : "Compartir imagen"}
           </button>
-          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: "#fff", border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "Fraunces, serif" }}>
+          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onAccent, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "Fraunces, serif" }}>
             Cerrar
           </button>
         </div>
@@ -11241,30 +10048,40 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const moodLabel = MOOD_OPTIONS.find(m => m.key === quote.mood)?.label;
-  const formattedDate = new Date(quote.created_at).toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" });
+  const formattedDate = new Date(quote.createdAt).toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" });
 
   async function handleSave() {
     if (!draft.text?.trim() || saving) return;
     setSaving(true);
+    setSaveError("");
     try {
       await updateQuoteInDB(draft, userId);
-      const book = (books || []).find(b => b.id === draft.book_id);
+      const book = (books || []).find(b => b.id === draft.bookId);
       const updated = { ...draft, bookTitle: book?.title || quote.bookTitle, bookAuthor: book?.author || quote.bookAuthor };
       setQuote(updated);
       onUpdate(updated);
       setEditing(false);
+    } catch (err) {
+      console.error("[quotes] no se pudo guardar la frase:", err);
+      setSaveError("No se pudo guardar. Intenta de nuevo.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleToggle() {
-    const newVal = !quote.is_favorite;
-    setQuote(q => ({ ...q, is_favorite: newVal }));
-    await toggleQuoteFavorite(quote.id, userId, newVal);
-    onToggleFavorite({ ...quote, is_favorite: newVal });
+    const newVal = !quote.isFavorite;
+    setQuote(q => ({ ...q, isFavorite: newVal }));
+    try {
+      await toggleQuoteFavorite(quote.id, userId, newVal);
+      onToggleFavorite({ ...quote, isFavorite: newVal });
+    } catch (err) {
+      console.error("[quotes] no se pudo cambiar favorita:", err);
+      setQuote(q => ({ ...q, isFavorite: !newVal }));
+    }
   }
 
   return (
@@ -11282,7 +10099,7 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
           )}
           <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
             {editing && (
-              <button onClick={handleSave} disabled={saving} style={{ ...display, fontSize: "0.82rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "8px", padding: "0.32rem 0.8rem", cursor: saving ? "not-allowed" : "pointer" }}>
+              <button onClick={handleSave} disabled={saving} style={{ ...display, fontSize: "0.82rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.32rem 0.8rem", cursor: saving ? "not-allowed" : "pointer" }}>
                 {saving ? "..." : "Guardar"}
               </button>
             )}
@@ -11302,16 +10119,17 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
                 autoFocus
                 style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "1.05rem", fontStyle: "italic", color: palette.ink, backgroundColor: palette.bgCard, border: `1.5px solid ${palette.border}`, borderRadius: "10px", padding: "0.85rem", resize: "none", outline: "none", lineHeight: 1.55, marginBottom: "1rem" }}
               />
+              {saveError && <p style={{ ...body, fontSize: "0.85rem", color: palette.danger, marginTop: "-0.5rem", marginBottom: "0.75rem" }}>{saveError}</p>}
               <div style={{ marginBottom: "0.75rem" }}>
                 <label style={{ ...ts.label, display: "block", marginBottom: "0.25rem" }}>Libro</label>
-                <select value={draft.book_id || ""} onChange={e => setDraft(d => ({ ...d, book_id: e.target.value || null }))} style={{ width: "100%", ...body, fontSize: "0.9rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem 0.65rem", outline: "none" }}>
+                <select value={draft.bookId || ""} onChange={e => setDraft(d => ({ ...d, bookId: e.target.value || null }))} style={{ width: "100%", ...body, fontSize: "0.9rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem 0.65rem", outline: "none" }}>
                   <option value="">Sin libro</option>
                   {(books || []).map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: "0.75rem" }}>
                 <label style={{ ...ts.label, display: "block", marginBottom: "0.25rem" }}>Página (opcional)</label>
-                <input type="number" value={draft.page_number || ""} onChange={e => setDraft(d => ({ ...d, page_number: e.target.value ? parseInt(e.target.value) : null }))} style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "0.9rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem 0.65rem", outline: "none" }} />
+                <input type="number" value={draft.pageNumber || ""} onChange={e => setDraft(d => ({ ...d, pageNumber: e.target.value ? parseInt(e.target.value) : null }))} style={{ width: "100%", boxSizing: "border-box", ...body, fontSize: "0.9rem", color: palette.ink, backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem 0.65rem", outline: "none" }} />
               </div>
             </div>
           ) : (
@@ -11334,17 +10152,17 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
               )}
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem 1rem", marginBottom: "1.25rem" }}>
-                {quote.page_number && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.inkFaint }}>Página {quote.page_number}</span>}
+                {quote.pageNumber && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.inkFaint }}>Página {quote.pageNumber}</span>}
                 {moodLabel && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.accent, backgroundColor: palette.accent + "15", borderRadius: "999px", padding: "0.15rem 0.55rem" }}>{moodLabel}</span>}
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", color: palette.inkFaint }}>{formattedDate}</span>
               </div>
 
               <button
                 onClick={handleToggle}
-                style={{ display: "flex", alignItems: "center", gap: "0.5rem", ...body, fontSize: "0.9rem", color: quote.is_favorite ? "#E74C3C" : palette.inkSoft, background: "none", border: `1px solid ${quote.is_favorite ? "#E74C3C40" : palette.border}`, borderRadius: "8px", padding: "0.6rem 1rem", cursor: "pointer", transition: "all 150ms ease", width: "100%", justifyContent: "center" }}
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem", ...body, fontSize: "0.9rem", color: quote.isFavorite ? palette.like : palette.inkSoft, background: "none", border: `1px solid ${quote.isFavorite ? "${palette.like}40" : palette.border}`, borderRadius: "8px", padding: "0.6rem 1rem", cursor: "pointer", transition: "all 150ms ease", width: "100%", justifyContent: "center" }}
               >
-                <Heart size={16} fill={quote.is_favorite ? "#E74C3C" : "none"} strokeWidth={1.8} color={quote.is_favorite ? "#E74C3C" : palette.inkSoft} />
-                {quote.is_favorite ? "Quitar de favoritas" : "Marcar como favorita"}
+                <Heart size={16} fill={quote.isFavorite ? palette.like : "none"} strokeWidth={1.8} color={quote.isFavorite ? palette.like : palette.inkSoft} />
+                {quote.isFavorite ? "Quitar de favoritas" : "Marcar como favorita"}
               </button>
             </div>
           )}
@@ -11352,15 +10170,15 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
 
         {showDeleteConfirm && (
           <div style={{ padding: "0 1.25rem 1.25rem" }}>
-            <div style={{ backgroundColor: "#FFF5F5", border: "1px solid #FCA5A5", borderRadius: "10px", padding: "1rem" }}>
-              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.88rem", color: "#7F1D1D", marginBottom: "0.75rem" }}>
+            <div style={{ backgroundColor: palette.dangerSoft, border: `1px solid ${palette.dangerBorder}`, borderRadius: "10px", padding: "1rem" }}>
+              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.88rem", color: palette.dangerInk, marginBottom: "0.75rem" }}>
                 ¿Eliminar esta frase? No se puede deshacer.
               </p>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, ...body, fontSize: "0.88rem", backgroundColor: palette.bgCard, color: palette.inkSoft, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
                   Cancelar
                 </button>
-                <button onClick={onDelete} style={{ flex: 1, ...body, fontSize: "0.88rem", fontWeight: 600, backgroundColor: "#EF4444", color: "#fff", border: "none", borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
+                <button onClick={onDelete} style={{ flex: 1, ...body, fontSize: "0.88rem", fontWeight: 600, backgroundColor: palette.danger, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
                   Eliminar
                 </button>
               </div>
@@ -11374,7 +10192,7 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
   );
 }
 
-function QuotesView({ user, books, onSaveQuote }) {
+function QuotesView({ user, books }) {
   const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterFav, setFilterFav] = useState(false);
@@ -11398,16 +10216,26 @@ function QuotesView({ user, books, onSaveQuote }) {
   }
 
   async function handleToggleFavorite(quote) {
-    const newVal = !quote.is_favorite;
-    setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_favorite: newVal } : q));
-    await toggleQuoteFavorite(quote.id, user.id, newVal).catch(() => {});
+    const newVal = !quote.isFavorite;
+    setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, isFavorite: newVal } : q));
+    try {
+      await toggleQuoteFavorite(quote.id, user.id, newVal);
+    } catch (err) {
+      console.error("[quotes] no se pudo cambiar favorita:", err);
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, isFavorite: !newVal } : q));
+    }
   }
 
   async function handleDelete(quoteId) {
-    await deleteQuoteFromDB(quoteId, user.id).catch(e => console.error(e));
-    setQuotes(prev => prev.filter(q => q.id !== quoteId));
-    setSelectedQuote(null);
-    showToast("Frase eliminada");
+    try {
+      await deleteQuoteFromDB(quoteId, user.id);
+      setQuotes(prev => prev.filter(q => q.id !== quoteId));
+      setSelectedQuote(null);
+      showToast("Frase eliminada");
+    } catch (err) {
+      console.error("[quotes] no se pudo eliminar la frase:", err);
+      showToast("No se pudo eliminar la frase. Intenta de nuevo.");
+    }
   }
 
   async function handleShareToFeed(quote) {
@@ -11417,16 +10245,16 @@ function QuotesView({ user, books, onSaveQuote }) {
         __folio_type: "quote",
         text: quote.text,
         mood: quote.mood || null,
-        page_number: quote.page_number || null,
+        page_number: quote.pageNumber || null,
         bookTitle: quote.bookTitle || null,
         bookAuthor: quote.bookAuthor || null,
       });
       // Use type "text" to avoid any CHECK constraint on the posts table
-      await createFeedPost({ userId: user.id, type: "text", bookId: quote.book_id || null, content: quoteContent });
+      await createFeedPost({ userId: user.id, type: "text", bookId: quote.bookId || null, content: quoteContent });
 
       // Post created successfully → now mark quote as public
-      await supabase.from("quotes").update({ is_public: true }).eq("id", quote.id).eq("user_id", user.id);
-      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, is_public: true } : q));
+      await setQuotePublic(quote.id, user.id);
+      setQuotes(prev => prev.map(q => q.id === quote.id ? { ...q, isPublic: true } : q));
       showToast("¡Frase compartida en tu feed! 🔥");
     } catch (e) {
       console.error("[QuotesView] handleShareToFeed:", e.message, e);
@@ -11440,7 +10268,7 @@ function QuotesView({ user, books, onSaveQuote }) {
   }
 
   function handleSaved(newQuote) {
-    const book = (books || []).find(b => b.id === newQuote.book_id);
+    const book = (books || []).find(b => b.id === newQuote.bookId);
     const enriched = { ...newQuote, bookTitle: newQuote.bookTitle || book?.title || null, bookAuthor: newQuote.bookAuthor || book?.author || null };
     setQuotes(prev => [enriched, ...prev]);
     setShowSaveModal(false);
@@ -11448,14 +10276,13 @@ function QuotesView({ user, books, onSaveQuote }) {
   }
 
   const filtered = quotes.filter(q => {
-    if (filterFav && !q.is_favorite) return false;
-    if (filterBook && q.book_id !== filterBook) return false;
+    if (filterFav && !q.isFavorite) return false;
+    if (filterBook && q.bookId !== filterBook) return false;
     if (filterMood && q.mood !== filterMood) return false;
     return true;
   });
 
-  const booksWithQuotes = (books || []).filter(b => quotes.some(q => q.book_id === b.id));
-  const moodsWithQuotes = MOOD_OPTIONS.filter(m => quotes.some(q => q.mood === m.key));
+  const booksWithQuotes = (books || []).filter(b => quotes.some(q => q.bookId === b.id));
   const activeFilter = filterFav || filterBook || filterMood;
 
   return (
@@ -11471,7 +10298,7 @@ function QuotesView({ user, books, onSaveQuote }) {
         </div>
         <button
           onClick={() => setShowSaveModal(true)}
-          style={{ ...display, fontSize: "0.88rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "10px", padding: "0.55rem 1rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}
+          style={{ ...display, fontSize: "0.88rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "10px", padding: "0.55rem 1rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.35rem", flexShrink: 0 }}
         >
           <Plus size={15} /> Guardar
         </button>
@@ -11514,7 +10341,7 @@ function QuotesView({ user, books, onSaveQuote }) {
           </p>
           <button
             onClick={() => setShowSaveModal(true)}
-            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: "#fff", border: "none", borderRadius: "10px", padding: "0.7rem 1.5rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "10px", padding: "0.7rem 1.5rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
           >
             <Plus size={16} /> Guardar primera frase
           </button>
@@ -11559,7 +10386,7 @@ function QuotesView({ user, books, onSaveQuote }) {
       )}
 
       {localToast && (
-        <div style={{ position: "fixed", bottom: 86, left: "50%", transform: "translateX(-50%)", backgroundColor: "#2A1F1A", color: palette.bg, padding: "0.75rem 1.25rem", borderRadius: "14px", boxShadow: "0 4px 24px rgba(0,0,0,0.35)", zIndex: 4000, maxWidth: "88vw", textAlign: "center", ...body, fontSize: "0.88rem", lineHeight: 1.4, animation: "slideUp 350ms cubic-bezier(0.32, 0.72, 0, 1)", border: "1px solid rgba(200,146,74,0.3)" }}>
+        <div style={{ position: "fixed", bottom: 86, left: "50%", transform: "translateX(-50%)", backgroundColor: palette.ink, color: palette.bg, padding: "0.75rem 1.25rem", borderRadius: "14px", boxShadow: "0 4px 24px rgba(0,0,0,0.35)", zIndex: 4000, maxWidth: "88vw", textAlign: "center", ...body, fontSize: "0.88rem", lineHeight: 1.4, animation: "slideUp 350ms cubic-bezier(0.32, 0.72, 0, 1)", border: "1px solid rgba(200,146,74,0.3)" }}>
           {localToast}
         </div>
       )}
@@ -11567,7 +10394,7 @@ function QuotesView({ user, books, onSaveQuote }) {
   );
 }
 
-function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme, onSaveQuote, pet, onRenamePet }) {
+function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme }) {
   const [sub, setSub] = useState("perfil");
   const TABS = [
     { id: "perfil", label: "Mi perfil" },
@@ -11589,152 +10416,11 @@ function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogo
         )}
       </div>
       {sub === "libros" && <LibraryView books={books} onSelectBook={onSelectBook} setTab={setTab} isOnline={isOnline} />}
-      {sub === "perfil" && <ProfileView user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={onSelectBook} setTab={setTab} onLogout={onLogout} theme={theme} setTheme={setTheme} pet={pet} onRenamePet={onRenamePet} />}
-      {sub === "frases" && <QuotesView user={user} books={books} onSaveQuote={onSaveQuote} />}
+      {sub === "perfil" && <ProfileView user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={onSelectBook} onLogout={onLogout} theme={theme} setTheme={setTheme} />}
+      {sub === "frases" && <QuotesView user={user} books={books} />}
       {sub === "resumen" && <ReadingStatsView books={books} />}
     </div>
   );
-}
-
-// ============ WRAP GENERATION ============
-function pickWrapPhrase(bookCount, currentStreak, isBestPeriod, isAnnual) {
-  const period = isAnnual ? "año" : "mes";
-  let base;
-  if (bookCount === 0)       base = `El próximo ${period} es tuyo. Un libro a la vez.`;
-  else if (bookCount <= 2)   base = "Cada página cuenta. Vas construyendo el hábito.";
-  else if (bookCount <= 5)   base = `¡Buen ${period}! Estás encontrando tu ritmo.`;
-  else if (bookCount <= 10)  base = `${isAnnual ? "Año" : "Mes"} sólido. Eres un lector constante.`;
-  else                       base = `¡${isAnnual ? "Año" : "Mes"} extraordinario! Eres una máquina lectora.`;
-  const extras = [];
-  if (currentStreak > 7) extras.push(`Tu racha de ${currentStreak} días habla de tu disciplina.`);
-  if (isBestPeriod)      extras.push(`¡Tu mejor ${period} hasta ahora!`);
-  return [base, ...extras].join(" ");
-}
-
-async function generateMonthWrap(userId, userName, month, year) {
-  const startISO = new Date(year, month - 1, 1).toISOString();
-  const endISO   = new Date(year, month, 1).toISOString();
-  const prevM    = month === 1 ? 12 : month - 1;
-  const prevY    = month === 1 ? year - 1 : year;
-  const prevStart = new Date(prevY, prevM - 1, 1).toISOString();
-  const prevEnd   = new Date(prevY, prevM, 1).toISOString();
-
-  const [
-    { data: booksData },
-    { data: logsData },
-    { data: achData },
-    { count: prevCount },
-  ] = await Promise.all([
-    supabase.from("books").select("id,title,author,cover_url,rating,genre,finished_at")
-      .eq("user_id", userId).eq("status", "read")
-      .gte("finished_at", startISO).lt("finished_at", endISO),
-    supabase.from("reading_logs").select("pages_read,logged_at")
-      .eq("user_id", userId).gte("logged_at", startISO).lt("logged_at", endISO),
-    supabase.from("achievements").select("achievement_key,unlocked_at")
-      .eq("user_id", userId).gte("unlocked_at", startISO).lt("unlocked_at", endISO),
-    supabase.from("books").select("id", { count: "exact", head: true })
-      .eq("user_id", userId).eq("status", "read")
-      .gte("finished_at", prevStart).lt("finished_at", prevEnd),
-  ]);
-
-  const books = booksData || [];
-  const logs  = logsData  || [];
-  const totalPages = logs.reduce((s, l) => s + (l.pages_read || 0), 0);
-
-  const genreCount = {};
-  books.forEach(b => { if (b.genre) genreCount[b.genre] = (genreCount[b.genre] || 0) + 1; });
-  const topGenre = Object.keys(genreCount).sort((a, b) => genreCount[b] - genreCount[a])[0] || null;
-  const favoriteBook = [...books].filter(b => b.rating > 0).sort((a, b) => b.rating - a.rating)[0] || null;
-
-  // Best month check: compare to best previous month
-  const { data: allPrevBooks } = await supabase.from("books").select("finished_at")
-    .eq("user_id", userId).eq("status", "read").not("finished_at", "is", null).lt("finished_at", startISO);
-  const prevMonthCounts = {};
-  (allPrevBooks || []).forEach(b => { const k = b.finished_at.slice(0, 7); prevMonthCounts[k] = (prevMonthCounts[k] || 0) + 1; });
-  const bestPrevMonth = Math.max(0, ...Object.values(prevMonthCounts).concat(0));
-  const isBestMonth = books.length > 0 && books.length > bestPrevMonth;
-
-  const { data: streakRowM } = await supabase.from("user_streaks").select("current_streak").eq("user_id", userId).maybeSingle();
-  const aiPhrase = pickWrapPhrase(books.length, streakRowM?.current_streak || 0, isBestMonth, false);
-
-  const data = {
-    booksRead: books.map(b => ({ id: b.id, title: b.title, author: b.author, coverUrl: b.cover_url, rating: b.rating, genre: b.genre })),
-    totalPages, topGenre,
-    favoriteBook: favoriteBook ? { title: favoriteBook.title, author: favoriteBook.author, coverUrl: favoriteBook.cover_url, rating: favoriteBook.rating } : null,
-    prevMonthBooks: prevCount || 0,
-    unlockedAchievements: (achData || []).map(a => a.achievement_key),
-    aiPhrase,
-  };
-
-  const { data: saved } = await supabase.from("monthly_wraps").upsert(
-    { user_id: userId, month, year, wrap_type: "monthly", data },
-    { onConflict: "user_id,month,year,wrap_type" }
-  ).select().single();
-  return saved || { user_id: userId, month, year, wrap_type: "monthly", data };
-}
-
-async function generateAnnualWrap(userId, userName, year) {
-  const startISO = new Date(year, 0, 1).toISOString();
-  const endISO   = new Date(year + 1, 0, 1).toISOString();
-  const prevStart = new Date(year - 1, 0, 1).toISOString();
-  const prevEnd   = new Date(year, 0, 1).toISOString();
-
-  const [{ data: booksData }, { data: logsData }, { count: prevCount }] = await Promise.all([
-    supabase.from("books").select("id,title,author,cover_url,rating,genre,finished_at")
-      .eq("user_id", userId).eq("status", "read")
-      .gte("finished_at", startISO).lt("finished_at", endISO),
-    supabase.from("reading_logs").select("pages_read,logged_at")
-      .eq("user_id", userId).gte("logged_at", startISO).lt("logged_at", endISO),
-    supabase.from("books").select("id", { count: "exact", head: true })
-      .eq("user_id", userId).eq("status", "read")
-      .gte("finished_at", prevStart).lt("finished_at", prevEnd),
-  ]);
-
-  const books = booksData || [];
-  const logs  = logsData  || [];
-  const totalPages = logs.reduce((s, l) => s + (l.pages_read || 0), 0);
-
-  const genreCount = {};
-  books.forEach(b => { if (b.genre) genreCount[b.genre] = (genreCount[b.genre] || 0) + 1; });
-  const topGenre = Object.keys(genreCount).sort((a, b) => genreCount[b] - genreCount[a])[0] || null;
-  const top3 = [...books].filter(b => b.rating > 0).sort((a, b) => b.rating - a.rating).slice(0, 3);
-
-  // Most active month: count books per month
-  const monthCounts = Array(12).fill(0);
-  books.forEach(b => {
-    if (b.finished_at) {
-      const m = new Date(b.finished_at).getMonth();
-      if (m >= 0 && m < 12) monthCounts[m]++;
-    }
-  });
-  const mostActiveMonthIdx = monthCounts.indexOf(Math.max(...monthCounts));
-  const mostActiveMonth = MONTHS_ES[mostActiveMonthIdx] || "";
-
-  const { data: streakRow } = await supabase.from("user_streaks").select("current_streak, longest_streak").eq("user_id", userId).maybeSingle();
-
-  // Best year check
-  const { data: allPrevYearBooks } = await supabase.from("books").select("finished_at")
-    .eq("user_id", userId).eq("status", "read").not("finished_at", "is", null).lt("finished_at", startISO);
-  const prevYearCounts = {};
-  (allPrevYearBooks || []).forEach(b => { const k = b.finished_at.slice(0, 4); prevYearCounts[k] = (prevYearCounts[k] || 0) + 1; });
-  const bestPrevYear = Math.max(0, ...Object.values(prevYearCounts).concat(0));
-  const isBestYear = books.length > 0 && books.length > bestPrevYear;
-
-  const aiPhrase = pickWrapPhrase(books.length, streakRow?.current_streak || 0, isBestYear, true);
-
-  const data = {
-    booksRead: books.map(b => ({ id: b.id, title: b.title, author: b.author, coverUrl: b.cover_url, rating: b.rating, genre: b.genre })),
-    totalPages, topGenre,
-    top3Books: top3.map(b => ({ title: b.title, author: b.author, coverUrl: b.cover_url, rating: b.rating })),
-    mostActiveMonth, longestStreak: streakRow?.longest_streak || 0,
-    prevYearBooks: prevCount || 0, aiPhrase,
-  };
-
-  const { data: saved } = await supabase.from("monthly_wraps").upsert(
-    { user_id: userId, month: null, year, wrap_type: "annual", data },
-    { onConflict: "user_id,month,year,wrap_type" }
-  ).select().single();
-  return saved || { user_id: userId, month: null, year, wrap_type: "annual", data };
 }
 
 // ============ TOAST ============
@@ -11746,7 +10432,7 @@ function Toast({ message, onDismiss }) {
   return (
     <div style={{
       position: "fixed", bottom: 86, left: "50%", transform: "translateX(-50%)",
-      backgroundColor: "#2A1F1A", color: palette.bg,
+      backgroundColor: palette.ink, color: palette.bg,
       padding: "0.75rem 1.25rem", borderRadius: "14px",
       boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
       zIndex: 3000, maxWidth: "88vw", textAlign: "center",
@@ -11789,7 +10475,7 @@ function GemToast({ amount, label, id, onDismiss }) {
         whiteSpace: "nowrap",
       }}>
         <img src="/gema.png" alt="" style={{ width: 22, height: 22, objectFit: "contain", flexShrink: 0 }} />
-        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", color: "#fff", lineHeight: 1, letterSpacing: "-0.01em" }}>
+        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", color: palette.onAccent, lineHeight: 1, letterSpacing: "-0.01em" }}>
           {label || `+${amount} gemas`} ✨
         </span>
       </div>
@@ -11797,10 +10483,8 @@ function GemToast({ amount, label, id, onDismiss }) {
   );
 }
 
-// (movido a src/pets/ (PetDisplay, PetOnboarding, PetLevelUpToast, PetScene, PetHub))
-
 // ============ WRAPPED STORY EXPERIENCE ============
-function WrappedStoryExperience({ wrap, userName, onClose }) {
+function WrappedStoryExperience({ wrap, onClose }) {
   const { data, month, year, wrap_type } = wrap;
   const isAnnual = wrap_type === "annual";
   const monthName = isAnnual ? null : MONTHS_ES[(month || 1) - 1];
@@ -11839,19 +10523,6 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
   const hoursComparison = stEps >= 2
     ? `como ver ${stEps} episodios de una serie`
     : hoursReading === 1 ? "una tarde bien aprovechada" : "cada minuto que leíste vale";
-
-  // Slides config
-  const SLIDE_GRADIENTS = [
-    "linear-gradient(160deg, #3D1A18 0%, #7A2E2E 60%, #2A1510 100%)",
-    "linear-gradient(160deg, #1A1210 0%, #C8924A 60%, #8B5E20 100%)",
-    "linear-gradient(160deg, #1a2a1a 0%, #3d6b28 60%, #1a1614 100%)",
-    "linear-gradient(160deg, #1a1a2e 0%, #4A3A8B 60%, #1a1614 100%)",
-    "linear-gradient(160deg, #1a1a1a 0%, #5C4A3F 55%, #2A1F1A 100%)",
-    "linear-gradient(160deg, #2e1a2e 0%, #7A2E5E 60%, #1a1614 100%)",
-    "linear-gradient(160deg, #1a2e2a 0%, #2e5E5A 60%, #1a1614 100%)",
-    "linear-gradient(160deg, #2e2a1a 0%, #8B7020 60%, #3d2e10 100%)",
-    "linear-gradient(160deg, #7A2E2E 0%, #C8924A 60%, #F4EDE0 100%)",
-  ];
 
   const slides = [
     { type: "intro" },
@@ -11938,18 +10609,18 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
   }
 
   const slide = slides[idx];
-  const bg = SLIDE_GRADIENTS[idx % SLIDE_GRADIENTS.length];
+  const bg = WRAPPED_SLIDE_GRADIENTS[idx % WRAPPED_SLIDE_GRADIENTS.length];
 
   function SlideContent() {
     const textShadow = "0 2px 12px rgba(0,0,0,0.4)";
-    const big = { fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 900, color: "#F5EDE0", textShadow, lineHeight: 1 };
+    const big = { fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 900, color: BRAND.cream, textShadow, lineHeight: 1 };
     const sub = { fontFamily: "'EB Garamond', serif", color: "rgba(245,237,224,0.75)", lineHeight: 1.45 };
 
     if (slide.type === "intro") return (
       <div style={{ textAlign: "center" }}>
         <p style={{ fontFamily: "system-ui", fontSize: "0.72rem", fontWeight: 600, color: "rgba(245,237,224,0.5)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "1rem" }}>folio</p>
         <p style={{ ...big, fontSize: "clamp(2.4rem, 10vw, 3.2rem)", marginBottom: "0.5rem" }}>tu {isAnnual ? "año" : "mes"}</p>
-        <p style={{ ...big, fontSize: "clamp(2rem, 8vw, 2.8rem)", color: "#D4A574" }}>{periodLabel}</p>
+        <p style={{ ...big, fontSize: "clamp(2rem, 8vw, 2.8rem)", color: BRAND.amberLight }}>{periodLabel}</p>
         <p style={{ ...sub, fontSize: "1rem", marginTop: "1.5rem" }}>en libros</p>
       </div>
     );
@@ -11958,7 +10629,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
       <div style={{ textAlign: "center" }}>
         <p style={{ ...sub, fontSize: "1.1rem", marginBottom: "1rem" }}>leíste</p>
         <p style={{ ...big, fontSize: "clamp(5rem, 22vw, 7rem)" }}>{displayCount}</p>
-        <p style={{ ...big, fontSize: "clamp(1.8rem, 7vw, 2.4rem)", color: "#D4A574", marginTop: "0.35rem" }}>
+        <p style={{ ...big, fontSize: "clamp(1.8rem, 7vw, 2.4rem)", color: BRAND.amberLight, marginTop: "0.35rem" }}>
           {booksCount === 1 ? "libro" : "libros"}
         </p>
         {data.prevMonthBooks > 0 && booksCount > data.prevMonthBooks && (
@@ -11974,7 +10645,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
       <div style={{ textAlign: "center" }}>
         <p style={{ ...sub, fontSize: "1.1rem", marginBottom: "1rem" }}>recorriste</p>
         <p style={{ ...big, fontSize: "clamp(4rem, 18vw, 6rem)" }}>{totalPages.toLocaleString("es")}</p>
-        <p style={{ ...big, fontSize: "clamp(1.6rem, 6vw, 2.2rem)", color: "#5bc234", marginTop: "0.35rem" }}>páginas</p>
+        <p style={{ ...big, fontSize: "clamp(1.6rem, 6vw, 2.2rem)", color: HEATMAP_COLORS.dark[3], marginTop: "0.35rem" }}>páginas</p>
         <p style={{ ...sub, fontSize: "0.85rem", marginTop: "1.5rem", maxWidth: 240, margin: "1.5rem auto 0" }}>{pagesComparison}</p>
       </div>
     );
@@ -11982,7 +10653,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
     if (slide.type === "genre") return (
       <div style={{ textAlign: "center" }}>
         <p style={{ ...sub, fontSize: "1rem", marginBottom: "1.25rem" }}>tu género del {isAnnual ? "año" : "mes"}</p>
-        <p style={{ ...big, fontSize: "clamp(2.2rem, 9vw, 3rem)", color: "#D4A574" }}>{topGenre}</p>
+        <p style={{ ...big, fontSize: "clamp(2.2rem, 9vw, 3rem)", color: BRAND.amberLight }}>{topGenre}</p>
         <p style={{ ...sub, fontSize: "0.88rem", marginTop: "1.25rem" }}>
           {uniqueGenres > 1 ? `también exploraste ${uniqueGenres - 1} género${uniqueGenres > 2 ? "s" : ""} más` : "tu gusto es profundo"}
         </p>
@@ -12007,7 +10678,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
     if (slide.type === "topauthor") return (
       <div style={{ textAlign: "center" }}>
         <p style={{ ...sub, fontSize: "1rem", marginBottom: "1.25rem" }}>tu autor del {isAnnual ? "año" : "mes"}</p>
-        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2.2rem)", color: "#D4A574", maxWidth: 280, margin: "0 auto 0.5rem", lineHeight: 1.2 }}>{topAuthor}</p>
+        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2.2rem)", color: BRAND.amberLight, maxWidth: 280, margin: "0 auto 0.5rem", lineHeight: 1.2 }}>{topAuthor}</p>
         {topAuthorCount > 1 && (
           <p style={{ ...sub, fontSize: "0.88rem", marginTop: "1rem" }}>
             {topAuthorCount} {topAuthorCount === 1 ? "libro suyo" : "libros suyos"} este {isAnnual ? "año" : "mes"}
@@ -12023,7 +10694,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
       <div style={{ textAlign: "center" }}>
         <p style={{ ...sub, fontSize: "1rem", marginBottom: "1rem" }}>tiempo leyendo</p>
         <p style={{ ...big, fontSize: "clamp(4rem, 18vw, 6rem)" }}>{hoursReading}</p>
-        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2rem)", color: "#D4A574", marginTop: "0.35rem" }}>
+        <p style={{ ...big, fontSize: "clamp(1.5rem, 6vw, 2rem)", color: BRAND.amberLight, marginTop: "0.35rem" }}>
           {hoursReading === 1 ? "hora" : "horas"}
         </p>
         <p style={{ ...sub, fontSize: "0.85rem", marginTop: "1.5rem", maxWidth: 240, margin: "1.5rem auto 0" }}>{hoursComparison}</p>
@@ -12045,7 +10716,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
           cuéntale a tu gente cómo fue tu {isAnnual ? "año" : "mes"} lector
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", maxWidth: 260, margin: "0 auto" }}>
-          <ShareButton wrap={wrap} userName={userName} setPaused={setPaused} slideRef={slideRef} />
+          <ShareButton wrap={wrap} setPaused={setPaused} slideRef={slideRef} />
           <button onClick={onClose} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: "rgba(245,237,224,0.6)", background: "none", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer" }}>
             Cerrar
           </button>
@@ -12056,7 +10727,10 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
     return null;
   }
 
-  function ShareButton({ wrap: w, userName: uName, setPaused: sp, slideRef: sr }) {
+  // TODO(audit): SlideContent y ShareButton se definen dentro del render de WrappedStoryExperience,
+  // así que se remontan en cada render del padre (p. ej. al pausar para descargar se pierde el
+  // estado `sharing`). Sacarlos a nivel de módulo cuando se rediseñe el Wrapped.
+  function ShareButton({ wrap: w, setPaused: sp, slideRef: sr }) {
     const [sharing, setSharing] = useState(false);
     const [shared, setShared] = useState(false);
 
@@ -12067,9 +10741,9 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
       const label = isA ? `${y}` : `${mn} ${y}`;
       const text = `mi wrapped de ${label} en folio: ${d.booksRead?.length || 0} libros, ${d.totalPages || 0} páginas${d.topGenre ? `, mi género favorito fue ${d.topGenre}` : ""}. #folio #lectura`;
       if (navigator.share) {
-        try { await navigator.share({ title: "Mi Folio Wrapped", text }); setShared(true); } catch {}
+        try { await navigator.share({ title: "Mi Folio Wrapped", text }); setShared(true); } catch { /* share cancelado */ }
       } else {
-        try { await navigator.clipboard.writeText(text); setShared(true); setTimeout(() => setShared(false), 2500); } catch {}
+        try { await navigator.clipboard.writeText(text); setShared(true); setTimeout(() => setShared(false), 2500); } catch (err) { console.warn("[wrapped] no se pudo copiar:", err); }
       }
     }
 
@@ -12093,10 +10767,10 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
 
     return (
       <>
-        <button onClick={handleShare} style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", backgroundColor: "#F5EDE0", color: "#7A2E2E", border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
+        <button onClick={handleShare} style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", backgroundColor: BRAND.cream, color: BRAND.wine, border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
           <Share2 size={17} />{shared ? "¡compartido!" : "compartir wrapped"}
         </button>
-        <button onClick={handleDownload} disabled={sharing} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: "#F5EDE0", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+        <button onClick={handleDownload} disabled={sharing} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: BRAND.cream, border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
           {sharing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={14} />}
           guardar imagen
         </button>
@@ -12118,12 +10792,12 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
       <div style={{ display: "flex", gap: 4, padding: "env(safe-area-inset-top, 12px) 14px 10px", flexShrink: 0 }}>
         {slides.map((_, i) => (
           <div key={i} style={{ flex: 1, height: 3, borderRadius: 999, backgroundColor: "rgba(245,237,224,0.25)", overflow: "hidden" }}>
-            {i < idx && <div style={{ width: "100%", height: "100%", backgroundColor: "#F5EDE0" }} />}
+            {i < idx && <div style={{ width: "100%", height: "100%", backgroundColor: BRAND.cream }} />}
             {i === idx && !paused && !shouldReduceMotion && (
-              <div style={{ height: "100%", backgroundColor: "#F5EDE0", animation: `progressFill ${DURATION}ms linear forwards` }} />
+              <div style={{ height: "100%", backgroundColor: BRAND.cream, animation: `progressFill ${DURATION}ms linear forwards` }} />
             )}
             {i === idx && (paused || shouldReduceMotion) && (
-              <div style={{ height: "100%", width: "50%", backgroundColor: "#F5EDE0" }} />
+              <div style={{ height: "100%", width: "50%", backgroundColor: BRAND.cream }} />
             )}
           </div>
         ))}
@@ -12132,7 +10806,7 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
       {/* Close button */}
       <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 12px) + 18px)", right: 16, zIndex: 10 }}>
         <button onClick={(e) => { e.stopPropagation(); onClose(); }} style={{ background: "rgba(0,0,0,0.35)", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <X size={16} color="#F5EDE0" />
+          <X size={16} color={BRAND.cream} />
         </button>
       </div>
 
@@ -12157,221 +10831,6 @@ function WrappedStoryExperience({ wrap, userName, onClose }) {
   );
 }
 
-// ============ WRAPPED CARD + MODAL ============
-function WrappedCard({ wrap, userName, cardRef }) {
-  const { data, month, year, wrap_type } = wrap;
-  const isAnnual = wrap_type === "annual";
-  const monthName = isAnnual ? null : MONTHS_ES[(month || 1) - 1];
-  const title = isAnnual ? `Tu ${year} en libros` : `Tu ${monthName} en libros`;
-  const booksCount = data.booksRead?.length || 0;
-  const diff = booksCount - (data.prevMonthBooks || data.prevYearBooks || 0);
-
-  return (
-    <div ref={cardRef} style={{
-      width: 320, minHeight: 540,
-      background: "linear-gradient(165deg, #5A1A1A 0%, #7A2E2E 25%, #C8924A 65%, #F4EDE0 100%)",
-      borderRadius: 20, padding: "2rem 1.6rem 1.75rem",
-      color: "#F4EDE0", position: "relative", overflow: "hidden",
-      boxSizing: "border-box",
-    }}>
-      {/* Decorative circles */}
-      <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.06)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: -40, left: -40, width: 160, height: 160, borderRadius: "50%", backgroundColor: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
-
-      {/* Logo */}
-      <div style={{ ...display, fontSize: "0.85rem", fontWeight: 300, fontStyle: "italic", opacity: 0.75, marginBottom: "1.75rem", letterSpacing: "0.08em" }}>Folio</div>
-
-      {/* Title */}
-      <div style={{ ...body, fontSize: "0.9rem", opacity: 0.8, marginBottom: "0.2rem" }}>{title}</div>
-
-      {/* Big number */}
-      <div style={{ ...display, fontSize: "5rem", fontWeight: 900, fontStyle: "italic", lineHeight: 1, color: "#FFF", marginBottom: "0.15rem" }}>{booksCount}</div>
-      <div style={{ ...body, fontSize: "1rem", opacity: 0.85, marginBottom: "1.5rem" }}>
-        {booksCount === 1 ? "libro leído" : "libros leídos"}
-        {diff !== 0 && <span style={{ fontSize: "0.78rem", marginLeft: "0.5rem", opacity: 0.7 }}>({diff > 0 ? "+" : ""}{diff} vs anterior)</span>}
-      </div>
-
-      {/* Stats grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.25rem" }}>
-        {data.totalPages > 0 && (
-          <div style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "0.6rem 0.75rem" }}>
-            <div style={{ ...display, fontSize: "1.3rem", fontWeight: 700 }}>{data.totalPages.toLocaleString()}</div>
-            <div style={{ ...body, fontSize: "0.72rem", opacity: 0.75 }}>páginas</div>
-          </div>
-        )}
-        {data.topGenre && (
-          <div style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "0.6rem 0.75rem" }}>
-            <div style={{ ...display, fontSize: "1rem", fontWeight: 700, fontStyle: "italic" }}>{data.topGenre}</div>
-            <div style={{ ...body, fontSize: "0.72rem", opacity: 0.75 }}>género favorito</div>
-          </div>
-        )}
-        {isAnnual && data.mostActiveMonth && (
-          <div style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "0.6rem 0.75rem" }}>
-            <div style={{ ...display, fontSize: "1rem", fontWeight: 700, fontStyle: "italic" }}>{data.mostActiveMonth}</div>
-            <div style={{ ...body, fontSize: "0.72rem", opacity: 0.75 }}>mes más activo</div>
-          </div>
-        )}
-        {isAnnual && data.longestStreak > 0 && (
-          <div style={{ backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 12, padding: "0.6rem 0.75rem" }}>
-            <div style={{ ...display, fontSize: "1.3rem", fontWeight: 700 }}>{data.longestStreak}</div>
-            <div style={{ ...body, fontSize: "0.72rem", opacity: 0.75 }}>días mejor racha</div>
-          </div>
-        )}
-      </div>
-
-      {/* Favorite / top books */}
-      {!isAnnual && data.favoriteBook && (
-        <div style={{ marginBottom: "1rem" }}>
-          <div style={{ ...body, fontSize: "0.72rem", opacity: 0.65, marginBottom: "0.2rem" }}>Tu favorito del mes</div>
-          <div style={{ ...display, fontSize: "0.95rem", fontStyle: "italic" }}>{data.favoriteBook.title}</div>
-        </div>
-      )}
-      {isAnnual && data.top3Books?.length > 0 && (
-        <div style={{ marginBottom: "1rem" }}>
-          <div style={{ ...body, fontSize: "0.72rem", opacity: 0.65, marginBottom: "0.35rem" }}>Top libros del año</div>
-          {data.top3Books.map((b, i) => (
-            <div key={i} style={{ ...display, fontSize: "0.88rem", fontStyle: "italic", opacity: 0.9, marginBottom: "0.15rem" }}>
-              {i + 1}. {b.title}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* AI Phrase */}
-      {data.aiPhrase && (
-        <div style={{ backgroundColor: "rgba(0,0,0,0.18)", borderRadius: 10, padding: "0.65rem 0.85rem", ...body, fontSize: "0.83rem", fontStyle: "italic", lineHeight: 1.5, opacity: 0.9 }}>
-          "{data.aiPhrase}"
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WrappedModal({ wrap, userName, onClose, onRegenerate }) {
-  const cardRef = useRef(null);
-  const { data, month, year, wrap_type } = wrap;
-  const isAnnual = wrap_type === "annual";
-  const monthName = isAnnual ? null : MONTHS_ES[(month || 1) - 1];
-  const title = isAnnual ? `Wrapped ${year}` : `Wrapped ${monthName} ${year}`;
-  const [downloading, setDownloading] = useState(false);
-  const [shared, setShared] = useState(false);
-  const booksCount = data.booksRead?.length || 0;
-
-  async function handleShare() {
-    const text = `${title}: leí ${booksCount} ${booksCount === 1 ? "libro" : "libros"}${data.totalPages > 0 ? `, ${data.totalPages} páginas` : ""}${data.topGenre ? `, mi género favorito fue ${data.topGenre}` : ""}. #Folio #Lectura`;
-    if (navigator.share) {
-      try { await navigator.share({ title: `Folio — ${title}`, text }); setShared(true); } catch {}
-    } else {
-      try { await navigator.clipboard.writeText(text); setShared(true); setTimeout(() => setShared(false), 2500); } catch {}
-    }
-  }
-
-  async function handleDownload() {
-    if (!cardRef.current) return;
-    setDownloading(true);
-    try {
-      const { default: html2canvas } = await import("html2canvas");
-      const canvas = await html2canvas(cardRef.current, { backgroundColor: null, scale: 2, useCORS: true });
-      const link = document.createElement("a");
-      link.download = `folio-${isAnnual ? `wrapped-${year}` : `${monthName}-${year}`}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch (err) { console.error("html2canvas error:", err); }
-    setDownloading(false);
-  }
-
-  const unlockedDefs = (data.unlockedAchievements || [])
-    .map(k => ACHIEVEMENT_DEFS.find(a => a.key === k)).filter(Boolean);
-
-  return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 1200,
-      backgroundColor: "rgba(10,5,0,0.92)",
-      display: "flex", flexDirection: "column", alignItems: "center",
-      overflowY: "auto", padding: "1.5rem 1rem 2rem",
-    }}>
-      <div style={{ width: "100%", maxWidth: 400 }}>
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-          <h2 style={{ ...display, fontSize: "1.1rem", color: palette.bg, fontStyle: "italic" }}>{title}</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9A8A7A", padding: "0.25rem" }}>
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Card */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
-          <WrappedCard wrap={wrap} userName={userName} cardRef={cardRef} />
-        </div>
-
-        {/* Action buttons */}
-        <div style={{ display: "flex", gap: "0.65rem", marginBottom: "1.25rem" }}>
-          <button onClick={handleShare} style={{
-            flex: 1, padding: "0.8rem", borderRadius: 12,
-            backgroundColor: palette.accent, color: palette.bg,
-            border: "none", cursor: "pointer", ...display, fontSize: "0.95rem",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
-          }}>
-            <Share2 size={16} />{shared ? "¡Copiado!" : "Compartir"}
-          </button>
-          <button onClick={handleDownload} disabled={downloading} style={{
-            flex: 1, padding: "0.8rem", borderRadius: 12,
-            backgroundColor: "rgba(255,255,255,0.08)", color: "#D8CCBC",
-            border: "1.5px solid rgba(255,255,255,0.12)", cursor: "pointer", ...body, fontSize: "0.9rem",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
-          }}>
-            {downloading ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : <Copy size={15} />}
-            Descargar
-          </button>
-        </div>
-
-        {/* Detail section */}
-        {booksCount > 0 && (
-          <div style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "1rem 1.1rem", marginBottom: "0.75rem" }}>
-            <p style={{ ...display, fontSize: "0.75rem", color: "#9A8A7A", fontWeight: 500, marginBottom: "0.75rem" }}>
-              {isAnnual ? "Libros del año" : "Libros del mes"}
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {(data.booksRead || []).slice(0, 8).map((b, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                  {b.coverUrl
-                    ? <img src={b.coverUrl} alt="" style={{ width: 32, height: 46, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                    : <div style={{ width: 32, height: 46, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.12)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}><BookOpen size={14} color="#9A8A7A" /></div>
-                  }
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ ...display, fontSize: "0.85rem", color: "#F4EDE0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</div>
-                    <div style={{ ...body, fontSize: "0.74rem", color: "#9A8A7A" }}>{b.author}</div>
-                  </div>
-                  {b.rating > 0 && <div style={{ ...body, fontSize: "0.75rem", color: palette.amber, flexShrink: 0 }}>{"★".repeat(b.rating)}</div>}
-                </div>
-              ))}
-              {(data.booksRead || []).length > 8 && (
-                <div style={{ ...body, fontSize: "0.8rem", color: "#9A8A7A", textAlign: "center" }}>+{data.booksRead.length - 8} más</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Achievements unlocked */}
-        {unlockedDefs.length > 0 && (
-          <div style={{ backgroundColor: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: "1rem 1.1rem" }}>
-            <p style={{ ...display, fontSize: "0.75rem", color: "#9A8A7A", fontWeight: 500, marginBottom: "0.65rem" }}>Logros desbloqueados</p>
-            {unlockedDefs.map(a => (
-              <div key={a.key} style={{ display: "flex", alignItems: "center", gap: "0.65rem", marginBottom: "0.4rem" }}>
-                <span style={{ fontSize: "1.2rem" }}>{a.emoji}</span>
-                <div>
-                  <div style={{ ...display, color: "#C8924A", fontSize: "0.88rem" }}>{a.name}</div>
-                  <div style={{ ...body, color: "#9A8A7A", fontSize: "0.76rem" }}>{a.desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ============ BOOK SHARE CARD ============
 function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef }) {
   const year = new Date().getFullYear();
@@ -12380,7 +10839,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
   return (
     <div ref={cardRef} style={{
       width: "320px",
-      background: "linear-gradient(160deg, #F5EFE3 0%, #C9976A 52%, #7A2E2E 100%)",
+      background: BRAND.gradientShareCard,
       borderRadius: "20px",
       padding: "1.75rem 1.5rem 1.25rem",
       display: "flex", flexDirection: "column", alignItems: "center",
@@ -12408,7 +10867,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.72rem", color: "rgba(42,31,26,0.55)", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>Terminé de leer</p>
 
       {/* Title */}
-      <p style={{ fontFamily: "Fraunces, serif", fontSize: "1.3rem", fontWeight: 800, color: "#2A1F1A", textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
+      <p style={{ fontFamily: "Fraunces, serif", fontSize: "1.3rem", fontWeight: 800, color: BRAND.ink, textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
         {book.title}
       </p>
 
@@ -12421,7 +10880,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       {rating > 0 && (
         <div style={{ display: "flex", gap: "3px", margin: "0.05rem 0" }}>
           {Array.from({ length: rating }, (_, i) => (
-            <Star key={i} size={15} fill="#C8924A" color="#C8924A" strokeWidth={0} />
+            <Star key={i} size={15} fill={BRAND.amber} color={BRAND.amber} strokeWidth={0} />
           ))}
         </div>
       )}
@@ -12436,15 +10895,15 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       {/* Stats */}
       <div style={{ width: "100%", borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem", marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <BookOpen size={13} color="#2A1F1A" strokeWidth={1.8} style={{ flexShrink: 0 }} />
-          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: "#2A1F1A", margin: 0 }}>
+          <BookOpen size={13} color={BRAND.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
             Libro #{booksThisYear} de {year}
           </p>
         </div>
         {streak?.current_streak > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <Flame size={13} color="#2A1F1A" strokeWidth={1.8} style={{ flexShrink: 0 }} />
-            <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: "#2A1F1A", margin: 0 }}>
+            <Flame size={13} color={BRAND.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+            <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
               {streak.current_streak} {streak.current_streak === 1 ? "día" : "días"} de racha
             </p>
           </div>
@@ -12519,8 +10978,8 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
     }}>
       <div style={{ width: "100%", maxWidth: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-          <h2 style={{ ...display, fontSize: "1.1rem", color: palette.bg, fontStyle: "italic" }}>¡Comparte tu logro!</h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9A8A7A", padding: "0.25rem" }}>
+          <h2 style={{ ...display, fontSize: "1.1rem", color: palette.onDark, fontStyle: "italic" }}>¡Comparte tu logro!</h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: palette.onDarkFaint, padding: "0.25rem" }}>
             <X size={20} />
           </button>
         </div>
@@ -12535,7 +10994,7 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
             disabled={generating}
             style={{
               flex: 1, padding: "0.85rem", borderRadius: 12,
-              backgroundColor: palette.accent, color: palette.bg,
+              backgroundColor: palette.accent, color: palette.onDark,
               border: "none", cursor: "pointer",
               ...display, fontSize: "0.95rem",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
@@ -12549,7 +11008,7 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
             disabled={generating}
             style={{
               flex: 1, padding: "0.85rem", borderRadius: 12,
-              backgroundColor: "rgba(255,255,255,0.08)", color: "#D8CCBC",
+              backgroundColor: "rgba(255,255,255,0.08)", color: palette.onDarkSoft,
               border: "1.5px solid rgba(255,255,255,0.12)", cursor: "pointer",
               ...body, fontSize: "0.9rem",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem",
@@ -12610,12 +11069,15 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
 
   useEffect(() => {
     if (step !== 1) return;
-    confetti({ particleCount: 120, spread: 80, origin: { y: 0.4 }, colors: ["#7A2E2E", "#C8924A", "#F4EDE0", "#2A1F1A"] });
-    setTimeout(() => confetti({ particleCount: 60, spread: 110, angle: 60, origin: { x: 0, y: 0.5 }, colors: ["#7A2E2E", "#C8924A", "#F4EDE0"] }), 250);
-    setTimeout(() => confetti({ particleCount: 60, spread: 110, angle: 120, origin: { x: 1, y: 0.5 }, colors: ["#7A2E2E", "#C8924A", "#F4EDE0"] }), 450);
-    setTimeout(() => setBookPhase("closing"), 900);
-    setTimeout(() => setBookPhase("closed"), 1600);
-    setTimeout(() => setStep(2), 2700);
+    confetti({ particleCount: 120, spread: 80, origin: { y: 0.4 }, colors: [BRAND.wine, BRAND.amber, BRAND.cream, BRAND.ink] });
+    const timers = [
+      setTimeout(() => confetti({ particleCount: 60, spread: 110, angle: 60, origin: { x: 0, y: 0.5 }, colors: BRAND.confetti }), 250),
+      setTimeout(() => confetti({ particleCount: 60, spread: 110, angle: 120, origin: { x: 1, y: 0.5 }, colors: BRAND.confetti }), 450),
+      setTimeout(() => setBookPhase("closing"), 900),
+      setTimeout(() => setBookPhase("closed"), 1600),
+      setTimeout(() => setStep(2), 2700),
+    ];
+    return () => timers.forEach(clearTimeout);
   }, [step]);
 
   async function fetchSummaryData() {
@@ -12636,17 +11098,27 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
 
   async function handleSaveRating() {
     setSaving(true);
-    await onSaveRating(book.id, rating, review);
-    await createFinishedPost();
-    await fetchSummaryData();
-    setSaving(false);
-    setStep(3);
+    try {
+      await onSaveRating(book.id, rating, review);
+      await createFinishedPost();
+      await fetchSummaryData();
+    } catch (err) {
+      console.error("[BookFinishedCelebration] error guardando calificación / resumen:", err);
+    } finally {
+      setSaving(false);
+      setStep(3);
+    }
   }
 
   async function handleSkipRating() {
-    await createFinishedPost();
-    await fetchSummaryData();
-    setStep(3);
+    try {
+      await createFinishedPost();
+      await fetchSummaryData();
+    } catch (err) {
+      console.error("[BookFinishedCelebration] error cargando el resumen:", err);
+    } finally {
+      setStep(3);
+    }
   }
 
   const displayRating = hoveredRating || rating;
@@ -12678,25 +11150,25 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
               boxShadow: "6px 6px 24px rgba(122,46,46,0.5), -3px 2px 10px rgba(0,0,0,0.35)",
             }}>
               {bookPhase === "closed"
-                ? <BookmarkCheck size={38} color={palette.bg} />
-                : <BookOpen size={38} color={palette.bg} />}
+                ? <BookmarkCheck size={38} color={palette.onDark} />
+                : <BookOpen size={38} color={palette.onDark} />}
             </div>
           </div>
-          <h1 style={{ ...display, fontSize: "clamp(2rem,7vw,3rem)", color: palette.bg, fontStyle: "italic", marginBottom: "0.5rem" }}>
+          <h1 style={{ ...display, fontSize: "clamp(2rem,7vw,3rem)", color: palette.onDark, fontStyle: "italic", marginBottom: "0.5rem" }}>
             ¡Libro terminado!
           </h1>
-          <p style={{ ...body, fontSize: "1.15rem", color: "#D8CCBC", marginBottom: "0.25rem" }}>{book.title}</p>
-          <p style={{ ...body, fontSize: "0.9rem", color: "#9A8A7A" }}>{book.author}</p>
+          <p style={{ ...body, fontSize: "1.15rem", color: palette.onDarkSoft, marginBottom: "0.25rem" }}>{book.title}</p>
+          <p style={{ ...body, fontSize: "0.9rem", color: palette.onDarkFaint }}>{book.author}</p>
         </div>
       )}
 
       {/* STEP 2 — Rating */}
       {step === 2 && (
         <div style={{ width: "100%", maxWidth: 400, animation: "celebCardIn 0.45s ease-out" }}>
-          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.bg, fontStyle: "italic", textAlign: "center", marginBottom: "0.2rem" }}>
+          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, fontStyle: "italic", textAlign: "center", marginBottom: "0.2rem" }}>
             ¿Qué te pareció?
           </h2>
-          <p style={{ ...body, fontSize: "0.9rem", color: "#9A8A7A", textAlign: "center", marginBottom: "1.75rem" }}>
+          <p style={{ ...body, fontSize: "0.9rem", color: palette.onDarkFaint, textAlign: "center", marginBottom: "1.75rem" }}>
             {book.title}
           </p>
 
@@ -12710,15 +11182,15 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
               >
                 <Star
                   size={46}
-                  fill={n <= displayRating ? "#C8924A" : "none"}
-                  color={n <= displayRating ? "#C8924A" : "#5A4A3A"}
+                  fill={n <= displayRating ? BRAND.amber : "none"}
+                  color={n <= displayRating ? BRAND.amber : palette.onDarkMuted}
                   style={{ transition: "all 0.12s" }}
                 />
               </button>
             ))}
           </div>
 
-          <p style={{ ...body, textAlign: "center", color: "#C8924A", fontSize: "1rem", minHeight: "1.5rem", marginBottom: "1.5rem", transition: "opacity 0.2s" }}>
+          <p style={{ ...body, textAlign: "center", color: BRAND.amber, fontSize: "1rem", minHeight: "1.5rem", marginBottom: "1.5rem", transition: "opacity 0.2s" }}>
             {displayRating > 0 ? ratingTexts[displayRating] : ""}
           </p>
 
@@ -12731,7 +11203,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
               width: "100%", borderRadius: "12px", padding: "0.85rem",
               backgroundColor: "rgba(255,255,255,0.06)",
               border: "1.5px solid rgba(255,255,255,0.1)",
-              color: palette.bg, ...body, fontSize: "0.95rem",
+              color: palette.onDark, ...body, fontSize: "0.95rem",
               resize: "none", outline: "none",
               marginBottom: "1.25rem",
               boxSizing: "border-box",
@@ -12743,8 +11215,8 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
             disabled={saving || rating === 0}
             style={{
               width: "100%", padding: "0.9rem", borderRadius: "12px",
-              backgroundColor: rating > 0 ? palette.accent : "#3A2A1A",
-              color: rating > 0 ? palette.bg : "#6A5A4A",
+              backgroundColor: rating > 0 ? palette.accent : BRAND.ink,
+              color: rating > 0 ? palette.onDark : palette.onDarkMuted,
               border: "none", cursor: rating > 0 ? "pointer" : "default",
               ...display, fontSize: "1.05rem",
               marginBottom: "0.65rem",
@@ -12759,7 +11231,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
             onClick={handleSkipRating}
             style={{
               width: "100%", padding: "0.6rem", background: "none", border: "none",
-              color: "#7A6A5A", ...body, fontSize: "0.9rem", cursor: "pointer",
+              color: palette.onDarkMuted, ...body, fontSize: "0.9rem", cursor: "pointer",
             }}
           >
             Saltar por ahora
@@ -12770,7 +11242,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
       {/* STEP 3 — Summary */}
       {step === 3 && (
         <div style={{ width: "100%", maxWidth: 420, animation: "celebCardIn 0.45s ease-out" }}>
-          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.bg, fontStyle: "italic", textAlign: "center", marginBottom: "1.5rem" }}>
+          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, fontStyle: "italic", textAlign: "center", marginBottom: "1.5rem" }}>
             Tu resumen
           </h2>
 
@@ -12781,12 +11253,12 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
               display: "flex", alignItems: "center", gap: "1rem",
               marginBottom: "0.75rem",
             }}>
-              <Flame size={28} color="#C8924A" />
+              <Flame size={28} color={BRAND.amber} />
               <div>
-                <div style={{ ...display, fontSize: "1.5rem", color: palette.bg }}>
-                  {streak.current_streak || 0} <span style={{ fontSize: "0.8rem", ...body, color: "#C8924A" }}>días de racha</span>
+                <div style={{ ...display, fontSize: "1.5rem", color: palette.onDark }}>
+                  {streak.current_streak || 0} <span style={{ fontSize: "0.8rem", ...body, color: BRAND.amber }}>días de racha</span>
                 </div>
-                <div style={{ ...body, fontSize: "0.82rem", color: "#9A8A7A" }}>
+                <div style={{ ...body, fontSize: "0.82rem", color: palette.onDarkFaint }}>
                   {streak.longest_streak > (streak.current_streak || 0)
                     ? `Mejor racha: ${streak.longest_streak} días`
                     : "¡Nueva mejor racha!"}
@@ -12801,17 +11273,17 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
             display: "flex", alignItems: "center", gap: "1rem",
             marginBottom: "0.75rem",
           }}>
-            <BookOpen size={24} color="#C8924A" />
-            <div style={{ ...body, color: "#D8CCBC", fontSize: "0.95rem" }}>
+            <BookOpen size={24} color={BRAND.amber} />
+            <div style={{ ...body, color: palette.onDarkSoft, fontSize: "0.95rem" }}>
               Has leído{" "}
-              <strong style={{ ...display, color: palette.bg, fontSize: "1.1rem" }}>{booksThisMonth}</strong>{" "}
+              <strong style={{ ...display, color: palette.onDark, fontSize: "1.1rem" }}>{booksThisMonth}</strong>{" "}
               {booksThisMonth === 1 ? "libro" : "libros"} este mes
             </div>
           </div>
 
           {newAchievements.length > 0 && (
             <div style={{ marginBottom: "0.75rem" }}>
-              <p style={{ ...body, fontSize: "0.8rem", color: "#9A8A7A", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }}>
+              <p style={{ ...body, fontSize: "0.8rem", color: palette.onDarkFaint, marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.35rem", justifyContent: "center" }}>
                 <Award size={13} />Logros desbloqueados
               </p>
               {newAchievements.map((a, i) => (
@@ -12824,8 +11296,8 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
                 }}>
                   <span style={{ fontSize: "1.5rem" }}>{a.emoji}</span>
                   <div>
-                    <div style={{ ...display, color: "#C8924A", fontSize: "0.95rem" }}>{a.name}</div>
-                    <div style={{ ...body, color: "#9A8A7A", fontSize: "0.78rem" }}>{a.desc}</div>
+                    <div style={{ ...display, color: BRAND.amber, fontSize: "0.95rem" }}>{a.name}</div>
+                    <div style={{ ...body, color: palette.onDarkFaint, fontSize: "0.78rem" }}>{a.desc}</div>
                   </div>
                 </div>
               ))}
@@ -12838,7 +11310,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
               width: "100%", padding: "0.85rem", borderRadius: "12px",
               background: "linear-gradient(135deg, rgba(122,46,46,0.18) 0%, rgba(200,146,74,0.18) 100%)",
               border: "1.5px solid rgba(200,146,74,0.35)",
-              color: "#C8924A", cursor: "pointer",
+              color: BRAND.amber, cursor: "pointer",
               ...display, fontSize: "1rem",
               marginTop: "0.5rem",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
@@ -12852,7 +11324,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
             onClick={() => setStep(4)}
             style={{
               width: "100%", padding: "0.9rem", borderRadius: "12px",
-              backgroundColor: palette.accent, color: palette.bg,
+              backgroundColor: palette.accent, color: palette.onDark,
               border: "none", cursor: "pointer",
               ...display, fontSize: "1.05rem",
               marginTop: "0.65rem",
@@ -12866,11 +11338,11 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
       {/* STEP 4 — What's next */}
       {step === 4 && (
         <div style={{ width: "100%", maxWidth: 400, textAlign: "center", animation: "celebCardIn 0.45s ease-out" }}>
-          <Sparkles size={42} color="#C8924A" style={{ marginBottom: "1rem" }} />
-          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.bg, fontStyle: "italic", marginBottom: "0.5rem" }}>
+          <Sparkles size={42} color={BRAND.amber} style={{ marginBottom: "1rem" }} />
+          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, fontStyle: "italic", marginBottom: "0.5rem" }}>
             ¿Listo para el siguiente?
           </h2>
-          <p style={{ ...body, color: "#9A8A7A", fontSize: "0.9rem", marginBottom: "2rem" }}>
+          <p style={{ ...body, color: palette.onDarkFaint, fontSize: "0.9rem", marginBottom: "2rem" }}>
             {wantCount > 0
               ? `Tienes ${wantCount} ${wantCount === 1 ? "libro" : "libros"} esperándote en tu biblioteca`
               : "Folio tiene miles de libros esperándote"}
@@ -12880,7 +11352,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
             onClick={onGoToExplorer}
             style={{
               width: "100%", padding: "0.9rem", borderRadius: "12px",
-              backgroundColor: palette.accent, color: palette.bg,
+              backgroundColor: palette.accent, color: palette.onDark,
               border: "none", cursor: "pointer",
               ...display, fontSize: "1.05rem",
               marginBottom: "0.75rem",
@@ -12897,7 +11369,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
               width: "100%", padding: "0.8rem", borderRadius: "12px",
               backgroundColor: "rgba(255,255,255,0.06)",
               border: "1.5px solid rgba(255,255,255,0.1)",
-              color: "#D8CCBC", ...body, fontSize: "0.95rem",
+              color: palette.onDarkSoft, ...body, fontSize: "0.95rem",
               cursor: "pointer",
             }}
           >
@@ -12958,7 +11430,7 @@ function PWAUpdateBanner() {
         onClick={() => updateServiceWorker(true)}
         style={{
           ...display, fontSize: "0.82rem", fontWeight: 600,
-          backgroundColor: palette.accent, color: "#fff",
+          backgroundColor: palette.accent, color: palette.onAccent,
           border: "none", borderRadius: "999px", padding: "0.35rem 0.85rem",
           cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap",
         }}
@@ -13001,7 +11473,6 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   const [gemBalance, setGemBalance] = useState(0);
   const [gemToastQueue, setGemToastQueue] = useState([]);
   const [pet, setPet] = useState(null);
-  const [petLoaded, setPetLoaded] = useState(false);
   const [showPetOnboarding, setShowPetOnboarding] = useState(false);
   const [petHubOpen, setPetHubOpen] = useState(false);
   const [amigosSheetOpen, setAmigosSheetOpen] = useState(false);
@@ -13074,7 +11545,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           setToastMessage(`¡Sincronizado! ${done} registro${done > 1 ? "s" : ""} guardado${done > 1 ? "s" : ""} ✓`);
           setTimeout(() => setToastMessage(null), 3000);
           // Refresh books after sync
-          fetchBooks(user.id).then(b => setBooks(b)).catch(() => {});
+          fetchBooks(user.id).then(b => setBooks(b)).catch((err) => console.error("[books] refresco tras sincronizar falló:", err));
         } else {
           setToastMessage(null);
         }
@@ -13126,7 +11597,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       supabase.from("monthly_wraps").select("id").eq("user_id", user.id).eq("month", m).eq("year", y).eq("wrap_type", "monthly").maybeSingle()
         .then(({ data: existing }) => {
           if (!existing) {
-            generateMonthWrap(user.id, user.name, m, y).then(wrap => { if (wrap) setActiveWrap(wrap); });
+            generateMonthWrap(user.id, m, y)
+              .then(wrap => { if (wrap) setActiveWrap(wrap); })
+              .catch(err => console.error("[wrapped] generación automática mensual falló:", err));
           }
         });
     }
@@ -13137,7 +11610,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       const y = todayCheck.getFullYear();
       supabase.from("monthly_wraps").select("id").eq("user_id", user.id).eq("wrap_type", "annual").eq("year", y).maybeSingle()
         .then(({ data: existing }) => {
-          if (!existing) generateAnnualWrap(user.id, user.name, y).then(wrap => { if (wrap) setActiveWrap(wrap); });
+          if (!existing) generateAnnualWrap(user.id, y)
+            .then(wrap => { if (wrap) setActiveWrap(wrap); })
+            .catch(err => console.error("[wrapped] generación automática anual falló:", err));
         });
     }
   }, [user.id]);
@@ -13164,7 +11639,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         .eq("user_id", user.id)
         .eq("read", false);
       if (error) { console.error("[notif] refreshUnreadNotifs SELECT error:", error.message, error); return; }
-      console.log(`[notif] refreshUnreadNotifs → count sin leer: ${count}`);
+      devLog(`[notif] refreshUnreadNotifs → count sin leer: ${count}`);
       setUnreadNotifs(count || 0);
     } catch (e) { console.error("[notif] refreshUnreadNotifs catch:", e); }
   }
@@ -13205,11 +11680,11 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
     const channel = supabase
       .channel(`notifs:${user.id}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, () => {
-        console.log("[notif] Realtime INSERT received → refreshing badge");
+        devLog("[notif] Realtime INSERT received → refreshing badge");
         refreshUnreadNotifs();
       })
       .subscribe((status, err) => {
-        console.log("[notif] Realtime subscription status:", status, err || "");
+        devLog("[notif] Realtime subscription status:", status, err || "");
       });
     return () => { supabase.removeChannel(channel); };
   }, [user.id]);
@@ -13232,7 +11707,8 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         const gemsEarned = keys.length * 10;
         // Server-side: +10 por logro, UNA vez por logro (la RPC valida que el
         // logro exista en la tabla y es idempotente). Devuelve el balance real.
-        supabase.rpc("claim_achievement_gems", { p_keys: keys }).then(({ data }) => {
+        supabase.rpc("claim_achievement_gems", { p_keys: keys }).then(({ data, error }) => {
+          if (error) console.error("[GEMS] claim_achievement_gems falló:", error.message);
           if (data !== null && data !== undefined) setGemBalance(data);
           showGemToast(gemsEarned, `+${gemsEarned} gemas`);
         });
@@ -13265,7 +11741,6 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         setShowPetOnboarding(true);
       }
       // p === undefined → tabla ausente/error: no mostrar mascota ni onboarding
-      setPetLoaded(true);
     });
     supabase.from("user_streaks").select("current_streak, total_pages_read").eq("user_id", user.id).maybeSingle()
       .then(({ data }) => { if (!cancelled && data) setPetStreak(data); });
@@ -13279,7 +11754,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       if (result.leveledUp) {
         haptic(HAPTIC.BOOK_DONE);
         if (typeof confetti === "function") {
-          const colors = ["#7A2E2E", "#C8924A", "#F4EDE0"];
+          const colors = [BRAND.wine, BRAND.amber, BRAND.cream];
           confetti({ particleCount: 80, spread: 75, origin: { y: 0.4 }, colors });
           setTimeout(() => confetti({ particleCount: 40, spread: 100, angle: 60, origin: { x: 0, y: 0.5 }, colors }), 200);
           setTimeout(() => confetti({ particleCount: 40, spread: 100, angle: 120, origin: { x: 1, y: 0.5 }, colors }), 350);
@@ -13325,7 +11800,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         // INSERT; aquí solo se refresca el estado visible.
         loadGems(user.id).then(bal => setGemBalance(bal));
         showGemToast(50, "+50 gemas");
-        addPetXP(user.id, 50).catch(() => {});
+        addPetXP(user.id, 50).catch((err) => console.error("[PET] sync tras libro terminado falló:", err));
       } else {
         checkAchievements(user.id, user.name);
       }
@@ -13371,10 +11846,10 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         // Recién aquí el trigger del servidor ya otorgó las +50 gemas y +50 XP
         // (el UPDATE de status acaba de persistir): sincronizar estado real.
         loadGems(user.id).then(bal => setGemBalance(bal));
-        addPetXP(user.id, 50).catch(() => {});
+        addPetXP(user.id, 50).catch((err) => console.error("[PET] sync tras libro terminado falló:", err));
       }
       if (!isFinishing) checkAchievements(user.id, user.name);
-      fetchBooks(user.id).then((b) => setBooks(b)).catch(() => {});
+      fetchBooks(user.id).then((b) => setBooks(b)).catch((err) => console.error("[books] refresco tras actualizar falló:", err));
     } catch (err) {
       console.error("Error actualizando libro:", err);
       if (prevBook) setBooks((prev) => prev.map((b) => (b.id === prevBook.id ? prevBook : b)));
@@ -13384,8 +11859,10 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   }
 
   async function deleteBook(id) {
+    const index = books.findIndex((b) => b.id === id);
+    const removed = books[index];
     const updated = books.filter((b) => b.id !== id);
-    setBooks(updated);
+    setBooks((prev) => prev.filter((b) => b.id !== id));
     setSelectedBook(null);
     try {
       await deleteBookFromDB(id, user.id);
@@ -13394,7 +11871,11 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       setTimeout(() => setToastMessage(null), 3000);
     } catch (err) {
       console.error("[deleteBook] error:", err?.message);
-      setBooks(books);
+      if (removed) {
+        setBooks((prev) => prev.some((b) => b.id === id)
+          ? prev
+          : [...prev.slice(0, index), removed, ...prev.slice(index)]);
+      }
       const msg = err?.message === "DELETE_NO_ROWS"
         ? "No se pudo eliminar (sin permisos en DB). Verifica RLS en Supabase."
         : "No se pudo eliminar el libro. Intenta de nuevo.";
@@ -13693,23 +12174,23 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       `}</style>
       <PWAUpdateBanner />
       {!isOnline && (
-        <div style={{ backgroundColor: "#FDF3DC", borderBottom: "1px solid #E8C97A", height: 32, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ backgroundColor: palette.warnBg, borderBottom: `1px solid ${palette.warnBorder}`, height: 32, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem", flexShrink: 0, position: "sticky", top: 0, zIndex: 50 }}>
           <WifiOff size={14} color={palette.amber} strokeWidth={2} />
-          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", color: "#8A6A1A", fontWeight: 500 }}>
+          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", color: palette.warnInk, fontWeight: 500 }}>
             Sin conexión — algunos datos pueden no estar actualizados
           </span>
         </div>
       )}
-      <AppHeader tab={tab} setTab={setTab} user={user} onLogout={onLogout} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
+      <AppHeader tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
       <main className="max-w-4xl mx-auto pb-24 sm:pb-10 fade-in" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}
-        {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
+        {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} /></div>}
         {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
-        {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} isOnline={isOnline} /></div>}
-        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSaveQuote={() => openSaveQuote(null)} pet={pet} onRenamePet={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }} /></div>}
+        {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}
+        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} /></div>}
       </main>
-      <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onAddPress={() => setShowFabMenu(true)} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
+      <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
       {/* FAB flotante para agregar (el centro de la nav ahora es Mascota) */}
       {!petHubOpen && (
         <button
@@ -13720,12 +12201,12 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
             position: "fixed", right: 18, zIndex: 35,
             bottom: "calc(env(safe-area-inset-bottom) + 80px)",
             width: 58, height: 58, borderRadius: "50%", border: "none", cursor: "pointer",
-            background: "linear-gradient(135deg, #7A2E2E 0%, #A4493D 100%)",
+            background: BRAND.gradientFab,
             boxShadow: "0 6px 20px rgba(122,46,46,0.45)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          <Plus size={26} color="#fff" strokeWidth={2.6} />
+          <Plus size={26} color={palette.onAccent} strokeWidth={2.6} />
         </button>
       )}
       {notifsSheetOpen && (
@@ -13812,7 +12293,6 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       {activeWrap && (
         <WrappedStoryExperience
           wrap={activeWrap}
-          userName={user.name}
           onClose={() => setActiveWrap(null)}
         />
       )}
@@ -13830,9 +12310,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       )}
       {petHubOpen && pet && (
         <PetHub
-          user={user}
           pet={pet}
-          streak={petStreak}
           onClose={() => setPetHubOpen(false)}
           onGoToProfile={() => { setPetHubOpen(false); setTab("perfil"); }}
           onRename={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }}
@@ -13909,7 +12387,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
             setShowSaveQuote(false);
             setToastMessage("Frase guardada ✨");
             setTimeout(() => setToastMessage(null), 3500);
-            addPetXP(user.id, 5).catch(() => {});
+            addPetXP(user.id, 5).catch((err) => console.error("[PET] sync tras guardar frase falló:", err));
           }}
         />
       )}
@@ -13978,7 +12456,7 @@ function TutorialOverlay({ onDone }) {
         ...(isAbove
           ? { bottom: window.innerHeight - hl.top + 12 }
           : { top: hl.top + hl.height + 12 }),
-        backgroundColor: '#7A2E2E', color: '#F5EDE0', borderRadius: 14,
+        backgroundColor: BRAND.wine, color: BRAND.cream, borderRadius: 14,
         padding: '0.9rem 1rem 0.85rem',
         boxShadow: '0 8px 32px rgba(42,31,26,0.5)',
         animation: isAbove
@@ -13986,18 +12464,18 @@ function TutorialOverlay({ onDone }) {
           : 'tutTipBelow 0.28s cubic-bezier(0.22,1,0.36,1) both',
         fontFamily: 'system-ui, -apple-system, sans-serif',
       }}>
-        <div style={{ position: 'absolute', width: 10, height: 10, backgroundColor: '#7A2E2E', left: arrowLeft, transform: 'rotate(45deg)', ...(isAbove ? { bottom: -5 } : { top: -5 }) }} />
+        <div style={{ position: 'absolute', width: 10, height: 10, backgroundColor: BRAND.wine, left: arrowLeft, transform: 'rotate(45deg)', ...(isAbove ? { bottom: -5 } : { top: -5 }) }} />
         <div style={{ display: 'flex', gap: 4, marginBottom: '0.65rem' }}>
           {STEPS.map((_, i) => (
             <div key={i} style={{ height: 3, flex: 1, borderRadius: 999, backgroundColor: i <= step ? 'rgba(245,237,224,0.9)' : 'rgba(245,237,224,0.22)', transition: 'background-color 0.25s' }} />
           ))}
         </div>
-        <p style={{ fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.45, margin: '0 0 0.85rem', color: '#F5EDE0' }}>{current.text}</p>
+        <p style={{ fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.45, margin: '0 0 0.85rem', color: BRAND.cream }}>{current.text}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={done} style={{ fontSize: '0.75rem', color: 'rgba(245,237,224,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
             Saltar
           </button>
-          <button onClick={advance} style={{ fontSize: '0.8rem', fontWeight: 600, backgroundColor: '#F5EDE0', color: '#7A2E2E', border: 'none', borderRadius: 999, padding: '0.38rem 1rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={advance} style={{ fontSize: '0.8rem', fontWeight: 600, backgroundColor: BRAND.cream, color: BRAND.wine, border: 'none', borderRadius: 999, padding: '0.38rem 1rem', cursor: 'pointer', fontFamily: 'inherit' }}>
             {isLast ? '¡Entendido!' : 'Siguiente →'}
           </button>
         </div>
@@ -14176,7 +12654,7 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
               ))}
             </div>
           </div>
-          {addErr && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", margin: 0 }}>{addErr}</p>}
+          {addErr && <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, margin: 0 }}>{addErr}</p>}
           <button
             onClick={() => saveBook(form)}
             disabled={!form.title.trim() || !form.author.trim() || adding}
@@ -14282,7 +12760,7 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
               }}>{label}</button>
             ))}
           </div>
-          {addErr && <p style={{ ...body, fontSize: "0.82rem", color: "#c0392b", marginBottom: "0.5rem" }}>{addErr}</p>}
+          {addErr && <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginBottom: "0.5rem" }}>{addErr}</p>}
           <button
             onClick={() => saveBook({ ...picked, status: pickedStatus })}
             disabled={adding}
@@ -14418,6 +12896,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
   const [sentIds, setSentIds] = useState(new Set());
   const [actionLoading, setActionLoading] = useState({});
   const debounceRef = useRef(null);
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   function handleSearch(val) {
     setQuery(val);
@@ -14425,12 +12904,15 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
     if (!val.trim()) { setResults([]); return; }
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
+      const term = sanitizeSearchTerm(val);
+      if (!term) { setResults([]); setSearching(false); return; }
+      const { data, error } = await supabase
         .from("users")
         .select("id, nombre, username, avatar_url")
-        .or(`username.ilike.%${val.trim()}%,nombre.ilike.%${val.trim()}%`)
+        .or(`username.ilike.%${term}%,nombre.ilike.%${term}%`)
         .neq("id", user.id)
         .limit(10);
+      if (error) console.error("[onboarding] búsqueda de usuarios falló:", error.message);
       setResults(data || []);
       setSearching(false);
     }, 300);
@@ -14438,10 +12920,11 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
 
   async function sendRequest(toId) {
     setActionLoading(p => ({ ...p, [toId]: true }));
-    await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
+    const { error } = await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
+    setActionLoading(p => ({ ...p, [toId]: false }));
+    if (error && error.code !== "23505") { console.error("[onboarding] no se pudo enviar la solicitud:", error.message); return; }
     setSentIds(prev => new Set([...prev, toId]));
     setAddedFriend(true);
-    setActionLoading(p => ({ ...p, [toId]: false }));
   }
 
   return (
@@ -14481,7 +12964,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
               <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", backgroundColor: palette.bgCard, borderRadius: 12, border: `1px solid ${palette.borderSoft}` }}>
                 {u.avatar_url
                   ? <img src={u.avatar_url} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                  : <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: getAvatarColor(u.id || u.nombre), display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: "1rem", color: "#FFFFFF", flexShrink: 0 }}>{initials}</div>
+                  : <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: getAvatarColor(u.id || u.nombre), display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: "1rem", color: palette.onAccent, flexShrink: 0 }}>{initials}</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.nombre}</p>
@@ -14515,9 +12998,9 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
       )}
 
       {addedFriend && (
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.65rem 0.85rem", backgroundColor: "#2D6A4F18", border: "1.5px solid #2D6A4F44", borderRadius: 10, marginBottom: "1rem" }}>
-          <CheckCircle2 size={16} color="#2D6A4F" />
-          <span style={{ ...body, fontSize: "0.85rem", color: "#2D6A4F" }}>¡Solicitud enviada! Tu amigo la verá pronto.</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.65rem 0.85rem", backgroundColor: `${palette.success}18`, border: `1.5px solid ${palette.success}44`, borderRadius: 10, marginBottom: "1rem" }}>
+          <CheckCircle2 size={16} color={palette.success} />
+          <span style={{ ...body, fontSize: "0.85rem", color: palette.success }}>¡Solicitud enviada! Tu amigo la verá pronto.</span>
         </div>
       )}
 
@@ -14526,7 +13009,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
         disabled={completing}
         style={{
           width: "100%", padding: "0.9rem", borderRadius: 12, border: "none",
-          backgroundColor: addedFriend ? "#2D6A4F" : palette.accent,
+          backgroundColor: addedFriend ? palette.success : palette.accent,
           color: palette.bg, cursor: completing ? "default" : "pointer",
           ...display, fontSize: "1.05rem",
           display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
@@ -14558,8 +13041,9 @@ function NewUserOnboarding({ user, onComplete }) {
     try {
       const updates = { preferred_genres: selectedGenres, onboarding_completed: true };
       if (selectedAvatar) updates.avatar_url = selectedAvatar;
-      await supabase.from("users").update(updates).eq("id", user.id);
-    } catch (err) { console.error("Error completing onboarding:", err); }
+      const { error } = await supabase.from("users").update(updates).eq("id", user.id);
+      if (error) console.error("[onboarding] no se pudieron guardar las preferencias:", error.message);
+    } catch (err) { console.error("[onboarding] Error completing onboarding:", err); }
     onComplete();
   }
 
@@ -14595,7 +13079,7 @@ function NewUserOnboarding({ user, onComplete }) {
         const ref = localStorage.getItem("folio_ref");
         if (!ref) return null;
         return (
-          <div style={{ margin: "0.85rem 1.5rem 0", padding: "0.65rem 1rem", backgroundColor: "#C8924A14", border: "1px solid #C8924A30", borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div style={{ margin: "0.85rem 1.5rem 0", padding: "0.65rem 1rem", backgroundColor: `${BRAND.amber}14`, border: `1px solid ${BRAND.amber}30`, borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span style={{ fontSize: "1rem" }}>👋</span>
             <p style={{ ...body, fontSize: "0.84rem", color: palette.inkSoft, margin: 0 }}>
               <strong style={{ color: palette.ink }}>{ref}</strong> te invitó a Folio
@@ -14645,127 +13129,6 @@ function NewUserOnboarding({ user, onComplete }) {
   );
 }
 
-// ============ ONBOARDING ============
-function OnboardingScreen({ user, onDone }) {
-  const features = [
-    {
-      icon: "📚",
-      title: "Cataloga tus libros",
-      desc: "Escanea el código de barras o busca por título. Tu biblioteca siempre contigo.",
-    },
-    {
-      icon: "✨",
-      title: "Recibe recomendaciones por mood",
-      desc: "Dile cómo te sientes y la IA te sugiere tu próxima lectura perfecta.",
-    },
-    {
-      icon: "👥",
-      title: "Conecta con lectores",
-      desc: "Sigue a amigos, comparte lecturas y descubre libros a través de tu red.",
-    },
-  ];
-
-  return (
-    <div style={{ backgroundColor: palette.bg, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem 1.5rem", overflowY: "auto" }}>
-      <style>{`
-        ${FONT_LINK}
-        @keyframes obFadeUp {
-          from { opacity: 0; transform: translateY(22px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes obFadeIn {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
-        .ob-fade-up-1 { animation: obFadeUp 0.65s cubic-bezier(0.22,1,0.36,1) both; }
-        .ob-fade-up-2 { animation: obFadeUp 0.65s 0.15s cubic-bezier(0.22,1,0.36,1) both; }
-        .ob-fade-up-3 { animation: obFadeUp 0.65s 0.28s cubic-bezier(0.22,1,0.36,1) both; }
-        .ob-fade-up-4 { animation: obFadeUp 0.65s 0.42s cubic-bezier(0.22,1,0.36,1) both; }
-        .ob-fade-up-5 { animation: obFadeUp 0.65s 0.58s cubic-bezier(0.22,1,0.36,1) both; }
-        .ob-fade-up-6 { animation: obFadeUp 0.65s 0.72s cubic-bezier(0.22,1,0.36,1) both; }
-      `}</style>
-
-      <div style={{ width: "100%", maxWidth: 420, display: "flex", flexDirection: "column", alignItems: "center", gap: "0" }}>
-
-        {/* Logo */}
-        <div className="ob-fade-up-1" style={{ textAlign: "center", marginBottom: "0.5rem" }}>
-          <div style={{
-            width: 80, height: 80, borderRadius: "22px", margin: "0 auto 1.1rem",
-            background: `linear-gradient(135deg, ${palette.accent} 0%, ${palette.amber} 100%)`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 8px 32px ${palette.accent}44`,
-          }}>
-            <span style={{ fontFamily: "Fraunces, serif", fontSize: "2.6rem", fontStyle: "italic", fontWeight: 700, color: palette.bg, lineHeight: 1 }}>F</span>
-          </div>
-          <h1 style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "2.6rem", fontWeight: 700, color: palette.ink, margin: 0, lineHeight: 1 }}>
-            Folio
-          </h1>
-        </div>
-
-        {/* Tagline */}
-        <div className="ob-fade-up-2" style={{ textAlign: "center", marginBottom: "2.25rem" }}>
-          <p style={{ ...body, fontSize: "1.05rem", color: palette.inkSoft, lineHeight: 1.55, maxWidth: 300 }}>
-            Tu biblioteca personal,<br />potenciada por <span style={{ color: palette.accent, fontWeight: 600 }}>IA</span>
-          </p>
-        </div>
-
-        {/* Feature cards */}
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.85rem", marginBottom: "2.25rem" }}>
-          {features.map((f, i) => (
-            <div
-              key={f.title}
-              className={`ob-fade-up-${i + 3}`}
-              style={{
-                backgroundColor: palette.bgCard,
-                border: `1px solid ${palette.border}`,
-                borderRadius: "14px",
-                padding: "1rem 1.1rem",
-                display: "flex",
-                gap: "1rem",
-                alignItems: "flex-start",
-                boxShadow: "0 2px 10px rgba(42,31,26,0.06)",
-              }}
-            >
-              <span style={{ fontSize: "1.6rem", lineHeight: 1, flexShrink: 0, marginTop: "0.1rem" }}>{f.icon}</span>
-              <div>
-                <p style={{ ...display, fontWeight: 700, fontSize: "0.95rem", color: palette.ink, marginBottom: "0.2rem" }}>{f.title}</p>
-                <p style={{ ...body, fontSize: "0.83rem", color: palette.inkSoft, lineHeight: 1.5 }}>{f.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* CTA */}
-        <div className="ob-fade-up-6" style={{ width: "100%" }}>
-          <button
-            onClick={onDone}
-            style={{
-              ...display,
-              width: "100%",
-              padding: "0.9rem 1.5rem",
-              borderRadius: "12px",
-              fontSize: "1.05rem",
-              fontWeight: 700,
-              background: `linear-gradient(135deg, ${palette.accent} 0%, ${palette.amber} 100%)`,
-              color: palette.bg,
-              border: "none",
-              cursor: "pointer",
-              boxShadow: `0 4px 20px ${palette.accent}44`,
-              letterSpacing: "0.01em",
-            }}
-          >
-            Empezar mi biblioteca
-          </button>
-          <p className="ob-fade-up-6" style={{ ...body, textAlign: "center", fontSize: "0.78rem", color: palette.inkFaint, marginTop: "0.85rem" }}>
-            Bienvenido/a, <span style={{ color: palette.inkSoft }}>{user?.name?.split(" ")[0] || "lector"}</span>
-          </p>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
 // ============ ROOT ============
 async function checkOnboardingNeeded(userId) {
   const controller = new AbortController();
@@ -14799,14 +13162,21 @@ class ErrorBoundary extends Component {
   componentDidCatch(error, errorInfo) { console.error('App crashed:', error, errorInfo); }
   render() {
     if (this.state.hasError) {
+      // Igual que RootErrorBoundary (main.jsx): el detalle técnico solo en desarrollo.
       return (
-        <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ padding: 20, textAlign: 'center', fontFamily: 'sans-serif', color: palette.ink }}>
           <h2 style={{ marginBottom: 12 }}>Algo se rompió</h2>
-          <p style={{ color: '#991b1b', marginBottom: 12, fontSize: 14 }}>{this.state.error?.message}</p>
-          <pre style={{ fontSize: 11, textAlign: 'left', overflow: 'auto', maxHeight: '40vh', background: '#fee2e2', padding: 12, borderRadius: 4, marginBottom: 16 }}>
-            {this.state.error?.stack}
-          </pre>
-          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: '#7A2E2E', color: '#fff', cursor: 'pointer', fontSize: 15 }}>
+          {import.meta.env.DEV ? (
+            <>
+              <p style={{ color: palette.dangerInk, marginBottom: 12, fontSize: 14 }}>{this.state.error?.message}</p>
+              <pre style={{ fontSize: 11, textAlign: 'left', overflow: 'auto', maxHeight: '40vh', background: palette.dangerSoft, padding: 12, borderRadius: 4, marginBottom: 16 }}>
+                {this.state.error?.stack}
+              </pre>
+            </>
+          ) : (
+            <p style={{ marginBottom: 16, fontSize: 14, color: palette.inkSoft }}>Intenta recargar la página. Si el problema continúa, vuelve a intentarlo en unos minutos.</p>
+          )}
+          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: BRAND.wine, color: palette.onAccent, cursor: 'pointer', fontSize: 15 }}>
             Recargar
           </button>
         </div>
@@ -14874,8 +13244,13 @@ export default function App() {
     if (isNew) {
       setShowOnboarding(true);
     } else {
-      const needed = await checkOnboardingNeeded(u.id);
-      setShowOnboarding(needed);
+      try {
+        const needed = await checkOnboardingNeeded(u.id);
+        setShowOnboarding(needed);
+      } catch (err) {
+        // Timeout (5 s) o red: se entra a la app; el onboarding se vuelve a revisar en el próximo arranque.
+        console.error("[onboarding] no se pudo verificar el onboarding:", err?.message || err);
+      }
     }
     // After login, resolve any pending ref
     const savedRef = localStorage.getItem("folio_ref");

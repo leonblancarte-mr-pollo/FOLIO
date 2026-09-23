@@ -1,4 +1,13 @@
 import { supabase } from "../supabase.js";
+import { devLog } from "./devLog.js";
+
+// Etiqueta legible de cada estado de lectura (la UI añade icono y color en App.jsx).
+const STATUS_LABELS = {
+  reading: "Leyendo",
+  want_to_read: "Por leer",
+  wish: "Quiero leer",
+  read: "Leído",
+};
 
 // ============ STORAGE ============
 function dbToBook(row) {
@@ -70,24 +79,24 @@ function readDateLabel(book) {
 function cacheBooks(books) {
   try {
     localStorage.setItem("folio_books", JSON.stringify(books));
-    console.log("[offline] Guardando books en caché:", books.length);
-  } catch {}
+    devLog("[offline] Guardando books en caché:", books.length);
+  } catch { /* localStorage lleno o bloqueado: la caché offline es best-effort */ }
 }
 function getCachedBooks() {
   try {
     const cached = JSON.parse(localStorage.getItem("folio_books"));
-    console.log("[offline] Books desde caché:", cached ? cached.length : "vacío");
+    devLog("[offline] Books desde caché:", cached ? cached.length : "vacío");
     return cached;
   } catch { return null; }
 }
 function cacheProfile(data) {
-  try { localStorage.setItem("folio_profile", JSON.stringify(data)); } catch {}
+  try { localStorage.setItem("folio_profile", JSON.stringify(data)); } catch { /* localStorage lleno o bloqueado: la caché offline es best-effort */ }
 }
 function getCachedProfile() {
   try { return JSON.parse(localStorage.getItem("folio_profile")); } catch { return null; }
 }
 function cacheAchievements(data) {
-  try { localStorage.setItem("folio_achievements", JSON.stringify(data)); } catch {}
+  try { localStorage.setItem("folio_achievements", JSON.stringify(data)); } catch { /* localStorage lleno o bloqueado: la caché offline es best-effort */ }
 }
 function getCachedAchievements() {
   try { return JSON.parse(localStorage.getItem("folio_achievements")); } catch { return null; }
@@ -98,7 +107,7 @@ function getPendingLogs() {
 function addPendingLog(log) {
   const logs = getPendingLogs();
   logs.push({ ...log, _id: Date.now() + Math.random() });
-  try { localStorage.setItem("folio_pending_logs", JSON.stringify(logs)); } catch {}
+  try { localStorage.setItem("folio_pending_logs", JSON.stringify(logs)); } catch { /* localStorage lleno o bloqueado: la caché offline es best-effort */ }
 }
 function getPendingPosts() {
   try { return JSON.parse(localStorage.getItem("folio_pending_posts") || "[]"); } catch { return []; }
@@ -106,7 +115,7 @@ function getPendingPosts() {
 function addPendingPost(post) {
   const posts = getPendingPosts();
   posts.push({ ...post, _id: Date.now() + Math.random() });
-  try { localStorage.setItem("folio_pending_posts", JSON.stringify(posts)); } catch {}
+  try { localStorage.setItem("folio_pending_posts", JSON.stringify(posts)); } catch { /* localStorage lleno o bloqueado: la caché offline es best-effort */ }
 }
 
 async function fetchBooks(userId) {
@@ -160,4 +169,4 @@ async function deleteBookFromDB(id, userId) {
 }
 
 
-export { dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, addPendingLog, getPendingPosts, addPendingPost, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB };
+export { STATUS_LABELS, dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, addPendingLog, getPendingPosts, addPendingPost, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB };

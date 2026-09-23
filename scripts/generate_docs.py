@@ -673,7 +673,7 @@ INTRO = [
     ("table", ["Prioridad", "Item", "Origen"], [
         ["Corto plazo", "Correr `fix_signup_permissions.sql` y `repair_all_orphan_profiles.sql` en Supabase y desplegar (`vercel --prod`)", "Fix de huérfanas"],
         ["Corto plazo", "Conectar GitHub ↔ Vercel para deploy automático", "Deuda #3"],
-        ["Corto plazo", "Mover `buyExtraSaves` y `daily_save_limits` a RPCs SECURITY DEFINER", "Deuda #4 y #5"],
+        ["Corto plazo", "Correr `spend_gems.sql` en Supabase (cierra `buyExtraSaves`) y mover `daily_save_limits` a RPC SECURITY DEFINER", "Deuda #4 (resuelta en código) y #5"],
         ["Medio plazo", "Suite mínima de tests (servicios y RPCs críticas) y code-splitting del bundle (1.2 MB)", "Deuda #6 y #8"],
         ["Medio plazo", "Seguir extrayendo vistas de App.jsx a `src/components/`", "Deuda #1"],
         ["Medio plazo", "Pago real de Folio Plus; push notifications de matches y mensajes", "Trueque Sprint 2"],

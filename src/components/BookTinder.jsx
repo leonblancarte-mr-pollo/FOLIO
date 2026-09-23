@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Heart, Loader2, Gem, RefreshCw, BookOpen, Info } from "lucide-react";
-import { supabase } from "../supabase.js";
+import { loadGems } from "../services/gemsService.js";
 import {
   getPreferredGenres,
   getRecommendations,
@@ -10,26 +10,14 @@ import {
 } from "../services/recommendationService.js";
 import ReadingStatusModal from "./ReadingStatusModal.jsx";
 import BookCoverImage from "./BookCoverImage.jsx";
-
-const P = {
-  bg: "#F4EDE0", bgSoft: "#EBE3D2", bgCard: "#FBF6EB",
-  ink: "#2A1F1A", inkSoft: "#5C4A3F", inkFaint: "#8B7B6E",
-  accent: "#7A2E2E", accentSoft: "#A4493D",
-  amber: "#C8924A",
-  border: "#D4C9B5", borderSoft: "#DDD5C5",
-  green: "#4A9D6A",
-  red: "#C74A4A",
-};
+import { haptic } from "../haptics.js";
+import { palette } from "../theme.js";
 
 const serif = { fontFamily: "Fraunces, serif" };
 const body  = { fontFamily: "'EB Garamond', serif" };
 
 const SWIPE_THRESHOLD = 100;   // px para confirmar el swipe
 const MAX_ROTATION = 16;       // grados
-
-function haptic(pattern) {
-  try { navigator.vibrate?.(pattern); } catch { /* no soportado */ }
-}
 
 // Genre pill — variante clara para overlay oscuro
 function GenrePill({ label }) {
@@ -57,7 +45,7 @@ function Toast({ msg, onDismiss }) {
   return (
     <div style={{
       position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
-      backgroundColor: P.ink, color: P.bg,
+      backgroundColor: palette.ink, color: palette.bg,
       borderRadius: 12, padding: "10px 20px",
       fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.9rem", fontWeight: 500,
       zIndex: 300, whiteSpace: "nowrap",
@@ -83,7 +71,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying }) {
     >
       <div
         style={{
-          width: "100%", maxWidth: 480, backgroundColor: P.bg,
+          width: "100%", maxWidth: 480, backgroundColor: palette.bg,
           borderRadius: "20px 20px 0 0", padding: "1.5rem 1.5rem 2.5rem",
           boxShadow: "0 -8px 32px rgba(42,31,26,0.15)",
           animation: "sheetUp 300ms cubic-bezier(0.32, 0.72, 0, 1)",
@@ -92,21 +80,21 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying }) {
       >
         <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
           <span style={{ fontSize: "2.25rem", lineHeight: 1 }}>📚</span>
-          <h2 style={{ ...serif, fontSize: "1.2rem", fontWeight: 700, color: P.ink, marginTop: "0.6rem" }}>
+          <h2 style={{ ...serif, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, marginTop: "0.6rem" }}>
             Límite diario alcanzado
           </h2>
-          <p style={{ ...body, fontSize: "0.97rem", color: P.inkSoft, marginTop: "0.4rem", lineHeight: 1.5 }}>
+          <p style={{ ...body, fontSize: "0.97rem", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5 }}>
             Has guardado 15 libros hoy. Vuelve mañana o<br />
             gasta 5 gemas para desbloquear 5 más.
           </p>
         </div>
         <div style={{
-          backgroundColor: P.bgCard, borderRadius: 12, padding: "0.9rem 1.1rem",
-          border: `1px solid ${P.borderSoft}`, marginBottom: "1rem",
+          backgroundColor: palette.bgCard, borderRadius: 12, padding: "0.9rem 1.1rem",
+          border: `1px solid ${palette.borderSoft}`, marginBottom: "1rem",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <span style={{ ...body, fontSize: "0.95rem", color: P.inkSoft }}>Tu balance</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 5, ...serif, fontWeight: 700, fontSize: "1.05rem", color: P.amber }}>
+          <span style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft }}>Tu balance</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, ...serif, fontWeight: 700, fontSize: "1.05rem", color: palette.amber }}>
             <Gem size={16} /> {gemBalance} gemas
           </span>
         </div>
@@ -117,9 +105,9 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying }) {
             width: "100%", padding: "0.95rem", borderRadius: 12, border: "none",
             cursor: gemBalance < 5 ? "not-allowed" : "pointer",
             background: gemBalance < 5
-              ? P.border
-              : `linear-gradient(135deg, ${P.accent} 0%, ${P.amber} 100%)`,
-            color: gemBalance < 5 ? P.inkFaint : "#fff",
+              ? palette.border
+              : `linear-gradient(135deg, ${palette.accent} 0%, ${palette.amber} 100%)`,
+            color: gemBalance < 5 ? palette.inkFaint : palette.onAccent,
             ...serif, fontSize: "1rem", fontWeight: 600,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             opacity: buying ? 0.7 : 1,
@@ -133,7 +121,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying }) {
           style={{
             width: "100%", padding: "0.75rem",
             backgroundColor: "transparent", border: "none", cursor: "pointer",
-            ...body, fontSize: "0.95rem", color: P.inkFaint, marginTop: "0.5rem",
+            ...body, fontSize: "0.95rem", color: palette.inkFaint, marginTop: "0.5rem",
           }}
         >
           Volver mañana
@@ -149,7 +137,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
   return (
     <>
       <BookCoverImage
-        coverUrl={book.cover_url}
+        coverUrl={book.coverUrl}
         title={book.title}
         author={book.author}
         genres={book.genres}
@@ -172,7 +160,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
 
         <h2 style={{
           ...serif, fontSize: "clamp(1.45rem, 5.5vw, 1.75rem)", fontWeight: 700, fontStyle: "italic",
-          color: "#fff", lineHeight: 1.15, margin: "0 0 0.28rem",
+          color: palette.onAccent, lineHeight: 1.15, margin: "0 0 0.28rem",
           textShadow: "0 2px 10px rgba(0,0,0,0.5)",
         }}>
           {book.title}
@@ -200,7 +188,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
           backgroundColor: "rgba(0,0,0,0.52)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
           borderRadius: 10, padding: "5px 11px",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "0.82rem", fontWeight: 600, color: "#fff",
+          fontSize: "0.82rem", fontWeight: 600, color: palette.onAccent,
           letterSpacing: "0.01em",
           pointerEvents: "none",
         }}>
@@ -222,7 +210,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
             cursor: "pointer",
           }}
         >
-          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, fontStyle: "italic", color: "#fff", margin: "0 0 0.3rem" }}>
+          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, fontStyle: "italic", color: palette.onAccent, margin: "0 0 0.3rem" }}>
             {book.title}
           </h3>
           <p style={{ ...body, fontSize: "0.97rem", color: "rgba(255,255,255,0.72)", margin: "0 0 1rem" }}>
@@ -252,12 +240,12 @@ function CardFace({ book, showInfo, onToggleInfo }) {
 function LoadingSkeleton() {
   return (
     <div style={{ padding: "0.5rem 1rem 1.5rem", maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ height: 26, width: 180, margin: "0 auto 0.6rem", borderRadius: 8, backgroundColor: P.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-      <div style={{ height: 5, borderRadius: 5, backgroundColor: P.bgSoft, marginBottom: "1.1rem", animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+      <div style={{ height: 26, width: 180, margin: "0 auto 0.6rem", borderRadius: 8, backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+      <div style={{ height: 5, borderRadius: 5, backgroundColor: palette.bgSoft, marginBottom: "1.1rem", animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
       <div style={{
         position: "relative", borderRadius: 22, overflow: "hidden",
         height: "clamp(420px, 64vh, 620px)",
-        backgroundColor: P.bgSoft,
+        backgroundColor: palette.bgSoft,
       }}>
         <div style={{
           position: "absolute", inset: 0,
@@ -271,9 +259,9 @@ function LoadingSkeleton() {
         </div>
       </div>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.5rem", marginTop: "1.2rem" }}>
-        <div style={{ width: 62, height: 62, borderRadius: "50%", backgroundColor: P.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-        <div style={{ width: 46, height: 46, borderRadius: "50%", backgroundColor: P.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-        <div style={{ width: 62, height: 62, borderRadius: "50%", backgroundColor: P.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+        <div style={{ width: 62, height: 62, borderRadius: "50%", backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+        <div style={{ width: 46, height: 46, borderRadius: "50%", backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+        <div style={{ width: 62, height: 62, borderRadius: "50%", backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
       </div>
     </div>
   );
@@ -285,7 +273,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   const [books, setBooks]               = useState([]);
   const [index, setIndex]               = useState(0);
   const [limitStatus, setLimitStatus]   = useState({
-    saves_used: 0, gems_spent: 0, limit: 15, effective_limit: 15, can_save: true, saves_left: 15,
+    savesUsed: 0, gemsSpent: 0, limit: 15, effectiveLimit: 15, canSave: true, savesLeft: 15,
   });
   const [gemBalance, setGemBalance]     = useState(0);
   const [loading, setLoading]           = useState(true);
@@ -321,17 +309,17 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
       setLoading(true);
       setError(null);
       try {
-        const [{ genres }, limit, { data: gemsRow }] = await Promise.all([
+        const [{ genres }, limit, balance] = await Promise.all([
           getPreferredGenres(user.id),
           checkDailyLimit(user.id),
-          supabase.from("user_gems").select("balance").eq("user_id", user.id).maybeSingle(),
+          loadGems(user.id),
         ]);
         if (cancelled) return;
 
         if (genres.length === 0) { setNoGenres(true); setLoading(false); return; }
 
         setLimitStatus(limit);
-        setGemBalance(gemsRow?.balance ?? 0);
+        setGemBalance(balance);
 
         const recs = await getRecommendations(user.id, genres, 20);
         if (!cancelled) { setBooks(recs); setIndex(0); setLoading(false); }
@@ -358,7 +346,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             return [...prev, ...more.filter((b) => !seen.has(`${b.title}__${b.author}`))];
           });
         })
-        .catch(() => {});
+        .catch((err) => console.error("[BookTinder] no se pudieron cargar más libros:", err));
     }
   }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -429,7 +417,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
 
   function attemptSave() {
     if (!currentBook || saving || exitingRef.current) return;
-    if (!limitStatus.can_save) {
+    if (!limitStatus.canSave) {
       springBack();
       setShowLimitModal(true);
       return;
@@ -473,9 +461,9 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
 
     setLimitStatus((prev) => ({
       ...prev,
-      saves_used: prev.saves_used + 1,
-      can_save: prev.saves_used + 1 < prev.effective_limit,
-      saves_left: Math.max(0, prev.saves_left - 1),
+      savesUsed: prev.savesUsed + 1,
+      canSave: prev.savesUsed + 1 < prev.effectiveLimit,
+      savesLeft: Math.max(0, prev.savesLeft - 1),
     }));
 
     const book = currentBook;
@@ -485,7 +473,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
       status,
       genre:    book.genres?.[0] || null,
       summary:  book.description || null,
-      coverUrl: book.cover_url || null,
+      coverUrl: book.coverUrl || null,
       isbn:     book.isbn || null,
       moodTags: [],
       rating:   0,
@@ -513,20 +501,22 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     setBuyingGems(false);
 
     if (!result.success) {
-      showToast(result.error === "not_enough_gems" ? "💎 No tienes suficientes gemas" : "Error al procesar. Intenta de nuevo.");
-      return;
+      if (result.error === "GEMS_INSUFFICIENT") showToast("💎 No tienes gemas suficientes");
+      else if (result.error === "GEMS_NO_BALANCE") showToast("Error al leer saldo");
+      else showToast(`Error al gastar gemas: ${result.error}`);
+      return; // el modal se queda abierto
     }
 
     setGemBalance(result.newBalance);
     setLimitStatus((prev) => ({
       ...prev,
-      gems_spent:      prev.gems_spent + 5,
-      effective_limit: prev.effective_limit + result.extraSaves,
-      can_save:        true,
-      saves_left:      result.extraSaves,
+      gemsSpent:      prev.gemsSpent + 5,
+      effectiveLimit: prev.effectiveLimit + result.extraSaves,
+      canSave:        true,
+      savesLeft:      result.extraSaves,
     }));
     setShowLimitModal(false);
-    showToast(`+${result.extraSaves} guardados desbloqueados 🎉`);
+    showToast(`¡5 gemas gastadas! Ahora tienes ${result.newBalance} gemas · +${result.extraSaves} guardados 🎉`);
   }
 
   // ── Estados especiales ────────────────────────────────────────
@@ -535,10 +525,10 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (error) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <p style={{ ...body, fontSize: "0.97rem", color: P.inkSoft, marginBottom: "1rem" }}>{error}</p>
+        <p style={{ ...body, fontSize: "0.97rem", color: palette.inkSoft, marginBottom: "1rem" }}>{error}</p>
         <button
           onClick={() => window.location.reload()}
-          style={{ ...serif, fontSize: "0.9rem", color: P.accent, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ ...serif, fontSize: "0.9rem", color: palette.accent, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
         >
           <RefreshCw size={15} /> Reintentar
         </button>
@@ -549,11 +539,11 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (noGenres) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={P.inkFaint} strokeWidth={1.2} style={{ marginBottom: "1rem" }} />
-        <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: P.ink, marginBottom: "0.5rem" }}>
+        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ marginBottom: "1rem" }} />
+        <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>
           Configura tus géneros primero
         </h3>
-        <p style={{ ...body, fontSize: "0.95rem", color: P.inkSoft, lineHeight: 1.55 }}>
+        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55 }}>
           Configura tus géneros favoritos en tu perfil para empezar a descubrir libros.
         </p>
       </div>
@@ -563,16 +553,16 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (books.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={P.inkFaint} strokeWidth={1.2} style={{ marginBottom: "1rem" }} />
-        <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: P.ink, marginBottom: "0.5rem" }}>
+        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ marginBottom: "1rem" }} />
+        <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>
           No hay libros disponibles
         </h3>
-        <p style={{ ...body, fontSize: "0.95rem", color: P.inkSoft, lineHeight: 1.55, marginBottom: "1.25rem" }}>
+        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55, marginBottom: "1.25rem" }}>
           Vuelve en un rato: estamos rellenando la estantería.
         </p>
         <button
           onClick={() => window.location.reload()}
-          style={{ ...serif, fontSize: "0.9rem", color: P.accent, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ ...serif, fontSize: "0.9rem", color: palette.accent, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
         >
           <RefreshCw size={15} /> Reintentar
         </button>
@@ -584,18 +574,18 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
         <span style={{ fontSize: "2.5rem" }}>📚</span>
-        <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 600, color: P.ink, margin: "0.75rem 0 0.5rem" }}>
+        <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 600, color: palette.ink, margin: "0.75rem 0 0.5rem" }}>
           ¡Guau, viste todos los libros disponibles!
         </h3>
-        <p style={{ ...body, fontSize: "0.95rem", color: P.inkSoft, lineHeight: 1.55 }}>
+        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55 }}>
           Vuelve mañana para más recomendaciones.
         </p>
       </div>
     );
   }
 
-  const savesLeft = limitStatus.saves_left;
-  const progress  = Math.min(100, (limitStatus.saves_used / limitStatus.effective_limit) * 100);
+  const savesLeft = limitStatus.savesLeft;
+  const progress  = Math.min(100, (limitStatus.savesUsed / limitStatus.effectiveLimit) * 100);
   const disabled  = saving;
 
   return (
@@ -626,19 +616,19 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
           <span aria-hidden style={{ fontSize: "1.05rem" }}>📖</span>
           <span style={{
             ...serif, fontSize: "1.45rem", fontWeight: 700, fontStyle: "italic",
-            color: savesLeft > 0 ? P.ink : P.accent,
+            color: savesLeft > 0 ? palette.ink : palette.accent,
           }}>
             {savesLeft > 0 ? `${savesLeft} restantes hoy` : "Límite alcanzado"}
           </span>
         </div>
 
-        <div style={{ height: 5, backgroundColor: P.border, borderRadius: 5, overflow: "hidden", marginBottom: "1.1rem" }}>
+        <div style={{ height: 5, backgroundColor: palette.border, borderRadius: 5, overflow: "hidden", marginBottom: "1.1rem" }}>
           <div style={{
             height: "100%", borderRadius: 5,
             width: `${progress}%`,
             background: savesLeft > 5
-              ? `linear-gradient(90deg, ${P.amber}, ${P.accent})`
-              : `linear-gradient(90deg, ${P.accent}, #E53E3E)`,
+              ? `linear-gradient(90deg, ${palette.amber}, ${palette.accent})`
+              : `linear-gradient(90deg, ${palette.accent}, ${palette.danger})`,
             transition: "width 450ms ease",
           }} />
         </div>
@@ -693,8 +683,8 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
                 style={{
                   position: "absolute", top: 26, left: 20,
                   transform: "rotate(-14deg)",
-                  border: `3.5px solid ${P.green}`,
-                  color: P.green,
+                  border: `3.5px solid ${palette.session}`,
+                  color: palette.session,
                   borderRadius: 10, padding: "4px 14px",
                   fontFamily: "system-ui, -apple-system, sans-serif",
                   fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.08em",
@@ -713,8 +703,8 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
                 style={{
                   position: "absolute", top: 26, right: 20,
                   transform: "rotate(14deg)",
-                  border: `3.5px solid ${P.red}`,
-                  color: P.red,
+                  border: `3.5px solid ${palette.danger}`,
+                  color: palette.danger,
                   borderRadius: 10, padding: "4px 14px",
                   fontFamily: "system-ui, -apple-system, sans-serif",
                   fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.08em",
@@ -738,9 +728,9 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             aria-label="No me interesa"
             style={{
               width: 62, height: 62,
-              border: `2px solid ${P.red}`,
-              backgroundColor: P.bgCard,
-              color: P.red,
+              border: `2px solid ${palette.danger}`,
+              backgroundColor: palette.bgCard,
+              color: palette.danger,
               boxShadow: "0 4px 14px rgba(199,74,74,0.22)",
             }}
           >
@@ -754,9 +744,9 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             aria-label="Más información"
             style={{
               width: 46, height: 46,
-              border: `1.5px solid ${P.border}`,
-              backgroundColor: P.bgCard,
-              color: P.inkSoft,
+              border: `1.5px solid ${palette.border}`,
+              backgroundColor: palette.bgCard,
+              color: palette.inkSoft,
               boxShadow: "0 3px 10px rgba(42,31,26,0.12)",
             }}
           >
@@ -771,11 +761,11 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             style={{
               width: 62, height: 62,
               border: "none",
-              background: limitStatus.can_save
-                ? `linear-gradient(135deg, ${P.accent} 0%, ${P.accentSoft} 100%)`
-                : P.border,
-              color: limitStatus.can_save ? "#fff" : P.inkFaint,
-              boxShadow: limitStatus.can_save ? "0 6px 20px rgba(122,46,46,0.42)" : "none",
+              background: limitStatus.canSave
+                ? `linear-gradient(135deg, ${palette.accent} 0%, ${palette.accentSoft} 100%)`
+                : palette.border,
+              color: limitStatus.canSave ? palette.onAccent : palette.inkFaint,
+              boxShadow: limitStatus.canSave ? "0 6px 20px rgba(122,46,46,0.42)" : "none",
             }}
           >
             <Heart size={26} strokeWidth={2.2} fill="currentColor" />
@@ -786,7 +776,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         <p style={{
           textAlign: "center", marginTop: "0.85rem",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "0.77rem", color: P.inkFaint, letterSpacing: "0.02em",
+          fontSize: "0.77rem", color: palette.inkFaint, letterSpacing: "0.02em",
         }}>
           {index + 1} de {books.length} libros
         </p>

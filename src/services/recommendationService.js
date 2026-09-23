@@ -1,5 +1,6 @@
 import { supabase } from "../supabase.js";
 import { localDateStr } from "./streakService.js";
+import { devLog } from "./devLog.js";
 
 const DAILY_LIMIT = 15;
 const GEMS_PER_PACK = 5;
@@ -22,6 +23,23 @@ const GENRE_MAP = {
   "ensayo":              ["Ensayo", "Filosófico", "Política", "Educación"],
   "arte":                ["Arte", "Creatividad"],
 };
+
+// Fila de books_curated → libro del catálogo en camelCase.
+function dbToCuratedBook(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    author: row.author,
+    description: row.description,
+    genres: row.genres || [],
+    subgenres: row.subgenres || [],
+    coverUrl: row.cover_url || null,
+    rating: row.rating,
+    isbn: row.isbn,
+    language: row.language,
+    pages: row.pages,
+  };
+}
 
 function expandGenres(preferredGenres) {
   const expanded = new Set();
@@ -56,14 +74,15 @@ export async function getRecommendations(userId, preferredGenres = [], limit = 2
   // Expand onboarding IDs to actual genre labels
   const expandedGenres = expandGenres(preferredGenres);
 
-  console.log("[BookTinder] preferred_genres from DB:", preferredGenres);
-  console.log("[BookTinder] expanded to curated labels:", expandedGenres);
+  devLog("[BookTinder] preferred_genres from DB:", preferredGenres);
+  devLog("[BookTinder] expanded to curated labels:", expandedGenres);
 
   // Fetch books user already has (exclude by title+author)
-  const { data: existing } = await supabase
+  const { data: existing, error: existingErr } = await supabase
     .from("books")
     .select("title, author, isbn")
     .eq("user_id", userId);
+  if (existingErr) console.error("[BookTinder] no se pudo leer la biblioteca para excluir libros:", existingErr.message);
 
   const existingKeys = new Set(
     (existing || []).map((b) => `${b.title?.toLowerCase()}__${b.author?.toLowerCase()}`)
@@ -86,13 +105,13 @@ export async function getRecommendations(userId, preferredGenres = [], limit = 2
       console.warn("[BookTinder] genre query error:", error.message, "— falling back to all books");
     } else {
       candidates = data || [];
-      console.log("[BookTinder] genre-matched results:", candidates.length);
+      devLog("[BookTinder] genre-matched results:", candidates.length);
     }
   }
 
   // Fallback: fetch all books if genre query returned nothing
   if (candidates.length === 0) {
-    console.log("[BookTinder] No genre matches — loading all books as fallback");
+    devLog("[BookTinder] No genre matches — loading all books as fallback");
     const { data: all, error } = await supabase
       .from("books_curated")
       .select("*")
@@ -101,7 +120,7 @@ export async function getRecommendations(userId, preferredGenres = [], limit = 2
 
     if (error) throw error;
     candidates = all || [];
-    console.log("[BookTinder] fallback results:", candidates.length);
+    devLog("[BookTinder] fallback results:", candidates.length);
   }
 
   // Filter already-owned books client-side
@@ -113,45 +132,49 @@ export async function getRecommendations(userId, preferredGenres = [], limit = 2
 
   // Shuffle for variety
   const shuffled = [...filtered].sort(() => Math.random() - 0.5);
-  const result = shuffled.slice(0, limit);
-  console.log("[BookTinder] final recommendations:", result.length);
+  const result = shuffled.slice(0, limit).map(dbToCuratedBook);
+  devLog("[BookTinder] final recommendations:", result.length);
   return result;
 }
 
+// Estado del límite diario de guardados. Si la lectura falla, degrada a "0 usados"
+// (no bloquea el swipe) pero deja el error en consola.
 export async function checkDailyLimit(userId) {
   const today = localDateStr();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("daily_save_limits")
     .select("saves_used, gems_spent")
     .eq("user_id", userId)
     .eq("date", today)
     .maybeSingle();
+  if (error) console.error("[BookTinder] checkDailyLimit:", error.message);
 
-  const saves_used = data?.saves_used ?? 0;
-  const gems_spent = data?.gems_spent ?? 0;
-  const effective_limit = DAILY_LIMIT + gems_spent;
+  const savesUsed = data?.saves_used ?? 0;
+  const gemsSpent = data?.gems_spent ?? 0;
+  const effectiveLimit = DAILY_LIMIT + gemsSpent;
 
   return {
-    saves_used,
-    gems_spent,
+    savesUsed,
+    gemsSpent,
     limit: DAILY_LIMIT,
-    effective_limit,
-    can_save: saves_used < effective_limit,
-    saves_left: Math.max(0, effective_limit - saves_used),
+    effectiveLimit,
+    canSave: savesUsed < effectiveLimit,
+    savesLeft: Math.max(0, effectiveLimit - savesUsed),
   };
 }
 
 export async function incrementSaveCounter(userId) {
   const today = localDateStr();
 
-  const { data } = await supabase
+  const { data, error: readErr } = await supabase
     .from("daily_save_limits")
     .select("saves_used, gems_spent")
     .eq("user_id", userId)
     .eq("date", today)
     .maybeSingle();
+  if (readErr) throw readErr;
 
-  await supabase.from("daily_save_limits").upsert(
+  const { error } = await supabase.from("daily_save_limits").upsert(
     {
       user_id: userId,
       date: today,
@@ -160,26 +183,28 @@ export async function incrementSaveCounter(userId) {
     },
     { onConflict: "user_id,date" }
   );
+  if (error) throw error;
 }
 
 export async function buyExtraSaves(userId) {
   const today = localDateStr();
 
-  const { data: gemsRow, error: gemsErr } = await supabase
-    .from("user_gems")
-    .select("balance")
-    .eq("user_id", userId)
-    .maybeSingle();
+  // El descuento lo hace el servidor (RPC SECURITY DEFINER spend_gems, supabase/spend_gems.sql):
+  // valida saldo, descuenta atómicamente y deja una fila negativa en reward_ledger.
+  // Devuelve { success, balance } o { success:false, error: código }.
+  const { data: spent, error: rpcErr } = await supabase.rpc("spend_gems", {
+    p_amount: GEMS_PER_PACK,
+    p_reason: "buy_extra_saves",
+  });
 
-  if (gemsErr || !gemsRow) return { success: false, error: "gems_not_found" };
-  if (gemsRow.balance < GEMS_PER_PACK) return { success: false, error: "not_enough_gems" };
-
-  const { error: deductErr } = await supabase
-    .from("user_gems")
-    .update({ balance: gemsRow.balance - GEMS_PER_PACK })
-    .eq("user_id", userId);
-
-  if (deductErr) return { success: false, error: "deduct_error" };
+  if (rpcErr) {
+    console.error("[BookTinder] buyExtraSaves: fallo la RPC spend_gems:", rpcErr.message);
+    return { success: false, error: rpcErr.message };
+  }
+  if (!spent?.success) {
+    console.error("[BookTinder] buyExtraSaves: spend_gems rechazó el cobro:", spent?.error);
+    return { success: false, error: spent?.error || "UNKNOWN" };
+  }
 
   const { data: limitRow } = await supabase
     .from("daily_save_limits")
@@ -188,7 +213,7 @@ export async function buyExtraSaves(userId) {
     .eq("date", today)
     .maybeSingle();
 
-  await supabase.from("daily_save_limits").upsert(
+  const { error: limitErr } = await supabase.from("daily_save_limits").upsert(
     {
       user_id: userId,
       date: today,
@@ -197,10 +222,38 @@ export async function buyExtraSaves(userId) {
     },
     { onConflict: "user_id,date" }
   );
+  if (limitErr) console.error("[BookTinder] buyExtraSaves: no se pudo registrar el paquete:", limitErr.message);
 
   return {
     success: true,
-    newBalance: gemsRow.balance - GEMS_PER_PACK,
+    newBalance: spent.balance,
     extraSaves: SAVES_PER_PACK,
+  };
+}
+
+// Recomendaciones colaborativas (SVD) servidas por /api/recommendations con el JWT
+// del usuario. Devuelve { items: [{ bookId, title, author, coverUrl, genres,
+// predictedRating, reason }], personalized } y lanza si la petición falla.
+export async function fetchCollaborativeRecommendations() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return { items: [], personalized: false };
+
+  const res = await fetch("/api/recommendations", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`status ${res.status}`);
+  const data = await res.json();
+  return {
+    personalized: !!data.personalized,
+    items: (data.items || []).map((it) => ({
+      bookId: it.book_id,
+      title: it.title,
+      author: it.author,
+      coverUrl: it.cover_url || null,
+      genres: it.genres || [],
+      predictedRating: it.predicted_rating,
+      reason: it.reason,
+    })),
   };
 }

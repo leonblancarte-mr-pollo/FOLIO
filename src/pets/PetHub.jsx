@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { User, X, Pencil } from "lucide-react";
-import { palette, PALETTE_DARK, body, display, FONT_LINK } from "../theme.js";
+import { palette, PALETTE_DARK, BRAND, body, display, FONT_LINK } from "../theme.js";
 import { petXpForLevel, PET_MAX_LEVEL } from "../services/petService.js";
 import { PetScene } from "./PetScene.jsx";
 import { PetDisplay } from "./PetDisplay.jsx";
 
 // Pet Hub — pantalla completa tipo Tamagotchi
-function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
+function PetHub({ pet, onClose, onGoToProfile, onRename }) {
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState(pet?.pet_name || "Mi compañero");
   const [savingName, setSavingName] = useState(false);
@@ -16,7 +16,7 @@ function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
 
   if (!pet) return null;
   const isDark = palette.bg === PALETTE_DARK.bg;
-  const onSceneText = "#FFFFFF";
+  const onSceneText = palette.onAccent;
   const textShadow = "0 2px 8px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)";
 
   const max = petXpForLevel(pet.level);
@@ -35,7 +35,7 @@ function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
 
   const topBtn = {
     width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer",
-    backgroundColor: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)", color: "#fff",
+    backgroundColor: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)", color: palette.onAccent,
     display: "flex", alignItems: "center", justifyContent: "center",
   };
 
@@ -66,9 +66,9 @@ function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
                 value={nameDraft} autoFocus maxLength={40}
                 onChange={(e) => setNameDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
-                style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 12, border: "none", backgroundColor: "rgba(255,255,255,0.94)", color: "#2A1F1A", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", textAlign: "center", outline: "none", minWidth: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
+                style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 12, border: "none", backgroundColor: "rgba(255,255,255,0.94)", color: BRAND.ink, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", textAlign: "center", outline: "none", minWidth: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
               />
-              <button onClick={saveName} disabled={savingName} className="btn-press" style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 12, border: "none", background: "#7A2E2E", color: "#fff", cursor: "pointer", ...display, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}>
+              <button onClick={saveName} disabled={savingName} className="btn-press" style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 12, border: "none", background: BRAND.wine, color: palette.onAccent, cursor: "pointer", ...display, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}>
                 {savingName ? "…" : "OK"}
               </button>
             </div>
@@ -87,7 +87,7 @@ function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
         {/* Barra XP grande */}
         <div style={{ width: "100%", maxWidth: 360, marginTop: "1.35rem" }}>
           <div style={{ height: 18, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.35)", overflow: "hidden", boxShadow: "inset 0 1px 4px rgba(0,0,0,0.25)" }}>
-            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #C8924A 0%, #F4C77A 100%)", animation: "petXpFill 600ms cubic-bezier(0.23,1,0.32,1)", transition: "width 500ms cubic-bezier(0.23,1,0.32,1)", boxShadow: "0 0 12px rgba(244,199,122,0.8)" }} />
+            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: `linear-gradient(90deg, ${BRAND.amber} 0%, ${BRAND.amberGlow} 100%)`, animation: "petXpFill 600ms cubic-bezier(0.23,1,0.32,1)", transition: "width 500ms cubic-bezier(0.23,1,0.32,1)", boxShadow: "0 0 12px rgba(244,199,122,0.8)" }} />
           </div>
           <p style={{ ...body, fontSize: "0.88rem", color: onSceneText, textShadow, marginTop: "0.55rem", textAlign: "center", fontWeight: 600 }}>
             {atMax ? `¡Nivel máximo ${PET_MAX_LEVEL}!` : `${pet.xp} / ${max} XP hasta nivel ${pet.level + 1}`}
@@ -108,10 +108,10 @@ function PetHub({ user, pet, streak, onClose, onGoToProfile, onRename }) {
 
         {/* Acciones */}
         <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.5rem", width: "100%", maxWidth: 360, paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
-          <button onClick={onGoToProfile} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.92)", color: "#7A2E2E", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
+          <button onClick={onGoToProfile} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.92)", color: BRAND.wine, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
             Mi perfil
           </button>
-          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: "#fff", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
+          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: palette.onAccent, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
             Ver galería
           </button>
         </div>

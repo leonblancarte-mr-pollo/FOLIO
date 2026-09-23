@@ -81,7 +81,7 @@ function AddToListSheet({ userId, bookId, onClose }) {
                       backgroundColor: inList ? `${palette.accent}12` : palette.bgCard,
                     }}
                   >
-                    {!l.is_public && <Lock size={13} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
+                    {!l.isPublic && <Lock size={13} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ ...display, fontSize: "0.92rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
                       <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: 0 }}>{l.bookIds.length} {l.bookIds.length === 1 ? "libro" : "libros"}</p>
@@ -107,7 +107,7 @@ function AddToListSheet({ userId, bookId, onClose }) {
                 <button
                   onClick={createAndAdd}
                   disabled={!newName.trim() || busyId === "new"}
-                  style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 10, border: "none", backgroundColor: newName.trim() ? palette.accent : palette.border, color: "#fff", cursor: newName.trim() ? "pointer" : "default", ...display, fontWeight: 600, fontSize: "0.9rem" }}
+                  style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 10, border: "none", backgroundColor: newName.trim() ? palette.accent : palette.border, color: palette.onAccent, cursor: newName.trim() ? "pointer" : "default", ...display, fontWeight: 600, fontSize: "0.9rem" }}
                 >
                   {busyId === "new" ? "…" : "Crear"}
                 </button>

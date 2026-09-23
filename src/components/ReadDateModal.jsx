@@ -89,7 +89,7 @@ function ReadDateModal({ book, onConfirm, onClose }) {
         <button
           onClick={confirm}
           disabled={option === "exact" && !dateStr}
-          style={{ width: "100%", padding: "0.9rem", borderRadius: 12, border: "none", backgroundColor: palette.accent, color: "#fff", cursor: "pointer", ...display, fontSize: "1rem", fontWeight: 600 }}
+          style={{ width: "100%", padding: "0.9rem", borderRadius: 12, border: "none", backgroundColor: palette.accent, color: palette.onAccent, cursor: "pointer", ...display, fontSize: "1rem", fontWeight: 600 }}
         >
           Guardar
         </button>

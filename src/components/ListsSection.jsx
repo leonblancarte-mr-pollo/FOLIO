@@ -45,11 +45,11 @@ function ListsSection({ user, books, onSelectBook }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           {lists.map((l) => (
             <button key={l.id} onClick={() => setOpenList(l)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.7rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.75rem 0.9rem", cursor: "pointer", textAlign: "left" }}>
-              {l.is_public ? <Bookmark size={16} color={palette.accent} style={{ flexShrink: 0 }} /> : <Lock size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
+              {l.isPublic ? <Bookmark size={16} color={palette.accent} style={{ flexShrink: 0 }} /> : <Lock size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ ...display, fontSize: "0.95rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
                 <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: 0 }}>
-                  {l.bookIds.length} {l.bookIds.length === 1 ? "libro" : "libros"} · {l.is_public ? "pública" : "privada"}
+                  {l.bookIds.length} {l.bookIds.length === 1 ? "libro" : "libros"} · {l.isPublic ? "pública" : "privada"}
                 </p>
               </div>
               <ChevronRight size={16} color={palette.inkFaint} />

@@ -7,12 +7,19 @@ function localDateStr(date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// Racha + páginas de hoy. Lanza si falla alguna lectura (el caller decide el fallback).
+// Nota: `streak` es la fila cruda de user_streaks (snake_case), igual que la que devuelven
+// las RPC de racha; ver "Excepciones a la convención" en DOCUMENTACION_ARQUITECTURA.md §X.
 async function fetchStreakData(userId) {
   const today = localDateStr();
-  const [{ data: streakRow }, { data: todayLogs }] = await Promise.all([
+  const [streakRes, logsRes] = await Promise.all([
     supabase.from("user_streaks").select("*").eq("user_id", userId).maybeSingle(),
     supabase.from("reading_logs").select("pages_read").eq("user_id", userId).eq("log_date", today),
   ]);
+  if (streakRes.error) throw streakRes.error;
+  if (logsRes.error) throw logsRes.error;
+  const streakRow = streakRes.data;
+  const todayLogs = logsRes.data;
   const hasLoggedToday = (todayLogs || []).length > 0;
   const pagesLoggedToday = (todayLogs || []).reduce((sum, r) => sum + (r.pages_read || 0), 0);
   return { streak: streakRow, hasLoggedToday, pagesLoggedToday };
@@ -29,8 +36,12 @@ function daysBetweenLocalDates(a, b) {
 
 async function checkStreakOnLoad(userId) {
   const today = localDateStr();
-  const { data: existing } = await supabase.from("user_streaks")
+  const { data: existing, error } = await supabase.from("user_streaks")
     .select("*").eq("user_id", userId).maybeSingle();
+  if (error) {
+    console.error("[streak] checkStreakOnLoad: no se pudo leer user_streaks:", error.message);
+    return;
+  }
 
   if (!existing || !existing.last_log_date || existing.current_streak === 0) {
     console.log("[streak] checkStreakOnLoad: sin racha activa, nada que hacer");
@@ -54,10 +65,27 @@ async function checkStreakOnLoad(userId) {
     // idempotente por día, funciona multi-dispositivo — antes el gate era
     // localStorage y se duplicaba); después se sincroniza la mascota.
     supabase.rpc("pet_daily_checkin")
-      .then(() => addPetXP(userId, 3))
-      .catch(() => {});
+      .then(({ error: rpcErr }) => {
+        if (rpcErr) console.error("[streak] pet_daily_checkin falló:", rpcErr.message);
+        return addPetXP(userId, 3);
+      })
+      .catch((err) => console.error("[streak] pet_daily_checkin falló:", err));
   }
 }
 
+// El protector de racha lo administra el SERVIDOR (user_streaks es solo-lectura para el
+// cliente). Ambas RPC devuelven la fila actualizada de user_streaks (o null) y lanzan si fallan.
+async function resetMonthlyFreeze() {
+  const { data, error } = await supabase.rpc("reset_monthly_freeze");
+  if (error) throw error;
+  return data || null;
+}
 
-export { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData };
+async function applyStreakFreeze() {
+  const { data, error } = await supabase.rpc("use_streak_freeze");
+  if (error) throw error;
+  return data || null;
+}
+
+
+export { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, resetMonthlyFreeze, applyStreakFreeze };
