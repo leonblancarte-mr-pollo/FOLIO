@@ -7,6 +7,7 @@ import {
   checkDailyLimit,
   incrementSaveCounter,
   buyExtraSaves,
+  DAILY_LIMIT,
 } from "../services/recommendationService.js";
 import ReadingStatusModal from "./ReadingStatusModal.jsx";
 import BookCoverImage from "./BookCoverImage.jsx";
@@ -57,7 +58,7 @@ function Toast({ msg, onDismiss }) {
   );
 }
 
-function LimitModal({ onClose, onUseGems, gemBalance, buying }) {
+function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
   return (
     <div
       style={{
@@ -84,7 +85,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying }) {
             Límite diario alcanzado
           </h2>
           <p style={{ ...body, fontSize: "0.97rem", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5 }}>
-            Has guardado 15 libros hoy. Vuelve mañana o<br />
+            Has guardado {savesUsed} libros hoy. Vuelve mañana o<br />
             gasta 5 gemas para desbloquear 5 más.
           </p>
         </div>
@@ -273,7 +274,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   const [books, setBooks]               = useState([]);
   const [index, setIndex]               = useState(0);
   const [limitStatus, setLimitStatus]   = useState({
-    savesUsed: 0, gemsSpent: 0, limit: 15, effectiveLimit: 15, canSave: true, savesLeft: 15,
+    savesUsed: 0, gemsSpent: 0, limit: DAILY_LIMIT, effectiveLimit: DAILY_LIMIT, canSave: true, savesLeft: DAILY_LIMIT,
   });
   const [gemBalance, setGemBalance]     = useState(0);
   const [loading, setLoading]           = useState(true);
@@ -503,6 +504,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     if (!result.success) {
       if (result.error === "GEMS_INSUFFICIENT") showToast("💎 No tienes gemas suficientes");
       else if (result.error === "GEMS_NO_BALANCE") showToast("Error al leer saldo");
+      else if (result.error === "GEMS_RPC_MISSING") showToast("La tienda de gemas no está disponible. Intenta más tarde.");
       else showToast(`Error al gastar gemas: ${result.error}`);
       return; // el modal se queda abierto
     }
@@ -794,6 +796,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
           onUseGems={handleUseGems}
           gemBalance={gemBalance}
           buying={buyingGems}
+          savesUsed={limitStatus.savesUsed}
         />
       )}
 

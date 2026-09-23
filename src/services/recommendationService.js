@@ -2,7 +2,7 @@ import { supabase } from "../supabase.js";
 import { localDateStr } from "./streakService.js";
 import { devLog } from "./devLog.js";
 
-const DAILY_LIMIT = 15;
+export const DAILY_LIMIT = 3;
 const GEMS_PER_PACK = 5;
 const SAVES_PER_PACK = 5;
 
@@ -198,7 +198,12 @@ export async function buyExtraSaves(userId) {
   });
 
   if (rpcErr) {
-    console.error("[BookTinder] buyExtraSaves: fallo la RPC spend_gems:", rpcErr.message);
+    console.error("[BookTinder] buyExtraSaves: falló la RPC spend_gems:", {
+      code: rpcErr.code, message: rpcErr.message, details: rpcErr.details, hint: rpcErr.hint,
+    });
+    // PGRST202 = PostgREST no encuentra la función: falta correr supabase/spend_gems.sql
+    // (o recargar su caché con NOTIFY pgrst, 'reload schema').
+    if (rpcErr.code === "PGRST202") return { success: false, error: "GEMS_RPC_MISSING" };
     return { success: false, error: rpcErr.message };
   }
   if (!spent?.success) {

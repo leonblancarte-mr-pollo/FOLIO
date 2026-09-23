@@ -102,6 +102,11 @@ END $$;
 REVOKE ALL ON FUNCTION public.spend_gems(int, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.spend_gems(int, text, text) TO authenticated;
 
+-- PostgREST cachea el esquema: sin esto la app puede seguir viendo
+-- "Could not find the function public.spend_gems(p_amount => integer, p_reason => text)
+--  in the schema cache" (PGRST202) aunque la función ya exista.
+NOTIFY pgrst, 'reload schema';
+
 -- Verificación (como usuario autenticado, desde la app o con un JWT):
 --   select public.spend_gems(5, 'buy_extra_saves');
 --   → {"success": true, "balance": <N-5>, "duplicate": false}   (o GEMS_INSUFFICIENT)
