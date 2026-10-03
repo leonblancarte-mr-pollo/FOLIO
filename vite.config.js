@@ -44,6 +44,11 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
+            // Buscador de lugares (Nominatim, Trueque v3): nunca cachear respuestas en el SW.
+            urlPattern: /^https:\/\/nominatim\.openstreetmap\.org\//,
+            handler: 'NetworkOnly',
+          },
+          {
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
             options: {

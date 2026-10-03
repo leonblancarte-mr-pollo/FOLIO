@@ -37,7 +37,7 @@ const ESTADOS = [
   { clave: "ZAC", nombre: "Zacatecas", lat: 22.77, lng: -102.58 },
 ];
 
-// Clave de Ciudad de México: el único estado con zonas fijas (src/config/zones.js).
+// Clave de Ciudad de México (centro por defecto del mapa). Desde Trueque v3 ya no hay zonas fijas.
 const CDMX = "CMX";
 
 const ESTADOS_BY_CLAVE = Object.fromEntries(ESTADOS.map((e) => [e.clave, e]));

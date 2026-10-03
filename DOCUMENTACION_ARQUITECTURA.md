@@ -1,6 +1,6 @@
 # FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-10-03 (Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-10-03 (Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -18,6 +18,7 @@
 - 2026-09-23 — `buyExtraSaves` migró de UPDATE directo a la RPC SECURITY DEFINER `spend_gems` (`supabase/spend_gems.sql`): saldo validado en servidor, precio fijado por `reason` y ledger negativo; cierra la deuda #4
 - 2026-09-23 — BookTinder: límite diario 15→3 saves (`DAILY_LIMIT` exportado de `recommendationService`); `spend_gems` con diagnóstico de `PGRST202` (función ausente en la caché de PostgREST) y `NOTIFY pgrst, 'reload schema'` al final del SQL
 - 2026-10-03 — Trueque v2: estado obligatorio (32 estados, `src/data/estados.js`), hasta 3 pines aproximados (~1 km) en mapa Leaflet + OpenStreetMap con carga perezosa, matches por cercanía calculada en Postgres (el cliente solo ve rangos), alcance de búsqueda (mi radio / 25 km / mi estado / todo el país), búsqueda sin cobro si devuelve 0 resultados (RPC `search_trueque_matches`, una sola transacción), pantalla «Antes de empezar» con confirmación +18, aviso de seguridad y botón «Reportar» en el chat, vista `trueque_funnel_summary`. Migración `supabase/trueque_geo.sql` (#14)
+- 2026-10-03 — Trueque v3: se quitan las 25 zonas fijas de CDMX de la interfaz (barra de zonas, onboarding/editor de zonas, chips en la tarjeta de match, aviso de Plus) y del matching (cercanía, alcance y requisito de ubicación usan SOLO `trueque_pins` + `max_radius_km`; el estado se queda). `user_exchange_zones` NO se borra (historial). Las cuentas que solo tenían zonas ven el mapa al entrar, igual que una nueva. Buscador de lugares con Nominatim (OpenStreetMap) arriba del mapa de "Mis lugares" (`placeSearchService`). Se re-corre `supabase/trueque_geo.sql`. Se borran `ZonesOnboarding.jsx`, `ZonesEditor.jsx` y `src/config/zones.js`
 
 ---
 
@@ -61,11 +62,11 @@ FOLIO FINAL/
 │   ├── theme.js              # PALETTE_LIGHT/DARK + objeto mutable `palette` + resolveTheme
 │   ├── haptics.js / sounds.js# Vibración y efectos de sonido (howler)
 │   ├── index.css             # Tailwind base + estilos globales
-│   ├── services/             # Capa de datos — 17 módulos (8 originales + 8 extraídos el 2026-09-22 + truequeGeoService 2026-10-03), ver §VI
-│   ├── config/zones.js       # ZONES_CDMX: las 25 zonas fijas del Trueque (slugs = enum exchange_zone)
+│   ├── services/             # Capa de datos — 18 módulos (8 originales + 8 extraídos el 2026-09-22 + truequeGeoService y placeSearchService 2026-10-03), ver §VI
+│   │                         # (src/config/zones.js se eliminó en Trueque v3: las 25 zonas solo quedan en el enum exchange_zone de la BD)
 │   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal,
 │   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal
-│   │   └── trueque/          # Trueque de libros: TruequeMain + 15 modales/tarjetas (5 de v2) + ui.jsx (ver §VII)
+│   │   └── trueque/          # Trueque de libros: TruequeMain + 13 modales/tarjetas (5 de v2; v3 quitó los 2 de zonas) + ui.jsx (ver §VII)
 │   ├── pets/                 # PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene
 │   ├── data/                 # cuentos.js + cuentos/*.txt: ~23 cuentos de dominio público para "Snacks"
 │   │                         # (los `_raw_*.txt` son material fuente sin procesar)
@@ -89,7 +90,7 @@ FOLIO FINAL/
 │   ├── cleanup_orphan_auth_users.sql     # (opcional) lista/repara/borra cuentas huérfanas de auth.users
 │   ├── repair_all_orphan_profiles.sql    # 12. Repara en bloque TODAS las cuentas huérfanas (idempotente; usernames duplicados con sufijo)
 │   ├── spend_gems.sql                    # 13. RPC spend_gems: única puerta para GASTAR gemas (cierra buyExtraSaves). Correr a mano antes de desplegar el cliente
-│   └── trueque_geo.sql                   # 14. Trueque v2: perfil de Trueque, pines, cercanía, reglas +18, reportes, embudo. Requiere 10 y 13. Correr ANTES de desplegar el cliente
+│   └── trueque_geo.sql                   # 14. Trueque v2/v3: perfil de Trueque, pines, cercanía SOLO por pines (v3), reglas +18, reportes, embudo. Requiere 10 y 13. Re-correr completo tras cada cambio; ANTES de desplegar el cliente
 ├── DOCUMENTACION_ARQUITECTURA_COMPLETA.docx  # Versión Word extendida (se genera con scripts/generate_docs.py; el .md es la fuente de verdad)
 ├── scripts/
 │   ├── generate_docs.py      # Lee este .md y genera el .docx extendido (pip install python-docx)
@@ -240,7 +241,7 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 ---
 
 ### 14. Trueque de libros (MVP, 2026-09-18)
-Intercambio de libros **físicos** entre usuarios cercanos: misma zona de CDMX (MVP) o, desde el Trueque v2 (2026-10-03, ver abajo), pines aproximados en cualquier estado de México. Tab `trueque` en `NAV_ITEMS` (icono `Repeat`), renderiza `TruequeMain`. El flujo de abajo es el del MVP; el v2 le antepone reglas y estado y cambia la búsqueda.
+Intercambio de libros **físicos** entre usuarios cercanos. MVP: misma zona de CDMX. v2 (2026-10-03): pines aproximados en cualquier estado, con las zonas como respaldo. **v3 (2026-10-03, vigente): solo pines** (las zonas ya no se leen ni se muestran). Tab `trueque` en `NAV_ITEMS` (icono `Repeat`), renderiza `TruequeMain`. El flujo y el matching de abajo son **históricos (MVP)**; lo vigente está en las subsecciones v2 y v3.
 
 **Flujo:**
 ```
@@ -277,7 +278,7 @@ Tab Trueque → TruequeMain carga en paralelo: trueque_status() · user_exchange
 - **Límites Plus extra:** se añadieron a la config 3 claves que el spec no listaba: `plus_max_wanted` (999), `plus_max_zones` (5) y `plus_daily_searches` (10).
 
 #### Trueque v2 (2026-10-03): estado, pines aproximados y cercanía
-Extiende el MVP sin reescribirlo: las zonas de CDMX, los límites del plan gratis, el chat, el cierre y la calificación siguen igual. Todo lo nuevo vive en `supabase/trueque_geo.sql`, `src/services/truequeGeoService.js`, nuevas funciones de `truequeService` y 5 componentes nuevos.
+Extiende el MVP sin reescribirlo (⚠️ lo relativo a zonas de esta subsección quedó reemplazado por v3, más abajo): las zonas de CDMX, los límites del plan gratis, el chat, el cierre y la calificación siguen igual. Todo lo nuevo vive en `supabase/trueque_geo.sql`, `src/services/truequeGeoService.js`, nuevas funciones de `truequeService` y 5 componentes nuevos.
 
 **Flujo al entrar a la tab:**
 ```
@@ -297,17 +298,40 @@ TruequeMain carga en paralelo: trueque_status() · user_exchange_zones · books_
 ```
 
 **Reglas:**
-- **Estado obligatorio** para publicar, buscar y abrir el mapa (lo exige la UI y, para publicar, también un trigger). **No bloquea matches**: solo centra el mapa, habilita el alcance "Mi estado" y alimenta métricas. CDMX conserva las zonas; fuera de CDMX no hay zonas y se exige ≥1 pin.
+- **Estado obligatorio** para publicar, buscar y abrir el mapa (lo exige la UI y, para publicar, también un trigger). **No bloquea matches**: solo centra el mapa, habilita el alcance "Mi estado" y alimenta métricas. ~~CDMX conserva las zonas~~ (v3: todos, CDMX incluida, necesitan ≥1 pin).
 - **Pines:** 1 a 3 por usuario (igual para free y Plus). El servidor redondea a 2 decimales (~1 km), valida la caja de México (lat 14–33, lng −119 a −86) y permite **cambiar coordenadas una vez cada 24 h** (la primera vez es libre). Cambiar solo etiquetas, estado o radio no consume ese límite. Etiqueta opcional ≤ 30 caracteres, privada. No se usa la geolocalización del navegador.
 - **Radio máximo:** 3, 6 (default), 12 o 25 km.
-- **Distancia** = mínima entre cualquiera de los pines de ambos (hasta 3×3), haversine en SQL. El cliente **nunca** recibe coordenadas ajenas ni distancias exactas: solo `proximity` ∈ `lt3` ("menos de 3 km"), `3_6`, `6_12`, `12_25`, `same_zone` ("misma zona", cuando alguno no tiene pines y comparten zona), `same_state`, `other_state`, `far` ("más lejos", sin estado conocido).
-- **Alcances** (cada uno incluye al anterior): `radius` = dentro de MI radio o, sin pines, zona compartida · `25km` · `state` = + mismo estado · `country` = todos. Con pines de ambos lados manda la distancia (aunque compartan zona).
+- **Distancia** = mínima entre cualquiera de los pines de ambos (hasta 3×3), haversine en SQL. El cliente **nunca** recibe coordenadas ajenas ni distancias exactas: solo `proximity` ∈ `lt3` ("menos de 3 km"), `3_6`, `6_12`, `12_25`, ~~`same_zone`~~ (retirado en v3), `same_state`, `other_state`, `far` ("más lejos", sin estado conocido).
+- **Alcances** (cada uno incluye al anterior): `radius` = dentro de MI radio (v2 tenía respaldo por zona; retirado en v3) · `25km` · `state` = + mismo estado · `country` = todos. Con pines de ambos lados manda la distancia (aunque compartan zona).
 - **Orden de resultados:** perfecto antes que parcial → más cerca → mejor calificación → más reciente (`sort_order` lo calcula el servidor).
 - **Cobro (cambio pedido en §3.4):** `search_trueque_matches` no cobra si la búsqueda devuelve 0 parejas en el alcance. Todo ocurre en una transacción: para usuarios free se hace `SELECT … FOR UPDATE` de su fila de `user_gems` antes de generar; si hubo resultados descuenta 20 + fila negativa en `reward_ledger` (`reason='trueque_search'`); si el descuento fallara, `RAISE` revierte también los matches generados. "Resultado" = pareja con libros cruzados dentro del alcance (incluye parejas que ya tenían un match vivo). Se sigue exigiendo saldo ≥ 20 antes de buscar. No cambió cómo se ganan ni cuánto cuestan las gemas.
 - **Reglas +18:** sin `rules_accepted_at` y `adult_confirmed_at` no se puede publicar ni chatear (trigger `trg_trueque_require_ready` en `books_offered`/`books_wanted`/`exchange_chats`, excepto mensajes de sistema) ni buscar (RPC). El `LegalDisclaimerModal` por match se conserva.
 - **Reportes:** motivos `acoso`, `estafa`, `datos_personales`, `inseguro`, `otro` + texto opcional (≤ 500). Máx. 10 por día por usuario. No hay pantalla de moderación: León revisa `public.trueque_reports` en el SQL Editor. No hay bloqueo de usuarios.
 - **Compatibilidad:** `cost_search_matches`, `find_book_matches` y `get_my_exchange_matches` siguen existiendo sin cambios (un cliente viejo en caché sigue funcionando con zonas y cobro previo). El cliente nuevo ya no las llama.
 - **Supuestos (opción más simple):** el estado no restringe dónde pueden caer los pines; un usuario de CDMX no puede quedarse con 0 pines una vez que guardó alguno (el servidor exige 1–3); las búsquedas con 0 resultados de usuarios free no tienen tope propio (sí cuentan para el tope diario de Plus y para métricas).
+
+#### Trueque v3 (2026-10-03): sin zonas fijas + buscador de lugares
+**Zonas retiradas.** Ahora todos usan pines, sin excepción:
+- **Matching:** `trueque_pair_geo` ya no lee `user_exchange_zones` (devuelve solo `dist_km` y `same_state`); `trueque_proximity_band` ya no produce `same_zone`; `trueque_in_scope` ya no tiene respaldo por zona (sin pines de ambos, la pareja solo entra en "Mi estado" o "Todo el país"); `search_trueque_matches` exige ≥1 pin (`LOCATION_REQUIRED`) también en CDMX; `save_trueque_pins(null, …)` exige pines guardados para cualquier estado. Los matches nuevos guardan `shared_zones = '{}'`. Las firmas v2 de esas funciones se borran con `DROP FUNCTION IF EXISTS` al re-correr el archivo.
+- **Datos:** `user_exchange_zones` y `exchange_matches.shared_zones` **no se borran** (historial). Ninguna función de `trueque_geo.sql` ni el cliente las leen. Siguen existiendo en `trueque_schema.sql` las RPCs viejas que sí las usan (`set_exchange_zones`, `cost_search_matches`, `trueque_generate_matches`, `trueque_status.max_zones/zones_count`) para clientes viejos en caché; el cliente nuevo no las llama.
+- **UI:** fuera la barra "Zonas:" de `TruequeMain`, `ZonesOnboarding`, `ZonesEditor`, los chips de zona de `MatchCard` (la fila de chips desaparece si no hay rango ni "Por leer") y la línea "Hasta 5 zonas" del aviso de Plus. `LocationStep` lleva a todos los estados al mapa. Si al entrar alguien ya aceptó reglas y tiene estado pero 0 pines (p. ej. cuenta v2 de CDMX que solo tenía zonas), se abre "Mis lugares" automáticamente, igual que a un usuario nuevo. El alcance "radius" se llama siempre "Mi radio (X km)".
+- **Estado:** sin cambios respecto a v2 (obligatorio, centra el mapa, alcance "Mi estado").
+
+**Buscador de lugares** (`src/services/placeSearchService.js` + `PlaceSearch` dentro de `MyPlaces.jsx`):
+```
+"Busca un lugar: estación de metro, plaza, café…"
+  └─ (≥3 letras, 450 ms sin teclear) → searchPlaces(q, { center: centro del estado })
+       └─ GET https://nominatim.openstreetmap.org/search?q=…&format=jsonv2&countrycodes=mx&limit=5
+              &accept-language=es&viewbox=<centro del estado ± 2.5°>&bounded=0
+  └─ 3–5 sugerencias con el nombre completo (display_name)
+  └─ tocar una → siguiente pin libre en ese punto, redondeado a ~1 km + círculo de ~1 km, flyTo animado
+                 (con 3 pines: "Ya tienes 3 lugares. Borra uno para agregar otro.")
+```
+- **Política de uso de Nominatim:** 1 solicitud/segundo como máximo (`THROTTLE_MS` 1.1 s entre solicitudes + debounce + caché en memoria por consulta y estado + `AbortController` que cancela búsquedas viejas). El navegador **no permite** fijar el header `User-Agent` en `fetch()`; la app se identifica por el `Referer` que manda el navegador (la política lo acepta para apps web).
+- **Prioridad del estado:** `viewbox` alrededor del centro del estado con `bounded=0` (prioriza, no excluye otros estados).
+- **Estados:** buscando (spinner), sin resultados ("No encontramos ese lugar, intenta con otro nombre o toca el mapa."), sin conexión, error o timeout de 8 s (mensaje, la pantalla sigue usable). Deshabilitado mientras corre el límite de 24 h.
+- **Privacidad:** el texto buscado va solo a Nominatim y nunca se guarda; a la BD solo llegan las coordenadas redondeadas, igual que al tocar el mapa. Tocar el mapa sigue funcionando igual.
+- **Service worker:** regla `NetworkOnly` para `nominatim.openstreetmap.org` (no se cachean respuestas).
 
 ## V. FLUJOS DE DATOS CRÍTICOS
 
@@ -391,7 +415,8 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 | `googleBooksService` *(2026-09-22)* | `searchGoogleBooks` | `/api/books` | Dedup + caché 60 s en memoria |
 | `wrapsService` *(2026-09-22)* | `generateMonthWrap`, `generateAnnualWrap`, `MONTHS_ES` | `books`, `reading_logs`, `achievements`, `user_streaks`, `monthly_wraps` | Si falla la lectura de libros del periodo **lanza y no guarda** (antes persistía un Wrapped vacío) |
 | `devLog` *(2026-09-22)* | `devLog` | — | `console.log` solo en `import.meta.env.DEV` (compartido por App.jsx y servicios) |
-| `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50. **Trueque v2 (2026-10-03):** `searchMatchesNearby(scope)` (RPC `search_trueque_matches`; `{ paid, resultCount, charged, matches }`, `{ paid:false }` si faltan gemas), `getMatchesNearby()` (RPC `get_my_trueque_matches`), `acceptTruequeRules(isAdult)`, `reportTruequeUser({ reportedId, reason, details, matchId })`, constantes `SEARCH_SCOPES`, `PROXIMITY_LABELS`, `REPORT_REASONS`, y el helper `callGeoRpc` (convierte el `{ success:false, error }` de las RPCs jsonb en `TruequeError { code }`; `PGRST202`/`PGRST205`/`42P01`/`42883` → `TRUEQUE_UPDATING` con `console.error` de code/message/details/hint). `searchMatches`/`getMatches` (MVP) se conservan pero la UI ya no las usa |
+| `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50. **Trueque v2 (2026-10-03):** `searchMatchesNearby(scope)` (RPC `search_trueque_matches`; `{ paid, resultCount, charged, matches }`, `{ paid:false }` si faltan gemas), `getMatchesNearby()` (RPC `get_my_trueque_matches`), `acceptTruequeRules(isAdult)`, `reportTruequeUser({ reportedId, reason, details, matchId })`, (v3: se eliminaron `getZones`, `getUserZones` y `setUserZones`), constantes `SEARCH_SCOPES`, `PROXIMITY_LABELS`, `REPORT_REASONS`, y el helper `callGeoRpc` (convierte el `{ success:false, error }` de las RPCs jsonb en `TruequeError { code }`; `PGRST202`/`PGRST205`/`42P01`/`42883` → `TRUEQUE_UPDATING` con `console.error` de code/message/details/hint). `searchMatches`/`getMatches` (MVP) se conservan pero la UI ya no las usa |
+| `placeSearchService` *(2026-10-03, v3)* | `searchPlaces(query, { center, signal })`, `PlaceSearchError` (`code`: `OFFLINE`/`TIMEOUT`/`FAILED`), `PLACE_MIN_QUERY` | Nominatim (`nominatim.openstreetmap.org/search`) | Buscador de lugares del mapa. Throttle 1 solicitud/1.1 s, caché en memoria, timeout 8 s, `countrycodes=mx` y `viewbox` del estado. Devuelve `[{ id, name, lat, lng }]` sin redondear (redondea `MyPlaces`). Cancelación = `AbortError` (la UI lo ignora). No guarda nada |
 | `truequeGeoService` *(2026-10-03)* | `getGeoProfile`, `saveGeo({ pins, state, maxRadiusKm })`, `roundCoord`, `MAX_PINS`, `PIN_DECIMALS`, `PIN_LABEL_MAX`, `RADII_KM`, `DEFAULT_RADIUS_KM`, `PIN_FUZZ_METERS` | RPCs `get_my_trueque_pins`, `save_trueque_pins` | Perfil de Trueque + pines del propio usuario, en camelCase (`maxRadiusKm`, `nextEditAt`, `rulesAcceptedAt`…). `saveGeo({ pins: null })` solo cambia estado/radio. En `PINS_COOLDOWN` el error trae `retry_at`. Lanza `TruequeError` |
 
 Desde el 2026-09-22 **no quedan helpers de datos sueltos en App.jsx**: se movieron a `quotesService`, `socialService`, `readingService`, `achievementsService`, `aiService`, `googleBooksService` y `wrapsService`. Siguen en App.jsx, a propósito, `loadStreakInfo` (función interna de `FeedView`, ~línea 8680, porque escribe estado de React) y las lecturas directas de Supabase de algunas vistas (perfil de amigo, amigos, notificaciones), permitidas en App.jsx por convención.
@@ -453,14 +478,13 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 
 | Componente | Qué renderiza |
 |---|---|
-| `TruequeMain` | Contenedor: zonas (chips editables), botón "Buscar matches" (costo en 💎 o cupo Plus), sub-tabs Ofrezco/Busco/Matches, y dueño de todos los modales |
-| `ZonesOnboarding` | Modal de primera vez (sin cerrar): elegir 2..máx zonas; "Ahora no" vuelve a Home |
-| `ZonesEditor` | Modal para editar zonas; exporta también `ZonePicker` (chips) y `MIN_ZONES` |
+| `TruequeMain` | Contenedor: barra "<Estado> · N lugares · radio X km" (v3: ya no hay chips de zonas), botón "Buscar matches" (costo en 💎 o cupo Plus), sub-tabs Ofrezco/Busco/Matches, y dueño de todos los modales |
+| ~~`ZonesOnboarding`~~ / ~~`ZonesEditor`~~ | **Eliminados en v3** (elegir/editar zonas de CDMX) |
 | `OfferBookModal` | Form de libro ofrecido: título, autor, editorial, estado (como nuevo/usado/rayoneado), foto JPG/PNG/WebP ≤ 5 MB |
 | `WantBookModal` | Form de libro buscado: título, autor, editorial |
 | `BookCard` | Tarjeta de libro (foto o placeholder, estado) con borrado en dos toques |
 | `MatchesList` | Agrupa 🟢 perfectos / 🟡 parciales / ✅ completados; estado vacío |
-| `MatchCard` | Otro usuario (avatar, ★ promedio), "Recibes ⇄ Das", zonas compartidas, badge "De tu lista Por leer", días para expirar, botones Enviar mensaje / Calificar |
+| `MatchCard` | Otro usuario (avatar, ★ promedio), "Recibes ⇄ Das", rango de cercanía (v3: sin zonas), badge "De tu lista Por leer", días para expirar, botones Enviar mensaje / Calificar |
 | `LegalDisclaimerModal` | Texto legal exacto + checkbox obligatorio "Confirmo que he leído y acepto" |
 | `ExchangeChat` | Chat a pantalla completa: burbujas, mensajes de sistema, "Cargar mensajes anteriores", polling 8 s, botón "Completado" (confirma en 2 toques) |
 | `RatingModal` | 1-5 estrellas + reseña opcional (≤ 500) |
@@ -472,7 +496,8 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | `ReportModal` *(v2)* | Reportar al otro participante: motivo de lista corta + texto opcional (≤ 500) |
 | `ExchangeChat` *(v2)* | + aviso fijo de seguridad bajo el encabezado y botón "Reportar" |
 | `MatchCard` *(v2)* | + chip de rango de cercanía (`proximity`) |
-| `ZonesOnboarding` *(v2)* | + enlace opcional "Prefiero marcar lugares en el mapa" |
+| `MyPlaces` *(v3)* | + buscador de lugares (`PlaceSearch`, Nominatim) arriba del mapa; sin menciones a zonas |
+| `LocationStep` *(v3)* | Todos los estados van al mapa (ya no hay atajo "solo estado" para CDMX) |
 
 **Navegación:** `NAV_ITEMS` pasó de 5 a 6 entradas (Trueque entre Social y Perfil). El padding lateral de cada ítem del `BottomNav` bajó de 14 px a 8 px para que las 6 quepan en ~360 px. El botón de Mascota deja de estar exactamente al centro.
 
@@ -514,7 +539,7 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 
 | Tabla | Columnas | RLS |
 |---|---|---|
-| `user_exchange_zones` | `user_id` FK users CASCADE, `zone exchange_zone`; PK (user_id, zone) | SELECT dueño + contrapartes de un match `pending/chatting/completed`; INSERT/UPDATE/DELETE solo dueño. Trigger: máx. del plan (free 3, Plus 5, tope duro 5) |
+| `user_exchange_zones` (⚠️ solo historial desde v3) | `user_id` FK users CASCADE, `zone exchange_zone`; PK (user_id, zone) | SELECT dueño + contrapartes de un match `pending/chatting/completed`; INSERT/UPDATE/DELETE solo dueño. Trigger: máx. del plan (free 3, Plus 5, tope duro 5) |
 | `books_offered` | `id`, `user_id` FK CASCADE, `title`/`author` (1-200, NOT NULL), `editor`, `condition`, `photo_url`, `is_active`, `created_at`, `title_norm` (GENERATED = `trueque_norm(title)`) | SELECT autenticados si `is_active` (o dueño); escritura solo dueño. Triggers: límite free/Plus en INSERT y en reactivación; costo de publicar si config > 0; cancelar matches vivos al desactivar; bloquear cambio de título/autor en match vivo |
 | `books_wanted` | `id`, `user_id` FK CASCADE, `title`/`author`, `editor`, `is_active`, `created_at`, `title_norm` | Igual que `books_offered` (límite free 5) |
 | `exchange_matches` | `id`, `user_a_id < user_b_id` (FK CASCADE), `match_type`, `book_a_offers`/`book_b_offers` (FK books_offered CASCADE, uno puede ser NULL en parcial), `shared_zones text[]`, `via_reading_list`, `status`, `created_at`, `expires_at` (+14 días) | SELECT solo participantes; sin INSERT/UPDATE/DELETE para clientes (REVOKE + sin policy) → solo RPCs. UNIQUE parcial `exchange_matches_live_unique` (pareja + libros con COALESCE, solo estados vivos/completados) |
@@ -562,6 +587,8 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 
 Estas RPCs devuelven `jsonb {success, error?}` sin lanzar (estilo de `spend_gems`, como pidió el spec); las del MVP lanzan `TRUEQUE_*`. `truequeService.callGeoRpc` unifica ambas en `TruequeError`.
 
+**v3:** `trueque_pair_geo(uid, other)` → `(dist_km, same_state)`, `trueque_proximity_band(dist, same_state)` y `trueque_in_scope(scope, dist, same_state, radius)` cambiaron de firma (sin zonas). Ninguna función de `trueque_geo.sql` lee `user_exchange_zones`.
+
 Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_valid_state`, `trueque_valid_report_reason`, `trueque_haversine_km`, `trueque_pair_geo` (⚠️ recibe dos user_id arbitrarios y devuelve su distancia: jamás exponerla), `trueque_proximity_band`, `trueque_band_rank`, `trueque_in_scope`, `trueque_generate_matches_geo` (mismo emparejamiento por título y mismo upsert por pareja que `trueque_generate_matches`, pero cruza libros primero y filtra por alcance después), `trueque_matches_geo_for`, `trg_trueque_require_ready`.
 
 **Vista `trueque_funnel_summary`** (`security_invoker`, REVOKE a PUBLIC/anon/authenticated → solo SQL Editor): `usuarios_con_estado`, `usuarios_con_pines`, `busquedas` (filas de `trueque_search_credits`, incluye las del flujo viejo), `chats_iniciados` (matches con ≥1 mensaje no de sistema), `intercambios_completados`. Sin datos personales.
@@ -571,7 +598,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 - **Quién lo ve:** solo el dueño (RLS + REVOKE). Ninguna RPC devuelve coordenadas de otra persona; a los demás solo les llega un rango de distancia. El cálculo se hace dentro de Postgres.
 - **Mitigación de triangulación:** coordenadas ya redondeadas, rangos anchos y 1 cambio de coordenadas cada 24 h.
 - **UI:** texto fijo pidiendo marcar lugares públicos (metro, plaza, café) y no casa, escuela ni trabajo.
-- **Terceros:** los tiles se piden a `tile.openstreetmap.org` (el proveedor ve la IP y la zona del mapa que se mira, como cualquier mapa web). No se envían pines a ningún tercero.
+- **Terceros:** los tiles se piden a `tile.openstreetmap.org` (el proveedor ve la IP y la zona del mapa que se mira, como cualquier mapa web). Desde v3, el texto que el usuario escribe en el buscador va a `nominatim.openstreetmap.org` (con su IP); FOLIO no lo guarda. No se envían pines a ningún tercero.
 - **Borrado:** `trueque_profiles`, `trueque_pins` y `trueque_reports` son `ON DELETE CASCADE` a `users`; `delete_my_account()` los arrastra sin cambios.
 - **Mayoría de edad:** solo una autodeclaración (`adult_confirmed_at`), no hay verificación.
 
@@ -593,6 +620,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 | Vercel | `vercel --prod` manual | ⚠️ sin integración Git aún; `vercel.json` controla el caching. Sus `rewrites` conservan `/api/anthropic` y `/api/buscalibre-check` (existen en `api/`); el rewrite muerto a `/api/login` se eliminó el 2026-09-19 |
 | GitHub Actions | cron diario | Entrena recomendador; secrets: SUPABASE_SERVICE_ROLE_KEY (SOLO aquí, jamás en Vercel/cliente) |
 | PWA/Workbox | vite.config.js | autoUpdate + skipWaiting; NetworkFirst para navegación (timeout 3 s → caché offline); `sw-notifications.js` para notifs programadas. Desde 2026-10-03: `globIgnores` saca del precache el chunk del mapa (`assets/MyPlaces-*`) y los tiles de OSM tienen una regla `NetworkOnly` explícita (nunca se cachean) |
+| Nominatim (OSM, v3) | `GET https://nominatim.openstreetmap.org/search` desde `placeSearchService.js` | Buscador de lugares del mapa. Gratis y sin API key; máx. 1 solicitud/segundo (throttle + debounce + caché). Sin User-Agent propio (el navegador no lo permite): se identifica por `Referer`. **Si el tráfico crece:** cambiar `NOMINATIM_URL` a un geocodificador con plan gratis (MapTiler, LocationIQ) o a un Nominatim propio. Si se agrega CSP: `connect-src https://nominatim.openstreetmap.org` |
 | OpenStreetMap (tiles) | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` desde `MyPlaces.jsx` | Mapa del Trueque v2 con Leaflet. Gratis bajo la política de uso justo de OSM; atribución "© OpenStreetMap contributors" visible. **Si el tráfico crece:** cambiar `TILE_URL` a un proveedor con plan gratis (MapTiler, Stadia, Thunderforest) y su atribución. No hay CSP en `vercel.json`; si se agrega una, permitir `img-src https://tile.openstreetmap.org` |
 
 ---
@@ -608,7 +636,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 7. **Fechas**: el cliente usa hora local, nunca UTC (`localDateStr`), y parseo a mediodía para aritmética de días; el servidor calcula "hoy" en `America/Mexico_City` (`timezone_fix.sql`). ⚠️ Un usuario fuera de la zona horaria de México puede ver desfases de unas horas entre su `log_date` y el "hoy" del servidor.
 8. **IA con contrato JSON estricto**: prompts piden "SOLO JSON válido", se limpian fences y se parsea; sin streaming.
 9. **Naming**: DB snake_case ↔ app camelCase, mapeado únicamente en servicios; español para dominio y UI. Excepciones documentadas (devuelven filas snake_case tal cual): el Trueque (RPCs), `socialService` (feed/chat), `petService` (`user_pets`), `streakService.fetchStreakData` (fila de `user_streaks`, misma forma que devuelven las RPC de racha) y `wrapsService` (`monthly_wraps`). Mapearlas exige tocar decenas de lecturas en App.jsx a la vez: hacerlo junto con la extracción de esas vistas.
-10. **Matching del Trueque** (`trueque_generate_matches`):
+10. **Matching del Trueque — MVP** (`trueque_generate_matches`; histórico: el cliente actual usa `trueque_generate_matches_geo`, solo pines, ver §IV.14 v3):
     - **Normalización:** `trueque_norm(t)` = `lower` → quitar acentos (`translate`, ñ→n) → todo lo que no sea `[a-z0-9]` se vuelve espacio → colapsar espacios → `trim`. Se guarda como columna GENERATED `title_norm`, indexada, así que el match es una igualdad exacta sobre el índice. Por ejemplo, `"¡Cien Años de Soledad!"` y `"cien anos de soledad"` empatan.
     - **Algoritmo** (un solo SQL con CTEs, no un loop por usuario):
       - (a) Candidatos = usuarios con ≥1 zona en común (JOIN sobre `user_exchange_zones`).
@@ -636,7 +664,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 - **Monetización**: las gemas ya tienen ledger; un "catálogo de compras" sería tabla `purchases` + RPC SECURITY DEFINER que valide balance y descuente (usar `spend_gems` como puerta de gasto: añadir el producto a su lista blanca `reason → precio`).
 - **Otro algoritmo de recomendación**: solo tiene que escribir filas en `recommendation_scores` (user_id, book_id, predicted_rating, reason) — `api/recommendations.js` y la UI no cambian. Sustituir/añadir script en `scripts/` y workflow.
 - **Más mascotas**: añadir entradas a `PET_TYPES` en petService (img, title, quote, label) + assets en `public/pets/`; el diseño evolutivo completo está especificado en `SISTEMA_MASCOTAS_EVOLUTIVAS.md`.
-- **Trueque**: cambiar costos o límites = `UPDATE trueque_gems_cost SET value = … WHERE key = …` (sin deploy). Agregar una zona = `ALTER TYPE exchange_zone ADD VALUE 'slug'` + entrada en `src/config/zones.js`. Dar Plus = `UPDATE users SET is_premium = true`. **v2:** número de pines, horas entre cambios, radios, caja de México y topes de reportes = editar `trueque_geo_cfg()` al inicio de `trueque_geo.sql` y re-correrlo (más las constantes espejo en `truequeGeoService.js`); reiniciar el límite de 24 h de una cuenta = `UPDATE trueque_profiles SET pins_updated_at = NULL WHERE user_id = …`; ver el embudo = `SELECT * FROM trueque_funnel_summary`; revisar reportes = `SELECT * FROM trueque_reports ORDER BY created_at DESC`.
+- **Trueque**: cambiar costos o límites = `UPDATE trueque_gems_cost SET value = … WHERE key = …` (sin deploy). ~~Agregar una zona~~ (v3: las zonas ya no se usan). Dar Plus = `UPDATE users SET is_premium = true`. **v2:** número de pines, horas entre cambios, radios, caja de México y topes de reportes = editar `trueque_geo_cfg()` al inicio de `trueque_geo.sql` y re-correrlo (más las constantes espejo en `truequeGeoService.js`); reiniciar el límite de 24 h de una cuenta = `UPDATE trueque_profiles SET pins_updated_at = NULL WHERE user_id = …`; ver el embudo = `SELECT * FROM trueque_funnel_summary`; revisar reportes = `SELECT * FROM trueque_reports ORDER BY created_at DESC`.
 - **Extraer vistas del monolito**: mover una vista de App.jsx a `src/components/` siguiendo el patrón del commit `3b3adfd` (imports de servicios + props explícitas).
 
 ## XII. LIMITACIONES CONOCIDAS Y DEUDA TÉCNICA
@@ -656,7 +684,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 11. **Cuentas privadas no encontrables**: efecto secundario de `privacy_hardening.sql`; si se quiere búsqueda por username de cuentas privadas habría que usar la vista `users_public` (ya creada, sin uso todavía) con una política/función dedicada.
 12. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
 13. **Trueque — TODOs de Sprint 2:**
-    - ~~Migrar zonas fijas a Google Places API~~ — **sustituido 2026-10-03** por pines aproximados con Leaflet + OSM (Trueque v2); las zonas quedan como respaldo en CDMX.
+    - ~~Migrar zonas fijas a Google Places API~~ — **sustituido 2026-10-03** por pines aproximados con Leaflet + OSM (Trueque v2); desde v3 ya no hay zonas: solo pines.
     - Implementar "Embajadas FOLIO" (lugares aliados verificados; el disclaimer ya las anuncia).
     - Pago real de Folio Plus: hoy `is_premium` se activa a mano y el CTA es placeholder con precio `$XX`.
     - Push notifications para matches y mensajes nuevos (hoy el usuario tiene que entrar a la tab; el chat hace polling solo mientras está abierto).
@@ -688,6 +716,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **Constantes duplicadas** en SQL (`trueque_geo_cfg`, CHECKs) y JS (`truequeGeoService`, `estados.js`, `REPORT_REASONS`): cambiarlas a la par.
     - **Rendimiento:** `trueque_pair_geo` se evalúa por pareja con títulos cruzados; suficiente para el volumen actual. Con muchos usuarios, precalcular o indexar por celda.
     - **PostHog:** no existe en el código, así que no se agregaron eventos (`trueque_pins_saved`, `trueque_search`, `trueque_chat_started`, `trueque_exchange_completed`); la medición vive en la vista `trueque_funnel_summary`.
+    - **v3 (2026-10-03):** re-correr `trueque_geo.sql` antes de desplegar (si el cliente v3 sale antes, la búsqueda sigue aceptando zonas en el servidor hasta re-correrlo). Pendiente decidir si se eliminan del todo `user_exchange_zones`, el enum `exchange_zone`, `set_exchange_zones` y las claves `*_max_zones` de `trueque_gems_cost` (hoy se conservan como historial y por compatibilidad). Nominatim: uso justo de 1 solicitud/segundo **por app** en la práctica (no hay cuota por usuario); si crece el tráfico, mover a un proveedor con plan. La calidad de Nominatim varía (p. ej. "Metro Insurgentes" puede devolver primero "Metro Insurgentes Sur"): siempre se puede tocar el mapa.
     - **Fuera de alcance (a propósito):** bloqueo de usuarios, pantalla de moderación, condición del libro en el match, puntos de encuentro sugeridos, alertas de "alguien cerca", cadenas de 3 intercambios, geolocalización del navegador.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
@@ -742,11 +771,13 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 
 | Item | Estado | Cómo se resolvió |
 |---|---|---|
-| Trueque limitado a 25 zonas de CDMX | ✅ RESUELTO 2026-10-03 (⚠️ requiere correr `trueque_geo.sql`) | Estado obligatorio (32 estados) + hasta 3 pines aproximados; matching por cercanía en Postgres; zonas como respaldo en CDMX |
+| Trueque limitado a 25 zonas de CDMX | ✅ RESUELTO 2026-10-03 (⚠️ requiere correr `trueque_geo.sql`) | Estado obligatorio (32 estados) + hasta 3 pines aproximados; matching por cercanía en Postgres; v3 retiró las zonas por completo |
 | La búsqueda de matches cobraba 20 gemas aunque no encontrara nada | ✅ RESUELTO 2026-10-03 | RPC única `search_trueque_matches`: bloquea saldo, genera y cobra solo si hay resultados, en la misma transacción |
 | Sin forma de reportar usuarios del Trueque | ✅ RESUELTO 2026-10-03 (parcial: sin bloqueo ni moderación en app) | Botón "Reportar" en el chat + `trueque_reports` + RPC `report_trueque_user` |
 | Sin reglas de seguridad ni confirmación de mayoría de edad | ✅ RESUELTO 2026-10-03 | "Antes de empezar" + `accept_trueque_rules`; triggers impiden publicar/chatear sin aceptarlas; aviso fijo en el chat |
 | Sin medición del Trueque | ✅ RESUELTO 2026-10-03 | Vista `trueque_funnel_summary` (solo SQL Editor) |
+| Dos sistemas de ubicación conviviendo (zonas de CDMX + pines) | ✅ RESUELTO 2026-10-03 (v3; ⚠️ re-correr `trueque_geo.sql`) | Solo pines en UI y matching; zonas como historial en la BD |
+| Marcar lugares solo tocando el mapa (difícil encontrar un punto) | ✅ RESUELTO 2026-10-03 (v3) | Buscador de lugares con Nominatim arriba del mapa |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER
 

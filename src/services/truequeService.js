@@ -1,5 +1,4 @@
 import { supabase } from "../supabase.js";
-import { ZONES_CDMX } from "../config/zones.js";
 
 // ============ TRUEQUE DE LIBROS ============
 // Toda regla de negocio (límites free/Plus, cobro de gemas, matching, estados del
@@ -43,7 +42,7 @@ const GEO_RPC_ERRORS = {
   RADIUS_INVALID: "Elige un radio de 3, 6, 12 o 25 km.",
   PINS_INVALID: "Revisa tus lugares: de 1 a 3 pines dentro de México y etiquetas de máximo 30 caracteres.",
   PINS_COOLDOWN: "Solo puedes cambiar tus lugares una vez cada 24 horas.",
-  LOCATION_REQUIRED: "Marca al menos un lugar en el mapa (o tus zonas si estás en CDMX).",
+  LOCATION_REQUIRED: "Marca al menos un lugar en el mapa para buscar matches.",
   SCOPE_INVALID: "Alcance de búsqueda no válido.",
   RATE_LIMIT: "Llegaste al máximo de búsquedas de hoy. Vuelve mañana.",
   GEMS_INSUFFICIENT: "No tienes gemas suficientes.",
@@ -106,33 +105,8 @@ async function currentUserId() {
   return uid;
 }
 
-// ---------- Zonas ----------
-function getZones() {
-  return ZONES_CDMX;
-}
-
-async function getUserZones(userId) {
-  try {
-    const { data, error } = await supabase.from("user_exchange_zones").select("zone").eq("user_id", userId);
-    if (error) throw error;
-    return (data || []).map((r) => r.zone);
-  } catch (e) {
-    console.error("[TRUEQUE] getUserZones:", e?.message);
-    throw toTruequeError(e, "No se pudieron cargar tus zonas.");
-  }
-}
-
-// Reemplaza todas las zonas (RPC atómica; valida mínimo 2 y máximo del plan en el servidor).
-async function setUserZones(zones) {
-  try {
-    const { error } = await supabase.rpc("set_exchange_zones", { p_zones: zones });
-    if (error) throw error;
-    return zones;
-  } catch (e) {
-    console.error("[TRUEQUE] setUserZones:", e?.message);
-    throw toTruequeError(e, "No se pudieron guardar tus zonas.");
-  }
-}
+// Trueque v3 (2026-10-03): las zonas fijas de CDMX ya no se leen ni se escriben desde el
+// cliente. user_exchange_zones queda en la BD solo como historial.
 
 // Plan y límites del usuario (is_premium no es legible directo en users).
 async function getTruequeStatus() {
@@ -291,7 +265,6 @@ const PROXIMITY_LABELS = {
   "6_12": "6 a 12 km",
   "12_25": "12 a 25 km",
   far: "más lejos",
-  same_zone: "misma zona",
   same_state: "mismo estado",
   other_state: "otro estado",
 };
@@ -412,7 +385,7 @@ function acceptDisclaimer(matchId) {
 
 export {
   TruequeError, CHAT_PAGE_SIZE, UPDATING_MESSAGE, callGeoRpc,
-  getZones, getUserZones, setUserZones, getTruequeStatus,
+  getTruequeStatus,
   getMyOffers, addBookOffered, deleteBookOffered,
   getMyWants, addBookWanted, deleteBookWanted,
   searchMatches, getMatches,

@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { Trash2, Loader2, MapPin, Lock } from "lucide-react";
+import { Trash2, Loader2, MapPin, Lock, Search } from "lucide-react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { palette, body, display } from "../../theme.js";
-import { ESTADOS, CDMX, estadoCentro } from "../../data/estados.js";
+import { ESTADOS, estadoCentro } from "../../data/estados.js";
 import {
   MAX_PINS, PIN_LABEL_MAX, RADII_KM, PIN_FUZZ_METERS, roundCoord, saveGeo,
 } from "../../services/truequeGeoService.js";
+import { searchPlaces, PLACE_MIN_QUERY } from "../../services/placeSearchService.js";
 import { Sheet, PrimaryButton, ErrorText, Label, fieldStyle } from "./ui.jsx";
 
-// ============ TRUEQUE v2: MIS LUGARES ============
+// ============ TRUEQUE v2/v3: MIS LUGARES ============
+// v3: buscador de lugares (Nominatim, ver placeSearchService.js) arriba del mapa. El texto buscado
+// no se guarda en ningún lado: solo las coordenadas redondeadas del pin, igual que al tocar el mapa.
 // Este módulo se carga con import() dinámico desde TruequeMain: Leaflet y su CSS solo se
 // descargan al abrir "Mis lugares". Está excluido del precache del service worker (vite.config.js).
 //
@@ -21,6 +24,83 @@ const ATTRIBUTION = '© <a href="https://www.openstreetmap.org/copyright" target
 const MEXICO_BOUNDS = [[12, -122], [35, -84]];   // límite de paneo (el servidor valida 14..33 / -119..-86)
 const IN_MEXICO = (lat, lng) => lat >= 14 && lat <= 33 && lng >= -119 && lng <= -86;
 const PRIVACY_TEXT = "Marca lugares públicos cerca de donde te mueves (metro, plaza, café). No marques tu casa, escuela ni trabajo. La ubicación se guarda aproximada y nadie ve tus pines.";
+
+const SEARCH_DEBOUNCE_MS = 450;
+
+// Buscador de lugares. Espera ~450 ms sin teclear antes de pedir a Nominatim (y el servicio
+// además respeta 1 solicitud/segundo y cachea). Fallas de red o timeout no rompen la pantalla.
+function PlaceSearch({ stateClave, disabled, onPick }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [status, setStatus] = useState("idle");   // idle | loading | ok | empty | error
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    const query = q.trim();
+    if (query.length < PLACE_MIN_QUERY) { setResults([]); setStatus("idle"); return undefined; }
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      setStatus("loading");
+      try {
+        const found = await searchPlaces(query, { center: stateClave ? estadoCentro(stateClave) : null, signal: ctrl.signal });
+        setResults(found);
+        setStatus(found.length ? "ok" : "empty");
+      } catch (e) {
+        if (e?.name === "AbortError") return;
+        setResults([]);
+        setMsg(e?.message || "No se pudo buscar ahora. Intenta de nuevo o toca el mapa.");
+        setStatus("error");
+      }
+    }, SEARCH_DEBOUNCE_MS);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [q, stateClave]);
+
+  function pick(place) {
+    onPick(place);
+    setQ("");
+    setResults([]);
+    setStatus("idle");
+  }
+
+  const hint = { ...body, fontSize: "0.82rem", color: palette.inkSoft, margin: "0.35rem 0 0" };
+  return (
+    <div style={{ marginBottom: "0.6rem" }}>
+      <div style={{ position: "relative" }}>
+        <Search size={16} color={palette.inkFaint} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          disabled={disabled}
+          placeholder="Busca un lugar: estación de metro, plaza, café…"
+          aria-label="Buscar un lugar en el mapa"
+          autoComplete="off"
+          style={{ ...fieldStyle(), paddingLeft: "2.2rem", opacity: disabled ? 0.6 : 1 }}
+        />
+        {status === "loading" && (
+          <Loader2 size={16} className="animate-spin" color={palette.inkFaint} style={{ position: "absolute", right: 12, top: "50%", marginTop: -8 }} />
+        )}
+      </div>
+      {status === "ok" && (
+        <ul aria-label="Sugerencias de lugares" style={{ listStyle: "none", margin: "0.35rem 0 0", padding: 0, borderRadius: 10, border: `1px solid ${palette.border}`, backgroundColor: palette.bgCard, overflow: "hidden" }}>
+          {results.map((r, i) => (
+            <li key={r.id} style={{ borderTop: i ? `1px solid ${palette.borderSoft}` : "none" }}>
+              <button
+                onClick={() => pick(r)}
+                aria-label={`Marcar ${r.name}`}
+                style={{ width: "100%", textAlign: "left", display: "flex", gap: "0.45rem", alignItems: "flex-start", padding: "0.55rem 0.7rem", background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.84rem", color: palette.ink, lineHeight: 1.35 }}
+              >
+                <MapPin size={14} color={palette.accent} style={{ flexShrink: 0, marginTop: 2 }} /> {r.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {status === "empty" && <p role="status" style={hint}>No encontramos ese lugar, intenta con otro nombre o toca el mapa.</p>}
+      {status === "error" && <p role="status" style={{ ...hint, color: palette.warnInk }}>{msg}</p>}
+    </div>
+  );
+}
 
 function fmtDateTime(iso) {
   return new Date(iso).toLocaleString("es-MX", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -41,7 +121,7 @@ function pinIcon(n, selected) {
   });
 }
 
-// profile: de getGeoProfile(). initialState: estado elegido en LocationStep (onboarding fuera de CDMX).
+// profile: de getGeoProfile(). initialState: estado elegido en LocationStep (onboarding).
 function MyPlaces({ profile, initialState = null, onSaved, onClose }) {
   const [state, setState] = useState(initialState || profile.state || "");
   const [pins, setPins] = useState(profile.pins.map((p) => ({ lat: p.lat, lng: p.lng, label: p.label || "" })));
@@ -60,7 +140,6 @@ function MyPlaces({ profile, initialState = null, onSaved, onClose }) {
   const live = useRef({});
 
   const locked = !!retryAt && new Date(retryAt).getTime() > Date.now();
-  const isCdmx = state === CDMX;
   live.current = { pins, selected, locked };
 
   // Crear el mapa (una vez)
@@ -115,6 +194,20 @@ function MyPlaces({ profile, initialState = null, onSaved, onClose }) {
     });
   }, [pins, selected]);
 
+  // Sugerencia del buscador: mismo redondeo (~1 km) y círculo que al tocar el mapa, pero siempre
+  // agrega el siguiente pin libre (con 3 pines pide borrar uno primero). Recentra con animación.
+  function addFromSearch(place) {
+    if (locked) { setErr("Todavía no puedes mover tus lugares."); return; }
+    if (pins.length >= MAX_PINS) { setErr(`Ya tienes ${MAX_PINS} lugares. Borra uno para agregar otro.`); return; }
+    const lat = roundCoord(place.lat);
+    const lng = roundCoord(place.lng);
+    if (!IN_MEXICO(lat, lng)) { setErr("Ese lugar está fuera de México."); return; }
+    setErr("");
+    setPins([...pins, { lat, lng, label: "" }]);
+    setSelected(pins.length);
+    mapRef.current?.flyTo([lat, lng], 14, { duration: 0.8 });
+  }
+
   function removePin(i) {
     setPins((prev) => prev.filter((_, j) => j !== i));
     setSelected(0);
@@ -132,8 +225,7 @@ function MyPlaces({ profile, initialState = null, onSaved, onClose }) {
   async function save() {
     if (saving) return;
     if (!state) { setErr("Elige tu estado."); return; }
-    if (!isCdmx && pins.length === 0) { setErr("Fuera de CDMX necesitas marcar al menos 1 lugar."); return; }
-    if (pins.length === 0 && profile.pins.length > 0) { setErr("Deja al menos 1 lugar marcado."); return; }
+    if (pins.length === 0) { setErr("Marca al menos 1 lugar: busca uno o toca el mapa."); return; }
     if (locked && !sameCoords(pins, profile.pins)) { setErr("Todavía no puedes mover tus lugares."); return; }
     setSaving(true);
     setErr("");
@@ -173,6 +265,8 @@ function MyPlaces({ profile, initialState = null, onSaved, onClose }) {
         </p>
       )}
 
+      <PlaceSearch stateClave={state} disabled={locked} onPick={addFromSearch} />
+
       <div style={{ position: "relative", isolation: "isolate", borderRadius: 14, overflow: "hidden", border: `1px solid ${palette.border}` }}>
         <div ref={mapEl} role="application" aria-label="Mapa: toca para colocar o mover un lugar" style={{ height: 300, width: "100%", backgroundColor: palette.bgSoft, cursor: locked ? "default" : "crosshair" }} />
         {tiles === "loading" && (
@@ -196,7 +290,7 @@ function MyPlaces({ profile, initialState = null, onSaved, onClose }) {
           <MapPin size={22} color={palette.accent} />
           <p style={{ ...display, fontSize: "0.98rem", fontWeight: 600, color: palette.ink, margin: "0.3rem 0 0.2rem" }}>Aún no marcas lugares</p>
           <p style={{ ...body, fontSize: "0.86rem", color: palette.inkSoft, margin: 0 }}>
-            Toca el mapa para agregar hasta {MAX_PINS} lugares{isCdmx ? " (opcional en CDMX: también cuentan tus zonas)" : ""}.
+            Busca un lugar o toca el mapa para agregar hasta {MAX_PINS} lugares.
           </p>
         </div>
       ) : (

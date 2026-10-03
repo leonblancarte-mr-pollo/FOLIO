@@ -11,7 +11,6 @@ function PlusUpsellModal({ reason, onClose }) {
       </p>
       <ul style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft, margin: "0 0 1.2rem", paddingLeft: "1.2rem", lineHeight: 1.6 }}>
         <li>Libros ofrecidos y buscados ilimitados</li>
-        <li>Hasta 5 zonas de intercambio</li>
         <li>Búsquedas de matches sin gastar gemas</li>
       </ul>
       <PrimaryButton disabled>Próximamente</PrimaryButton>

@@ -20,6 +20,10 @@
 --     calculados una sola vez; una tabla aparte queda privada y bloqueada sin tocar Auth.
 --   · Los pines se guardan YA redondeados (2 decimales ≈ 1 km) y nadie más que su dueño
 --     los puede leer. La distancia se calcula aquí; el cliente solo recibe un rango.
+--   · v3 (2026-10-03): las 25 zonas de CDMX YA NO cuentan. Cercanía, alcance y requisito de
+--     ubicación usan solo trueque_pins + max_radius_km (+ estado para "mi estado"). La tabla
+--     user_exchange_zones NO se borra (historial), pero ninguna función de este archivo la lee.
+--     Re-correr este archivo completo aplica el cambio (borra las firmas v2 que usaban zonas).
 --   · cost_search_matches / find_book_matches quedan intactas (clientes viejos en caché
 --     siguen funcionando). El cliente nuevo usa search_trueque_matches, que cobra en la
 --     MISMA transacción y solo si la búsqueda devuelve resultados.
@@ -157,63 +161,65 @@ RETURNS double precision LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
          )));
 $$;
 
--- Geografía de una pareja: distancia mínima entre cualquiera de sus pines (hasta 3×3),
--- zonas en común y si comparten estado (NULL = alguno no tiene estado).
+-- v3: las firmas v2 recibían/devolvían zonas compartidas. Se borran para recrearlas sin zonas
+-- (cambia el tipo de retorno, así que CREATE OR REPLACE no basta). Re-ejecutable.
+DROP FUNCTION IF EXISTS public.trueque_pair_geo(uuid, uuid);
+DROP FUNCTION IF EXISTS public.trueque_proximity_band(double precision, text[], boolean);
+DROP FUNCTION IF EXISTS public.trueque_in_scope(text, double precision, text[], boolean, int);
+
+-- Geografía de una pareja: distancia mínima entre cualquiera de sus pines (hasta 3×3; NULL si
+-- alguno no tiene pines) y si comparten estado (NULL = alguno no tiene estado). Sin zonas (v3).
 -- ⚠️ Recibe dos user_id arbitrarios: NUNCA exponerla a clientes.
 CREATE OR REPLACE FUNCTION public.trueque_pair_geo(p_uid uuid, p_other uuid)
-RETURNS TABLE (dist_km double precision, shared_zones text[], same_state boolean)
+RETURNS TABLE (dist_km double precision, same_state boolean)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT
     (SELECT min(trueque_haversine_km(a.lat, a.lng, b.lat, b.lng))
        FROM trueque_pins a JOIN trueque_pins b ON b.user_id = p_other
       WHERE a.user_id = p_uid),
-    coalesce((SELECT array_agg(z1.zone::text ORDER BY z1.zone::text)
-                FROM user_exchange_zones z1
-                JOIN user_exchange_zones z2 ON z2.zone = z1.zone AND z2.user_id = p_other
-               WHERE z1.user_id = p_uid), '{}'::text[]),
     (SELECT pa.state = pb.state
        FROM trueque_profiles pa, trueque_profiles pb
       WHERE pa.user_id = p_uid AND pb.user_id = p_other
         AND pa.state IS NOT NULL AND pb.state IS NOT NULL);
 $$;
 
--- Rango de cercanía (lo único que ve el cliente). Con pines manda la distancia;
--- sin pines de alguno de los dos, el respaldo es la zona compartida.
-CREATE OR REPLACE FUNCTION public.trueque_proximity_band(p_dist double precision, p_shared text[], p_same_state boolean)
+-- Rango de cercanía (lo único que ve el cliente). Con pines de ambos manda la distancia;
+-- si no, solo se sabe si comparten estado.
+CREATE OR REPLACE FUNCTION public.trueque_proximity_band(p_dist double precision, p_same_state boolean)
 RETURNS text LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE
     WHEN p_dist IS NOT NULL AND p_dist <= 3  THEN 'lt3'
     WHEN p_dist IS NOT NULL AND p_dist <= 6  THEN '3_6'
     WHEN p_dist IS NOT NULL AND p_dist <= 12 THEN '6_12'
     WHEN p_dist IS NOT NULL AND p_dist <= 25 THEN '12_25'
-    WHEN p_dist IS NULL AND cardinality(p_shared) > 0 THEN 'same_zone'
     WHEN p_same_state IS TRUE  THEN 'same_state'
     WHEN p_same_state IS FALSE THEN 'other_state'
     ELSE 'far'
   END;
 $$;
 
--- Orden de cercanía (menor = más cerca). "Misma zona" cuenta como cerca.
+-- Orden de cercanía (menor = más cerca).
 CREATE OR REPLACE FUNCTION public.trueque_band_rank(p_band text)
 RETURNS int LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE p_band
-    WHEN 'lt3' THEN 1 WHEN 'same_zone' THEN 2 WHEN '3_6' THEN 3 WHEN '6_12' THEN 4
-    WHEN '12_25' THEN 5 WHEN 'same_state' THEN 6 WHEN 'far' THEN 7 WHEN 'other_state' THEN 8
-    ELSE 9 END;
+    WHEN 'lt3' THEN 1 WHEN '3_6' THEN 2 WHEN '6_12' THEN 3 WHEN '12_25' THEN 4
+    WHEN 'same_state' THEN 5 WHEN 'far' THEN 6 WHEN 'other_state' THEN 7
+    ELSE 8 END;
 $$;
 
 -- ¿Entra la pareja en el alcance elegido? Cada alcance incluye a los anteriores.
---   radius  = dentro de MI radio (max_radius_km) o, sin pines, zona compartida
---   25km    = dentro de 25 km o zona compartida
+--   radius  = dentro de MI radio (max_radius_km)
+--   25km    = dentro de 25 km
 --   state   = lo anterior + mismo estado
 --   country = todo el país
-CREATE OR REPLACE FUNCTION public.trueque_in_scope(p_scope text, p_dist double precision, p_shared text[],
+-- Sin pines de alguno de los dos (dist NULL) solo entra por "mi estado" o "todo el país".
+CREATE OR REPLACE FUNCTION public.trueque_in_scope(p_scope text, p_dist double precision,
                                                   p_same_state boolean, p_radius int)
 RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE p_scope
-    WHEN 'radius'  THEN coalesce(p_dist <= p_radius, cardinality(p_shared) > 0)
-    WHEN '25km'    THEN coalesce(p_dist <= public.trueque_geo_int('wide_radius_km'), cardinality(p_shared) > 0)
-    WHEN 'state'   THEN coalesce(p_dist <= public.trueque_geo_int('wide_radius_km'), cardinality(p_shared) > 0)
+    WHEN 'radius'  THEN coalesce(p_dist <= p_radius, false)
+    WHEN '25km'    THEN coalesce(p_dist <= public.trueque_geo_int('wide_radius_km'), false)
+    WHEN 'state'   THEN coalesce(p_dist <= public.trueque_geo_int('wide_radius_km'), false)
                         OR coalesce(p_same_state, false)
     WHEN 'country' THEN true
     ELSE false
@@ -323,8 +329,8 @@ BEGIN
 
   -- Solo estado/radio
   IF p_pins IS NULL OR jsonb_typeof(p_pins) = 'null' THEN
-    -- Fuera de CDMX no hay zonas: se exige al menos 1 pin ya guardado.
-    IF v_state <> 'CMX' AND NOT EXISTS (SELECT 1 FROM trueque_pins WHERE user_id = uid) THEN
+    -- v3: sin zonas, todos (CDMX incluida) necesitan al menos 1 pin ya guardado.
+    IF NOT EXISTS (SELECT 1 FROM trueque_pins WHERE user_id = uid) THEN
       RETURN jsonb_build_object('success', false, 'error', 'PINS_INVALID');
     END IF;
     UPDATE trueque_profiles SET state = v_state, max_radius_km = v_radius, updated_at = v_now
@@ -425,9 +431,9 @@ END $$;
 -- ----------------------------------------------------------------------------
 
 -- 6.1 Generador (interno). Mismo emparejamiento por título y mismo upsert por pareja
---     que trueque_generate_matches(), pero los candidatos salen del alcance (pines/zonas/
---     estado) en vez de exigir zona compartida. Primero se cruzan libros y luego se filtra
---     por geografía, así el costo depende de cuántos títulos coinciden, no de cuántos
+--     que trueque_generate_matches(), pero los candidatos salen del alcance (pines/estado;
+--     desde v3 sin zonas) en vez de exigir zona compartida; shared_zones se guarda vacío.
+--     Primero se cruzan libros y luego se filtra por geografía, así el costo depende de cuántos títulos coinciden, no de cuántos
 --     usuarios hay. Devuelve cuántas parejas entraron en el alcance (= resultados).
 CREATE OR REPLACE FUNCTION public.trueque_generate_matches_geo(p_uid uuid, p_scope text)
 RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
@@ -468,10 +474,10 @@ BEGIN
              coalesce(t.from_list, false) AS via_list
       FROM mine m FULL JOIN theirs t ON t.xid = m.xid
     )
-    SELECT p.xid, p.my_book, p.their_book, p.via_list, g.shared_zones AS shared
+    SELECT p.xid, p.my_book, p.their_book, p.via_list
     FROM pairs p
     CROSS JOIN LATERAL trueque_pair_geo(p_uid, p.xid) g
-    WHERE trueque_in_scope(p_scope, g.dist_km, g.shared_zones, g.same_state, v_radius)
+    WHERE trueque_in_scope(p_scope, g.dist_km, g.same_state, v_radius)
   LOOP
     n := n + 1;
     IF p_uid < r.xid THEN
@@ -496,7 +502,7 @@ BEGIN
     VALUES (a, b,
             CASE WHEN r.my_book IS NOT NULL AND r.their_book IS NOT NULL
                  THEN 'perfecto'::exchange_match_type ELSE 'parcial'::exchange_match_type END,
-            ba, bb, r.shared, r.via_list)
+            ba, bb, '{}'::text[], r.via_list)
     ON CONFLICT DO NOTHING;
   END LOOP;
   RETURN n;
@@ -522,7 +528,7 @@ RETURNS TABLE (
                                       f.other_rating_avg DESC NULLS LAST, f.created_at DESC))::int
   FROM trueque_matches_for(p_uid) f
   CROSS JOIN LATERAL trueque_pair_geo(p_uid, f.other_user_id) g
-  CROSS JOIN LATERAL (SELECT trueque_proximity_band(g.dist_km, g.shared_zones, g.same_state) AS band) x
+  CROSS JOIN LATERAL (SELECT trueque_proximity_band(g.dist_km, g.same_state) AS band) x
   ORDER BY 24;
 $$;
 
@@ -575,9 +581,8 @@ BEGIN
   IF v_prof.state IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'STATE_REQUIRED');
   END IF;
-  -- Con pines se busca por cercanía; sin pines, solo CDMX con zonas (respaldo de hoy).
-  IF NOT EXISTS (SELECT 1 FROM trueque_pins WHERE user_id = uid)
-     AND NOT (v_prof.state = 'CMX' AND EXISTS (SELECT 1 FROM user_exchange_zones WHERE user_id = uid)) THEN
+  -- v3: se busca solo con pines (las zonas de CDMX ya no cuentan, aunque sigan guardadas).
+  IF NOT EXISTS (SELECT 1 FROM trueque_pins WHERE user_id = uid) THEN
     RETURN jsonb_build_object('success', false, 'error', 'LOCATION_REQUIRED');
   END IF;
 
@@ -678,9 +683,9 @@ REVOKE ALL ON FUNCTION public.trueque_valid_state(text)                         
 REVOKE ALL ON FUNCTION public.trueque_valid_report_reason(text)                    FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trueque_haversine_km(numeric, numeric, numeric, numeric) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trueque_pair_geo(uuid, uuid)                         FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.trueque_proximity_band(double precision, text[], boolean) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trueque_proximity_band(double precision, boolean)    FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trueque_band_rank(text)                              FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.trueque_in_scope(text, double precision, text[], boolean, int) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.trueque_in_scope(text, double precision, boolean, int) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trg_trueque_require_ready()                          FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trueque_generate_matches_geo(uuid, text)             FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.trueque_matches_geo_for(uuid)                        FROM PUBLIC, anon, authenticated;
@@ -704,8 +709,12 @@ NOTIFY pgrst, 'reload schema';
 -- ============================================================================
 -- CONSULTAS DE PRUEBA (SQL Editor, como postgres)
 --   select public.trueque_haversine_km(19.42, -99.16, 19.43, -99.13);   -- ≈ 3.3 km (Roma → Centro)
---   select public.trueque_proximity_band(4.2, '{}', true);               -- '3_6'
---   select public.trueque_proximity_band(null, '{roma}', null);          -- 'same_zone'
+--   select public.trueque_proximity_band(4.2, true);                     -- '3_6'
+--   select public.trueque_proximity_band(null, true);                    -- 'same_state' (alguno sin pines)
+--   -- v3: ninguna función de cercanía debe mencionar user_exchange_zones (debe dar 0 filas):
+--   select proname from pg_proc where pronamespace = 'public'::regnamespace
+--     and proname like 'trueque%' and prosrc ilike '%user_exchange_zones%'
+--     and proname not in ('trueque_generate_matches', 'trueque_status');
 --   select * from public.trueque_funnel_summary;                         -- embudo
 --   select p.user_id, u.username, p.state, p.max_radius_km, p.pins_updated_at, p.rules_accepted_at
 --     from public.trueque_profiles p join public.users u on u.id = p.user_id;

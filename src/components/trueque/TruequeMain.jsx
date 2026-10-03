@@ -1,18 +1,15 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { Plus, Loader2, MapPin, Pencil } from "lucide-react";
 import { palette, body, display, BRAND } from "../../theme.js";
-import { zoneLabel } from "../../config/zones.js";
-import { CDMX, estadoNombre } from "../../data/estados.js";
+import { estadoNombre } from "../../data/estados.js";
 import {
-  getTruequeStatus, getUserZones, setUserZones,
+  getTruequeStatus,
   getMyOffers, addBookOffered, deleteBookOffered,
   getMyWants, addBookWanted, deleteBookWanted,
   rateExchange, isDisclaimerAccepted, acceptDisclaimer,
   SEARCH_SCOPES, searchMatchesNearby, getMatchesNearby, acceptTruequeRules, UPDATING_MESSAGE,
 } from "../../services/truequeService.js";
-import { getGeoProfile, saveGeo } from "../../services/truequeGeoService.js";
-import { ZonesOnboarding } from "./ZonesOnboarding.jsx";
-import { ZonesEditor } from "./ZonesEditor.jsx";
+import { getGeoProfile } from "../../services/truequeGeoService.js";
 import { OfferBookModal } from "./OfferBookModal.jsx";
 import { WantBookModal } from "./WantBookModal.jsx";
 import { BookCard } from "./BookCard.jsx";
@@ -53,8 +50,8 @@ function MapLoadError({ onClose, onRetry }) {
   );
 }
 
-function scopeLabel(scope, radiusKm, zonesOnly) {
-  if (scope === "radius") return zonesOnly ? "Mis zonas" : `Mi radio (${radiusKm} km)`;
+function scopeLabel(scope, radiusKm) {
+  if (scope === "radius") return `Mi radio (${radiusKm} km)`;
   if (scope === "25km") return "25 km";
   if (scope === "state") return "Mi estado";
   return "Todo el país";
@@ -65,7 +62,6 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
   const [loading, setLoading] = useState(true);
   const [fatal, setFatal] = useState("");
   const [status, setStatus] = useState(null);
-  const [zones, setZones] = useState([]);
   const [offers, setOffers] = useState([]);
   const [wants, setWants] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -73,7 +69,6 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
   const [searching, setSearching] = useState(false);
   const [notice, setNotice] = useState("");
 
-  const [zonesEditorOpen, setZonesEditorOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [wantOpen, setWantOpen] = useState(false);
   const [upsell, setUpsell] = useState(null);          // { reason }
@@ -94,10 +89,13 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([getTruequeStatus(), getUserZones(user.id), getMyOffers(), getMyWants(), getMatchesNearby(), getGeoProfile()])
-      .then(([st, z, o, w, m, g]) => {
+    Promise.all([getTruequeStatus(), getMyOffers(), getMyWants(), getMatchesNearby(), getGeoProfile()])
+      .then(([st, o, w, m, g]) => {
         if (!alive) return;
-        setStatus(st); setZones(z); setOffers(o); setWants(w); setMatches(m); setGeo(g);
+        setStatus(st); setOffers(o); setWants(w); setMatches(m); setGeo(g);
+        // Sin pines (p. ej. cuenta vieja que solo tenía zonas de CDMX): pedirlos de entrada,
+        // igual que a un usuario nuevo tras elegir su estado.
+        if (g.rulesAcceptedAt && g.adultConfirmedAt && g.state && g.pins.length === 0) setPlacesOpen({});
       })
       // TRUEQUE_UPDATING = falta correr supabase/trueque_geo.sql (el servicio ya registró code/message/details/hint)
       .catch((e) => alive && setFatal(e.code === "TRUEQUE_UPDATING" ? UPDATING_MESSAGE : e.message || "No se pudo cargar el Trueque."))
@@ -115,22 +113,10 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
     await refreshGeo();
   }
 
-  async function saveCdmxState() {
-    await saveGeo({ state: CDMX });
-    await refreshGeo();
-  }
-
   async function onPlacesSaved() {
     await refreshGeo();
     setPlacesOpen(null);
     flash("Tus lugares quedaron guardados 📍");
-  }
-
-  async function saveZones(next) {
-    await setUserZones(next);
-    setZones(next);
-    setZonesEditorOpen(false);
-    refreshStatus();
   }
 
   function openOffer() {
@@ -246,15 +232,13 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
     return <p style={{ ...body, textAlign: "center", color: palette.inkSoft, padding: "3rem 1rem" }}>{fatal}</p>;
   }
 
-  // Requisitos en orden: reglas (+18) → estado → ubicación (zonas en CDMX o al menos 1 pin).
+  // Requisitos en orden: reglas (+18) → estado → al menos 1 pin. Desde v3 las zonas viejas de
+  // CDMX no cuentan: quien solo tiene zonas se trata igual que alguien sin pines.
   const needsRules = !geo?.rulesAcceptedAt || !geo?.adultConfirmedAt;
   const needsState = !needsRules && !geo?.state;
-  const isCdmx = geo?.state === CDMX;
   const hasPins = (geo?.pins.length || 0) > 0;
-  const needsZones = !needsRules && !needsState && isCdmx && zones.length === 0 && !hasPins;
-  const needsPins = !needsRules && !needsState && !isCdmx && !hasPins;
-  const blocked = needsRules || needsState || needsZones || needsPins;
-  const zonesOnly = isCdmx && !hasPins;
+  const needsPins = !needsRules && !needsState && !hasPins;
+  const blocked = needsRules || needsState || needsPins;
 
   const searchLabel = status?.is_premium
     ? `🔍 Buscar matches · gratis (${Math.max(0, status.plus_daily_searches - status.searches_today)} hoy)`
@@ -282,13 +266,6 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
           <Pencil size={13} color={palette.inkFaint} style={{ marginLeft: "auto" }} />
         </button>
       )}
-      {isCdmx && zones.length > 0 && (
-        <button onClick={() => setZonesEditorOpen(true)} aria-label="Editar mis zonas de CDMX" style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap", padding: "0.6rem 0.75rem", borderRadius: 12, border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, cursor: "pointer", marginBottom: "0.9rem", textAlign: "left" }}>
-          <span style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>Zonas:</span>
-          {zones.map((z) => <span key={z} style={{ padding: "0.1rem 0.55rem", borderRadius: 999, backgroundColor: palette.bgSoft, ...body, fontSize: "0.8rem", color: palette.inkSoft }}>{zoneLabel(z)}</span>)}
-          <Pencil size={13} color={palette.inkFaint} style={{ marginLeft: "auto" }} />
-        </button>
-      )}
       {needsPins && (
         <button onClick={() => setPlacesOpen({})} style={{ width: "100%", padding: "0.75rem", borderRadius: 12, border: `1.5px dashed ${palette.accent}`, backgroundColor: "transparent", color: palette.accent, cursor: "pointer", ...body, fontSize: "0.9rem", marginBottom: "0.9rem" }}>
           📍 Marca al menos un lugar en el mapa para buscar matches
@@ -310,7 +287,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
           const on = scope === s;
           return (
             <button key={s} role="radio" aria-checked={on} onClick={() => setScope(s)} disabled={blocked} style={{ padding: "0.3rem 0.7rem", borderRadius: 999, cursor: blocked ? "default" : "pointer", border: `1.5px solid ${on ? palette.accent : palette.border}`, backgroundColor: on ? palette.accentSoft : palette.bgCard, color: on ? palette.onAccent : palette.inkSoft, ...body, fontSize: "0.8rem" }}>
-              {scopeLabel(s, geo?.maxRadiusKm ?? 6, zonesOnly)}
+              {scopeLabel(s, geo?.maxRadiusKm ?? 6)}
             </button>
           );
         })}
@@ -352,12 +329,12 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
       {tab === "matches" && lastSearch && lastSearch.resultCount === 0 && (
         <div role="status" style={{ padding: "0.9rem", borderRadius: 14, backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, marginBottom: "1rem", textAlign: "center" }}>
           <p style={{ ...display, fontSize: "0.98rem", fontWeight: 600, color: palette.ink, margin: "0 0 0.2rem" }}>
-            No encontramos matches en «{scopeLabel(lastSearch.scope, geo?.maxRadiusKm ?? 6, zonesOnly)}»
+            No encontramos matches en «{scopeLabel(lastSearch.scope, geo?.maxRadiusKm ?? 6)}»
           </p>
           <p style={{ ...body, fontSize: "0.85rem", color: palette.inkSoft, margin: nextScope ? "0 0 0.7rem" : 0 }}>No se cobraron gemas.</p>
           {nextScope && (
             <button onClick={widenSearch} disabled={searching} style={{ padding: "0.55rem 1rem", borderRadius: 10, border: "none", backgroundColor: palette.accent, color: palette.onAccent, cursor: "pointer", ...display, fontSize: "0.88rem", fontWeight: 600 }}>
-              Ampliar a «{scopeLabel(nextScope, geo?.maxRadiusKm ?? 6, zonesOnly)}»
+              Ampliar a «{scopeLabel(nextScope, geo?.maxRadiusKm ?? 6)}»
             </button>
           )}
         </div>
@@ -366,10 +343,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
 
       {needsRules && <TruequeRulesModal onAccept={acceptRules} onSkip={onExit} />}
       {needsState && !placesOpen && (
-        <LocationStep onSaveCdmx={saveCdmxState} onPickOtherState={(st) => setPlacesOpen({ initialState: st })} onSkip={onExit} />
-      )}
-      {needsZones && !placesOpen && (
-        <ZonesOnboarding maxZones={status?.max_zones ?? 3} isPremium={!!status?.is_premium} onSave={saveZones} onSkip={onExit} onUseMap={() => setPlacesOpen({})} />
+        <LocationStep onPickState={(st) => setPlacesOpen({ initialState: st })} onSkip={onExit} />
       )}
       {placesOpen && (
         <Suspense fallback={<Sheet title="📍 Mis lugares"><div style={{ display: "flex", justifyContent: "center", padding: "2rem 0" }}><Loader2 size={24} className="animate-spin" color={palette.inkFaint} /></div></Sheet>}>
@@ -381,9 +355,6 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
             onRetry={() => setMyPlaces(() => loadMyPlaces())}
           />
         </Suspense>
-      )}
-      {zonesEditorOpen && (
-        <ZonesEditor initial={zones} maxZones={status?.max_zones ?? 3} isPremium={!!status?.is_premium} onSave={saveZones} onClose={() => setZonesEditorOpen(false)} />
       )}
       {offerOpen && <OfferBookModal onSubmit={submitOffer} onClose={() => setOfferOpen(false)} />}
       {wantOpen && <WantBookModal onSubmit={submitWant} onClose={() => setWantOpen(false)} />}

@@ -1,6 +1,5 @@
 import { MessageCircle, Star, MapPin, ArrowLeftRight, BookOpen } from "lucide-react";
 import { palette, body, display } from "../../theme.js";
-import { zoneLabel } from "../../config/zones.js";
 import { CONDITION_LABELS } from "./ui.jsx";
 import { PROXIMITY_LABELS } from "../../services/truequeService.js";
 
@@ -60,19 +59,20 @@ function MatchCard({ match, onMessage, onRate }) {
         <BookLine label="Das" title={match.my_book_title} author={match.my_book_author} />
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", margin: "0.6rem 0 0.1rem", alignItems: "center" }}>
-        <MapPin size={13} color={palette.inkFaint} />
-        {/* Trueque v2: solo un rango (nunca distancia exacta ni coordenadas) */}
-        {PROXIMITY_LABELS[match.proximity] && (
-          <span style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: `${palette.accent}1A`, ...body, fontSize: "0.75rem", fontWeight: 600, color: palette.accent }}>{PROXIMITY_LABELS[match.proximity]}</span>
-        )}
-        {(match.shared_zones || []).map((z) => (
-          <span key={z} style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: palette.bgSoft, ...body, fontSize: "0.75rem", color: palette.inkSoft }}>{zoneLabel(z)}</span>
-        ))}
-        {match.via_reading_list && (
-          <span style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: `${palette.mauve}22`, ...body, fontSize: "0.75rem", color: palette.mauve }}>📚 De tu lista "Por leer"</span>
-        )}
-      </div>
+      {/* Solo un rango de cercanía (nunca distancia exacta ni coordenadas). Desde v3 ya no se
+          muestran zonas de CDMX. Si no hay nada que mostrar, la fila no se pinta. */}
+      {(PROXIMITY_LABELS[match.proximity] || match.via_reading_list) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", margin: "0.6rem 0 0.1rem", alignItems: "center" }}>
+          {PROXIMITY_LABELS[match.proximity] && (
+            <span style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: `${palette.accent}1A`, ...body, fontSize: "0.75rem", fontWeight: 600, color: palette.accent, display: "inline-flex", alignItems: "center", gap: "0.2rem" }}>
+              <MapPin size={12} /> {PROXIMITY_LABELS[match.proximity]}
+            </span>
+          )}
+          {match.via_reading_list && (
+            <span style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: `${palette.mauve}22`, ...body, fontSize: "0.75rem", color: palette.mauve }}>📚 De tu lista "Por leer"</span>
+          )}
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.7rem" }}>
         <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, margin: 0, flex: 1 }}>
