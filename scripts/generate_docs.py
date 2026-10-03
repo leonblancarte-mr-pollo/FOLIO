@@ -664,7 +664,7 @@ INTRO = [
         "**Producción:** proyecto Vercel `folio-final`. El repositorio GitHub **no** está conectado a Vercel: los deploys son manuales (`vercel --prod`); un `git push` no despliega.",
         "**Backend:** Supabase con RLS en todas las tablas. Las migraciones SQL se corren a mano en el SQL Editor (no hay CLI configurada).",
         "**Seguridad:** XP, nivel, gemas, logros y racha solo se escriben desde Postgres; `is_public` se hace cumplir en RLS; `users.email` está fuera del SELECT de clientes.",
-        "**Trueque:** MVP funcional. No hay pago real de Folio Plus (`is_premium` se activa a mano).",
+        "**Trueque:** funcional; desde el 2026-10-03 (v2) exige estado y aceptar reglas (+18), admite hasta 3 pines aproximados (~1 km) y busca por cercanía calculada en Postgres (el cliente solo ve rangos). No hay pago real de Folio Plus (`is_premium` se activa a mano).",
         "**Bug abierto (2026-09-19):** el auto-perfil de cuentas huérfanas no dejó rastro en producción; hay instrumentación `[auth-debug]` disponible (`AUTH_DEBUG` en `authService.js`) a la espera de las trazas de un registro nuevo y de un login. Desde el sprint de higiene esos logs están apagados (`AUTH_DEBUG = false`); se reactivan poniéndolo en `true`.",
         "**Calidad:** sin suite de tests; App.jsx sigue siendo un monolito de ~14.900 líneas (ver sección de deuda técnica).",
     ]),
@@ -677,7 +677,8 @@ INTRO = [
         ["Medio plazo", "Suite mínima de tests (servicios y RPCs críticas) y code-splitting del bundle (1.2 MB)", "Deuda #6 y #8"],
         ["Medio plazo", "Seguir extrayendo vistas de App.jsx a `src/components/`", "Deuda #1"],
         ["Medio plazo", "Pago real de Folio Plus; push notifications de matches y mensajes", "Trueque Sprint 2"],
-        ["Largo plazo", "Trueque: geolocalización real (Google Places), «Embajadas FOLIO», moderación (reportar/bloquear)", "Trueque Sprint 2"],
+        ["Corto plazo", "Correr `trueque_geo.sql` en Supabase ANTES de desplegar el cliente (Trueque v2: estado, pines, cercanía, reportes)", "Trueque v2"],
+        ["Largo plazo", "Trueque: «Embajadas FOLIO», bloqueo de usuarios y pantalla de moderación de reportes", "Trueque Sprint 2 / v2"],
         ["Largo plazo", "Más mascotas (sistema evolutivo) y más motores de recomendación", "Puntos de extensión"],
     ], [0.14, 0.62, 0.24]),
     ("h2", "Cómo leer este documento"),
@@ -736,7 +737,9 @@ DECISIONS = [
     ("h2", "Migraciones SQL manuales"),
     ("p", "Las migraciones se corren a mano en el SQL Editor, en un orden documentado. Es simple para un equipo de una persona, pero no hay historial automático ni rollback, y los servicios toleran migraciones pendientes (degradación por columnas inexistentes) para poder desplegar el frontend antes. Adoptar la CLI de Supabase con migraciones versionadas es un paso natural cuando crezca el equipo."),
     ("h2", "Trueque: zonas fijas y matching por título"),
-    ("p", "Para el MVP se eligieron 25 zonas fijas de CDMX (enum `exchange_zone`) en vez de geolocalización, y un match exacto sobre el título normalizado (columna GENERATED indexada) en vez de fuzzy matching o ISBN. Es determinista, rápido y explicable; a cambio se pierden coincidencias por ediciones o erratas. La migración a Google Places está en el roadmap."),
+    ("p", "Para el MVP se eligieron 25 zonas fijas de CDMX (enum `exchange_zone`) en vez de geolocalización, y un match exacto sobre el título normalizado (columna GENERATED indexada) en vez de fuzzy matching o ISBN. Es determinista, rápido y explicable; a cambio se pierden coincidencias por ediciones o erratas."),
+    ("h2", "Trueque v2: pines aproximados en vez de Google Places"),
+    ("p", "En vez de geolocalización precisa (Google Places o GPS del navegador), cada usuario marca a mano hasta 3 lugares públicos en un mapa Leaflet + OpenStreetMap. El servidor guarda las coordenadas redondeadas a 2 decimales (~1 km), solo el dueño puede leerlas y la distancia (haversine, mínima entre pines) se calcula dentro de Postgres; el cliente recibe solo un rango («menos de 3 km», «misma zona», «otro estado»…). Las zonas de CDMX quedan como respaldo para quien no marca pines. Sin costo de API, sin permisos de ubicación y sin exponer domicilios."),
 ]
 
 GUIDE = [
@@ -837,7 +840,10 @@ GLOSSARY = [
     ("Mascota", "Compañero virtual del usuario (hoy un gato, «El Sensible») que sube de nivel con XP. Tabla `user_pets`; el cliente solo puede renombrarla."),
     ("Streak / Racha", "Días consecutivos leyendo. Filosofía anti-castigo: si falta un día la racha se **pausa**, no se resetea. Solo la avanza la RPC `update_streak()`."),
     ("Freeze / Protector", "Un protector de racha por mes (`streak_freezes_remaining`) que salva un día perdido. Se consume con `use_streak_freeze()`."),
-    ("Trueque", "Módulo de intercambio de libros **físicos** entre usuarios de la misma zona de CDMX. Incluye matching, chat, cierre y calificación."),
+    ("Trueque", "Módulo de intercambio de libros **físicos** entre usuarios cercanos (zonas de CDMX o pines aproximados en todo México). Incluye matching, chat, cierre, calificación y reportes."),
+    ("Pin (Trueque v2)", "Lugar público aproximado que marca el usuario en el mapa (máx. 3). Se guarda redondeado a ~1 km en `trueque_pins` y nadie más lo ve; sus coordenadas se cambian una vez cada 24 h."),
+    ("Alcance de búsqueda", "Hasta dónde busca matches el Trueque: mi radio (3/6/12/25 km), 25 km, mi estado o todo el país. Cada alcance incluye al anterior."),
+    ("Rango de cercanía", "Lo único que el cliente ve de la distancia a otro usuario: menos de 3 km, 3 a 6, 6 a 12, 12 a 25, misma zona, mismo estado, otro estado o más lejos."),
     ("Match (perfecto / parcial)", "Empate del Trueque entre dos usuarios. Perfecto: cada uno tiene un libro que el otro busca. Parcial: solo una dirección. Uno vivo por pareja."),
     ("Crédito de búsqueda", "Vale de un solo uso (tabla interna `trueque_search_credits`) que emite `cost_search_matches` y consume `find_book_matches`, para que no se pueda buscar gratis."),
     ("Zona", "Una de las 25 zonas fijas de CDMX del Trueque (`exchange_zone`, `src/config/zones.js`). Free elige 2–3, Plus 2–5."),
@@ -1046,11 +1052,20 @@ RPCS = [
     ("send_exchange_message(p_match_id uuid, p_message text) → uuid", "trueque_schema", "Envía un mensaje al chat; pending→chatting.", "await supabase.rpc('send_exchange_message', { p_match_id: id, p_message: 'Hola' });"),
     ("complete_exchange(p_match_id uuid) → boolean", "trueque_schema", "Marca el intercambio como completado y desactiva los libros.", "await supabase.rpc('complete_exchange', { p_match_id: id });"),
     ("rate_exchange(p_match_id uuid, p_rating int, p_review text) → uuid", "trueque_schema", "Califica 1–5 (una vez por participante).", "await supabase.rpc('rate_exchange', { p_match_id: id, p_rating: 5, p_review: 'Excelente' });"),
+    ("spend_gems(p_amount int, p_reason text, p_ref text) → jsonb", "spend_gems", "Única puerta para gastar gemas; el precio lo fija el servidor por `p_reason` (hoy `buy_extra_saves` = 5).", "const { data } = await supabase.rpc('spend_gems', { p_amount: 5, p_reason: 'buy_extra_saves' });"),
+    ("accept_trueque_rules(p_adult boolean) → jsonb", "trueque_geo", "«Antes de empezar»: guarda `rules_accepted_at` y `adult_confirmed_at`. Sin esto no se publica, busca ni chatea.", "const { data } = await supabase.rpc('accept_trueque_rules', { p_adult: true });"),
+    ("save_trueque_pins(p_pins jsonb, p_state text, p_max_radius_km int) → jsonb", "trueque_geo", "Guarda 1–3 pines (redondeo y validación de México en el servidor, 1 cambio de coordenadas cada 24 h), estado y radio. `p_pins = null` cambia solo estado/radio. Errores: `PINS_INVALID`, `PINS_COOLDOWN` (+`retry_at`), `STATE_INVALID`, `RADIUS_INVALID`, `RULES_REQUIRED`.", "const { data } = await supabase.rpc('save_trueque_pins', { p_pins: [{ lat: 19.42, lng: -99.16, label: 'Metro Insurgentes' }], p_state: 'CMX', p_max_radius_km: 6 });"),
+    ("get_my_trueque_pins() → jsonb", "trueque_geo", "Mi perfil de Trueque (estado, radio, reglas, `next_edit_at`) y mis pines. Nunca devuelve pines de otros.", "const { data } = await supabase.rpc('get_my_trueque_pins');"),
+    ("search_trueque_matches(p_scope text) → jsonb", "trueque_geo", "Busca en el alcance (`radius`, `25km`, `state`, `country`); cobra 20 gemas a free SOLO si hay resultados, en la misma transacción. Devuelve `{success, result_count, charged, matches[]}` con `proximity` (rango) por match.", "const { data } = await supabase.rpc('search_trueque_matches', { p_scope: 'radius' });"),
+    ("get_my_trueque_matches() → TABLE", "trueque_geo", "Como `get_my_exchange_matches` + `proximity` y `sort_order` (perfecto → cerca → calificación → reciente).", "const { data } = await supabase.rpc('get_my_trueque_matches');"),
+    ("report_trueque_user(p_reported_id uuid, p_reason text, p_details text, p_match_id uuid) → jsonb", "trueque_geo", "Reporta al otro participante (máx. 10/día). Motivos: `acoso`, `estafa`, `datos_personales`, `inseguro`, `otro`.", "await supabase.rpc('report_trueque_user', { p_reported_id: otherId, p_reason: 'acoso', p_details: null, p_match_id: matchId });"),
 ]
 RPC_INTERNAL = [
     ("folio_award(user, xp, gems, reason, ref)", "sprint1", "Única puerta de recompensas. REVOKE a clientes: solo triggers/RPCs."),
     ("cleanup_expired_matches() → int", "trueque_schema", "pg_cron diario (`0 9 * * *` UTC). No expuesta a clientes."),
     ("trueque_norm / trueque_cfg / trueque_generate_matches / trueque_matches_for", "trueque_schema", "Auxiliares internas del Trueque (REVOKE a clientes)."),
+    ("trueque_geo_cfg / trueque_haversine_km / trueque_pair_geo / trueque_proximity_band / trueque_in_scope / trueque_generate_matches_geo / trueque_matches_geo_for", "trueque_geo", "Constantes, distancia y matching por cercanía. `trueque_pair_geo` recibe dos user_id arbitrarios: jamás exponerla."),
+    ("trg_trueque_require_ready()", "trueque_geo", "Trigger: sin reglas aceptadas no se inserta en `books_offered`/`books_wanted`/`exchange_chats`; sin estado no se publica."),
 ]
 
 ENV_VARS = [
@@ -1082,6 +1097,8 @@ MIGRATIONS = [
     (11, "fix_signup_permissions.sql", "2026-09-18", "Fix del signup: policies INSERT/UPDATE de `users` y GRANT INSERT/UPDATE por columna."),
     ("—", "cleanup_orphan_auth_users.sql", "2026-09-18", "Opcional: lista, repara o borra cuentas huérfanas de `auth.users`."),
     (12, "repair_all_orphan_profiles.sql", "2026-09-19", "Repara en bloque TODAS las cuentas huérfanas (perfil desde `raw_user_meta_data`, usernames duplicados con sufijo). Idempotente."),
+    (13, "spend_gems.sql", "2026-09-23", "RPC `spend_gems`: única puerta para gastar gemas (cierra `buyExtraSaves`)."),
+    (14, "trueque_geo.sql", "2026-10-03", "Trueque v2: `trueque_profiles`, `trueque_pins`, `trueque_reports`, RPCs de pines/cercanía/reportes, triggers de reglas y vista `trueque_funnel_summary`. Correr antes de desplegar el cliente."),
 ]
 
 
@@ -1137,6 +1154,10 @@ def appendix_b(b):
         ["`TRUEQUE_BAD_MESSAGE` / `_BAD_RATING`", "Mensaje vacío o demasiado largo / calificación fuera de 1–5"],
         ["`TRUEQUE_NOT_COMPLETED` / `_ALREADY_RATED`", "Calificar antes de completar / ya calificó"],
         ["`TRUEQUE_BOOK_IN_MATCH`", "No se puede cambiar título/autor de un libro en un match vivo"],
+        ["`TRUEQUE_RULES_REQUIRED` / `_STATE_REQUIRED`", "(v2, triggers) Publicar o chatear sin aceptar las reglas / publicar sin estado"],
+        ["`PINS_INVALID` / `PINS_COOLDOWN` / `STATE_INVALID`", "(v2, jsonb de `save_trueque_pins`) pines fuera de 1–3, fuera de México o etiqueta > 30 / coordenadas ya cambiadas en las últimas 24 h / estado inexistente"],
+        ["`LOCATION_REQUIRED` / `SCOPE_INVALID` / `GEMS_INSUFFICIENT`", "(v2, jsonb de `search_trueque_matches`) sin pines ni zonas / alcance desconocido / saldo menor al costo"],
+        ["`TRUEQUE_UPDATING` (solo cliente)", "La RPC nueva no existe todavía (`PGRST202`): la UI muestra «Trueque se está actualizando»"],
     ], [0.4, 0.6])
 
 

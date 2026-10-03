@@ -2,6 +2,7 @@ import { MessageCircle, Star, MapPin, ArrowLeftRight, BookOpen } from "lucide-re
 import { palette, body, display } from "../../theme.js";
 import { zoneLabel } from "../../config/zones.js";
 import { CONDITION_LABELS } from "./ui.jsx";
+import { PROXIMITY_LABELS } from "../../services/truequeService.js";
 
 function daysLeft(expiresAt) {
   const ms = new Date(expiresAt).getTime() - Date.now();
@@ -61,6 +62,10 @@ function MatchCard({ match, onMessage, onRate }) {
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", margin: "0.6rem 0 0.1rem", alignItems: "center" }}>
         <MapPin size={13} color={palette.inkFaint} />
+        {/* Trueque v2: solo un rango (nunca distancia exacta ni coordenadas) */}
+        {PROXIMITY_LABELS[match.proximity] && (
+          <span style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: `${palette.accent}1A`, ...body, fontSize: "0.75rem", fontWeight: 600, color: palette.accent }}>{PROXIMITY_LABELS[match.proximity]}</span>
+        )}
         {(match.shared_zones || []).map((z) => (
           <span key={z} style={{ padding: "0.1rem 0.5rem", borderRadius: 999, backgroundColor: palette.bgSoft, ...body, fontSize: "0.75rem", color: palette.inkSoft }}>{zoneLabel(z)}</span>
         ))}

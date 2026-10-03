@@ -31,9 +31,18 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Trueque v2: el mapa (Leaflet) solo se descarga al abrir "Mis lugares"; no precachearlo.
+        globIgnores: ['**/assets/MyPlaces-*'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
+          {
+            // Tiles de OpenStreetMap (mapa del Trueque): NUNCA cachear (política de uso de OSM).
+            // NetworkOnly explícito para que ninguna regla futura los guarde. Si el tráfico crece,
+            // cambiar a un proveedor de tiles con plan gratis (ver TILE_URL en MyPlaces.jsx).
+            urlPattern: /^https:\/\/tile\.openstreetmap\.org\//,
+            handler: 'NetworkOnly',
+          },
           {
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',

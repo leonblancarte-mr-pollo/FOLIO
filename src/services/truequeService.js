@@ -28,14 +28,65 @@ const TRUEQUE_ERRORS = {
   TRUEQUE_ALREADY_RATED: "Ya calificaste este intercambio.",
   TRUEQUE_BAD_RATING: "La calificación debe ser de 1 a 5 estrellas.",
   TRUEQUE_BOOK_IN_MATCH: "Este libro está en un intercambio activo.",
+  // Trueque v2 (supabase/trueque_geo.sql)
+  TRUEQUE_RULES_REQUIRED: "Primero acepta las reglas del Trueque.",
+  TRUEQUE_STATE_REQUIRED: "Primero completa tu ubicación aproximada.",
 };
+
+// Códigos que devuelven en { success:false, error } las RPCs jsonb de trueque_geo.sql.
+const GEO_RPC_ERRORS = {
+  NOT_AUTHENTICATED: "Tu sesión expiró. Vuelve a iniciar sesión.",
+  ADULT_REQUIRED: "Debes confirmar que eres mayor de 18 años.",
+  RULES_REQUIRED: "Primero acepta las reglas del Trueque.",
+  STATE_REQUIRED: "Primero completa tu ubicación aproximada.",
+  STATE_INVALID: "Elige un estado válido.",
+  RADIUS_INVALID: "Elige un radio de 3, 6, 12 o 25 km.",
+  PINS_INVALID: "Revisa tus lugares: de 1 a 3 pines dentro de México y etiquetas de máximo 30 caracteres.",
+  PINS_COOLDOWN: "Solo puedes cambiar tus lugares una vez cada 24 horas.",
+  LOCATION_REQUIRED: "Marca al menos un lugar en el mapa (o tus zonas si estás en CDMX).",
+  SCOPE_INVALID: "Alcance de búsqueda no válido.",
+  RATE_LIMIT: "Llegaste al máximo de búsquedas de hoy. Vuelve mañana.",
+  GEMS_INSUFFICIENT: "No tienes gemas suficientes.",
+  REPORT_INVALID: "Revisa el motivo del reporte.",
+  NOT_PARTICIPANT: "No participas en este intercambio.",
+  REPORT_LIMIT: "Llegaste al máximo de reportes de hoy. Escríbenos a soporte@folio.mx.",
+};
+
+const UPDATING_MESSAGE = "Trueque se está actualizando, intenta más tarde.";
 
 // Error con `code` estable para que la UI decida (p. ej. mostrar el modal de Plus).
 class TruequeError extends Error {
-  constructor(code, message) {
+  constructor(code, message, extra = {}) {
     super(message);
     this.code = code;
+    Object.assign(this, extra);
   }
+}
+
+// La RPC/tabla no existe todavía en Supabase (migración sin correr o caché de PostgREST vieja).
+function isMissingInDb(error) {
+  return ["PGRST202", "PGRST205", "42P01", "42883"].includes(error?.code);
+}
+
+function logSupabaseError(tag, error) {
+  console.error(`[TRUEQUE] ${tag}:`, { code: error?.code, message: error?.message, details: error?.details, hint: error?.hint });
+}
+
+// Llama una RPC jsonb de trueque_geo.sql ({ success, error? }) y la convierte al contrato del
+// servicio: devuelve el payload o lanza TruequeError. Si la RPC aún no existe → TRUEQUE_UPDATING.
+async function callGeoRpc(tag, fn, params) {
+  const { data, error } = await supabase.rpc(fn, params);
+  if (error) {
+    logSupabaseError(tag, error);
+    if (isMissingInDb(error)) throw new TruequeError("TRUEQUE_UPDATING", UPDATING_MESSAGE);
+    throw toTruequeError(error);
+  }
+  if (!data?.success) {
+    const code = data?.error || "TRUEQUE_UNKNOWN";
+    console.error(`[TRUEQUE] ${tag}: la RPC respondió`, data);
+    throw new TruequeError(code, GEO_RPC_ERRORS[code] || "Algo salió mal. Intenta de nuevo.", data || {});
+  }
+  return data;
 }
 
 function toTruequeError(error, fallback) {
@@ -229,6 +280,71 @@ async function getMatches() {
   }
 }
 
+// ---------- Matches por cercanía (Trueque v2) ----------
+// Alcances de búsqueda: cada uno incluye a los anteriores (ver trueque_in_scope en el SQL).
+const SEARCH_SCOPES = ["radius", "25km", "state", "country"];
+
+// Rangos que devuelve el servidor (`proximity`). Nunca hay distancias exactas ni coordenadas.
+const PROXIMITY_LABELS = {
+  lt3: "menos de 3 km",
+  "3_6": "3 a 6 km",
+  "6_12": "6 a 12 km",
+  "12_25": "12 a 25 km",
+  far: "más lejos",
+  same_zone: "misma zona",
+  same_state: "mismo estado",
+  other_state: "otro estado",
+};
+
+// Busca en el alcance elegido. Cobra SOLO si hay resultados, en la misma transacción
+// (RPC search_trueque_matches). Si no alcanzan las gemas devuelve { paid:false } sin lanzar.
+async function searchMatchesNearby(scope = "radius") {
+  try {
+    const data = await callGeoRpc("searchMatchesNearby", "search_trueque_matches", { p_scope: scope });
+    return { paid: true, scope: data.scope, resultCount: data.result_count || 0, charged: data.charged || 0, matches: data.matches || [] };
+  } catch (e) {
+    if (e.code === "GEMS_INSUFFICIENT") return { paid: false, cost: e.cost, matches: [] };
+    throw e;
+  }
+}
+
+// Mis matches con su rango de cercanía (gratis; no descubre nuevos).
+async function getMatchesNearby() {
+  const { data, error } = await supabase.rpc("get_my_trueque_matches");
+  if (error) {
+    logSupabaseError("getMatchesNearby", error);
+    if (isMissingInDb(error)) throw new TruequeError("TRUEQUE_UPDATING", UPDATING_MESSAGE);
+    throw toTruequeError(error, "No se pudieron cargar tus matches.");
+  }
+  return data || [];
+}
+
+// ---------- Seguridad ----------
+// "Antes de empezar": reglas + confirmación de mayoría de edad (se guarda en el servidor).
+async function acceptTruequeRules(isAdult) {
+  await callGeoRpc("acceptTruequeRules", "accept_trueque_rules", { p_adult: !!isAdult });
+  return true;
+}
+
+// Motivos de reporte. Las claves son idénticas al CHECK de trueque_reports (trueque_geo.sql).
+const REPORT_REASONS = [
+  { id: "acoso", label: "Acoso o lenguaje ofensivo" },
+  { id: "estafa", label: "Engaño o no cumplió lo acordado" },
+  { id: "datos_personales", label: "Pidió mis datos personales o mi domicilio" },
+  { id: "inseguro", label: "Me hizo sentir inseguro/a" },
+  { id: "otro", label: "Otro" },
+];
+
+async function reportTruequeUser({ reportedId, reason, details, matchId }) {
+  await callGeoRpc("reportTruequeUser", "report_trueque_user", {
+    p_reported_id: reportedId,
+    p_reason: reason,
+    p_details: details?.trim() || null,
+    p_match_id: matchId || null,
+  });
+  return true;
+}
+
 // ---------- Chat ----------
 // Página de mensajes más recientes; `before` (ISO) trae los anteriores a ese instante.
 // Devuelve en orden cronológico + hasMore para el botón "cargar más".
@@ -295,11 +411,13 @@ function acceptDisclaimer(matchId) {
 }
 
 export {
-  TruequeError, CHAT_PAGE_SIZE,
+  TruequeError, CHAT_PAGE_SIZE, UPDATING_MESSAGE, callGeoRpc,
   getZones, getUserZones, setUserZones, getTruequeStatus,
   getMyOffers, addBookOffered, deleteBookOffered,
   getMyWants, addBookWanted, deleteBookWanted,
   searchMatches, getMatches,
+  SEARCH_SCOPES, PROXIMITY_LABELS, searchMatchesNearby, getMatchesNearby,
+  acceptTruequeRules, REPORT_REASONS, reportTruequeUser,
   getMatchChat, sendMessage, completeExchange, rateExchange,
   isDisclaimerAccepted, acceptDisclaimer,
 };

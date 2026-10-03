@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Send, Loader2, CheckCircle2 } from "lucide-react";
+import { ChevronLeft, Send, Loader2, CheckCircle2, Flag, ShieldCheck } from "lucide-react";
 import { palette, body, display } from "../../theme.js";
 import { getMatchChat, sendMessage, completeExchange } from "../../services/truequeService.js";
+import { ReportModal } from "./ReportModal.jsx";
 
 const POLL_MS = 8000;
 
@@ -28,6 +29,8 @@ function ExchangeChat({ match, userId, onClose, onCompleted, onChanged }) {
   const [status, setStatus] = useState(match.status);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [err, setErr] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reported, setReported] = useState(false);
   const bottomRef = useRef(null);
 
   const expired = new Date(match.expires_at).getTime() <= Date.now();
@@ -114,7 +117,14 @@ function ExchangeChat({ match, userId, onClose, onCompleted, onChanged }) {
             <CheckCircle2 size={14} /> {confirmComplete ? "¿Confirmar?" : "Completado"}
           </button>
         )}
+        <button onClick={() => setReportOpen(true)} disabled={reported} aria-label={reported ? "Usuario reportado" : "Reportar a este usuario"} style={{ flexShrink: 0, padding: "0.4rem 0.55rem", borderRadius: 10, border: `1.5px solid ${palette.dangerBorder}`, backgroundColor: "transparent", color: palette.danger, cursor: reported ? "default" : "pointer", ...body, fontSize: "0.8rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.25rem", opacity: reported ? 0.6 : 1 }}>
+          <Flag size={14} /> {reported ? "Reportado" : "Reportar"}
+        </button>
       </div>
+      {/* Aviso fijo de seguridad (Trueque v2) */}
+      <p role="note" style={{ ...body, fontSize: "0.8rem", color: palette.warnInk, backgroundColor: palette.warnBg, borderBottom: `1px solid ${palette.warnBorder}`, margin: 0, padding: "0.45rem 1rem", display: "flex", gap: "0.35rem", alignItems: "center" }}>
+        <ShieldCheck size={14} style={{ flexShrink: 0 }} /> Reúnanse en un lugar público y concurrido, de día. No compartas tu domicilio.
+      </p>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         {loading && <Loader2 size={22} className="animate-spin" style={{ margin: "2rem auto", color: palette.inkFaint }} />}
@@ -167,6 +177,13 @@ function ExchangeChat({ match, userId, onClose, onCompleted, onChanged }) {
           </p>
         )}
       </div>
+      {reportOpen && (
+        <ReportModal
+          match={match}
+          onClose={() => setReportOpen(false)}
+          onDone={() => { setReportOpen(false); setReported(true); }}
+        />
+      )}
     </div>
   );
 }

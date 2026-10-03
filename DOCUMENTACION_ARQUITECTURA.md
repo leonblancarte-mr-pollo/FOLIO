@@ -1,6 +1,6 @@
 # FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-09-23 (RPC `spend_gems` cierra `buyExtraSaves`; antes, sprint de auditoría y limpieza 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-10-03 (Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -17,6 +17,7 @@
 - 2026-09-22 — Sprint de auditoría y limpieza: ~1,000 líneas de código muerto fuera de App.jsx; helpers de datos movidos a 8 servicios nuevos (quotes, social, reading, achievements, ai, googleBooks, wraps, devLog); sistema de color centralizado en `theme.js` (palette semántica + `BRAND` + datos de arte, 0 hex sueltos en App.jsx); camelCase en lists/quotes/recommendations; 5 bugs 🔴 corregidos (hooks condicionales, fuga de canal realtime en el chat, mensajes "enviados" que fallaban, frases de racha que nunca salían, textos ilegibles en modo oscuro) + ~20 🟡 de manejo de errores; ErrorBoundary interno ya no muestra el stack en producción. Ver `AUDIT_SPRINT_REPORT.md`
 - 2026-09-23 — `buyExtraSaves` migró de UPDATE directo a la RPC SECURITY DEFINER `spend_gems` (`supabase/spend_gems.sql`): saldo validado en servidor, precio fijado por `reason` y ledger negativo; cierra la deuda #4
 - 2026-09-23 — BookTinder: límite diario 15→3 saves (`DAILY_LIMIT` exportado de `recommendationService`); `spend_gems` con diagnóstico de `PGRST202` (función ausente en la caché de PostgREST) y `NOTIFY pgrst, 'reload schema'` al final del SQL
+- 2026-10-03 — Trueque v2: estado obligatorio (32 estados, `src/data/estados.js`), hasta 3 pines aproximados (~1 km) en mapa Leaflet + OpenStreetMap con carga perezosa, matches por cercanía calculada en Postgres (el cliente solo ve rangos), alcance de búsqueda (mi radio / 25 km / mi estado / todo el país), búsqueda sin cobro si devuelve 0 resultados (RPC `search_trueque_matches`, una sola transacción), pantalla «Antes de empezar» con confirmación +18, aviso de seguridad y botón «Reportar» en el chat, vista `trueque_funnel_summary`. Migración `supabase/trueque_geo.sql` (#14)
 
 ---
 
@@ -60,14 +61,15 @@ FOLIO FINAL/
 │   ├── theme.js              # PALETTE_LIGHT/DARK + objeto mutable `palette` + resolveTheme
 │   ├── haptics.js / sounds.js# Vibración y efectos de sonido (howler)
 │   ├── index.css             # Tailwind base + estilos globales
-│   ├── services/             # Capa de datos — 16 módulos (8 originales + 8 extraídos el 2026-09-22), ver §VI
+│   ├── services/             # Capa de datos — 17 módulos (8 originales + 8 extraídos el 2026-09-22 + truequeGeoService 2026-10-03), ver §VI
 │   ├── config/zones.js       # ZONES_CDMX: las 25 zonas fijas del Trueque (slugs = enum exchange_zone)
 │   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal,
 │   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal
-│   │   └── trueque/          # Trueque de libros: TruequeMain + 10 modales/tarjetas + ui.jsx (ver §VII)
+│   │   └── trueque/          # Trueque de libros: TruequeMain + 15 modales/tarjetas (5 de v2) + ui.jsx (ver §VII)
 │   ├── pets/                 # PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene
 │   ├── data/                 # cuentos.js + cuentos/*.txt: ~23 cuentos de dominio público para "Snacks"
 │   │                         # (los `_raw_*.txt` son material fuente sin procesar)
+│   │                         # estados.js: los 32 estados (clave ISO, nombre, centro aproximado) del Trueque v2
 │   └── scripts/seed-books.js # Script suelto de seed (no forma parte del bundle)
 │   (no existe `src/pages/`: no hay router, las "páginas" son vistas dentro de App.jsx)
 ├── public/                   # Iconos PWA, `logo.png`, `gema.png`, `avatars/avatar-1..10.png`, `pets/` (cat.png, cat-blink.png,
@@ -86,7 +88,8 @@ FOLIO FINAL/
 │   ├── fix_signup_permissions.sql        # 11. Fix signup: policies INSERT/UPDATE de users + GRANT INSERT/UPDATE por columna
 │   ├── cleanup_orphan_auth_users.sql     # (opcional) lista/repara/borra cuentas huérfanas de auth.users
 │   ├── repair_all_orphan_profiles.sql    # 12. Repara en bloque TODAS las cuentas huérfanas (idempotente; usernames duplicados con sufijo)
-│   └── spend_gems.sql                    # 13. RPC spend_gems: única puerta para GASTAR gemas (cierra buyExtraSaves). Correr a mano antes de desplegar el cliente
+│   ├── spend_gems.sql                    # 13. RPC spend_gems: única puerta para GASTAR gemas (cierra buyExtraSaves). Correr a mano antes de desplegar el cliente
+│   └── trueque_geo.sql                   # 14. Trueque v2: perfil de Trueque, pines, cercanía, reglas +18, reportes, embudo. Requiere 10 y 13. Correr ANTES de desplegar el cliente
 ├── DOCUMENTACION_ARQUITECTURA_COMPLETA.docx  # Versión Word extendida (se genera con scripts/generate_docs.py; el .md es la fuente de verdad)
 ├── scripts/
 │   ├── generate_docs.py      # Lee este .md y genera el .docx extendido (pip install python-docx)
@@ -117,7 +120,7 @@ FOLIO FINAL/
   - `BRAND` (fijo en ambos temas): `wine`, `wineDeep`, `amber`, `amberLight`, `amberGlow`, `cream`, `ink`, `gold*`, degradados `gradient`/`gradientFab`/`gradientWrappedCta`/`gradientShareCard` y `confetti`. Se usa para identidad, confetti y tarjetas que se exportan como imagen.
   - Datos de arte con nombre: `COVER_PALETTES`, `HEATMAP_COLORS`, `STREAK_PHASES`, `FRIEND_STREAK_GRADIENT`, `WRAPPED_SLIDE_GRADIENTS`, `QUOTE_POSTER_GRADIENTS`, `STATUS_COLORS`, `AVATAR_COLORS`, `SOCIAL_COLORS`, `genrePillStyle`, `genreColor`.
   - `ts.caption`/`ts.label` leen `palette.inkFaint` con un getter (antes tenían el hex claro fijo y no seguían al modo oscuro).
-  - Quedan hex fuera de `theme.js` solo en `BookCoverImage.jsx` y `pets/PetScene.jsx` (ilustraciones), `main.jsx` (pantallas de error independientes del tema) y el Trueque (zona intocable).
+  - Quedan hex fuera de `theme.js` solo en `BookCoverImage.jsx` y `pets/PetScene.jsx` (ilustraciones), `main.jsx` (pantallas de error independientes del tema) y en algunos componentes del MVP del Trueque (`ui.jsx`, `MatchCard`, `ExchangeChat`, `ZonesEditor`). Los componentes del Trueque v2 (2026-10-03: `MyPlaces`, `TruequeRulesModal`, `LocationStep`, `ReportModal`) y las líneas tocadas de `TruequeMain` usan solo tokens (`BRAND.gradientFab`, `palette.onAccent`…); el mapa pinta pines y círculos con `palette.accent`/`palette.amber`.
   - **z-index**: todavía no hay escala; el mapa real (de 10 a 99999) y los conflictos conocidos están en `AUDIT_SPRINT_REPORT.md` §C.
 - **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection`. El **overlay rojo de debug** (div en `document.body`) ahora solo se pinta con `import.meta.env.DEV`; en producción solo hace `console.error`. `RootErrorBoundary` también condiciona su fallback: en DEV muestra el stack trace rojo; en producción una pantalla amigable "Algo salió mal" con botón Recargar.
 
@@ -168,7 +171,7 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 `.env.example` está sincronizado con estas variables (con un comentario por cada una). Ojo: el job de Python también acepta `SUPABASE_URL`/`SUPABASE_ANON_KEY` como alternativa a las `VITE_*`.
 
 ### Dependencias (package.json)
-- **runtime**: `react`/`react-dom` 18, `@supabase/supabase-js` ^2.105, `lucide-react`, `canvas-confetti`, `howler`, `html2canvas`; `express`, `dotenv` y `concurrently` (solo para `npm run dev`, están en `dependencies` pero no van al bundle).
+- **runtime**: `react`/`react-dom` 18, `@supabase/supabase-js` ^2.105, `lucide-react`, `canvas-confetti`, `howler`, `html2canvas`, `leaflet` 1.9 (mapa del Trueque v2; se usa directo, sin react-leaflet, y va en un chunk aparte que solo se descarga al abrir "Mis lugares"); `express`, `dotenv` y `concurrently` (solo para `npm run dev`, están en `dependencies` pero no van al bundle).
 - **dev**: `vite` 5, `@vitejs/plugin-react`, `vite-plugin-pwa`, `tailwindcss` 3 + `postcss` + `autoprefixer`, `@resvg/resvg-js` (`generate-icons.mjs`), `pg` (sin uso detectado en el repo).
 - **Python** (`requirements.txt`, solo el job de GitHub Actions): `supabase`, `pandas`, `numpy`, `scipy`, `scikit-surprise`, `fuzzywuzzy`, `python-Levenshtein`.
 - No hay dependencia de email transaccional (Resend/SMTP/etc.): el código no envía emails propios, solo los de Supabase Auth.
@@ -237,7 +240,7 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 ---
 
 ### 14. Trueque de libros (MVP, 2026-09-18)
-Intercambio de libros **físicos** entre usuarios de la misma zona de CDMX. Tab `trueque` en `NAV_ITEMS` (icono `Repeat`), renderiza `TruequeMain`.
+Intercambio de libros **físicos** entre usuarios cercanos: misma zona de CDMX (MVP) o, desde el Trueque v2 (2026-10-03, ver abajo), pines aproximados en cualquier estado de México. Tab `trueque` en `NAV_ITEMS` (icono `Repeat`), renderiza `TruequeMain`. El flujo de abajo es el del MVP; el v2 le antepone reglas y estado y cambia la búsqueda.
 
 **Flujo:**
 ```
@@ -272,6 +275,39 @@ Tab Trueque → TruequeMain carga en paralelo: trueque_status() · user_exchange
 - **Colores:** la UI usa `palette` de `theme.js` (accent `#7A2E2E`, bg `#F4EDE0`, Fraunces/EB Garamond) en vez de los hex del spec (`#A02A2A`/`#F5EBD8`), para mantener consistencia con el resto de la app y el modo oscuro.
 - **Chat sin realtime:** el chat del trueque usa polling cada 8 s mientras está abierto; no usa realtime ni notificaciones.
 - **Límites Plus extra:** se añadieron a la config 3 claves que el spec no listaba: `plus_max_wanted` (999), `plus_max_zones` (5) y `plus_daily_searches` (10).
+
+#### Trueque v2 (2026-10-03): estado, pines aproximados y cercanía
+Extiende el MVP sin reescribirlo: las zonas de CDMX, los límites del plan gratis, el chat, el cierre y la calificación siguen igual. Todo lo nuevo vive en `supabase/trueque_geo.sql`, `src/services/truequeGeoService.js`, nuevas funciones de `truequeService` y 5 componentes nuevos.
+
+**Flujo al entrar a la tab:**
+```
+TruequeMain carga en paralelo: trueque_status() · user_exchange_zones · books_offered · books_wanted
+                               · get_my_trueque_matches() · get_my_trueque_pins()
+  ├─ RPC nueva inexistente (PGRST202) → "Trueque se está actualizando, intenta más tarde" (+ console.error code/message/details/hint)
+  ├─ sin reglas aceptadas → TruequeRulesModal "Antes de empezar" (+ casilla "Confirmo que soy mayor de 18 años")
+  │                          → RPC accept_trueque_rules   ("Ahora no" → Home)
+  ├─ sin estado → LocationStep "Completa tu ubicación aproximada" (los usuarios existentes también la ven 1 vez)
+  │     ├─ Ciudad de México → save_trueque_pins(null, 'CMX', …) y siguen las zonas (ZonesOnboarding si no tiene)
+  │     └─ otro estado → MyPlaces (mapa) → hay que marcar ≥1 pin; estado y pines se guardan juntos
+  ├─ "📍 <Estado> · N lugares · radio X km" → MyPlaces (import() dinámico de Leaflet)
+  ├─ "🔍 Buscar matches" + alcance [Mi radio | 25 km | Mi estado | Todo el país]
+  │     → RPC search_trueque_matches(scope): valida → bloquea gemas → genera → cobra SOLO si hubo resultados
+  │     → 0 resultados: "No se cobraron gemas" + botón "Ampliar a <siguiente alcance>"
+  └─ ExchangeChat: aviso fijo de seguridad + botón "Reportar" → ReportModal → RPC report_trueque_user
+```
+
+**Reglas:**
+- **Estado obligatorio** para publicar, buscar y abrir el mapa (lo exige la UI y, para publicar, también un trigger). **No bloquea matches**: solo centra el mapa, habilita el alcance "Mi estado" y alimenta métricas. CDMX conserva las zonas; fuera de CDMX no hay zonas y se exige ≥1 pin.
+- **Pines:** 1 a 3 por usuario (igual para free y Plus). El servidor redondea a 2 decimales (~1 km), valida la caja de México (lat 14–33, lng −119 a −86) y permite **cambiar coordenadas una vez cada 24 h** (la primera vez es libre). Cambiar solo etiquetas, estado o radio no consume ese límite. Etiqueta opcional ≤ 30 caracteres, privada. No se usa la geolocalización del navegador.
+- **Radio máximo:** 3, 6 (default), 12 o 25 km.
+- **Distancia** = mínima entre cualquiera de los pines de ambos (hasta 3×3), haversine en SQL. El cliente **nunca** recibe coordenadas ajenas ni distancias exactas: solo `proximity` ∈ `lt3` ("menos de 3 km"), `3_6`, `6_12`, `12_25`, `same_zone` ("misma zona", cuando alguno no tiene pines y comparten zona), `same_state`, `other_state`, `far` ("más lejos", sin estado conocido).
+- **Alcances** (cada uno incluye al anterior): `radius` = dentro de MI radio o, sin pines, zona compartida · `25km` · `state` = + mismo estado · `country` = todos. Con pines de ambos lados manda la distancia (aunque compartan zona).
+- **Orden de resultados:** perfecto antes que parcial → más cerca → mejor calificación → más reciente (`sort_order` lo calcula el servidor).
+- **Cobro (cambio pedido en §3.4):** `search_trueque_matches` no cobra si la búsqueda devuelve 0 parejas en el alcance. Todo ocurre en una transacción: para usuarios free se hace `SELECT … FOR UPDATE` de su fila de `user_gems` antes de generar; si hubo resultados descuenta 20 + fila negativa en `reward_ledger` (`reason='trueque_search'`); si el descuento fallara, `RAISE` revierte también los matches generados. "Resultado" = pareja con libros cruzados dentro del alcance (incluye parejas que ya tenían un match vivo). Se sigue exigiendo saldo ≥ 20 antes de buscar. No cambió cómo se ganan ni cuánto cuestan las gemas.
+- **Reglas +18:** sin `rules_accepted_at` y `adult_confirmed_at` no se puede publicar ni chatear (trigger `trg_trueque_require_ready` en `books_offered`/`books_wanted`/`exchange_chats`, excepto mensajes de sistema) ni buscar (RPC). El `LegalDisclaimerModal` por match se conserva.
+- **Reportes:** motivos `acoso`, `estafa`, `datos_personales`, `inseguro`, `otro` + texto opcional (≤ 500). Máx. 10 por día por usuario. No hay pantalla de moderación: León revisa `public.trueque_reports` en el SQL Editor. No hay bloqueo de usuarios.
+- **Compatibilidad:** `cost_search_matches`, `find_book_matches` y `get_my_exchange_matches` siguen existiendo sin cambios (un cliente viejo en caché sigue funcionando con zonas y cobro previo). El cliente nuevo ya no las llama.
+- **Supuestos (opción más simple):** el estado no restringe dónde pueden caer los pines; un usuario de CDMX no puede quedarse con 0 pines una vez que guardó alguno (el servidor exige 1–3); las búsquedas con 0 resultados de usuarios free no tienen tope propio (sí cuentan para el tope diario de Plus y para métricas).
 
 ## V. FLUJOS DE DATOS CRÍTICOS
 
@@ -355,7 +391,8 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 | `googleBooksService` *(2026-09-22)* | `searchGoogleBooks` | `/api/books` | Dedup + caché 60 s en memoria |
 | `wrapsService` *(2026-09-22)* | `generateMonthWrap`, `generateAnnualWrap`, `MONTHS_ES` | `books`, `reading_logs`, `achievements`, `user_streaks`, `monthly_wraps` | Si falla la lectura de libros del periodo **lanza y no guarda** (antes persistía un Wrapped vacío) |
 | `devLog` *(2026-09-22)* | `devLog` | — | `console.log` solo en `import.meta.env.DEV` (compartido por App.jsx y servicios) |
-| `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50 |
+| `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50. **Trueque v2 (2026-10-03):** `searchMatchesNearby(scope)` (RPC `search_trueque_matches`; `{ paid, resultCount, charged, matches }`, `{ paid:false }` si faltan gemas), `getMatchesNearby()` (RPC `get_my_trueque_matches`), `acceptTruequeRules(isAdult)`, `reportTruequeUser({ reportedId, reason, details, matchId })`, constantes `SEARCH_SCOPES`, `PROXIMITY_LABELS`, `REPORT_REASONS`, y el helper `callGeoRpc` (convierte el `{ success:false, error }` de las RPCs jsonb en `TruequeError { code }`; `PGRST202`/`PGRST205`/`42P01`/`42883` → `TRUEQUE_UPDATING` con `console.error` de code/message/details/hint). `searchMatches`/`getMatches` (MVP) se conservan pero la UI ya no las usa |
+| `truequeGeoService` *(2026-10-03)* | `getGeoProfile`, `saveGeo({ pins, state, maxRadiusKm })`, `roundCoord`, `MAX_PINS`, `PIN_DECIMALS`, `PIN_LABEL_MAX`, `RADII_KM`, `DEFAULT_RADIUS_KM`, `PIN_FUZZ_METERS` | RPCs `get_my_trueque_pins`, `save_trueque_pins` | Perfil de Trueque + pines del propio usuario, en camelCase (`maxRadiusKm`, `nextEditAt`, `rulesAcceptedAt`…). `saveGeo({ pins: null })` solo cambia estado/radio. En `PINS_COOLDOWN` el error trae `retry_at`. Lanza `TruequeError` |
 
 Desde el 2026-09-22 **no quedan helpers de datos sueltos en App.jsx**: se movieron a `quotesService`, `socialService`, `readingService`, `achievementsService`, `aiService`, `googleBooksService` y `wrapsService`. Siguen en App.jsx, a propósito, `loadStreakInfo` (función interna de `FeedView`, ~línea 8680, porque escribe estado de React) y las lecturas directas de Supabase de algunas vistas (perfil de amigo, amigos, notificaciones), permitidas en App.jsx por convención.
 
@@ -429,6 +466,13 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | `RatingModal` | 1-5 estrellas + reseña opcional (≤ 500) |
 | `PlusUpsellModal` | CTA placeholder de Folio Plus (botón "Próximamente", sin pago) |
 | `ui.jsx` | Helpers compartidos: `Sheet`, `fieldStyle`, `Label`, `PrimaryButton`, `ErrorText`, `CONDITION_LABELS` |
+| `TruequeRulesModal` *(v2)* | "Antes de empezar": 5 reglas de seguridad + casilla obligatoria "Confirmo que soy mayor de 18 años" (sin cerrar; "Ahora no" → Home) |
+| `LocationStep` *(v2)* | "Completa tu ubicación aproximada": selector de los 32 estados. CDMX guarda directo; otro estado abre `MyPlaces`. No importa Leaflet |
+| `MyPlaces` *(v2, carga perezosa)* | Mapa Leaflet + tiles OSM: tocar coloca/mueve el siguiente pin (máx. 3), salta al punto redondeado con círculo de ~1 km, etiqueta privada ≤ 30, borrar, selector de estado y de radio (3/6/12/25), texto fijo de privacidad, atribución OSM. Estados: cargando, error de red del mapa (con Reintentar), sin pines, límite de 24 h activo (con la fecha/hora en que se podrá editar). Pines con `L.divIcon` (sin el bug del ícono por defecto con Vite). Export **default** para `lazy()` |
+| `ReportModal` *(v2)* | Reportar al otro participante: motivo de lista corta + texto opcional (≤ 500) |
+| `ExchangeChat` *(v2)* | + aviso fijo de seguridad bajo el encabezado y botón "Reportar" |
+| `MatchCard` *(v2)* | + chip de rango de cercanía (`proximity`) |
+| `ZonesOnboarding` *(v2)* | + enlace opcional "Prefiero marcar lugares en el mapa" |
 
 **Navegación:** `NAV_ITEMS` pasó de 5 a 6 entradas (Trueque entre Social y Perfil). El padding lateral de cada ítem del `BottomNav` bajó de 14 px a 8 px para que las 6 quepan en ~360 px. El botón de Mascota deja de estar exactamente al centro.
 
@@ -437,9 +481,9 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 ## VIII. BASE DE DATOS (Supabase)
 
 ### Tablas
-`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger` · **Trueque:** `user_exchange_zones` · `books_offered` · `books_wanted` · `exchange_matches` · `exchange_chats` · `exchange_ratings` · `trueque_gems_cost` (+ interna `trueque_search_credits`).
+`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger` · **Trueque:** `user_exchange_zones` · `books_offered` · `books_wanted` · `exchange_matches` · `exchange_chats` · `exchange_ratings` · `trueque_gems_cost` (+ interna `trueque_search_credits`) · **Trueque v2:** `trueque_profiles` · `trueque_pins` · `trueque_reports`.
 
-**Vistas:** `users_public` (`security_invoker`, columnas `id, nombre, username, avatar_url, cover_url, bio, is_public`, sin email; creada por `privacy_hardening.sql`, el código actual todavía no la usa). **Columnas añadidas por los parches:** `reading_logs.session_id` (uuid NOT NULL DEFAULT gen_random_uuid(), UNIQUE). **Storage:** buckets `avatars`, `covers`, `post-images` (ver §III).
+**Vistas:** `users_public` (`security_invoker`, columnas `id, nombre, username, avatar_url, cover_url, bio, is_public`, sin email; creada por `privacy_hardening.sql`, el código actual todavía no la usa) · `trueque_funnel_summary` (embudo del Trueque, solo SQL Editor; ver abajo). **Columnas añadidas por los parches:** `reading_logs.session_id` (uuid NOT NULL DEFAULT gen_random_uuid(), UNIQUE). **Storage:** buckets `avatars`, `covers`, `post-images` (ver §III).
 
 ### RLS — modelo general (`auth_rls_migration.sql` + parches posteriores)
 - **Lectura con privacidad real** (`privacy_hardening.sql`, reemplaza las antiguas `*_select_auth` abiertas): `users` (`users_select_scoped`), `books` (`books_select_scoped`), `user_streaks` (`streaks_select_scoped`) y `achievements` (`ach_select_scoped`) permiten SELECT solo si eres el dueño, el dueño tiene `is_public` ≠ false (default histórico "público", `COALESCE(is_public,true)`) o hay `friendships.status='accepted'` entre ambos. `users.email` además está revocado a nivel de **columna** (GRANT SELECT explícito sobre todas las demás columnas, calculado al correr la migración: ⚠️ una columna añadida después a `users` NO queda legible hasta re-otorgar el GRANT).
@@ -495,6 +539,42 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 
 **Borrado de cuenta:** todas las FKs del Trueque son `ON DELETE CASCADE` a `users`, así que `delete_my_account()` (que borra `public.users`) arrastra zonas, libros, matches, chats y ratings sin tocar esa función. Las fotos del bucket `trueque` **no** se borran (ver §XII).
 
+### Trueque v2 (`trueque_geo.sql`, 2026-10-03)
+
+**Constantes** arriba del archivo en `trueque_geo_cfg()` (jsonb): `max_pins` 3, `pin_cooldown_hours` 24, `pin_decimals` 2, caja de México, `radii_km` [3,6,12,25], `default_radius_km` 6, `wide_radius_km` 25, `label_max` 30, `report_daily_max` 10. Se cambian editando el archivo y re-corriéndolo (los CHECK de `slot` y de redondeo tienen el 3 y el 2 literales: cambiarlos a la par). Estados válidos en `trueque_valid_state()` (= `src/data/estados.js`).
+
+| Tabla | Columnas | RLS / privilegios |
+|---|---|---|
+| `trueque_profiles` | `user_id` PK FK users CASCADE, `state` (clave ISO del estado), `max_radius_km` (default 6), `pins_updated_at`, `adult_confirmed_at`, `rules_accepted_at`, `created_at`, `updated_at` | SELECT solo el dueño. Sin INSERT/UPDATE/DELETE para clientes (REVOKE): escribe solo `accept_trueque_rules`/`save_trueque_pins`. REVOKE ALL a anon |
+| `trueque_pins` | `user_id` FK CASCADE, `slot` 1..3, `lat`, `lng` (CHECK: ya redondeadas a 2 decimales), `label` (≤ 30), `updated_at`; PK (user_id, slot) | SELECT solo el dueño; **ninguna** política muestra pines ajenos. Escritura solo por RPC. REVOKE ALL a anon |
+| `trueque_reports` | `id`, `reporter_id`, `reported_id` (FK CASCADE), `match_id` (FK SET NULL), `reason` (lista corta), `details` (≤ 500), `created_at`; CHECK reporter ≠ reported | Solo INSERT del propio reportante (`reporter_id = auth.uid()`); sin SELECT/UPDATE/DELETE para clientes. La UI usa la RPC |
+
+**Por qué una tabla nueva y no columnas en `users`:** `users` es legible por otros (perfiles públicos y amigos) y su GRANT por columna se calculó una sola vez (§XII #12); una tabla aparte queda privada y bloqueada a escritura sin tocar Auth.
+
+| RPC (SECURITY DEFINER, `authenticated`) | Qué hace |
+|---|---|
+| `accept_trueque_rules(p_adult)` → jsonb | Crea/actualiza el perfil con `rules_accepted_at` y `adult_confirmed_at`. `ADULT_REQUIRED` si `p_adult` no es true |
+| `save_trueque_pins(p_pins, p_state, p_max_radius_km)` → jsonb | Ver reglas en §IV.14. Errores: `PINS_INVALID`, `PINS_COOLDOWN` (+`retry_at`), `STATE_INVALID`, `RADIUS_INVALID`, `RULES_REQUIRED`, `NOT_AUTHENTICATED` |
+| `get_my_trueque_pins()` → jsonb | Perfil + pines propios + `next_edit_at` |
+| `search_trueque_matches(p_scope)` → jsonb | Búsqueda por alcance con cobro condicionado a resultados, en una transacción. Errores: `SCOPE_INVALID`, `RULES_REQUIRED`, `STATE_REQUIRED`, `LOCATION_REQUIRED`, `RATE_LIMIT`, `GEMS_INSUFFICIENT` (+`cost`). Registra cada búsqueda en `trueque_search_credits` ya consumida (cupo Plus y métricas) |
+| `get_my_trueque_matches()` → TABLE | Columnas de `get_my_exchange_matches` + `proximity` + `sort_order` |
+| `report_trueque_user(p_reported_id, p_reason, p_details, p_match_id)` → jsonb | Valida motivo, que ambos participen del match y el tope diario. Errores: `REPORT_INVALID`, `NOT_PARTICIPANT`, `REPORT_LIMIT` |
+
+Estas RPCs devuelven `jsonb {success, error?}` sin lanzar (estilo de `spend_gems`, como pidió el spec); las del MVP lanzan `TRUEQUE_*`. `truequeService.callGeoRpc` unifica ambas en `TruequeError`.
+
+Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_valid_state`, `trueque_valid_report_reason`, `trueque_haversine_km`, `trueque_pair_geo` (⚠️ recibe dos user_id arbitrarios y devuelve su distancia: jamás exponerla), `trueque_proximity_band`, `trueque_band_rank`, `trueque_in_scope`, `trueque_generate_matches_geo` (mismo emparejamiento por título y mismo upsert por pareja que `trueque_generate_matches`, pero cruza libros primero y filtra por alcance después), `trueque_matches_geo_for`, `trg_trueque_require_ready`.
+
+**Vista `trueque_funnel_summary`** (`security_invoker`, REVOKE a PUBLIC/anon/authenticated → solo SQL Editor): `usuarios_con_estado`, `usuarios_con_pines`, `busquedas` (filas de `trueque_search_credits`, incluye las del flujo viejo), `chats_iniciados` (matches con ≥1 mensaje no de sistema), `intercambios_completados`. Sin datos personales.
+
+### Datos personales: ubicación aproximada (Trueque v2)
+- **Qué se guarda:** el estado (clave de 3 letras) y hasta 3 puntos redondeados a 2 decimales (~1.1 km de precisión) con una etiqueta opcional escrita por el usuario. Nunca la ubicación del dispositivo (no se usa `navigator.geolocation`).
+- **Quién lo ve:** solo el dueño (RLS + REVOKE). Ninguna RPC devuelve coordenadas de otra persona; a los demás solo les llega un rango de distancia. El cálculo se hace dentro de Postgres.
+- **Mitigación de triangulación:** coordenadas ya redondeadas, rangos anchos y 1 cambio de coordenadas cada 24 h.
+- **UI:** texto fijo pidiendo marcar lugares públicos (metro, plaza, café) y no casa, escuela ni trabajo.
+- **Terceros:** los tiles se piden a `tile.openstreetmap.org` (el proveedor ve la IP y la zona del mapa que se mira, como cualquier mapa web). No se envían pines a ningún tercero.
+- **Borrado:** `trueque_profiles`, `trueque_pins` y `trueque_reports` son `ON DELETE CASCADE` a `users`; `delete_my_account()` los arrastra sin cambios.
+- **Mayoría de edad:** solo una autodeclaración (`adult_confirmed_at`), no hay verificación.
+
 ### Índices relevantes
 `reward_ledger_once` (UNIQUE parcial user+reason+ref WHERE ref IS NOT NULL), `reading_logs_session_id_key` (UNIQUE `session_id`), `recommendation_scores_user_idx`, PKs/uniques (user_pets.user_id UNIQUE, achievements UNIQUE(user_id, key), daily_save_limits onConflict user_id+date).
 
@@ -512,7 +592,8 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 | Email transaccional (Resend, etc.) | — | **No integrado.** No hay código ni dependencia; solo los emails propios de Supabase Auth |
 | Vercel | `vercel --prod` manual | ⚠️ sin integración Git aún; `vercel.json` controla el caching. Sus `rewrites` conservan `/api/anthropic` y `/api/buscalibre-check` (existen en `api/`); el rewrite muerto a `/api/login` se eliminó el 2026-09-19 |
 | GitHub Actions | cron diario | Entrena recomendador; secrets: SUPABASE_SERVICE_ROLE_KEY (SOLO aquí, jamás en Vercel/cliente) |
-| PWA/Workbox | vite.config.js | autoUpdate + skipWaiting; NetworkFirst para navegación (timeout 3 s → caché offline); `sw-notifications.js` para notifs programadas |
+| PWA/Workbox | vite.config.js | autoUpdate + skipWaiting; NetworkFirst para navegación (timeout 3 s → caché offline); `sw-notifications.js` para notifs programadas. Desde 2026-10-03: `globIgnores` saca del precache el chunk del mapa (`assets/MyPlaces-*`) y los tiles de OSM tienen una regla `NetworkOnly` explícita (nunca se cachean) |
+| OpenStreetMap (tiles) | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` desde `MyPlaces.jsx` | Mapa del Trueque v2 con Leaflet. Gratis bajo la política de uso justo de OSM; atribución "© OpenStreetMap contributors" visible. **Si el tráfico crece:** cambiar `TILE_URL` a un proveedor con plan gratis (MapTiler, Stadia, Thunderforest) y su atribución. No hay CSP en `vercel.json`; si se agrega una, permitir `img-src https://tile.openstreetmap.org` |
 
 ---
 
@@ -542,6 +623,9 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 14. **Colores**: nunca hex en componentes; usar `palette.*` (sigue al tema) o `BRAND.*` (identidad fija). Si falta un color, se agrega a `theme.js` con nombre semántico (ver §III).
 15. **Hooks y efectos**: todos los `useState`/`useEffect` antes de cualquier `return` condicional; todo efecto que cree timers, canales realtime o listeners devuelve cleanup; si hay `await` antes de suscribirse, usar una bandera `cancelled` (patrón de `ChatView`).
 16. **Filtros PostgREST con texto del usuario**: pasar por `sanitizeSearchTerm()` (App.jsx) antes de interpolar en `.or(...)`.
+17. **Ubicación de usuarios (Trueque v2)**: se guarda ya degradada (redondeo en el servidor), en una tabla que solo su dueño lee, y se escribe solo por RPC con límite de cambios. Cualquier comparación entre dos usuarios (distancia, cercanía) se calcula dentro de una función SECURITY DEFINER **interna** y sale al cliente como un rango, nunca como número ni coordenada. Las funciones que reciben dos `user_id` arbitrarios jamás se exponen.
+18. **Cobro condicionado al resultado**: si una acción de pago solo debe cobrarse cuando entrega algo, va en UNA RPC: bloquear el saldo (`SELECT … FOR UPDATE`), ejecutar, y descontar al final solo si hubo resultado; un fallo en el descuento hace `RAISE` y revierte todo (`search_trueque_matches`). Sustituye al patrón de dos RPCs con crédito (§X.11) cuando el precio depende del resultado.
+19. **RPCs nuevas y migraciones pendientes**: si la RPC no existe (`PGRST202`), el servicio registra `code/message/details/hint` y la UI muestra un mensaje de "se está actualizando" en vez de romperse (`callGeoRpc`).
 
 ---
 
@@ -552,7 +636,7 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 - **Monetización**: las gemas ya tienen ledger; un "catálogo de compras" sería tabla `purchases` + RPC SECURITY DEFINER que valide balance y descuente (usar `spend_gems` como puerta de gasto: añadir el producto a su lista blanca `reason → precio`).
 - **Otro algoritmo de recomendación**: solo tiene que escribir filas en `recommendation_scores` (user_id, book_id, predicted_rating, reason) — `api/recommendations.js` y la UI no cambian. Sustituir/añadir script en `scripts/` y workflow.
 - **Más mascotas**: añadir entradas a `PET_TYPES` en petService (img, title, quote, label) + assets en `public/pets/`; el diseño evolutivo completo está especificado en `SISTEMA_MASCOTAS_EVOLUTIVAS.md`.
-- **Trueque**: cambiar costos o límites = `UPDATE trueque_gems_cost SET value = … WHERE key = …` (sin deploy). Agregar una zona = `ALTER TYPE exchange_zone ADD VALUE 'slug'` + entrada en `src/config/zones.js`. Dar Plus = `UPDATE users SET is_premium = true`.
+- **Trueque**: cambiar costos o límites = `UPDATE trueque_gems_cost SET value = … WHERE key = …` (sin deploy). Agregar una zona = `ALTER TYPE exchange_zone ADD VALUE 'slug'` + entrada en `src/config/zones.js`. Dar Plus = `UPDATE users SET is_premium = true`. **v2:** número de pines, horas entre cambios, radios, caja de México y topes de reportes = editar `trueque_geo_cfg()` al inicio de `trueque_geo.sql` y re-correrlo (más las constantes espejo en `truequeGeoService.js`); reiniciar el límite de 24 h de una cuenta = `UPDATE trueque_profiles SET pins_updated_at = NULL WHERE user_id = …`; ver el embudo = `SELECT * FROM trueque_funnel_summary`; revisar reportes = `SELECT * FROM trueque_reports ORDER BY created_at DESC`.
 - **Extraer vistas del monolito**: mover una vista de App.jsx a `src/components/` siguiendo el patrón del commit `3b3adfd` (imports de servicios + props explícitas).
 
 ## XII. LIMITACIONES CONOCIDAS Y DEUDA TÉCNICA
@@ -572,7 +656,7 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 11. **Cuentas privadas no encontrables**: efecto secundario de `privacy_hardening.sql`; si se quiere búsqueda por username de cuentas privadas habría que usar la vista `users_public` (ya creada, sin uso todavía) con una política/función dedicada.
 12. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
 13. **Trueque — TODOs de Sprint 2:**
-    - Migrar zonas fijas a Google Places API (geolocalización real en vez de 25 zonas).
+    - ~~Migrar zonas fijas a Google Places API~~ — **sustituido 2026-10-03** por pines aproximados con Leaflet + OSM (Trueque v2); las zonas quedan como respaldo en CDMX.
     - Implementar "Embajadas FOLIO" (lugares aliados verificados; el disclaimer ya las anuncia).
     - Pago real de Folio Plus: hoy `is_premium` se activa a mano y el CTA es placeholder con precio `$XX`.
     - Push notifications para matches y mensajes nuevos (hoy el usuario tiene que entrar a la tab; el chat hace polling solo mientras está abierto).
@@ -582,7 +666,7 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
     - **Búsquedas O(usuarios con zona común):** suficiente para el MVP; con miles de usuarios por zona habría que materializar o paginar.
     - **Fotos huérfanas en Storage:** se quedan en el bucket `trueque` al quitar un libro o borrar la cuenta (no hay limpieza).
     - **Disclaimer por dispositivo:** la aceptación vive en `localStorage`, así que en otro dispositivo se vuelve a pedir.
-    - **Sin moderación:** no hay botón de reportar usuario ni bloqueo; el reporte es por email a soporte@folio.mx.
+    - **Moderación mínima (v2):** ya hay botón "Reportar" en el chat (`trueque_reports`), pero **no** hay bloqueo de usuarios ni pantalla de moderación: León revisa la tabla a mano. El `LegalDisclaimerModal` todavía menciona soporte@folio.mx.
     - **Mensaje de sistema a nombre del dueño:** cuando se cancela un match, el mensaje de sistema del chat usa `sender_id` = dueño del libro (con `is_system = true`).
     - **pg_cron puede faltar:** si la extensión no está habilitada, el SQL solo emite un NOTICE. La app igual oculta y expira los vencidos al listar y al buscar.
 
@@ -596,6 +680,15 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
     - **28 avisos `react-hooks/exhaustive-deps`**: casi todos efectos de montaje intencionales; revisar al extraer vistas.
     - **`DeleteAccountModal`** llama `supabase.rpc("delete_my_account")` directo (única llamada a Supabase en `components/` fuera del Trueque).
     - **Excepciones a camelCase** (ver §X.9): social, pet, streak y wraps.
+17. **Trueque v2 — pendientes y lo que quedó fuera (2026-10-03):**
+    - **Orden de despliegue:** correr `supabase/trueque_geo.sql` ANTES de `vercel --prod`. Sin la migración, la tab Trueque muestra "Trueque se está actualizando" (el resto de la app no se afecta). Tras la migración, un cliente viejo en caché no puede publicar ni chatear hasta recargar (los triggers exigen reglas aceptadas).
+    - **SQL validado solo sintácticamente** (parser oficial de Postgres, incluidos los cuerpos PL/pgSQL); no se ejecutó contra una base real. Probar con el guion de 4 cuentas antes de anunciarlo.
+    - **Ruta vieja de cobro abierta:** `cost_search_matches` + `find_book_matches` siguen concedidas a `authenticated` por compatibilidad y **sí cobran** búsquedas con 0 resultados. Cuando todos los clientes estén actualizados, revocarlas (`REVOKE EXECUTE … FROM authenticated`).
+    - **Búsquedas gratis ilimitadas con 0 resultados** para usuarios free (cuestan CPU, no gemas). Si se abusa, agregar tope diario en `search_trueque_matches`.
+    - **Constantes duplicadas** en SQL (`trueque_geo_cfg`, CHECKs) y JS (`truequeGeoService`, `estados.js`, `REPORT_REASONS`): cambiarlas a la par.
+    - **Rendimiento:** `trueque_pair_geo` se evalúa por pareja con títulos cruzados; suficiente para el volumen actual. Con muchos usuarios, precalcular o indexar por celda.
+    - **PostHog:** no existe en el código, así que no se agregaron eventos (`trueque_pins_saved`, `trueque_search`, `trueque_chat_started`, `trueque_exchange_completed`); la medición vive en la vista `trueque_funnel_summary`.
+    - **Fuera de alcance (a propósito):** bloqueo de usuarios, pantalla de moderación, condición del libro en el match, puntos de encuentro sugeridos, alertas de "alguien cerca", cadenas de 3 intercambios, geolocalización del navegador.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 
@@ -644,6 +737,16 @@ Internas (REVOKE a clientes): `trueque_norm`, `trueque_cfg`, `trueque_generate_m
 | Filtro `.or(...)` con texto crudo del usuario en la búsqueda de amigos | ✅ RESUELTO 2026-09-22 | `sanitizeSearchTerm()` |
 | Timers sin cleanup (celebración, debounces, deep-link del feed) y blob del preview de imagen sin liberar | ✅ RESUELTO 2026-09-22 | Cleanup en los efectos y `URL.revokeObjectURL` |
 | Placeholder "Mínimo 4 caracteres" con validación de 6 | ✅ RESUELTO 2026-09-22 | Texto corregido |
+
+### Resuelto (Trueque v2, 2026-10-03 — `supabase/trueque_geo.sql`)
+
+| Item | Estado | Cómo se resolvió |
+|---|---|---|
+| Trueque limitado a 25 zonas de CDMX | ✅ RESUELTO 2026-10-03 (⚠️ requiere correr `trueque_geo.sql`) | Estado obligatorio (32 estados) + hasta 3 pines aproximados; matching por cercanía en Postgres; zonas como respaldo en CDMX |
+| La búsqueda de matches cobraba 20 gemas aunque no encontrara nada | ✅ RESUELTO 2026-10-03 | RPC única `search_trueque_matches`: bloquea saldo, genera y cobra solo si hay resultados, en la misma transacción |
+| Sin forma de reportar usuarios del Trueque | ✅ RESUELTO 2026-10-03 (parcial: sin bloqueo ni moderación en app) | Botón "Reportar" en el chat + `trueque_reports` + RPC `report_trueque_user` |
+| Sin reglas de seguridad ni confirmación de mayoría de edad | ✅ RESUELTO 2026-10-03 | "Antes de empezar" + `accept_trueque_rules`; triggers impiden publicar/chatear sin aceptarlas; aviso fijo en el chat |
+| Sin medición del Trueque | ✅ RESUELTO 2026-10-03 | Vista `trueque_funnel_summary` (solo SQL Editor) |
 
 ## XIII. CHECKLIST PARA NUEVO DEVELOPER
 

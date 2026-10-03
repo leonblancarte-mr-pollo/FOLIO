@@ -5,7 +5,8 @@ import { Sheet, PrimaryButton, ErrorText } from "./ui.jsx";
 
 // Primera vez en Trueque: elegir 2..máximo zonas. Sin botón de cerrar (es requisito);
 // "Ahora no" regresa al Home.
-function ZonesOnboarding({ maxZones, isPremium, onSave, onSkip }) {
+// onUseMap (Trueque v2, opcional): en vez de zonas, marcar lugares en el mapa.
+function ZonesOnboarding({ maxZones, isPremium, onSave, onSkip, onUseMap }) {
   const [selected, setSelected] = useState([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -36,6 +37,11 @@ function ZonesOnboarding({ maxZones, isPremium, onSave, onSkip }) {
         <PrimaryButton onClick={save} disabled={selected.length < MIN_ZONES || saving}>
           {saving ? "Guardando…" : "Empezar"}
         </PrimaryButton>
+        {onUseMap && (
+          <button onClick={onUseMap} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.9rem", color: palette.accent, padding: "0.3rem" }}>
+            📍 Prefiero marcar lugares en el mapa
+          </button>
+        )}
         {onSkip && (
           <button onClick={onSkip} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.9rem", color: palette.inkFaint, padding: "0.3rem" }}>
             Ahora no
