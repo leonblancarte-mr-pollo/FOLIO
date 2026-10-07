@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Cuentas huérfanas: existen en auth.users pero NO en public.users
+-- SEMA — Cuentas huérfanas: existen en auth.users pero NO en public.users
 -- (signups que fallaron con "permission denied for table users").
 -- Correr en Supabase → SQL Editor. Los pasos 2 y 3 están comentados a propósito:
 -- REVISA la lista del paso 1 antes de ejecutar cualquiera.

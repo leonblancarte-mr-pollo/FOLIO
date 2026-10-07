@@ -249,7 +249,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
     <div style={{ padding: "1rem 1rem 6rem", maxWidth: 640, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "0.5rem" }}>
         <h1 style={{ ...display, fontSize: "1.7rem", fontWeight: 700, fontStyle: "italic", color: palette.ink, margin: 0 }}>Trueque</h1>
-        {status?.is_premium && <span style={{ ...body, fontSize: "0.8rem", color: palette.amber, fontWeight: 600 }}>✨ Folio Plus</span>}
+        {status?.is_premium && <span style={{ ...body, fontSize: "0.8rem", color: palette.amber, fontWeight: 600 }}>✨ SEMA Plus</span>}
       </div>
       <p style={{ ...body, fontSize: "0.92rem", color: palette.inkSoft, margin: "0.2rem 0 0.9rem" }}>Intercambia libros físicos con lectores cerca de ti.</p>
 

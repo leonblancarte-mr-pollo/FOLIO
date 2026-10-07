@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Trueque de Libros (MVP)
+-- SEMA — Trueque de Libros (MVP)
 -- Correr en Supabase → SQL Editor, DESPUÉS de sprint1_server_authority.sql,
 -- privacy_hardening.sql y timezone_fix.sql. Es idempotente (se puede re-correr).
 --
@@ -47,7 +47,7 @@ RETURNS text LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
 $$;
 
 -- ----------------------------------------------------------------------------
--- 1. users.is_premium (Folio Plus) + guard
+-- 1. users.is_premium (SEMA Plus) + guard
 -- ----------------------------------------------------------------------------
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS is_premium boolean NOT NULL DEFAULT false;
@@ -807,5 +807,5 @@ END $$;
 --   select public.trueque_norm('  ¡Cien Años de Soledad! ');        -- 'cien anos de soledad'
 --   select * from public.trueque_gems_cost;                          -- 9 filas de config
 --   select cron.schedule ... / select * from cron.job;               -- job 'trueque-cleanup-expired-matches'
---   update public.users set is_premium = true where id = '<uuid>';   -- dar Folio Plus a mano
+--   update public.users set is_premium = true where id = '<uuid>';   -- dar SEMA Plus a mano
 -- ============================================================================

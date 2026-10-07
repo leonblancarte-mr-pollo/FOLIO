@@ -48,7 +48,7 @@ const GEO_RPC_ERRORS = {
   GEMS_INSUFFICIENT: "No tienes gemas suficientes.",
   REPORT_INVALID: "Revisa el motivo del reporte.",
   NOT_PARTICIPANT: "No participas en este intercambio.",
-  REPORT_LIMIT: "Llegaste al máximo de reportes de hoy. Escríbenos a soporte@folio.mx.",
+  REPORT_LIMIT: "Llegaste al máximo de reportes de hoy. Escríbenos a soporte@sema.mx.",
 };
 
 const UPDATING_MESSAGE = "Trueque se está actualizando, intenta más tarde.";

@@ -3,7 +3,7 @@ import { CheckCircle2 } from "lucide-react";
 import { palette, body, display } from "../theme.js";
 
 // Al marcar un libro como leído, el usuario elige cuándo lo leyó:
-// fecha exacta, solo el año, "antes de FOLIO" o "en otra vida".
+// fecha exacta, solo el año, "antes de SEMA" o "en otra vida".
 function ReadDateModal({ book, onConfirm, onClose }) {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -16,7 +16,7 @@ function ReadDateModal({ book, onConfirm, onClose }) {
   const OPTIONS = [
     { id: "exact", emoji: "📅", label: "Fecha exacta", desc: "Sé exactamente cuándo lo terminé" },
     { id: "year", emoji: "📆", label: "Solo el año", desc: "Recuerdo el año, más o menos" },
-    { id: "before_folio", emoji: "📚", label: "Antes de FOLIO", desc: "Lo leí antes de usar la app" },
+    { id: "before_folio", emoji: "📚", label: "Antes de SEMA", desc: "Lo leí antes de usar la app" },
     { id: "unknown", emoji: "✨", label: "En otra vida", desc: "Ni idea, pero lo leí" },
   ];
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Privacidad real (el toggle is_public deja de ser decorativo)
+-- SEMA — Privacidad real (el toggle is_public deja de ser decorativo)
 -- Correr en Supabase → SQL Editor, DESPUÉS de auth_rls_migration.sql.
 --
 -- Problema: auth_rls_migration.sql da lectura ABIERTA a cualquier

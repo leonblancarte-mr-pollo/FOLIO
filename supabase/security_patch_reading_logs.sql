@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Security patch: farmeo infinito de XP/gemas vía reading_logs
+-- SEMA — Security patch: farmeo infinito de XP/gemas vía reading_logs
 -- Correr en Supabase → SQL Editor, DESPUÉS de sprint1_server_authority.sql.
 --
 -- Problema: trg_reading_logged premiaba con ref=NULL (sin idempotencia) en

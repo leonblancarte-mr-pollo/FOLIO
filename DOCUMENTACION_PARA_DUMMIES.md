@@ -1,25 +1,25 @@
-# FOLIO — Guía para cofundadores, sin tecnicismos
+# SEMA — Guía para cofundadores, sin tecnicismos
 
 > Preparado el 28 de septiembre de 2026 para la reunión con BIDIUAM del martes 29 de septiembre de 2026. Ampliado el 28 de septiembre de 2026 con las secciones 11 a 16.
 > Cómo leer este documento: no hace falta leerlo de corrido. Cada sección responde una pregunta concreta. Cuando aparece una palabra rara, se explica en la misma línea — no tienes que buscar nada aparte.
 
 ---
 
-## 1. ¿Qué es FOLIO en una sola oración?
+## 1. ¿Qué es SEMA en una sola oración?
 
-FOLIO es una app para llevar tu biblioteca personal, mantener el hábito de leer con una racha diaria y una mascota que crece contigo, platicar de libros con tus amigos, y hasta intercambiar libros físicos con otros lectores — pensada para gente joven en México a la que le cuesta trabajo agarrarle el ritmo a la lectura.
+SEMA es una app para llevar tu biblioteca personal, mantener el hábito de leer con una racha diaria y una mascota que crece contigo, platicar de libros con tus amigos, y hasta intercambiar libros físicos con otros lectores — pensada para gente joven en México a la que le cuesta trabajo agarrarle el ritmo a la lectura.
 
 ---
 
 ## 2. ¿Cómo funciona la app por dentro? (La cocina)
 
-Imagina que Folio es un restaurante. El cliente —la persona que usa la app en su celular— nunca entra a la cocina: solo ve el menú, pide lo que quiere, y el mesero le trae el platillo. Esa parte que el cliente sí ve y toca —los botones, las pantallas, los colores— es lo que en software se llama el "frontend". Es literalmente lo único que corre dentro del teléfono de la persona.
+Imagina que SEMA es un restaurante. El cliente —la persona que usa la app en su celular— nunca entra a la cocina: solo ve el menú, pide lo que quiere, y el mesero le trae el platillo. Esa parte que el cliente sí ve y toca —los botones, las pantallas, los colores— es lo que en software se llama el "frontend". Es literalmente lo único que corre dentro del teléfono de la persona.
 
 Detrás del menú está la cocina, donde de verdad se preparan las cosas: ahí se checa si hay ingredientes, se cobra la cuenta, se decide si el platillo se puede hacer o no. Esa cocina, en una app, se llama "servidor" (o "backend"): un programa que corre en una computadora rentada en algún centro de datos, no en el celular del usuario. La cocina es la que manda: decide qué es válido y qué no.
 
 Y toda cocina necesita una bodega donde se guardan los ingredientes: la harina, el aceite, la carne. En una app esa bodega es la "base de datos": un lugar donde se guarda cada dato —cada libro, cada usuario, cada mensaje— de forma ordenada, para poder encontrarlo después.
 
-¿Y en Folio, específicamente? El menú (el frontend) es el código que se descarga al navegador o celular del usuario cuando abre la app; incluso se puede "instalar" como si fuera una app nativa, aunque por dentro sigue siendo una página web. La cocina y la bodega casi no las construimos nosotros desde cero: rentamos ambas, ya armadas y con seguridad incluida, a un proveedor llamado Supabase. Solo un par de tareas puntuales —como pedirle a una Inteligencia Artificial que resuma un libro, o buscar un título en Google— corren en cocinas propias muy pequeñas, rentadas a otro proveedor llamado Vercel.
+¿Y en SEMA, específicamente? El menú (el frontend) es el código que se descarga al navegador o celular del usuario cuando abre la app; incluso se puede "instalar" como si fuera una app nativa, aunque por dentro sigue siendo una página web. La cocina y la bodega casi no las construimos nosotros desde cero: rentamos ambas, ya armadas y con seguridad incluida, a un proveedor llamado Supabase. Solo un par de tareas puntuales —como pedirle a una Inteligencia Artificial que resuma un libro, o buscar un título en Google— corren en cocinas propias muy pequeñas, rentadas a otro proveedor llamado Vercel.
 
 ¿Por qué así? Porque somos un equipo chico, sin experiencia previa en programación, y construir y mantener nuestra propia cocina grande —con toda la seguridad que eso implica— nos hubiera tomado meses. Rentar servicios ya armados y confiables nos dejó enfocarnos en la app en sí.
 
@@ -39,11 +39,11 @@ Y toda cocina necesita una bodega donde se guardan los ingredientes: la harina, 
 
 ## 4. ¿De dónde saca la app la información de los libros?
 
-**1. Google Books.** Es la base de libros de Google. Cuando el usuario busca un título, Folio le pregunta a Google Books por título, autor, portada e ISBN (el "número de serie" único de cada edición de un libro). Pedimos primero resultados en español; si hay menos de 3, buscamos en todos los idiomas y mezclamos. Lo que nos falta: muchas ediciones en español, sobre todo de editoriales mexicanas o libros de texto universitarios, están mal documentadas — a veces no traen portada, o el resumen viene incompleto o solo en inglés.
+**1. Google Books.** Es la base de libros de Google. Cuando el usuario busca un título, SEMA le pregunta a Google Books por título, autor, portada e ISBN (el "número de serie" único de cada edición de un libro). Pedimos primero resultados en español; si hay menos de 3, buscamos en todos los idiomas y mezclamos. Lo que nos falta: muchas ediciones en español, sobre todo de editoriales mexicanas o libros de texto universitarios, están mal documentadas — a veces no traen portada, o el resumen viene incompleto o solo en inglés.
 
 **2. Open Library.** Otro catálogo de libros, gratuito y abierto, que usamos únicamente como plan B para conseguir una portada cuando Google Books no tiene una.
 
-**3. Claude (la Inteligencia Artificial que usamos, de la empresa Anthropic).** Una vez que el libro ya está en la biblioteca del usuario, le pedimos a la IA que "enriquezca" ese libro — en palabras simples: que rellene los huecos. Le mandamos el título y el autor, y ella nos regresa el género, un resumen corto, y unas etiquetas de "para qué estado de ánimo sirve este libro" (por ejemplo, "reconfortante" o "para pensar"). Esto es lo que le da a Folio ese toque de personalización que Google Books solo no podría dar.
+**3. Claude (la Inteligencia Artificial que usamos, de la empresa Anthropic).** Una vez que el libro ya está en la biblioteca del usuario, le pedimos a la IA que "enriquezca" ese libro — en palabras simples: que rellene los huecos. Le mandamos el título y el autor, y ella nos regresa el género, un resumen corto, y unas etiquetas de "para qué estado de ánimo sirve este libro" (por ejemplo, "reconfortante" o "para pensar"). Esto es lo que le da a SEMA ese toque de personalización que Google Books solo no podría dar.
 
 **4. Nuestra propia base de datos.** Todo lo anterior —lo que capturó el usuario a mano, lo que vino de Google Books, lo que generó la IA— se guarda finalmente en nuestra bodega (Supabase), que es de donde la app de verdad lee cuando le muestra a alguien su biblioteca.
 
@@ -69,15 +69,15 @@ Vale la pena distinguir dos cosas que suenan parecido pero no son lo mismo: el c
 
 **Opción B — Exportación periódica del catálogo.** BIDIUAM nos manda, cada semana o cada mes, un archivo con la lista completa (o una parte) de su catálogo, y nosotros lo metemos a nuestra propia bodega. Los formatos más comunes en los que las bibliotecas exportan esta información son: MARC21 (un formato clásico y muy detallado, hecho específicamente para describir libros de biblioteca — como una ficha bibliográfica súper completa), CSV (una simple hoja de cálculo, como un Excel guardado en texto plano) o JSON (un formato ordenado que usan casi todos los programas modernos para intercambiar información entre sí). Ventaja: mucho más simple de construir que la Opción A. Desventaja: la información no es instantánea — si alguien presta un libro a las 10 de la mañana, nuestra copia no se entera hasta el siguiente envío.
 
-**Opción C — Solo mostrar enlace a Primo.** La más sencilla de las tres. Cuando alguien busca un libro en Folio, le ponemos un botón que dice "Ver en Biblioteca UAM", y ese botón simplemente abre Primo con la búsqueda de ese libro ya hecha. No hay ninguna conexión técnica real entre las dos apps — es nada más un enlace inteligente que le ahorra al estudiante el paso de ir a buscar por su cuenta.
+**Opción C — Solo mostrar enlace a Primo.** La más sencilla de las tres. Cuando alguien busca un libro en SEMA, le ponemos un botón que dice "Ver en Biblioteca UAM", y ese botón simplemente abre Primo con la búsqueda de ese libro ya hecha. No hay ninguna conexión técnica real entre las dos apps — es nada más un enlace inteligente que le ahorra al estudiante el paso de ir a buscar por su cuenta.
 
 ---
 
 ## 7. ¿Qué le damos nosotros a BIDIUAM a cambio?
 
-**Datos anónimos de tendencias de lectura.** Qué libros buscan y leen más los estudiantes de la UAM dentro de Folio. Es información que a ellos, como biblioteca, les puede servir para decidir qué comprar o qué promover, y que nosotros les podemos dar sin revelar quién es quién.
+**Datos anónimos de tendencias de lectura.** Qué libros buscan y leen más los estudiantes de la UAM dentro de SEMA. Es información que a ellos, como biblioteca, les puede servir para decidir qué comprar o qué promover, y que nosotros les podemos dar sin revelar quién es quién.
 
-**Visibilidad ante un público joven.** Muchos estudiantes quizás ni saben todo lo que ya tiene su propia biblioteca digital; si Folio se los muestra dentro de una app que ya usan para leer, les da alcance sin que ellos tengan que hacer marketing.
+**Visibilidad ante un público joven.** Muchos estudiantes quizás ni saben todo lo que ya tiene su propia biblioteca digital; si SEMA se los muestra dentro de una app que ya usan para leer, les da alcance sin que ellos tengan que hacer marketing.
 
 **Un posible tablero de tendencias.** Hecho a la medida, que puedan usar en sus reportes internos — algo que hoy probablemente no tienen tan fácil de armar.
 
@@ -91,7 +91,7 @@ Vale la pena distinguir dos cosas que suenan parecido pero no son lo mismo: el c
 
 **3. ¿Pueden exportarnos el catálogo en JSON o CSV?** Nos dice si la Opción B (exportación periódica) es realista, y qué tan fácil sería para su equipo generar ese archivo sin tener que aprender algo nuevo.
 
-**4. ¿Los libros digitales de BIDIUAM son de acceso abierto, o piden iniciar sesión con cuenta UAM?** Importa mucho: si un estudiante puede leer el PDF directo desde Folio sin volver a loguearse, la experiencia es mucho mejor; si necesita su cuenta institucional, hay que diseñar ese paso extra desde ahora.
+**4. ¿Los libros digitales de BIDIUAM son de acceso abierto, o piden iniciar sesión con cuenta UAM?** Importa mucho: si un estudiante puede leer el PDF directo desde SEMA sin volver a loguearse, la experiencia es mucho mejor; si necesita su cuenta institucional, hay que diseñar ese paso extra desde ahora.
 
 **5. ¿Qué datos les gustaría recibir de nuestra parte a cambio?** Antes de prometerles un tablero o unos datos específicos, conviene preguntar qué es lo que de verdad les sirve a ellos, para no construir algo que no van a usar.
 
@@ -107,7 +107,7 @@ Vale la pena distinguir dos cosas que suenan parecido pero no son lo mismo: el c
 
 **Frontend / Backend:** frontend es el menú, lo que el usuario ve y toca en su pantalla. Backend es la cocina detrás, donde se procesa y se decide todo.
 
-**Supabase:** el proveedor que le renta a Folio, ya armados, la cocina (servidor) y la bodega (base de datos), con seguridad incluida.
+**Supabase:** el proveedor que le renta a SEMA, ya armados, la cocina (servidor) y la bodega (base de datos), con seguridad incluida.
 
 **PWA (Progressive Web App):** una página web que se puede "instalar" en el celular como si fuera una app normal, aunque por dentro siga siendo una página.
 
@@ -121,7 +121,7 @@ Vale la pena distinguir dos cosas que suenan parecido pero no son lo mismo: el c
 
 **Metadata:** información que describe a un dato. El género, el resumen o el año de un libro son "metadata" del libro, no el libro en sí.
 
-**Integración:** cuando dos sistemas de software distintos (por ejemplo, Folio y Alma) se conectan entre sí para compartir información automáticamente, sin que alguien tenga que copiar y pegar a mano.
+**Integración:** cuando dos sistemas de software distintos (por ejemplo, SEMA y Alma) se conectan entre sí para compartir información automáticamente, sin que alguien tenga que copiar y pegar a mano.
 
 ---
 
@@ -131,9 +131,9 @@ Vale la pena distinguir dos cosas que suenan parecido pero no son lo mismo: el c
 
 **En construcción o con problemas conocidos:** subir la foto de portada del perfil todavía falla en producción y no hemos encontrado la causa exacta; publicar cambios nuevos de la app requiere que León lo haga a mano cada vez (no está conectado en automático a donde vive el código); y no hay ninguna prueba automática que detecte errores antes de publicar — hoy se prueba a mano, abriendo la app.
 
-**Lo más importante para la reunión del martes:** la pestaña "Biblioteca UAM" que ya existe hoy dentro de Folio es, en realidad, una lista fija de unos 40 libros que capturamos nosotros a mano, y la "disponibilidad" que se muestra (si un libro está prestado o no) está inventada — es un resultado calculado con una fórmula interna, no información real de la biblioteca. La propia app ya le avisa al usuario "Próximamente: catálogo completo de la Biblioteca UAM-I con disponibilidad en tiempo real" — es justo la promesa que una integración de verdad con BIDIUAM nos permitiría cumplir.
+**Lo más importante para la reunión del martes:** la pestaña "Biblioteca UAM" que ya existe hoy dentro de SEMA es, en realidad, una lista fija de unos 40 libros que capturamos nosotros a mano, y la "disponibilidad" que se muestra (si un libro está prestado o no) está inventada — es un resultado calculado con una fórmula interna, no información real de la biblioteca. La propia app ya le avisa al usuario "Próximamente: catálogo completo de la Biblioteca UAM-I con disponibilidad en tiempo real" — es justo la promesa que una integración de verdad con BIDIUAM nos permitiría cumplir.
 
-Falta también: el pago real de la versión paga de Folio (hoy se activa a mano, sin cobrar), y pruebas automatizadas que hoy no existen. Nada de esto es un secreto — es simplemente en qué etapa está el proyecto, y está bien que sea así para el tamaño del equipo que lo construyó.
+Falta también: el pago real de la versión paga de SEMA (hoy se activa a mano, sin cobrar), y pruebas automatizadas que hoy no existen. Nada de esto es un secreto — es simplemente en qué etapa está el proyecto, y está bien que sea así para el tamaño del equipo que lo construyó.
 
 ---
 
@@ -159,7 +159,7 @@ Falta también: el pago real de la versión paga de Folio (hoy se activa a mano,
 
 **Mascota virtual.** El usuario elige una mascota (hoy solo hay un gato, apodado "El Sensible") y la pone un nombre. Cada vez que lee, la mascota gana experiencia (los cofundadores la conocen como "XP": son puntos que se acumulan). Al juntar suficiente experiencia, la mascota sube de nivel, y eso se celebra con una animación en pantalla. Importante: el nivel y la experiencia los calcula y los suma el servidor, nunca el celular del usuario — así nadie puede hacer trampa y subir de nivel sin leer de verdad.
 
-**Gemas.** Son la moneda del juego dentro de Folio. Se ganan automáticamente al terminar un libro, al registrar sesiones de lectura, y por reclamar un premio diario. Se gastan, por ejemplo, para comprar más intentos en el juego de recomendaciones (BookTinder, ver sección 12) o para buscar intercambios de libros en el Trueque. Igual que con la mascota, el servidor es el único que puede sumar o restar gemas — el celular solo las muestra.
+**Gemas.** Son la moneda del juego dentro de SEMA. Se ganan automáticamente al terminar un libro, al registrar sesiones de lectura, y por reclamar un premio diario. Se gastan, por ejemplo, para comprar más intentos en el juego de recomendaciones (BookTinder, ver sección 12) o para buscar intercambios de libros en el Trueque. Igual que con la mascota, el servidor es el único que puede sumar o restar gemas — el celular solo las muestra.
 
 **Logros.** Son medallas que el usuario desbloquea al cumplir ciertas metas. Algunos ejemplos reales dentro de la app: "Primera página" (agregaste tu primer libro), "Lector nato" (terminaste tu primer libro), "Racha de fuego" (7 días seguidos leyendo), "Imparable" (30 días seguidos), "Maratón" (leíste 3 libros en un mes), y "Universitario lector" (agregaste un libro de la Biblioteca UAM). Cada logro también da unas gemas de premio.
 
@@ -193,7 +193,7 @@ Falta también: el pago real de la versión paga de Folio (hoy se activa a mano,
 
 ### Trueque de libros
 
-**En una oración:** el Trueque es la sección donde dos personas que usan Folio pueden intercambiar libros físicos entre ellas, si viven cerca.
+**En una oración:** el Trueque es la sección donde dos personas que usan SEMA pueden intercambiar libros físicos entre ellas, si viven cerca.
 
 **Cómo funciona, paso a paso:** primero, el usuario elige entre 2 y 5 zonas de la Ciudad de México donde le queda bien recibir o entregar libros. Después, anota qué libros ofrece (los que ya no quiere) y qué libros busca (los que quiere conseguir). Cuando quiere ver si hay alguien compatible, aprieta el botón de "Buscar matches" (match = una pareja de personas cuyos libros combinan: lo que uno busca, el otro lo tiene, o viceversa). Si encuentra a alguien, se abre un chat dentro de la misma app para ponerse de acuerdo en dónde y cuándo entregar los libros — eso ya lo coordinan ellos mismos, cara a cara. Cuando el intercambio ya sucedió de verdad, cualquiera de los dos lo marca como "completado", y ambos se califican del uno al otro con estrellas.
 
@@ -223,7 +223,7 @@ La solución que usamos: el celular del usuario NUNCA puede escribir directament
 
 Una analogía que ayuda: es como en un casino. El jugador no puede tocar las fichas del juego hasta que el crupier las pone sobre la mesa. Por más que el jugador quiera, no tiene forma de agarrar fichas que el crupier no le haya entregado.
 
-Los puntos que funcionan exactamente así en Folio son: la experiencia y el nivel de la mascota, las gemas, los logros, y la racha diaria. Ninguno de los cuatro se puede falsificar desde el celular.
+Los puntos que funcionan exactamente así en SEMA son: la experiencia y el nivel de la mascota, las gemas, los logros, y la racha diaria. Ninguno de los cuatro se puede falsificar desde el celular.
 
 ---
 
@@ -235,7 +235,7 @@ Una PWA (se pronuncia como se escribe, viene de "Progressive Web App") es, en ca
 
 Elegimos empezar con una PWA por varias razones prácticas: construir dos apps nativas por separado (una para iPhone y otra para Android) nos hubiera tomado el triple de tiempo; una PWA funciona en cualquier celular con un solo código, sin duplicar trabajo; se puede actualizar y publicar sin esperar la aprobación de Apple o de Google (que puede tardar días); y para un equipo de dos personas sin experiencia previa en programación, era, de lejos, la opción más realista para empezar a probar la idea.
 
-Hay que ser honestos con las desventajas también: al no estar en las tiendas de apps, Folio no aparece cuando alguien busca "apps de lectura" en la App Store o en Google Play; las notificaciones en iPhone funcionan distinto y de forma más limitada en una PWA que en una app nativa; y algunos usuarios, sobre todo los menos acostumbrados a la tecnología, no saben que pueden "instalar" una página web y se quedan usándola solo desde el navegador.
+Hay que ser honestos con las desventajas también: al no estar en las tiendas de apps, SEMA no aparece cuando alguien busca "apps de lectura" en la App Store o en Google Play; las notificaciones en iPhone funcionan distinto y de forma más limitada en una PWA que en una app nativa; y algunos usuarios, sobre todo los menos acostumbrados a la tecnología, no saben que pueden "instalar" una página web y se quedan usándola solo desde el navegador.
 
 ¿Cuándo pasaríamos a una app nativa de verdad? Cuando tengamos ya una base de usuarios que lo justifique, existen herramientas que toman el código que ya tenemos hecho y lo empaquetan como app nativa para las tiendas, sin tener que reescribir todo desde cero. Es un paso que se puede dar más adelante, no algo que haya que resolver hoy.
 
@@ -243,7 +243,7 @@ Hay que ser honestos con las desventajas también: al no estar en las tiendas de
 
 ## 15. ¿Cómo sabemos si un usuario es alumno activo de la UAM? (El problema de verificación de identidad universitaria)
 
-**El problema, en simple:** hoy, cualquier persona se puede registrar en Folio con cualquier correo —Gmail, Hotmail, lo que sea—. Eso significa que, tal como está la app ahorita, alguien que no es alumno de la UAM podría entrar a la sección de la Biblioteca UAM y, eventualmente, al catálogo real de BIDIUAM, algo que la propia UAM nos pidió que no pase.
+**El problema, en simple:** hoy, cualquier persona se puede registrar en SEMA con cualquier correo —Gmail, Hotmail, lo que sea—. Eso significa que, tal como está la app ahorita, alguien que no es alumno de la UAM podría entrar a la sección de la Biblioteca UAM y, eventualmente, al catálogo real de BIDIUAM, algo que la propia UAM nos pidió que no pase.
 
 **Lo que sabemos hoy:** los alumnos activos de la UAM Unidad Xochimilco tienen un correo institucional con este formato: matrícula@alumnos.xoc.uam.mx. Ese correo funciona casi como un "carnet digital" del alumno: si alguien tiene acceso a esa cuenta, es muy probable que sea (o haya sido) alumno de la UAM.
 
@@ -271,10 +271,10 @@ Hay que ser honestos con las desventajas también: al no estar en las tiendas de
 
 - Publicar una versión nueva de la app requiere que León ejecute el proceso a mano cada vez; no pasa solo cuando se sube el código.
 - No existe ninguna prueba automática: cada versión nueva se revisa abriendo la app a mano, no hay un sistema que detecte errores antes de publicar.
-- Folio Plus (la versión de paga) ya existe como concepto dentro del código, pero hoy se activa manualmente para cada usuario; no hay ningún cobro real todavía integrado.
+- SEMA Plus (la versión de paga) ya existe como concepto dentro del código, pero hoy se activa manualmente para cada usuario; no hay ningún cobro real todavía integrado.
 - Subir la foto de **portada** del perfil sigue fallando en producción. Este es un bug que ya estaba documentado antes de esta actualización y que revisamos de nuevo ahora: el código de subir la portada es prácticamente idéntico al de subir la foto de perfil (que sí funciona), así que la causa exacta sigue sin identificarse.
 
-**Escala:** la app no se ha probado todavía con miles de usuarios usándola al mismo tiempo. El proveedor que rentamos (Supabase) sí está preparado para eso, pero nosotros no hemos verificado que todo en Folio se comporte igual de bien a esa escala.
+**Escala:** la app no se ha probado todavía con miles de usuarios usándola al mismo tiempo. El proveedor que rentamos (Supabase) sí está preparado para eso, pero nosotros no hemos verificado que todo en SEMA se comporte igual de bien a esa escala.
 
 **La Biblioteca UAM dentro de la app, hoy:** la pestaña muestra una lista fija de unos 40 libros capturados a mano por nosotros. La "disponibilidad" que se muestra (si un libro está prestado o no) es ficticia: se calcula con una fórmula interna, no refleja ningún dato real de la biblioteca. Esto es, exactamente, lo que buscaría resolver una integración real con BIDIUAM.
 

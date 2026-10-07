@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Trueque v2: estado obligatorio, pines aproximados y matches por cercanía
+-- SEMA — Trueque v2: estado obligatorio, pines aproximados y matches por cercanía
 -- Correr en Supabase → SQL Editor, DESPUÉS de trueque_schema.sql y spend_gems.sql.
 -- Es idempotente (se puede re-correr). No crea extensiones.
 --

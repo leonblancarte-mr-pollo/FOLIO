@@ -3,7 +3,7 @@
 // Política de uso (https://operations.osmfoundation.org/policies/nominatim/):
 //   · Máx. 1 solicitud por segundo → THROTTLE_MS + debounce en la UI + caché en memoria.
 //   · Identificar la app: el navegador NO permite fijar el header User-Agent en fetch(); el
-//     navegador manda solo el Referer (el dominio de FOLIO), que la política acepta para apps web.
+//     navegador manda solo el Referer (el dominio de SEMA), que la política acepta para apps web.
 //   · Si el tráfico crece, cambiar NOMINATIM_URL a un proveedor con plan gratis
 //     (MapTiler Geocoding, LocationIQ…) o a un Nominatim propio.
 // Privacidad: el texto buscado va solo a Nominatim; NUNCA se guarda en la base de datos.

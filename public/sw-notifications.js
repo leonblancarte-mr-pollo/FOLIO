@@ -1,4 +1,4 @@
-// Folio — Daily notification scheduler
+// SEMA — Daily notification scheduler
 
 const PHRASES_DEFAULT = [
   "ese libro lleva días viéndote feo desde la mesa",
@@ -64,7 +64,7 @@ function scheduleNotification() {
   if (notifTimerId) clearTimeout(notifTimerId);
   notifTimerId = setTimeout(() => {
     const body = pickPhrase();
-    self.registration.showNotification('folio', {
+    self.registration.showNotification('SEMA', {
       body,
       icon: '/icon-192.png',
       badge: '/icon-192.png',

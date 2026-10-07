@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Fix signup: "No se pudo crear el perfil: permission denied for table users"
+-- SEMA — Fix signup: "No se pudo crear el perfil: permission denied for table users"
 -- Correr en Supabase → SQL Editor, DESPUÉS de privacy_hardening.sql y trueque_schema.sql.
 -- Es idempotente: se puede correr más de una vez.
 --
@@ -63,7 +63,7 @@ CREATE POLICY "Users can update their own profile"
 -- ----------------------------------------------------------------------------
 -- 3. GRANTs por columna. Se calculan dinámicamente desde el esquema real (mismo enfoque que
 --    privacy_hardening.sql) para no depender de listar a mano las columnas de `users`.
---    - INSERT y UPDATE sobre TODAS las columnas excepto `is_premium` (Folio Plus: además
+--    - INSERT y UPDATE sobre TODAS las columnas excepto `is_premium` (SEMA Plus: además
 --      lo protege el trigger guard_users_premium).
 --    - SELECT NO se toca: `email` sigue sin SELECT para clientes (privacy_hardening.sql).
 --    - Nunca se otorga nada a `anon`.

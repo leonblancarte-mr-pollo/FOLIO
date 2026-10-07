@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Security patch: racha (user_streaks) client-authority
+-- SEMA — Security patch: racha (user_streaks) client-authority
 -- Correr en Supabase → SQL Editor, DESPUÉS de sprint1_server_authority.sql
 -- y security_patch_reading_logs.sql (usa reading_logs.log_date real).
 --

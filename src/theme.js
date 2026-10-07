@@ -1,6 +1,6 @@
 // ============ STYLES ============
 //
-// SISTEMA DE COLOR DE FOLIO — fuente única de colores de la app.
+// SISTEMA DE COLOR DE SEMA — fuente única de colores de la app.
 //
 // 1) `palette` (tokens que CAMBIAN con el tema). Objeto mutable: MainApp hace
 //    Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT) en cada render,

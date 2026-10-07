@@ -1,7 +1,7 @@
-# FOLIO — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
+# SEMA — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-10-03 (Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
-> Audiencia: developer que NO conoce FOLIO y necesita continuar el proyecto sin preguntar.
+> Última actualización: 2026-10-07 (email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Audiencia: developer que NO conoce SEMA y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
 
@@ -19,12 +19,14 @@
 - 2026-09-23 — BookTinder: límite diario 15→3 saves (`DAILY_LIMIT` exportado de `recommendationService`); `spend_gems` con diagnóstico de `PGRST202` (función ausente en la caché de PostgREST) y `NOTIFY pgrst, 'reload schema'` al final del SQL
 - 2026-10-03 — Trueque v2: estado obligatorio (32 estados, `src/data/estados.js`), hasta 3 pines aproximados (~1 km) en mapa Leaflet + OpenStreetMap con carga perezosa, matches por cercanía calculada en Postgres (el cliente solo ve rangos), alcance de búsqueda (mi radio / 25 km / mi estado / todo el país), búsqueda sin cobro si devuelve 0 resultados (RPC `search_trueque_matches`, una sola transacción), pantalla «Antes de empezar» con confirmación +18, aviso de seguridad y botón «Reportar» en el chat, vista `trueque_funnel_summary`. Migración `supabase/trueque_geo.sql` (#14)
 - 2026-10-03 — Trueque v3: se quitan las 25 zonas fijas de CDMX de la interfaz (barra de zonas, onboarding/editor de zonas, chips en la tarjeta de match, aviso de Plus) y del matching (cercanía, alcance y requisito de ubicación usan SOLO `trueque_pins` + `max_radius_km`; el estado se queda). `user_exchange_zones` NO se borra (historial). Las cuentas que solo tenían zonas ven el mapa al entrar, igual que una nueva. Buscador de lugares con Nominatim (OpenStreetMap) arriba del mapa de "Mis lugares" (`placeSearchService`). Se re-corre `supabase/trueque_geo.sql`. Se borran `ZonesOnboarding.jsx`, `ZonesEditor.jsx` y `src/config/zones.js`
+- 2026-10-07 — Rebrand FOLIO → SEMA: texto visible de la app (títulos, manifest PWA, notificaciones, mensajes de compartir, tarjetas exportables, nombres de archivos descargados, disclaimers del Trueque) y documentación pasan a «SEMA»; íconos PWA y `logo.png` reemplazados por `SEMA LOGO PROVISIONAL.png` (`generate-icons.mjs` ahora lo reescala). Se conservan a propósito identificadores internos: claves `localStorage` `folio_*`, `__folio_type` en posts, mensaje `FOLIO_SCHEDULE_NOTIF` del service worker, función SQL `folio_award`, valor `before_folio`, dominio `folio-final.vercel.app`, proyecto Vercel `folio-final` y el nombre de carpeta `FOLIO FINAL/`
+- 2026-10-07 — Email de soporte actualizado a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado
 
 ---
 
 ## I. VISIÓN GENERAL
 
-**FOLIO** es una PWA de biblioteca personal + red social de lectura en español (es-MX), gamificada al estilo Duolingo: rachas diarias, mascota virtual que sube de nivel con XP, gemas, logros, feed social con amigos, chat 1:1, recomendaciones con IA (Claude) y un recomendador colaborativo (Matrix Factorization) entrenado offline.
+**SEMA** es una PWA de biblioteca personal + red social de lectura en español (es-MX), gamificada al estilo Duolingo: rachas diarias, mascota virtual que sube de nivel con XP, gemas, logros, feed social con amigos, chat 1:1, recomendaciones con IA (Claude) y un recomendador colaborativo (Matrix Factorization) entrenado offline.
 
 **Elevator pitch técnico:** SPA de React 18 servida por Vite como PWA instalable, con **Supabase como backend completo** (Auth, Postgres con RLS, triggers SECURITY DEFINER como "servidor de autoridad") y **funciones serverless de Vercel** solo para proxies (Anthropic, Google Books) y lectura de recomendaciones. No hay backend propio persistente.
 
@@ -101,7 +103,7 @@ FOLIO FINAL/
 ├── requirements.txt          # Deps de Python del job de entrenamiento
 ├── vite.config.js            # PWA manifest + estrategias de caché Workbox
 ├── vercel.json               # Cache-Control no-store para index.html/sw.js (¡crítico para PWA!)
-├── generate-icons.mjs        # Genera iconos PWA desde SVG (usa @resvg/resvg-js)
+├── generate-icons.mjs        # Genera iconos PWA reescalando `SEMA LOGO PROVISIONAL.png` (usa @resvg/resvg-js)
 ├── AUDITORIA_FASE1_REPORTE.md / SISTEMA_MASCOTAS_EVOLUTIVAS.md  # Reporte de auditoría de esquema y diseño futuro de mascotas
 └── .env / .env.example       # Ver "Variables de entorno" en §III (⚠️ .env.example está desactualizado)
 ```
@@ -265,7 +267,7 @@ Tab Trueque → TruequeMain carga en paralelo: trueque_status() · user_exchange
 
 **Estados del match:** `pending` → (primer mensaje) `chatting` → `completed`. Laterales: `cancelled` (el dueño quitó el libro, o una búsqueda nueva lo reemplazó por otro mientras seguía `pending`) y `expired` (`expires_at` = creación + 14 días).
 
-**Monetización (freemium):** `users.is_premium` = Folio Plus. **No hay pago real**; se activa a mano (`UPDATE users SET is_premium = true WHERE id = '<uuid>'`). Los límites viven en la tabla `trueque_gems_cost`, editable sin redeploy.
+**Monetización (freemium):** `users.is_premium` = SEMA Plus. **No hay pago real**; se activa a mano (`UPDATE users SET is_premium = true WHERE id = '<uuid>'`). Los límites viven en la tabla `trueque_gems_cost`, editable sin redeploy.
 
 **Supuestos tomados en el MVP (ambigüedades del spec → opción más simple):**
 - **Una fila por pareja:** `user_a_id < user_b_id` (orden canónico) y **un solo match vivo por pareja**, con el primer libro que empata de cada lado. Si hay varios libros en común, se negocia en el chat.
@@ -488,7 +490,7 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | `LegalDisclaimerModal` | Texto legal exacto + checkbox obligatorio "Confirmo que he leído y acepto" |
 | `ExchangeChat` | Chat a pantalla completa: burbujas, mensajes de sistema, "Cargar mensajes anteriores", polling 8 s, botón "Completado" (confirma en 2 toques) |
 | `RatingModal` | 1-5 estrellas + reseña opcional (≤ 500) |
-| `PlusUpsellModal` | CTA placeholder de Folio Plus (botón "Próximamente", sin pago) |
+| `PlusUpsellModal` | CTA placeholder de SEMA Plus (botón "Próximamente", sin pago) |
 | `ui.jsx` | Helpers compartidos: `Sheet`, `fieldStyle`, `Label`, `PrimaryButton`, `ErrorText`, `CONDITION_LABELS` |
 | `TruequeRulesModal` *(v2)* | "Antes de empezar": 5 reglas de seguridad + casilla obligatoria "Confirmo que soy mayor de 18 años" (sin cerrar; "Ahora no" → Home) |
 | `LocationStep` *(v2)* | "Completa tu ubicación aproximada": selector de los 32 estados. CDMX guarda directo; otro estado abre `MyPlaces`. No importa Leaflet |
@@ -598,7 +600,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 - **Quién lo ve:** solo el dueño (RLS + REVOKE). Ninguna RPC devuelve coordenadas de otra persona; a los demás solo les llega un rango de distancia. El cálculo se hace dentro de Postgres.
 - **Mitigación de triangulación:** coordenadas ya redondeadas, rangos anchos y 1 cambio de coordenadas cada 24 h.
 - **UI:** texto fijo pidiendo marcar lugares públicos (metro, plaza, café) y no casa, escuela ni trabajo.
-- **Terceros:** los tiles se piden a `tile.openstreetmap.org` (el proveedor ve la IP y la zona del mapa que se mira, como cualquier mapa web). Desde v3, el texto que el usuario escribe en el buscador va a `nominatim.openstreetmap.org` (con su IP); FOLIO no lo guarda. No se envían pines a ningún tercero.
+- **Terceros:** los tiles se piden a `tile.openstreetmap.org` (el proveedor ve la IP y la zona del mapa que se mira, como cualquier mapa web). Desde v3, el texto que el usuario escribe en el buscador va a `nominatim.openstreetmap.org` (con su IP); SEMA no lo guarda. No se envían pines a ningún tercero.
 - **Borrado:** `trueque_profiles`, `trueque_pins` y `trueque_reports` son `ON DELETE CASCADE` a `users`; `delete_my_account()` los arrastra sin cambios.
 - **Mayoría de edad:** solo una autodeclaración (`adult_confirmed_at`), no hay verificación.
 
@@ -685,8 +687,8 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 12. **Columnas nuevas en `users`** requieren `GRANT SELECT (col) ON public.users TO authenticated` explícito (el REVOKE/GRANT por columna de `privacy_hardening.sql` se calculó una sola vez).
 13. **Trueque — TODOs de Sprint 2:**
     - ~~Migrar zonas fijas a Google Places API~~ — **sustituido 2026-10-03** por pines aproximados con Leaflet + OSM (Trueque v2); desde v3 ya no hay zonas: solo pines.
-    - Implementar "Embajadas FOLIO" (lugares aliados verificados; el disclaimer ya las anuncia).
-    - Pago real de Folio Plus: hoy `is_premium` se activa a mano y el CTA es placeholder con precio `$XX`.
+    - Implementar "Embajadas SEMA" (lugares aliados verificados; el disclaimer ya las anuncia).
+    - Pago real de SEMA Plus: hoy `is_premium` se activa a mano y el CTA es placeholder con precio `$XX`.
     - Push notifications para matches y mensajes nuevos (hoy el usuario tiene que entrar a la tab; el chat hace polling solo mientras está abierto).
 14. **Trueque — limitaciones conocidas del MVP:**
     - **Un match vivo por pareja**, con un libro por lado.
@@ -694,7 +696,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **Búsquedas O(usuarios con zona común):** suficiente para el MVP; con miles de usuarios por zona habría que materializar o paginar.
     - **Fotos huérfanas en Storage:** se quedan en el bucket `trueque` al quitar un libro o borrar la cuenta (no hay limpieza).
     - **Disclaimer por dispositivo:** la aceptación vive en `localStorage`, así que en otro dispositivo se vuelve a pedir.
-    - **Moderación mínima (v2):** ya hay botón "Reportar" en el chat (`trueque_reports`), pero **no** hay bloqueo de usuarios ni pantalla de moderación: León revisa la tabla a mano. El `LegalDisclaimerModal` todavía menciona soporte@folio.mx.
+    - **Moderación mínima (v2):** ya hay botón "Reportar" en el chat (`trueque_reports`), pero **no** hay bloqueo de usuarios ni pantalla de moderación: León revisa la tabla a mano. El `LegalDisclaimerModal` todavía menciona soporte@sema.mx.
     - **Mensaje de sistema a nombre del dueño:** cuando se cancela un match, el mensaje de sistema del chat usa `sender_id` = dueño del libro (con `is_system = true`).
     - **pg_cron puede faltar:** si la extensión no está habilitada, el SQL solo emite un NOTICE. La app igual oculta y expira los vencidos al listar y al buscar.
 

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const response = await fetch(url, {
       method: "HEAD",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; FolioApp/1.0)",
+        "User-Agent": "Mozilla/5.0 (compatible; SEMAApp/1.0)",
       },
       redirect: "follow",
       signal: AbortSignal.timeout(5000),

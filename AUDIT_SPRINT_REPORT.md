@@ -1,4 +1,4 @@
-# FOLIO — Reporte de auditoría (Sprint de limpieza 2026-09-22)
+# SEMA — Reporte de auditoría (Sprint de limpieza 2026-09-22)
 
 > Alcance: `src/` completo (App.jsx de 14,908 líneas leído entero, `services/`, `components/`, `pets/`, `main.jsx`), `api/`, `server.js`.
 > **Zonas intocables** (solo se reportan, no se modifican): Trueque (`trueque_schema.sql`, `src/components/trueque/`, `truequeService.js`), Auth (`authService.js`, `fix_signup_permissions.sql`, `repair_all_orphan_profiles.sql`) y el esquema/migraciones de Supabase.

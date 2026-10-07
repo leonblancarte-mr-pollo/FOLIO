@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Sprint 1: XP y gemas con autoridad SERVER-SIDE
+-- SEMA — Sprint 1: XP y gemas con autoridad SERVER-SIDE
 -- Correr en Supabase → SQL Editor (después de auth_rls_migration.sql).
 --
 -- Objetivo: que el navegador NO pueda manipular xp/level/gemas directamente.

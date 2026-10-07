@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Migración de features (jul 2026)
+-- SEMA — Migración de features (jul 2026)
 -- Correr en Supabase → SQL Editor. Cada bloque es independiente e idempotente.
 -- ============================================================================
 

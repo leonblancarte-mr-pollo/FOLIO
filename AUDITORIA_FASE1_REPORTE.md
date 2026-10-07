@@ -1,4 +1,4 @@
-# AUDITORÍA FOLIO — REPORTE FINAL (FASE 1)
+# AUDITORÍA SEMA — REPORTE FINAL (FASE 1)
 
 > **Nota de método.** No tengo credenciales para correr SQL contra tu Supabase, así que
 > el schema de abajo está **reconstruido desde el código** (las llamadas `.from(...)` en
@@ -15,7 +15,7 @@
 
 ## 0. Hallazgo que reordena todo el reporte
 
-Folio **no usa Supabase Auth**. Cero referencias a `supabase.auth`, `auth.uid()`,
+SEMA **no usa Supabase Auth**. Cero referencias a `supabase.auth`, `auth.uid()`,
 `signInWith*` o sesiones en todo `src/`. La autenticación es casera:
 
 - `users` tiene `password_hash`.
@@ -39,7 +39,7 @@ Esto tiene tres consecuencias que dominan el resto de la auditoría:
    que el hash es **SHA-256 sin sal por usuario** (solo un "pepper" estático y público en
    el código), los hashes son crackeables con GPU/rainbow tables casi triviales.
 
-Esto **no significa que "Folio esté roto"** — funciona. Significa que su seguridad real
+Esto **no significa que "SEMA esté roto"** — funciona. Significa que su seguridad real
 hoy es ≈ la de una base de datos pública. Para una sola persona probando, da igual. Para
 "escalar a UAM" (multiusuario real, datos de terceros), es el problema #1.
 
@@ -283,7 +283,7 @@ try {
 
 ## VI. RECOMENDACIÓN FINAL
 
-**Folio funciona y, en el detalle, está mejor construido de lo que el plan inicial asumía**
+**SEMA funciona y, en el detalle, está mejor construido de lo que el plan inicial asumía**
 (buen manejo de errores en datos, caché offline, lógica de rachas/mascota cuidada). Pero
 descansa sobre dos cosas que no escalan a multiusuario real:
 

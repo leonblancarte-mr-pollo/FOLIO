@@ -33,7 +33,7 @@ const ACHIEVEMENT_DEFS = [
   { key: "first_comment",     name: "Social",               desc: "Hiciste tu primer comentario",                     emoji: "💬", cat: "Social"   },
   { key: "comments_10",       name: "Conversador",          desc: "10 comentarios en total",                          emoji: "🗣️", cat: "Social"   },
   { key: "first_friend",      name: "Conector",             desc: "Agregaste tu primer amigo",                        emoji: "🤝", cat: "Social"   },
-  { key: "friends_5",         name: "Popular",              desc: "Tienes 5 amigos en Folio",                         emoji: "👥", cat: "Social"   },
+  { key: "friends_5",         name: "Popular",              desc: "Tienes 5 amigos en SEMA",                         emoji: "👥", cat: "Social"   },
   { key: "first_message",     name: "Mensajero",            desc: "Enviaste tu primer mensaje de chat",               emoji: "💌", cat: "Social"   },
   // Especiales
   { key: "top_reader",        name: "Top lector",           desc: "Leíste más que todos tus amigos este mes",         emoji: "🏆", cat: "Especial" },

@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Security patch: logros falsificables
+-- SEMA — Security patch: logros falsificables
 -- Correr en Supabase → SQL Editor, DESPUÉS de sprint1_server_authority.sql.
 --
 -- Problema: la política ach_write_own (auth_rls_migration.sql) es FOR ALL,

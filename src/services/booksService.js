@@ -67,7 +67,7 @@ function stripTotalPages(dbBook) {
 // Etiqueta legible de cuándo se leyó un libro, según la precisión elegida.
 function readDateLabel(book) {
   if (book.status !== "read") return null;
-  if (book.readDatePrecision === "before_folio") return "Leído antes de FOLIO 📚";
+  if (book.readDatePrecision === "before_folio") return "Leído antes de SEMA 📚";
   if (book.readDatePrecision === "unknown") return "Leído en otra vida ✨";
   if (!book.finishedAt) return null;
   const d = new Date(book.finishedAt);

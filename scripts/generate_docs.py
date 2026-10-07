@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FOLIO — Generador de la documentación extendida en Word.
+SEMA — Generador de la documentación extendida en Word.
 
 Lee DOCUMENTACION_ARQUITECTURA.md (fuente de verdad), lo expande con contexto,
 diagramas en texto, decisiones de arquitectura, guía para developers, glosario y
@@ -44,11 +44,11 @@ SQL_DIR = ROOT / "supabase"
 
 DOC_VERSION = "1.3 (extendida)"
 PENDING_COMMIT = ""   # se rellena con --pending "mensaje" para incluir el commit en curso en el apéndice E
-AUTHOR = "FOLIO Team"
+AUTHOR = "SEMA Team"
 SERIF = "Georgia"
 SANS = "Calibri"
 MONO = "Consolas"
-ACCENT = RGBColor(0x7A, 0x2E, 0x2E)   # accent de FOLIO (theme.js)
+ACCENT = RGBColor(0x7A, 0x2E, 0x2E)   # accent de SEMA (theme.js)
 GRAY = RGBColor(0x55, 0x55, 0x55)
 CODE_FILL = "F0F0F0"
 NOTE_FILL = "FBF3E4"
@@ -159,7 +159,7 @@ def setup_styles(doc):
     # Pie con numeración de página
     fp = sec.footer.paragraphs[0]
     fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = fp.add_run("FOLIO · Documentación de arquitectura  —  Página ")
+    r = fp.add_run("SEMA · Documentación de arquitectura  —  Página ")
     set_font(r, SANS, 8.5, color=GRAY)
     add_field(fp, "PAGE", "1")
     for run in fp.runs:
@@ -172,7 +172,7 @@ def setup_styles(doc):
     settings.append(uf)
 
     cp = doc.core_properties
-    cp.title = "FOLIO — Documentación de arquitectura técnica completa"
+    cp.title = "SEMA — Documentación de arquitectura técnica completa"
     cp.author = AUTHOR
     cp.subject = "Arquitectura, base de datos, servicios y guía de desarrollo"
     cp.language = "es-MX"
@@ -366,7 +366,7 @@ class Builder:
             d.add_paragraph()
         p = d.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r = p.add_run("FOLIO")
+        r = p.add_run("SEMA")
         set_font(r, SERIF, 54, bold=True, color=ACCENT)
         p = d.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -616,13 +616,13 @@ def git_first_date(path):
 # 5. CONTENIDO EXTENDIDO
 # ============================================================================
 INTRO = [
-    ("h2", "Qué es FOLIO"),
-    ("p", "**FOLIO** es una aplicación web progresiva (PWA) en español (es-MX) que combina tres cosas: una **biblioteca personal** "
+    ("h2", "Qué es SEMA"),
+    ("p", "**SEMA** es una aplicación web progresiva (PWA) en español (es-MX) que combina tres cosas: una **biblioteca personal** "
           "(qué libros tengo, cuáles leo, cuáles quiero, qué opino de ellos), una **red social de lectura** (feed, amigos, chat 1:1, "
           "citas compartidas, compatibilidad lectora) y una capa de **gamificación** inspirada en Duolingo: rachas diarias, una "
           "mascota virtual que sube de nivel con XP, gemas, logros y un resumen mensual tipo «Wrapped»."),
     ("p", "La propuesta de valor es convertir el hábito de leer —solitario y difícil de sostener— en algo visible, social y recompensado, "
-          "sin castigar: la racha se **pausa**, nunca se resetea. Sobre esa base FOLIO añade recomendaciones (tres motores distintos, "
+          "sin castigar: la racha se **pausa**, nunca se resetea. Sobre esa base SEMA añade recomendaciones (tres motores distintos, "
           "incluido un recomendador colaborativo entrenado offline) y, desde septiembre de 2026, el **Trueque**: intercambio de libros "
           "físicos entre usuarios cercanos de todo México (desde octubre de 2026, por pines aproximados en un mapa)."),
     ("p", "Técnicamente es una SPA de React 18 servida por Vite, con **Supabase** como backend completo (Auth, Postgres con RLS y "
@@ -664,7 +664,7 @@ INTRO = [
         "**Producción:** proyecto Vercel `folio-final`. El repositorio GitHub **no** está conectado a Vercel: los deploys son manuales (`vercel --prod`); un `git push` no despliega.",
         "**Backend:** Supabase con RLS en todas las tablas. Las migraciones SQL se corren a mano en el SQL Editor (no hay CLI configurada).",
         "**Seguridad:** XP, nivel, gemas, logros y racha solo se escriben desde Postgres; `is_public` se hace cumplir en RLS; `users.email` está fuera del SELECT de clientes.",
-        "**Trueque:** funcional; desde el 2026-10-03 (v2) exige estado y aceptar reglas (+18), admite hasta 3 pines aproximados (~1 km) y busca por cercanía calculada en Postgres (el cliente solo ve rangos). No hay pago real de Folio Plus (`is_premium` se activa a mano).",
+        "**Trueque:** funcional; desde el 2026-10-03 (v2) exige estado y aceptar reglas (+18), admite hasta 3 pines aproximados (~1 km) y busca por cercanía calculada en Postgres (el cliente solo ve rangos). No hay pago real de SEMA Plus (`is_premium` se activa a mano).",
         "**Bug abierto (2026-09-19):** el auto-perfil de cuentas huérfanas no dejó rastro en producción; hay instrumentación `[auth-debug]` disponible (`AUTH_DEBUG` en `authService.js`) a la espera de las trazas de un registro nuevo y de un login. Desde el sprint de higiene esos logs están apagados (`AUTH_DEBUG = false`); se reactivan poniéndolo en `true`.",
         "**Calidad:** sin suite de tests; App.jsx sigue siendo un monolito de ~14.900 líneas (ver sección de deuda técnica).",
     ]),
@@ -676,9 +676,9 @@ INTRO = [
         ["Corto plazo", "Correr `spend_gems.sql` en Supabase (cierra `buyExtraSaves`) y mover `daily_save_limits` a RPC SECURITY DEFINER", "Deuda #4 (resuelta en código) y #5"],
         ["Medio plazo", "Suite mínima de tests (servicios y RPCs críticas) y code-splitting del bundle (1.2 MB)", "Deuda #6 y #8"],
         ["Medio plazo", "Seguir extrayendo vistas de App.jsx a `src/components/`", "Deuda #1"],
-        ["Medio plazo", "Pago real de Folio Plus; push notifications de matches y mensajes", "Trueque Sprint 2"],
+        ["Medio plazo", "Pago real de SEMA Plus; push notifications de matches y mensajes", "Trueque Sprint 2"],
         ["Corto plazo", "Correr `trueque_geo.sql` en Supabase ANTES de desplegar el cliente (Trueque v2: estado, pines, cercanía, reportes)", "Trueque v2"],
-        ["Largo plazo", "Trueque: «Embajadas FOLIO», bloqueo de usuarios y pantalla de moderación de reportes", "Trueque Sprint 2 / v2"],
+        ["Largo plazo", "Trueque: «Embajadas SEMA», bloqueo de usuarios y pantalla de moderación de reportes", "Trueque Sprint 2 / v2"],
         ["Largo plazo", "Más mascotas (sistema evolutivo) y más motores de recomendación", "Puntos de extensión"],
     ], [0.14, 0.62, 0.24]),
     ("h2", "Cómo leer este documento"),
@@ -691,7 +691,7 @@ INTRO = [
 ]
 
 DECISIONS = [
-    ("note", "**Nota de método.** FOLIO no tiene un registro formal de decisiones (ADR). Las razones de este capítulo se reconstruyen "
+    ("note", "**Nota de método.** SEMA no tiene un registro formal de decisiones (ADR). Las razones de este capítulo se reconstruyen "
              "del código, de la documentación y de las restricciones del producto; donde una decisión fue más histórica que deliberada "
              "(por ejemplo el monolito App.jsx) se dice explícitamente."),
     ("h2", "Supabase en lugar de Firebase"),
@@ -835,7 +835,7 @@ export async function setWeeklyGoal(userId, pages) {
 ]
 
 GLOSSARY = [
-    ("Gemas", "Moneda virtual de FOLIO. Se ganan (libro terminado +50, sesión de lectura +5, bono diario, logros +10) y se gastan (BookTinder, búsqueda de matches del Trueque −20). Solo se leen en el cliente; toda escritura pasa por RPCs/triggers."),
+    ("Gemas", "Moneda virtual de SEMA. Se ganan (libro terminado +50, sesión de lectura +5, bono diario, logros +10) y se gastan (BookTinder, búsqueda de matches del Trueque −20). Solo se leen en el cliente; toda escritura pasa por RPCs/triggers."),
     ("XP / Nivel", "Experiencia de la mascota. `xpForLevel = nivel × 100`, tope de nivel 50. Lo calcula el servidor en `folio_award`."),
     ("Mascota", "Compañero virtual del usuario (hoy un gato, «El Sensible») que sube de nivel con XP. Tabla `user_pets`; el cliente solo puede renombrarla."),
     ("Streak / Racha", "Días consecutivos leyendo. Filosofía anti-castigo: si falta un día la racha se **pausa**, no se resetea. Solo la avanza la RPC `update_streak()`."),
@@ -848,7 +848,7 @@ GLOSSARY = [
     ("Crédito de búsqueda", "Vale de un solo uso (tabla interna `trueque_search_credits`) que emite `cost_search_matches` y consume `find_book_matches`, para que no se pueda buscar gratis."),
     ("Zona (histórico)", "Una de las 25 zonas fijas de CDMX del MVP del Trueque (enum `exchange_zone`). Desde v3 (2026-10-03) no se usan ni se muestran; `user_exchange_zones` queda solo como historial."),
     ("Buscador de lugares", "Campo arriba del mapa de «Mis lugares» que consulta Nominatim (OpenStreetMap) y coloca el siguiente pin en el lugar elegido. El texto buscado no se guarda."),
-    ("Folio Plus (`is_premium`)", "Plan de pago del Trueque con límites mayores. Aún sin pasarela: se activa a mano en SQL."),
+    ("SEMA Plus (`is_premium`)", "Plan de pago del Trueque con límites mayores. Aún sin pasarela: se activa a mano en SQL."),
     ("`folio_award`", "Función SECURITY DEFINER, única puerta de otorgamiento de XP/gemas. Idempotente vía `reward_ledger`; revocada a clientes."),
     ("`reward_ledger`", "Libro mayor de recompensas: una fila por (usuario, motivo, ref) única. Garantiza que un premio no se pague dos veces."),
     ("Server authority", "Principio: todo valor «ganable» se decide en Postgres, no en el cliente."),
@@ -868,7 +868,7 @@ GLOSSARY = [
     ("Logro (achievement)", "Hito desbloqueable (27 definidos). El cliente propone candidatos y `award_achievement(key)` los valida en SQL."),
     ("Event bus", "Pub/sub casero (`petBus`, `gemsEventBus`, `achievementBus`) para que servicios sin React notifiquen a la UI."),
     ("`users_public`", "Vista `security_invoker` con columnas públicas de `users` (sin email). Creada por `privacy_hardening.sql`; aún sin uso."),
-    ("Embajadas FOLIO", "Lugares aliados verificados para intercambios (pendiente de Sprint 2; el disclaimer ya las anuncia)."),
+    ("Embajadas SEMA", "Lugares aliados verificados para intercambios (pendiente de Sprint 2; el disclaimer ya las anuncia)."),
     ("Buscalibre / afiliado", "Tienda a la que apuntan los links de compra, con `VITE_BUSCALIBRE_AFFILIATE_ID`."),
     ("UAM", "Universidad Autónoma Metropolitana; su catálogo curado vive en `UAMLibraryView` y los libros llevan `is_uam_book`."),
     ("PWA", "Progressive Web App: la app instalable con service worker (Workbox) y soporte offline."),
@@ -1011,7 +1011,7 @@ CORE_SCHEMA = {
               [("id", "uuid, PK (= auth.uid())"), ("nombre", "text (nombre visible; el cliente lo mapea a `name`)"), ("username", "text (asumido único)"),
                ("email", "text (SIN SELECT para clientes)"), ("avatar_url", "text"), ("cover_url", "text"), ("bio", "text"),
                ("is_public", "boolean, default true"), ("preferred_genres", "text[] (onboarding)"), ("onboarding_completed", "boolean"),
-               ("is_premium", "boolean NOT NULL DEFAULT false (Folio Plus; protegido por `guard_users_premium`)")]),
+               ("is_premium", "boolean NOT NULL DEFAULT false (SEMA Plus; protegido por `guard_users_premium`)")]),
     "books": ("Biblioteca por usuario (por valor, sin FK a catálogo).",
               [("id", "uuid PK"), ("user_id", "uuid → users"), ("title / author", "text"), ("status", "reading | want_to_read | wish | read"),
                ("genre / summary / review", "text"), ("rating", "int"), ("cover_url", "text"), ("mood_tags", "text[]"), ("added_at / finished_at", "timestamptz"),
@@ -1221,7 +1221,7 @@ def build(doc, toc_entries):
     b.heading(1, "Guía para nuevos developers")
     b.render(GUIDE)
     b.heading(1, "Glosario")
-    b.paragraph("Términos específicos de FOLIO, en orden de aparición temática.")
+    b.paragraph("Términos específicos de SEMA, en orden de aparición temática.")
     b.table(["Término", "Significado"], [[t if "`" in t else f"**{t}**", d] for t, d in GLOSSARY], [0.24, 0.76])
 
     # Apéndices

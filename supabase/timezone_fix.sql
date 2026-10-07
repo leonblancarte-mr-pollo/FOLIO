@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Fix de zonas horarias: unificar a fecha local México server-side
+-- SEMA — Fix de zonas horarias: unificar a fecha local México server-side
 -- Correr en Supabase → SQL Editor, DESPUÉS de sprint1_server_authority.sql.
 --
 -- Problema: pet_daily_checkin() y claim_daily_gems() usan `current_date`,

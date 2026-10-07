@@ -134,8 +134,8 @@ const ACHIEVEMENT_CONDITION_MAP = {
   streak_90:         "Mantén una racha de 90 días consecutivos",
   first_comment:     "Comenta en la publicación de un amigo",
   comments_10:       "Haz 10 comentarios en total",
-  first_friend:      "Agrega tu primer amigo en Folio",
-  friends_5:         "Ten 5 amigos en Folio",
+  first_friend:      "Agrega tu primer amigo en SEMA",
+  friends_5:         "Ten 5 amigos en SEMA",
   first_message:     "Envía tu primer mensaje de chat",
   top_reader:        "Lee más que todos tus amigos en un mes",
   uam_book:          "Agrega un libro de la Biblioteca UAM",
@@ -596,7 +596,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
     <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}`, paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span
-          aria-label="Folio"
+          aria-label="SEMA"
           style={{
             fontFamily: "Fraunces, serif",
             fontStyle: "italic",
@@ -1593,7 +1593,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
     ];
     if (stars) lines.push("", stars + ` (${book.rating}/5)`);
     if (book.review?.trim()) lines.push("", `"${book.review.trim()}"`);
-    lines.push("", "— compartido desde Folio");
+    lines.push("", "— compartido desde SEMA");
     const text = lines.join("\n");
 
     try {
@@ -2607,7 +2607,7 @@ function AuthView({ onLogin }) {
               lineHeight: 1,
             }}
           >
-            Folio
+            SEMA
           </h1>
           <span style={{ color: palette.amber, fontSize: "1.5rem", marginLeft: "0.2rem" }}>·</span>
         </div>
@@ -2624,7 +2624,7 @@ function AuthView({ onLogin }) {
           <div style={{ width: "100%", maxWidth: 420, marginBottom: "1rem", padding: "0.7rem 1rem", backgroundColor: `${BRAND.amber}14`, border: `1px solid ${BRAND.amber}40`, borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <span style={{ fontSize: "1.1rem" }}>👋</span>
             <p style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft, margin: 0 }}>
-              <strong style={{ color: palette.ink }}>@{ref}</strong> te invitó a Folio
+              <strong style={{ color: palette.ink }}>@{ref}</strong> te invitó a SEMA
             </p>
           </div>
         );
@@ -2863,8 +2863,8 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
   const ref = userUsername || userName || "folio";
   const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(ref)}`;
   const peakMsg = isStreakAch
-    ? `Llevo ${streakDays} días leyendo seguido en Folio 🔥 ¿Puedes superarme? https://folio-final.vercel.app`
-    : `Acabo de desbloquear '${def?.name}' en Folio 🏆 ¿Te animas a leer conmigo? https://folio-final.vercel.app`;
+    ? `Llevo ${streakDays} días leyendo seguido en SEMA 🔥 ¿Puedes superarme? https://folio-final.vercel.app`
+    : `Acabo de desbloquear '${def?.name}' en SEMA 🏆 ¿Te animas a leer conmigo? https://folio-final.vercel.app`;
 
   useEffect(() => {
     if (!def) return;
@@ -2885,10 +2885,10 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
   }, [achievementKey]);
 
   async function handleAchievementShare() {
-    const msg = `Acabo de desbloquear '${def.name}' en Folio. ¿Te animas a leer más este año? Únete aquí 👇`;
+    const msg = `Acabo de desbloquear '${def.name}' en SEMA. ¿Te animas a leer más este año? Únete aquí 👇`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Folio — Tu biblioteca personal", text: msg, url: refUrl });
+        await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
       } else {
         setAchInviteOpen(true);
       }
@@ -2901,7 +2901,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
     markInviteCardShown();
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Folio — Tu biblioteca personal", text: peakMsg, url: refUrl });
+        await navigator.share({ title: "SEMA — Tu biblioteca personal", text: peakMsg, url: refUrl });
       } else {
         setAchInviteOpen(true);
       }
@@ -3785,10 +3785,10 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           onClick={async () => {
             const username = profile.username || user.name || "Alguien";
             const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-            const msg = `Llevo ${books.length} libros en mi biblioteca de Folio. Únete y veamos qué tenemos en común 📚`;
+            const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común 📚`;
             try {
               if (navigator.share) {
-                await navigator.share({ title: "Folio — Tu biblioteca personal", text: msg, url: refUrl });
+                await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
               } else {
                 setInviteModalOpen(true);
               }
@@ -3805,7 +3805,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       {inviteModalOpen && (() => {
         const username = profile.username || user.name || "Alguien";
         const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-        const msg = `Llevo ${books.length} libros en mi biblioteca de Folio. Únete y veamos qué tenemos en común 📚`;
+        const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común 📚`;
         return <InviteShareModal message={msg} url={refUrl} onClose={() => setInviteModalOpen(false)} />;
       })()}
 
@@ -5772,7 +5772,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
   }
 
   async function handleShare() {
-    const msg = `Acabo de leer "${cuento.titulo}" de ${cuento.autor} en Folio 📚`;
+    const msg = `Acabo de leer "${cuento.titulo}" de ${cuento.autor} en SEMA 📚`;
     const url = "https://folio-final.vercel.app";
     try {
       if (navigator.share) {
@@ -5935,7 +5935,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
     markInviteCardShown();
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Folio — Tu biblioteca personal", text: message, url });
+        await navigator.share({ title: "SEMA — Tu biblioteca personal", text: message, url });
         onClose();
       } else {
         setInviteOpen(true);
@@ -5963,7 +5963,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
         textAlign: "center",
       }}>
         <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: ink, lineHeight: 1.3, marginBottom: "1rem" }}>
-          Folio es mejor<br />con alguien más
+          SEMA es mejor<br />con alguien más
         </p>
         <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginBottom: "1rem" }}>
           <div style={{
@@ -6037,10 +6037,10 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
   async function handleFriendsInvite() {
     const username = user.username || user.name || "Alguien";
     const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-    const msg = `${user.name || username} te invita a Folio. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
+    const msg = `${user.name || username} te invita a SEMA. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
     try {
       if (navigator.share) {
-        await navigator.share({ title: "Folio — Tu biblioteca personal", text: msg, url: refUrl });
+        await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
       } else {
         setInviteModalOpen(true);
       }
@@ -6308,7 +6308,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
         style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", width: "100%", padding: "0.875rem 1rem", marginBottom: "1rem", border: `1.5px solid ${palette.accent}`, borderRadius: "14px", backgroundColor: "transparent", color: palette.accent, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.9rem", fontWeight: 600, cursor: "pointer" }}
       >
         <UserPlus size={18} strokeWidth={2} />
-        Invitar amigos a Folio
+        Invitar amigos a SEMA
       </button>
 
       {/* Search — always visible */}
@@ -6547,7 +6547,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
       {inviteModalOpen && (() => {
         const username = user.username || user.name || "Alguien";
         const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-        const msg = `${user.name || username} te invita a Folio. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
+        const msg = `${user.name || username} te invita a SEMA. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
         return <InviteShareModal message={msg} url={refUrl} onClose={() => setInviteModalOpen(false)} />;
       })()}
     </div>
@@ -8892,9 +8892,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   async function handleInvite() {
     const username = user.username || user.name || "Alguien";
     const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-    const msg = `${user.name || username} te invita a Folio. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
+    const msg = `${user.name || username} te invita a SEMA. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
     try {
-      if (navigator.share) await navigator.share({ title: "Folio — Tu biblioteca personal", text: msg, url: refUrl });
+      if (navigator.share) await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
     } catch (e) { /* user cancelled */ }
   }
 
@@ -9516,7 +9516,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           {/* Invitar amigo */}
           <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: 14, padding: "1.1rem 1.25rem" }}>
             <p style={{ ...display, fontSize: "1rem", color: palette.ink, margin: "0 0 0.2rem" }}>Invita a un amigo y lean juntos</p>
-            <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>Comparte tu link personal de Folio</p>
+            <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>Comparte tu link personal de SEMA</p>
             <button onClick={handleInvite} style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.bg, color: palette.ink, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}>
               Invitar amigo
             </button>
@@ -9970,7 +9970,7 @@ function QuoteShareCard({ quote, cardRef }) {
     <div ref={cardRef} style={{ width: "320px", background: BRAND.gradientShareCard, borderRadius: "20px", padding: "2.5rem 2rem 1.75rem", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: "1rem", minHeight: "380px" }}>
       <div style={{ position: "absolute", top: -60, right: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
-      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>FOLIO</p>
+      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>SEMA</p>
       <div style={{ fontFamily: "Georgia, serif", fontSize: "4rem", lineHeight: 0.9, color: "rgba(42,31,26,0.18)", margin: 0 }}>"</div>
       <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "1.15rem", lineHeight: 1.62, color: BRAND.ink, margin: 0, flex: 1 }}>
         {(quote.text || "").length > 220 ? (quote.text || "").slice(0, 220) + "…" : quote.text}
@@ -10001,14 +10001,14 @@ function QuoteShareModal({ quote, onClose }) {
       const { default: html2canvas } = await import("html2canvas");
       const canvas = await html2canvas(cardRef.current, { scale: 2.5, useCORS: true, backgroundColor: null, logging: false });
       canvas.toBlob(async blob => {
-        const file = new File([blob], "frase-folio.png", { type: "image/png" });
+        const file = new File([blob], "frase-sema.png", { type: "image/png" });
         if (navigator.share && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: "Frase guardada en Folio" });
+          await navigator.share({ files: [file], title: "Frase guardada en SEMA" });
           setShared(true);
         } else {
           const url = canvas.toDataURL("image/png");
           const a = document.createElement("a");
-          a.href = url; a.download = "frase-folio.png"; a.click();
+          a.href = url; a.download = "frase-sema.png"; a.click();
           setShared(true);
         }
       }, "image/png");
@@ -10618,7 +10618,7 @@ function WrappedStoryExperience({ wrap, onClose }) {
 
     if (slide.type === "intro") return (
       <div style={{ textAlign: "center" }}>
-        <p style={{ fontFamily: "system-ui", fontSize: "0.72rem", fontWeight: 600, color: "rgba(245,237,224,0.5)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "1rem" }}>folio</p>
+        <p style={{ fontFamily: "system-ui", fontSize: "0.72rem", fontWeight: 600, color: "rgba(245,237,224,0.5)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "1rem" }}>sema</p>
         <p style={{ ...big, fontSize: "clamp(2.4rem, 10vw, 3.2rem)", marginBottom: "0.5rem" }}>tu {isAnnual ? "año" : "mes"}</p>
         <p style={{ ...big, fontSize: "clamp(2rem, 8vw, 2.8rem)", color: BRAND.amberLight }}>{periodLabel}</p>
         <p style={{ ...sub, fontSize: "1rem", marginTop: "1.5rem" }}>en libros</p>
@@ -10739,9 +10739,9 @@ function WrappedStoryExperience({ wrap, onClose }) {
       const isA = wt === "annual";
       const mn = isA ? null : MONTHS_ES[(m || 1) - 1];
       const label = isA ? `${y}` : `${mn} ${y}`;
-      const text = `mi wrapped de ${label} en folio: ${d.booksRead?.length || 0} libros, ${d.totalPages || 0} páginas${d.topGenre ? `, mi género favorito fue ${d.topGenre}` : ""}. #folio #lectura`;
+      const text = `mi wrapped de ${label} en sema: ${d.booksRead?.length || 0} libros, ${d.totalPages || 0} páginas${d.topGenre ? `, mi género favorito fue ${d.topGenre}` : ""}. #sema #lectura`;
       if (navigator.share) {
-        try { await navigator.share({ title: "Mi Folio Wrapped", text }); setShared(true); } catch { /* share cancelado */ }
+        try { await navigator.share({ title: "Mi SEMA Wrapped", text }); setShared(true); } catch { /* share cancelado */ }
       } else {
         try { await navigator.clipboard.writeText(text); setShared(true); setTimeout(() => setShared(false), 2500); } catch (err) { console.warn("[wrapped] no se pudo copiar:", err); }
       }
@@ -10756,7 +10756,7 @@ function WrappedStoryExperience({ wrap, onClose }) {
         if (el) {
           const canvas = await html2canvas(el, { backgroundColor: null, scale: 2, useCORS: true });
           const link = document.createElement("a");
-          link.download = `folio-wrapped.png`;
+          link.download = `sema-wrapped.png`;
           link.href = canvas.toDataURL("image/png");
           link.click();
         }
@@ -10851,7 +10851,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 130, height: 130, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
 
       {/* Logo */}
-      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>FOLIO</p>
+      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>SEMA</p>
 
       {/* Book cover */}
       <div style={{ position: "relative", marginTop: "0.25rem", marginBottom: "0.25rem" }}>
@@ -10936,14 +10936,14 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
       await new Promise((resolve) => {
         canvas.toBlob(async (blob) => {
           try {
-            const file = new File([blob], "folio-logro.png", { type: "image/png" });
+            const file = new File([blob], "sema-logro.png", { type: "image/png" });
             if (navigator.canShare?.({ files: [file] })) {
-              await navigator.share({ files: [file], title: `Terminé "${book.title}" en Folio` });
+              await navigator.share({ files: [file], title: `Terminé "${book.title}" en SEMA` });
               setShared(true);
             } else {
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
-              a.href = url; a.download = "folio-logro.png"; a.click();
+              a.href = url; a.download = "sema-logro.png"; a.click();
               URL.revokeObjectURL(url);
             }
           } catch (e) { /* cancelled */ }
@@ -10960,7 +10960,7 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
     try {
       const canvas = await getCanvas();
       const link = document.createElement("a");
-      link.download = `folio-${book.title.slice(0, 30).replace(/\s+/g, "-")}.png`;
+      link.download = `sema-${book.title.slice(0, 30).replace(/\s+/g, "-")}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (err) { console.error("Download error:", err); }
@@ -11345,7 +11345,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
           <p style={{ ...body, color: palette.onDarkFaint, fontSize: "0.9rem", marginBottom: "2rem" }}>
             {wantCount > 0
               ? `Tienes ${wantCount} ${wantCount === 1 ? "libro" : "libros"} esperándote en tu biblioteca`
-              : "Folio tiene miles de libros esperándote"}
+              : "SEMA tiene miles de libros esperándote"}
           </p>
 
           <button
@@ -11378,7 +11378,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
 
           {showPeakInvite && friendCount >= 0 && friendCount < 5 && canShowInviteCard() && (
             <PeakInviteCard
-              message={`Acabo de terminar "${book.title}" en Folio 📚 Es una app para llevar tu biblioteca personal y ver qué leen tus amigos. Únete: https://folio-final.vercel.app`}
+              message={`Acabo de terminar "${book.title}" en SEMA 📚 Es una app para llevar tu biblioteca personal y ver qué leen tus amigos. Únete: https://folio-final.vercel.app`}
               url="https://folio-final.vercel.app"
               userInitial={(user.name || "?")[0]}
               onClose={() => setShowPeakInvite(false)}
@@ -12512,7 +12512,7 @@ function OnboardingStep1({ selectedGenres, setSelectedGenres, onNext }) {
   return (
     <div style={{ padding: "0 1.25rem 2.5rem", maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
       <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
-        Bienvenido a Folio
+        Bienvenido a SEMA
       </h1>
       <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "1.75rem", lineHeight: 1.55 }}>
         Cuéntanos tus gustos para personalizar tu experiencia
@@ -12993,7 +12993,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
 
       {!searching && query.trim() && results.length === 0 && (
         <p style={{ ...body, fontSize: "0.88rem", color: palette.inkFaint, textAlign: "center", fontStyle: "italic", marginBottom: "1.5rem" }}>
-          No encontramos a "{query}" en Folio aún.
+          No encontramos a "{query}" en SEMA aún.
         </p>
       )}
 
@@ -13060,7 +13060,7 @@ function NewUserOnboarding({ user, onComplete }) {
 
       {/* Top bar */}
       <div style={{ padding: "1.1rem 1.5rem 0", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <span style={{ ...display, fontSize: "1.05rem", fontStyle: "italic", color: palette.accent }}>Folio</span>
+        <span style={{ ...display, fontSize: "1.05rem", fontStyle: "italic", color: palette.accent }}>SEMA</span>
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
           {[1, 2, 3, 4].map(n => (
             <div key={n} style={{
@@ -13082,7 +13082,7 @@ function NewUserOnboarding({ user, onComplete }) {
           <div style={{ margin: "0.85rem 1.5rem 0", padding: "0.65rem 1rem", backgroundColor: `${BRAND.amber}14`, border: `1px solid ${BRAND.amber}30`, borderRadius: "10px", display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <span style={{ fontSize: "1rem" }}>👋</span>
             <p style={{ ...body, fontSize: "0.84rem", color: palette.inkSoft, margin: 0 }}>
-              <strong style={{ color: palette.ink }}>{ref}</strong> te invitó a Folio
+              <strong style={{ color: palette.ink }}>{ref}</strong> te invitó a SEMA
             </p>
           </div>
         );

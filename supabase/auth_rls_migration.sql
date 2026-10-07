@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Migración a Supabase Auth + RLS  (Plan A, wipe limpio)
+-- SEMA — Migración a Supabase Auth + RLS  (Plan A, wipe limpio)
 -- Correr en Supabase → SQL Editor, en ESTE orden, por bloques.
 --
 -- Filosofía RLS: el agujero real es el acceso ANÓNIMO con la anon key del bundle.

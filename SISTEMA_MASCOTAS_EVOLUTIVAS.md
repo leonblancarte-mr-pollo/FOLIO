@@ -1,4 +1,4 @@
-# FOLIO — Sistema de Mascotas Evolutivas
+# SEMA — Sistema de Mascotas Evolutivas
 ## Documento maestro de diseño, arquitectura e implementación
 
 > Versión 1.0 — 15 de julio de 2026
@@ -8,7 +8,7 @@
 
 # 0. RESUMEN EJECUTIVO
 
-FOLIO ya tiene un sistema de mascota funcional pero embrionario: un solo gato, niveles 1–50 por XP, sin evoluciones visuales, sin tienda, sin mensajes contextuales, con un sistema de gemas **ya implementado pero deliberadamente oculto en la UI**. Este documento especifica cómo convertir ese embrión en el loop de retención central de FOLIO.
+SEMA ya tiene un sistema de mascota funcional pero embrionario: un solo gato, niveles 1–50 por XP, sin evoluciones visuales, sin tienda, sin mensajes contextuales, con un sistema de gemas **ya implementado pero deliberadamente oculto en la UI**. Este documento especifica cómo convertir ese embrión en el loop de retención central de SEMA.
 
 **Las 5 decisiones más importantes de este documento (y donde contradigo el brief):**
 
@@ -74,7 +74,7 @@ Nota importante: el FK apunta a la tabla propia `users`, **no** a `auth.users` c
 
 **Psicología:** la paradoja de la elección (Schwartz) aplica en onboarding: 6 opciones con personalidades matizadas aumenta el tiempo de decisión y el arrepentimiento post-elección. 4 arquetipos limpios (sofisticado / nerd entusiasta / aventurero / calmado) cubren el espectro emocional sin solapamiento. Serpiente (introspectiva) solapa con Gato (crítico-reflexivo); Mariposa (transformadora) solapa con Luciérnaga (esperanza suave).
 
-**El beneficio oculto:** lanzar Serpiente y Mariposa en el mes 2-3 como eventos ("llegó alguien nuevo a FOLIO…") es un beat de contenido que reactiva usuarios dormidos gratis. Un roadmap de mascotas > todas las mascotas el día 1.
+**El beneficio oculto:** lanzar Serpiente y Mariposa en el mes 2-3 como eventos ("llegó alguien nuevo a SEMA…") es un beat de contenido que reactiva usuarios dormidos gratis. Un roadmap de mascotas > todas las mascotas el día 1.
 
 **Decisión propuesta:** MVP = Gato (rediseño), Búho, Zorro, Luciérnaga. Post-MVP = Serpiente (mes 2), Mariposa (mes 3).
 
@@ -84,7 +84,7 @@ El brief pide "gato siamés elegante" Y "debe verse claramente mejor pero recono
 
 **Propuesta que resuelve ambas cosas:**
 - **Se mantiene:** gato negro, ojos grandes crema, el libro sostenido con la cola (esta es su firma única — ninguna otra app la tiene), proporciones cabezonas.
-- **Cambia:** estilo de render (de "anime AI-gen" a vector suave del sistema §4), interior de orejas pasa de morado-Jiji a **terracota FOLIO** (`#C8924A`), ojos rediseñados con forma propia (almendrados con brillo doble, no los círculos Jiji), collar con dije de pluma (nuevo elemento distintivo), y postura ligeramente más erguida y "crítica".
+- **Cambia:** estilo de render (de "anime AI-gen" a vector suave del sistema §4), interior de orejas pasa de morado-Jiji a **terracota SEMA** (`#C8924A`), ojos rediseñados con forma propia (almendrados con brillo doble, no los círculos Jiji), collar con dije de pluma (nuevo elemento distintivo), y postura ligeramente más erguida y "crítica".
 - La personalidad "sofisticado, crítico, cita a Borges" funciona idéntica en un gato negro — de hecho mejor (gato negro = misterio literario).
 
 Esto elimina el riesgo IP (§1.3.5), mantiene el vínculo, y da el upgrade visual. La animación de migración "tu gato ha crecido" (§9) hace el resto.
@@ -193,10 +193,10 @@ reading_logs ──(trigger insert)──▶ xp por páginas + racha
 
 ## 4.1 Fundamentos compartidos (las 6 mascotas)
 
-- **Paleta madre (ya es la de FOLIO):** crema `#F4EDE0`, tinta `#2A1F1A`, vino `#7A2E2E`, terracota `#C8924A`, verde bosque `#2E5A3E`, azul noche `#131F38`. Cada mascota toma 2 colores propios + los neutros.
+- **Paleta madre (ya es la de SEMA):** crema `#F4EDE0`, tinta `#2A1F1A`, vino `#7A2E2E`, terracota `#C8924A`, verde bosque `#2E5A3E`, azul noche `#131F38`. Cada mascota toma 2 colores propios + los neutros.
 - **Proporciones:** cabeza = 40-45% de la altura total (cría) bajando a 33% en etapa 4 (madurar = estilizarse). Ojos enormes SIEMPRE (es el rasgo de familia que unifica el universo).
 - **Trazo:** contorno orgánico de grosor variable, color tinta cálida (`#2A1F1A`), nunca negro puro. Esquinas redondeadas, cero ángulos agresivos.
-- **Regla del accesorio literario:** cada mascota interactúa con un objeto de lectura a su manera (el gato: libro en la cola; el búho: lentes y pergamino; el zorro: mapa/brújula; la luciérnaga: ilumina la página). Esto ancla todas al tema de FOLIO.
+- **Regla del accesorio literario:** cada mascota interactúa con un objeto de lectura a su manera (el gato: libro en la cola; el búho: lentes y pergamino; el zorro: mapa/brújula; la luciérnaga: ilumina la página). Esto ancla todas al tema de SEMA.
 - **Evolución visual por capas:** E1 formas planas → E2 + textura/patrón → E3 + accesorio simbólico → E4 + aura/glow (CSS, no en el asset: el glow se hace con `filter: drop-shadow` animado, así un solo asset sirve para modo claro y oscuro).
 
 ## 4.2 Rediseño del Gato Literario (spec de cambios exactos)
@@ -241,7 +241,7 @@ reading_logs ──(trigger insert)──▶ xp por páginas + racha
 
 ## 5.1 Decisión técnica: PNG por capas + CSS (no Lottie en MVP)
 
-Razones: (a) el pipeline actual ya es PNG y funciona; (b) Lottie exige After Effects + Bodymovin y nadie en el equipo lo domina; (c) las animaciones del brief (parpadeo, respiración, idle, reacción) se logran al 100% con capas + CSS; (d) `lottie-web` pesa ~250KB y FOLIO es PWA móvil. Lottie queda para post-MVP.
+Razones: (a) el pipeline actual ya es PNG y funciona; (b) Lottie exige After Effects + Bodymovin y nadie en el equipo lo domina; (c) las animaciones del brief (parpadeo, respiración, idle, reacción) se logran al 100% con capas + CSS; (d) `lottie-web` pesa ~250KB y SEMA es PWA móvil. Lottie queda para post-MVP.
 
 **Estructura de capas por estado:**
 ```
@@ -785,9 +785,9 @@ Los mensajes se muestran en la burbuja del Hub y se registran en `pet_interactio
 1. **Modelo Hook (Nir Eyal, *Hooked*, 2014).** Trigger (notificación suave/curiosidad "¿cómo está mi mascota?") → Acción (abrir app, tap) → Recompensa variable (mensaje impredecible del pool §10 + evolución no anunciada) → Inversión (nombrar, vestir, acumular memorias). La inversión es la fase que Beek nunca construyó: aquí cada libro leído deposita valor DENTRO de la mascota (`books_read_together`, memorias).
 2. **Recompensa de razón variable (Ferster & Skinner, 1957).** El refuerzo impredecible produce la tasa de respuesta más alta y resistente a extinción. Aplicación: el momento exacto de evolución no se comunica; los mensajes rotan sin repetición próxima (§10.1). Límite ético: sin loot boxes ni azar pagado — el azar aquí solo decide QUÉ mensaje, nunca CUÁNTO valor.
 3. **Efecto de progreso dotado (Nunes & Drèze, 2006).** El avance percibido acelera el compromiso. Aplicación: la migración regala etapa visible (§9); el onboarding entrega mascota E1 + primera meta alcanzable en días (§2.3).
-4. **Teoría de la autodeterminación (Deci & Ryan, 2000).** Competencia (niveles/etapas), autonomía (elección de mascota, qué leer, qué comprar — nunca "debes leer X"), relación (la mascota como vínculo + squads). Duolingo falla en autonomía (presión); FOLIO la protege: la mascota jamás prescribe, invita.
+4. **Teoría de la autodeterminación (Deci & Ryan, 2000).** Competencia (niveles/etapas), autonomía (elección de mascota, qué leer, qué comprar — nunca "debes leer X"), relación (la mascota como vínculo + squads). Duolingo falla en autonomía (presión); SEMA la protege: la mascota jamás prescribe, invita.
 5. **Efecto Tamagotchi (Lawton, 2017; estudios HRI de Fujita).** Los humanos forman apego real con agentes digitales que muestran necesidad + memoria + reciprocidad. Aplicación: Memorias (§6.3) — la mascota recuerda títulos y fechas reales; los mensajes citan `{book}` por nombre.
-6. **Aversión a la pérdida (Kahneman & Tversky, 1979) — usada al revés.** Duolingo explota el miedo a perder la racha (funciona, pero genera el resentimiento que el brief documenta). FOLIO invierte: nada se pierde nunca (racha en pausa, felicidad con piso, niveles permanentes). La motivación queda del lado de la ganancia. Menos punzante a corto plazo, más sostenible y sin churn por resentimiento — esta es la apuesta diferencial y la hipótesis H3 de §14 la mide.
+6. **Aversión a la pérdida (Kahneman & Tversky, 1979) — usada al revés.** Duolingo explota el miedo a perder la racha (funciona, pero genera el resentimiento que el brief documenta). SEMA invierte: nada se pierde nunca (racha en pausa, felicidad con piso, niveles permanentes). La motivación queda del lado de la ganancia. Menos punzante a corto plazo, más sostenible y sin churn por resentimiento — esta es la apuesta diferencial y la hipótesis H3 de §14 la mide.
 7. **Peak-end rule (Kahneman, 2000).** Los momentos pico y finales definen el recuerdo de la experiencia. Aplicación: la ceremonia de evolución (§5.2) y el cierre de libro (confetti + mensaje + memoria) son los dos picos orquestados; el "final" de cada sesión deja a la mascota feliz, nunca reprochando.
 8. **Cute response / Kindchenschema (Lorenz, 1943; Sherman et al., 2009).** Rasgos infantiles (ojos grandes, cabeza grande) disparan cuidado y atención — de ahí la regla de proporciones §4.1.
 

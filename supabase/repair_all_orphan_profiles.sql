@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — Reparación masiva de cuentas huérfanas
+-- SEMA — Reparación masiva de cuentas huérfanas
 -- (existen en auth.users pero NO tienen fila en public.users)
 --
 -- Correr en Supabase → SQL Editor (rol postgres: no le afecta RLS).

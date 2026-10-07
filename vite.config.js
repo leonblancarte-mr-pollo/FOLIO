@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'logo.png'],
       manifest: {
-        name: 'Folio',
-        short_name: 'Folio',
+        name: 'SEMA',
+        short_name: 'SEMA',
         description: 'Tu biblioteca personal con IA',
         theme_color: '#2A1F1A',
         background_color: '#F4EDE0',

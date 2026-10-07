@@ -1,5 +1,5 @@
 -- ============================================================================
--- FOLIO — spend_gems: única puerta para GASTAR gemas desde el cliente
+-- SEMA — spend_gems: única puerta para GASTAR gemas desde el cliente
 -- ============================================================================
 -- Contexto: user_gems no tiene policy de UPDATE para clientes (server authority,
 -- sprint1_server_authority.sql), así que el descuento client-side de
