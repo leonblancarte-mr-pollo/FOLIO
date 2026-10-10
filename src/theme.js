@@ -30,6 +30,9 @@
 // (ilustraciones con sus propias paletas de arte), main.jsx (pantallas de error que
 // deben renderizar aunque falle el tema) y src/components/trueque/ (zona intocable).
 //
+// 4) Variables CSS (`applyPaletteCssVars`, 2026-10-10): los mismos tokens de `palette`
+//    expuestos como --sema-* para index.css (estados hover/press/focus y skeleton).
+//
 // z-index: no hay escala todavía; el mapa real está en AUDIT_SPRINT_REPORT.md §C.
 
 const FONT_LINK = `
@@ -67,6 +70,31 @@ const PALETTE_DARK = {
   session: "#4CAF50", sessionInk: "#7BC47F", freeze: "#3A8FD6",
 };
 let palette = { ...PALETTE_LIGHT };
+
+// Variables CSS del tema (2026-10-10): copia `palette` a :root como --sema-<token> (camelCase →
+// kebab-case: bgSoft → --sema-bg-soft) para que index.css (hover, skeleton, focus) use los mismos
+// colores sin hex propios. Además define tres variables derivadas que dependen del modo:
+//   --sema-skel-base / --sema-skel-shine  (fondo y brillo del skeleton, de border/borderSoft)
+//   --sema-hover-brightness / --sema-press-brightness (oscurece en claro, aclara en oscuro)
+// MainApp la llama en cada render; solo escribe en el DOM cuando cambia el tema.
+let appliedCssTheme = null;
+function applyPaletteCssVars(isDark = false) {
+  if (typeof document === "undefined") return;
+  const key = isDark ? "dark" : "light";
+  if (appliedCssTheme === key) return;
+  appliedCssTheme = key;
+  const src = isDark ? PALETTE_DARK : PALETTE_LIGHT;
+  const root = document.documentElement.style;
+  Object.entries(src).forEach(([k, v]) => {
+    root.setProperty(`--sema-${k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`, v);
+  });
+  root.setProperty("--sema-skel-base", isDark ? src.borderSoft : src.border);
+  root.setProperty("--sema-skel-shine", isDark ? src.border : src.borderSoft);
+  root.setProperty("--sema-hover-brightness", isDark ? "1.12" : "0.96");
+  root.setProperty("--sema-press-brightness", isDark ? "1.22" : "0.9");
+}
+// Valores iniciales (modo claro) para las pantallas que se pintan antes de MainApp (login, onboarding).
+applyPaletteCssVars(false);
 
 // Identidad fija (no cambia con el tema).
 const BRAND = {
@@ -204,7 +232,7 @@ function genreColor(genre) {
 
 
 export {
-  FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, BRAND, SOCIAL_COLORS, STATUS_COLORS,
+  FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
   display, body, ts, genrePillStyle, genreColor,

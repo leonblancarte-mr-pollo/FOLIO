@@ -1,5 +1,7 @@
 import { palette, body, display } from "../../theme.js";
+import { Repeat } from "lucide-react";
 import { MatchCard } from "./MatchCard.jsx";
+import { EmptyState } from "../EmptyState.jsx";
 
 function Group({ title, hint, matches, onMessage, onRate }) {
   if (matches.length === 0) return null;
@@ -18,13 +20,12 @@ function Group({ title, hint, matches, onMessage, onRate }) {
 function MatchesList({ matches, onMessage, onRate }) {
   if (!matches || matches.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
-        <p style={{ fontSize: "2rem", margin: 0 }}>🔍</p>
-        <p style={{ ...display, fontSize: "1rem", fontWeight: 600, color: palette.ink, margin: "0.5rem 0 0.25rem" }}>Aún no tienes matches</p>
-        <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, margin: 0 }}>
-          Agrega libros en "Ofrezco" y "Busco", y toca "Buscar matches".
-        </p>
-      </div>
+      <EmptyState
+        icon={Repeat}
+        title="Sin matches"
+        description="Los matches aparecen después de buscar con libros en «Ofrezco» y «Busco»."
+        compact
+      />
     );
   }
   const live = matches.filter((m) => m.status !== "completed");

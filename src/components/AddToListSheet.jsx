@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
-import { X, Plus, Lock, CheckCircle2, Loader2 } from "lucide-react";
+import { X, Plus, Lock, CheckCircle2, Loader2, Bookmark } from "lucide-react";
 import { palette, body, display } from "../theme.js";
+import { EmptyState } from "./EmptyState.jsx";
+import { SkeletonList } from "./Skeleton.jsx";
 import { fetchUserLists, createUserList, addBookToList, removeBookFromList } from "../services/listsService.js";
 
 // Sheet para agregar/quitar el libro actual de las listas del usuario.
@@ -56,15 +58,11 @@ function AddToListSheet({ userId, bookId, onClose }) {
         </div>
 
         {lists === null ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: "1.5rem" }}>
-            <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
-          </div>
+          <SkeletonList count={2} lead={null} lines={2} gap="0.45rem" label="Cargando listas" />
         ) : (
           <>
             {lists.length === 0 && !creating && (
-              <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic", marginBottom: "0.75rem" }}>
-                Aún no tienes listas. Crea la primera.
-              </p>
+              <EmptyState icon={Bookmark} title="Sin listas" description="Las listas creadas aparecen aquí." compact style={{ paddingTop: "0.5rem" }} />
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "0.85rem" }}>
               {lists.map((l) => {

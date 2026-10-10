@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Plus, Lock, Bookmark, ChevronRight, Loader2 } from "lucide-react";
+import { Plus, Lock, Bookmark, ChevronRight } from "lucide-react";
 import { palette, body, display } from "../theme.js";
 import { fetchUserLists, createUserList } from "../services/listsService.js";
 import { ListFormModal } from "./ListFormModal.jsx";
 import { ListDetailModal } from "./ListDetailModal.jsx";
+import { SkeletonList } from "./Skeleton.jsx";
 
 // Sección "Mis listas" del perfil propio.
 function ListsSection({ user, books, onSelectBook }) {
@@ -30,9 +31,7 @@ function ListsSection({ user, books, onSelectBook }) {
       </div>
 
       {lists === null ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: "1rem" }}>
-          <Loader2 size={18} className="animate-spin" color={palette.inkFaint} />
-        </div>
+        <SkeletonList count={2} lead={null} lines={2} label="Cargando listas" />
       ) : lists.length === 0 ? (
         <button onClick={() => setCreateOpen(true)} style={{ width: "100%", borderRadius: 14, padding: "1rem 1.25rem", backgroundColor: palette.bgCard, border: `1px dashed ${palette.border}`, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <Bookmark size={22} color={palette.inkFaint} style={{ flexShrink: 0 }} />

@@ -75,7 +75,9 @@ import { ListsSection } from "./components/ListsSection.jsx";
 import { ReadDateModal } from "./components/ReadDateModal.jsx";
 import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
-import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, ts, genrePillStyle, genreColor } from "./theme.js";
+import { EmptyState } from "./components/EmptyState.jsx";
+import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
+import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, ts, genrePillStyle, genreColor } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
@@ -568,6 +570,7 @@ function SubTabBar({ tabs, active, onChange }) {
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
+          className={active === t.id ? undefined : "sema-tab"}
           style={{
             ...display,
             padding: "0.6rem 1.1rem",
@@ -639,6 +642,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
               <button
                 key={t.id}
                 onClick={() => { if (t.id === "mascota" && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
+                className={active ? undefined : "sema-pill"}
                 style={{
                   display: "flex", alignItems: "center", gap: "0.35rem",
                   padding: "0.4rem 1rem", borderRadius: "999px",
@@ -690,7 +694,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
             key={t.id}
             data-tutorial={`nav-${t.id}`}
             onClick={() => { haptic(HAPTIC.NAV); if (isCenter && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
-            className={`flex-1 flex flex-col items-center justify-center py-1.5${isCenter ? " nav-add-btn" : ""}`}
+            className={`flex-1 flex flex-col items-center justify-center py-1.5 sema-nav-item${isCenter ? " nav-add-btn" : ""}`}
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
           >
             {isCenter ? (
@@ -708,7 +712,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
                 )}
               </div>
             ) : (
-              <div style={{
+              <div className={active ? undefined : "sema-nav-pill"} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
                 padding: "5px 8px",
                 borderRadius: "999px",
@@ -845,38 +849,13 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
       );
     }
     return (
-      <div className="text-center py-20 px-6">
-        <div
-          className="inline-flex items-center justify-center mb-6 rounded-full"
-          style={{
-            width: 72,
-            height: 72,
-            backgroundColor: palette.bgSoft,
-            border: `1px solid ${palette.border}`,
-          }}
-        >
-          <Library size={28} color={palette.inkSoft} strokeWidth={1.5} />
-        </div>
-        <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.5rem", color: palette.ink, marginBottom: "0.5rem" }}>
-          Tu biblioteca espera
-        </h2>
-        <p style={{ ...body, color: palette.inkSoft, fontSize: "1.05rem", maxWidth: 400, margin: "0 auto 1.5rem" }}>
-          Empieza agregando un libro. Escanea el código de barras o escríbelo a mano.
-        </p>
-        <button
-          onClick={() => setTab("add")}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full transition-all hover:scale-105"
-          style={{
-            ...display,
-            fontWeight: 500,
-            backgroundColor: palette.ink,
-            color: palette.bg,
-          }}
-        >
-          <Plus size={16} />
-          Agregar primer libro
-        </button>
-      </div>
+      <EmptyState
+        icon={Library}
+        title="Sin libros en la biblioteca"
+        description="Los libros agregados aparecen aquí."
+        action={{ label: "Agregar libro", icon: Plus, onClick: () => setTab("add") }}
+        style={{ padding: "5rem 1.5rem" }}
+      />
     );
   }
 
@@ -924,7 +903,7 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className="px-3 py-1.5 rounded-full transition-all whitespace-nowrap flex-shrink-0"
+              className={`px-3 py-1.5 rounded-full transition-all whitespace-nowrap flex-shrink-0${active ? "" : " sema-chip"}`}
               style={{
                 fontFamily: "system-ui, -apple-system, sans-serif",
                 fontSize: "14px",
@@ -943,19 +922,21 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-14">
-          {!search && (
-            <div style={{
-              fontFamily: "Fraunces, serif", fontSize: "6rem", fontStyle: "italic", fontWeight: 700, lineHeight: 1,
-              color: palette.accent + "22", marginBottom: "0.5rem", userSelect: "none",
-            }}>
-              {filter === "reading" ? "L" : filter === "read" ? "✓" : filter === "want_to_read" ? "☆" : "?"}
-            </div>
-          )}
-          <p style={{ ...body, fontStyle: "italic", color: palette.inkSoft }}>
-            {search ? `No encontré libros que coincidan con "${search}"` : "No hay libros en este estado"}
-          </p>
-        </div>
+        search ? (
+          <EmptyState
+            icon={Search}
+            title="Sin resultados"
+            description={`Ningún libro coincide con «${search.trim()}».`}
+            action={{ label: "Limpiar búsqueda", onClick: () => setSearch("") }}
+          />
+        ) : (
+          <EmptyState
+            icon={filter === "read" ? BookCheck : filter === "reading" ? BookOpen : Bookmark}
+            title={`Sin libros en «${filters.find((f) => f.id === filter)?.label}»`}
+            description="Los libros con este estado aparecen aquí."
+            action={{ label: "Ver todos", onClick: () => setFilter("all") }}
+          />
+        )
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((book) => (
@@ -1115,9 +1096,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
       {/* Scrollable content */}
       <div className="scrollbar-hide" style={{ flex: 1, overflowY: "auto", paddingBottom: "100px" }}>
         {loading && (
-          <div style={{ display: "flex", justifyContent: "center", padding: "2.5rem 0" }}>
-            <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
-          </div>
+          <SkeletonList count={4} lead="cover" card={false} gap="0.25rem" label="Buscando libros" style={{ padding: "0.5rem 1rem" }} />
         )}
 
         {!loading && error && (
@@ -1155,9 +1134,8 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
                   <button
                     key={book.olKey || i}
                     onClick={() => setSelectedBook(book)}
-                    style={{ display: "flex", alignItems: "center", gap: "0.75rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`, cursor: "pointer", textAlign: "left", transition: "background-color 0.1s" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = palette.bgSoft; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                    className="hover-bg-soft sema-no-hover"
+                    style={{ display: "flex", alignItems: "center", gap: "0.75rem", width: "100%", padding: "0.75rem 1rem", background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`, cursor: "pointer", textAlign: "left" }}
                   >
                     {book.coverUrl ? (
                       <img src={book.coverUrl} alt="" style={{ width: 50, height: 75, objectFit: "cover", borderRadius: 4, flexShrink: 0, backgroundColor: palette.bgSoft }} loading="lazy" />
@@ -1184,10 +1162,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
         )}
 
         {!loading && !error && query.trim().length >= 2 && results.length === 0 && (
-          <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-            <p style={{ ...ts.h2, color: palette.inkSoft, fontStyle: "italic", marginBottom: "0.5rem" }}>Sin resultados</p>
-            <p style={{ ...ts.body15, color: palette.inkFaint }}>Prueba con otro título o autor</p>
-          </div>
+          <EmptyState icon={Search} title="Sin resultados" description="Ningún libro coincide con ese título o autor." />
         )}
 
         {!loading && (results.length > 0 || (query.trim().length >= 2 && !error)) && (
@@ -2049,7 +2024,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
   );
 }
 
-function RecommendFlow({ books, onSelectBook, onAdd }) {
+function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({ mood: "", time: "", challenge: "", openness: "", extra: "" });
   const [loading, setLoading] = useState(false);
@@ -2059,15 +2034,12 @@ function RecommendFlow({ books, onSelectBook, onAdd }) {
 
   if (books.length === 0) {
     return (
-      <div className="text-center py-16 px-6">
-        <Sparkles size={32} color={palette.amber} className="mx-auto mb-4" />
-        <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.4rem", color: palette.ink, marginBottom: "0.5rem" }}>
-          Necesito conocerte un poco
-        </h2>
-        <p style={{ ...body, color: palette.inkSoft, maxWidth: 400, margin: "0 auto" }}>
-          Agrega al menos un libro a tu biblioteca para que pueda darte recomendaciones personalizadas.
-        </p>
-      </div>
+      <EmptyState
+        icon={Sparkles}
+        title="Sin libros para recomendar"
+        description="Las recomendaciones se basan en los libros de la biblioteca."
+        action={setTab ? { label: "Agregar libro", icon: Plus, onClick: () => setTab("add") } : undefined}
+      />
     );
   }
 
@@ -3115,6 +3087,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
                   <button
                     key={def.key}
                     onClick={() => setSelectedAch({ def, unlockedAt: unlockedMap[def.key] || null })}
+                    className={isUnlocked ? "sema-card" : undefined}
                     style={{
                       backgroundColor: isUnlocked ? palette.bgCard : palette.bgSoft,
                       border: isUnlocked ? "1px solid rgba(200,146,74,0.35)" : "none",
@@ -3122,10 +3095,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
                       cursor: "pointer", position: "relative",
                       opacity: isUnlocked ? 1 : 0.6,
                       boxShadow: isUnlocked ? "0 2px 6px rgba(200,146,74,0.15)" : "none",
-                      transition: "transform 0.15s, box-shadow 0.15s",
                     }}
-                    onMouseEnter={(e) => { if (isUnlocked) { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(200,146,74,0.25)"; }}}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = isUnlocked ? "0 2px 6px rgba(200,146,74,0.15)" : "none"; }}
                   >
                     {!isUnlocked && (
                       <Lock size={10} color={palette.border} style={{ position: "absolute", top: 5, right: 5 }} />
@@ -3268,9 +3238,9 @@ function ReadingHeatmap({ userId }) {
       </div>
 
       {loading ? (
-        <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Loader2 size={18} color={palette.inkFaint} style={{ animation: "spin 1s linear infinite" }} />
-        </div>
+        <SkeletonGroup label="Cargando calendario" style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, height: 200, alignContent: "start" }}>
+          {Array.from({ length: 35 }, (_, i) => <Skeleton key={i} height={30} radius={6} />)}
+        </SkeletonGroup>
       ) : (
         <>
           {/* Day-of-week headers */}
@@ -3559,9 +3529,20 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
 
   if (loading) {
     return (
-      <div className="flex justify-center py-20">
-        <Loader2 size={24} className="animate-spin" color={palette.inkFaint} />
-      </div>
+      <SkeletonGroup label="Cargando perfil" style={{ maxWidth: "56rem", margin: "0 auto", paddingBottom: "2rem" }}>
+        <Skeleton height={180} radius={0} />
+        <div style={{ padding: "0 20px", marginTop: -46, display: "flex", flexDirection: "column", gap: 10 }}>
+          <Skeleton circle height={100} style={{ border: `4px solid ${palette.bg}` }} />
+          <Skeleton width="45%" height={20} />
+          <Skeleton width="25%" height={13} />
+          <Skeleton height={76} radius={14} style={{ marginTop: 12 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 4 }}>
+            <Skeleton height={72} radius={14} />
+            <Skeleton height={72} radius={14} />
+            <Skeleton height={72} radius={14} />
+          </div>
+        </div>
+      </SkeletonGroup>
     );
   }
 
@@ -4320,14 +4301,9 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
         style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.35rem", backgroundColor: palette.bg }}
       >
         {loading ? (
-          <div style={{ display: "flex", justifyContent: "center", paddingTop: "3rem" }}>
-            <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
-          </div>
+          <SkeletonBubbles />
         ) : messages.length === 0 ? (
-          <div style={{ textAlign: "center", paddingTop: "4rem" }}>
-            <MessageCircle size={32} color={palette.border} style={{ margin: "0 auto 0.75rem" }} />
-            <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>Aún no hay mensajes. ¡Di hola!</p>
-          </div>
+          <EmptyState icon={MessageCircle} title="Sin mensajes" description="Los mensajes de esta conversación aparecen aquí." style={{ paddingTop: "4rem" }} />
         ) : (
           (() => {
             const rendered = [];
@@ -4556,9 +4532,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
   }, [user.id]);
 
   if (loadingUser) return (
-    <div style={{ padding: "3rem 1rem", textAlign: "center" }}>
-      <Loader2 size={22} className="animate-spin mx-auto" color={palette.inkFaint} />
-    </div>
+    <SkeletonCardGrid count={4} avatar={false} label="Cargando comparación" style={{ padding: "1.25rem" }} />
   );
 
   const uRead    = userBooks.filter((b) => b.status === "read");
@@ -5362,9 +5336,19 @@ function FriendProfileModal({ friend, user, onClose }) {
         ) : (
           <div className="px-5 py-4" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             {loading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
-              </div>
+              <SkeletonGroup label="Cargando perfil" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
+                  <Skeleton height={70} radius={12} />
+                  <Skeleton height={70} radius={12} />
+                  <Skeleton height={70} radius={12} />
+                </div>
+                <Skeleton width="40%" height={16} />
+                <div style={{ display: "flex", gap: "0.6rem" }}>
+                  <Skeleton width={70} height={104} radius={8} />
+                  <Skeleton width={70} height={104} radius={8} />
+                  <Skeleton width={70} height={104} radius={8} />
+                </div>
+              </SkeletonGroup>
             ) : isPrivateLocked ? (
               <div style={{ textAlign: "center", padding: "1.5rem 1rem 2.5rem" }}>
                 <div style={{ width: 56, height: 56, borderRadius: "50%", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.85rem" }}>
@@ -6371,6 +6355,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
           <button
             key={t.id}
             onClick={() => setSubtab(t.id)}
+            className={subtab === t.id ? undefined : "sema-tab"}
             style={{
               flexShrink: 0, ...body, fontSize: "0.76rem", fontWeight: subtab === t.id ? 600 : 400,
               backgroundColor: subtab === t.id ? palette.bgCard : "transparent",
@@ -6388,12 +6373,14 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
       {/* ── MIS AMIGOS ── */}
       {subtab === "amigos" && (
         loadingFriends ? (
-          <div className="flex justify-center py-10"><Loader2 size={20} className="animate-spin" color={palette.inkFaint} /></div>
+          <SkeletonCardGrid count={4} label="Cargando amigos" />
         ) : friends.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-            <Users size={32} color={palette.border} style={{ margin: "0 auto 0.75rem" }} />
-            <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>Aún no tienes amigos. Búscalos arriba.</p>
-          </div>
+          <EmptyState
+            icon={Users}
+            title="Sin amigos agregados"
+            description="Las amistades aceptadas aparecen aquí."
+            action={{ label: "Invitar amigo", icon: UserPlus, onClick: handleFriendsInvite }}
+          />
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.65rem" }}>
             {friends.map((row) => {
@@ -6403,6 +6390,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
               return (
                 <div
                   key={row.id}
+                  className="sema-card"
                   style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "14px", padding: "0.85rem", position: "relative", boxShadow: "0 2px 8px rgba(42,31,26,0.05)" }}
                 >
                   {/* Chat icon top-right */}
@@ -6444,10 +6432,10 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
       {/* ── SOLICITUDES ── */}
       {subtab === "solicitudes" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          {pending.length === 0 && sentPending.length === 0 ? (
-            <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic", textAlign: "center", padding: "2rem 0" }}>
-              No tienes solicitudes pendientes.
-            </p>
+          {loadingFriends ? (
+            <SkeletonList count={2} trailing label="Cargando solicitudes" />
+          ) : pending.length === 0 && sentPending.length === 0 ? (
+            <EmptyState icon={UserPlus} title="Sin solicitudes pendientes" description="Las solicitudes recibidas y enviadas aparecen aquí." />
           ) : (
             <>
               {pending.length > 0 && (
@@ -6500,11 +6488,15 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
 
       {/* ── CHATS ── */}
       {subtab === "chats" && (
-        conversations.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-            <MessageCircle size={32} color={palette.border} style={{ margin: "0 auto 0.75rem" }} />
-            <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>Aún no tienes conversaciones.</p>
-          </div>
+        loadingFriends ? (
+          <SkeletonList count={3} label="Cargando conversaciones" gap="0.4rem" />
+        ) : conversations.length === 0 ? (
+          <EmptyState
+            icon={MessageCircle}
+            title="Sin conversaciones"
+            description="Los chats con amistades aparecen aquí."
+            action={friends.length > 0 ? { label: "Ver amigos", onClick: () => setSubtab("amigos") } : undefined}
+          />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             {conversations.map((conv) => {
@@ -6601,7 +6593,7 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
           </button>
         </div>
       </div>
-      <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} />
+      <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} onOpenAmigos={onOpenAmigos} />
     </div>
   );
 }
@@ -6683,12 +6675,9 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
         </div>
         <div style={{ overflowY: "auto", flex: 1, padding: "0 16px 20px" }}>
           {loading ? (
-            <div style={{ textAlign: "center", padding: 40, color: palette.inkFaint }}>Cargando...</div>
+            <SkeletonList count={5} card={false} gap="0.25rem" label="Cargando notificaciones" style={{ padding: "0 8px" }} />
           ) : notifications.length === 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "60%", gap: 12 }}>
-              <Bell size={32} color={palette.border} strokeWidth={1.5} />
-              <span style={{ fontSize: 14, color: palette.inkFaint }}>Sin notificaciones por ahora</span>
-            </div>
+            <EmptyState icon={Bell} title="Sin notificaciones" description="Los likes, comentarios y solicitudes de amistad aparecen aquí." />
           ) : (
             notifications.map((notif) => {
               if (!notif) return null;
@@ -6707,6 +6696,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                       onNavigate?.(notif.post_id, notif.type === "like_comment");
                     }
                   }}
+                  className="sema-row hover-bg-soft"
                   style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 8px", backgroundColor: notif.read ? "transparent" : palette.unreadBg, borderRadius: 10, marginBottom: 4, cursor: "pointer" }}
                 >
                   <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: getAvatarColor(actor.id || actorName), display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
@@ -6809,7 +6799,7 @@ function UAMLibraryView({ books, onAdd }) {
             <button
               key={a}
               onClick={() => setArea(a)}
-              className="whitespace-nowrap flex-shrink-0 transition-all hover:opacity-80"
+              className={`whitespace-nowrap flex-shrink-0 transition-all${active ? "" : " sema-chip"}`}
               style={{ ...display, fontSize: "0.8rem", fontWeight: active ? 600 : 400, padding: "0.3rem 0.85rem", borderRadius: "999px", backgroundColor: active ? palette.ink : "transparent", color: active ? palette.bg : palette.inkSoft, border: `1px solid ${active ? palette.ink : palette.border}`, cursor: "pointer" }}
             >
               {a}
@@ -6825,10 +6815,12 @@ function UAMLibraryView({ books, onAdd }) {
 
       {/* Catálogo */}
       {filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-          <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: palette.inkSoft }}>Sin resultados</p>
-          <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, marginTop: "0.3rem" }}>Intenta con otro término o área</p>
-        </div>
+        <EmptyState
+          icon={GraduationCap}
+          title="Sin resultados"
+          description="Ningún libro del catálogo UAM coincide con la búsqueda o el área."
+          action={{ label: "Limpiar filtros", onClick: () => { setSearch(""); setArea("Todas"); } }}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
           {filtered.map((uamBook) => {
@@ -7145,7 +7137,7 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
   return (
     <div style={{ marginTop: "0.75rem", borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.75rem" }}>
       {loading ? (
-        <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint }}>Cargando…</p>
+        <SkeletonList count={2} lines={2} card={false} gap="0.2rem" label="Cargando comentarios" style={{ marginBottom: "0.6rem" }} />
       ) : comments.length === 0 ? (
         <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "0.6rem" }}>Sin comentarios aún.</p>
       ) : (
@@ -7601,9 +7593,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
             <p style={{ ...display, fontStyle: "italic", fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Qué libro leíste hoy?</p>
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "1.25rem" }}>Paso 1 de 3</p>
             {loadingBooks ? (
-              <div style={{ display: "flex", justifyContent: "center", padding: "2rem" }}>
-                <Loader2 size={20} className="animate-spin" color={palette.inkFaint} />
-              </div>
+              <SkeletonList count={2} lead="cover" label="Cargando libros" />
             ) : readingBooks.length === 0 ? (
               <div style={{ textAlign: "center", padding: "1.5rem 0" }}>
                 <BookOpen size={32} color={palette.border} strokeWidth={1.5} style={{ margin: "0 auto 0.5rem", display: "block" }} />
@@ -7623,9 +7613,8 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
                   <button
                     key={book.id}
                     onClick={() => { setSelectedBook(book); setStep(2); }}
-                    style={{ display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: palette.bg, border: `1px solid ${palette.border}`, borderRadius: "10px", padding: "0.75rem", textAlign: "left", cursor: "pointer", width: "100%", transition: "background 0.12s" }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = palette.bgSoft}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = palette.bg}
+                    className="hover-bg-soft sema-no-hover"
+                    style={{ display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: palette.bg, border: `1px solid ${palette.border}`, borderRadius: "10px", padding: "0.75rem", textAlign: "left", cursor: "pointer", width: "100%" }}
                   >
                     {book.cover_url ? (
                       <img src={book.cover_url} alt="" style={{ width: 40, height: 58, objectFit: "cover", borderRadius: "4px", flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.15)" }} />
@@ -7712,10 +7701,9 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
                     padding: "1.1rem 1.25rem", borderRadius: "14px",
                     border: `1.5px solid ${palette.border}`,
                     backgroundColor: palette.bg, cursor: saving ? "default" : "pointer",
-                    textAlign: "left", opacity: saving ? 0.7 : 1, transition: "background 0.15s, transform 0.12s",
+                    textAlign: "left", opacity: saving ? 0.7 : 1,
                   }}
-                  onMouseEnter={(e) => { if (!saving) { e.currentTarget.style.backgroundColor = palette.bgSoft; e.currentTarget.style.transform = "scale(1.01)"; }}}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = palette.bg; e.currentTarget.style.transform = "scale(1)"; }}
+                  className="hover-bg-soft sema-no-hover btn-press"
                 >
                   <span style={{ fontSize: "2.2rem", lineHeight: 1 }}>{emoji}</span>
                   <span style={{ ...display, fontSize: "1.1rem", color: palette.ink, fontWeight: 600 }}>{label}</span>
@@ -8125,12 +8113,8 @@ function SnacksHero({ onRead }) {
             backgroundColor: palette.accent, color: BRAND.cream,
             border: "none", borderRadius: 12, padding: "0.75rem 1.5rem",
             cursor: "pointer", width: "100%",
-            transition: "transform 150ms cubic-bezier(0.23,1,0.32,1)",
           }}
-          onMouseEnter={e => e.currentTarget.style.transform = "scale(1.01)"}
-          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-          onMouseDown={e => e.currentTarget.style.transform = "scale(0.98)"}
-          onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+          className="btn-press"
         >
           Leer ahora →
         </button>
@@ -8167,10 +8151,8 @@ function SnacksCarousel({ onRead }) {
               textAlign: "left",
               cursor: "pointer",
               display: "flex", flexDirection: "column", gap: "0.25rem",
-              transition: "transform 150ms ease, box-shadow 150ms ease",
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 18px rgba(42,31,26,0.12)`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
+            className="sema-card"
           >
             <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "0.88rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
               {c.titulo}
@@ -8497,7 +8479,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           <p style={sectionTitle}>Seguir leyendo</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
             {readingBooks.slice(0, 3).map((b) => (
-              <button key={b.id} onClick={() => openRead(b)} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "0.85rem 1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, display: "flex", gap: "0.85rem", alignItems: "center" }}>
+              <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-card" style={{ width: "100%", textAlign: "left", padding: "0.85rem 1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, display: "flex", gap: "0.85rem", alignItems: "center" }}>
                 <div style={{ width: 48, height: 70, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {b.coverUrl ? <img src={b.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={22} color={palette.inkFaint} />}
                 </div>
@@ -8535,7 +8517,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           </div>
           <div className="scrollbar-hide" style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
             {wantBooks.map((b) => (
-              <button key={b.id} onClick={() => onSelectBook(b)} className="btn-press" style={{ flexShrink: 0, width: 92, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+              <button key={b.id} onClick={() => onSelectBook(b)} className="btn-press sema-card" style={{ flexShrink: 0, width: 92, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                 <div style={{ width: 92, height: 138, borderRadius: 10, overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {b.coverUrl ? <img src={b.coverUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={24} color={palette.inkFaint} />}
                 </div>
@@ -8584,7 +8566,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   );
 }
 
-function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone }) {
+function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone, onOpenAmigos }) {
   const [posts, setPosts] = useState([]);
   const [feedError, setFeedError] = useState("");
   const [showNewPost, setShowNewPost] = useState(false);
@@ -9178,7 +9160,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Necesitas conexión para ver el feed de tus amigos.</p>
         </div>
       ) : feedState === 'empty' ? (
-        null
+        <EmptyState
+          icon={Users}
+          title="Sin publicaciones en el feed"
+          description="Las lecturas, frases y logros de las amistades aparecen aquí."
+          action={onOpenAmigos ? { label: "Buscar amigos", icon: UserPlus, onClick: onOpenAmigos } : undefined}
+          style={{ paddingTop: "1.5rem" }}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem", animation: "feedFadeIn 200ms ease-out" }}>
           {posts.map((post) => {
@@ -9694,7 +9682,17 @@ function RatingDistribution({ books }) {
   );
 }
 
-function ReadingStatsView({ books }) {
+function ReadingStatsView({ books, onAddBook }) {
+  if (books.length === 0) {
+    return (
+      <EmptyState
+        icon={TrendingUp}
+        title="Sin estadísticas"
+        description="Las estadísticas se calculan con los libros de la biblioteca."
+        action={onAddBook ? { label: "Agregar libro", icon: Plus, onClick: onAddBook } : undefined}
+      />
+    );
+  }
   const read = books.filter((b) => b.status === "read");
   const reading = books.filter((b) => b.status === "reading");
   const want = books.filter((b) => b.status === "want_to_read");
@@ -9728,7 +9726,7 @@ function ReadingStatsView({ books }) {
   );
 }
 
-function ExplorarView({ user, books, onSelectBook, onAdd }) {
+function ExplorarView({ user, books, onSelectBook, onAdd, setTab }) {
   const [sub, setSub] = useState("para_ti");
   const [searchOpen, setSearchOpen] = useState(false);
   const isUAM = (user?.university || "").toUpperCase() === "UAM";
@@ -9756,7 +9754,7 @@ function ExplorarView({ user, books, onSelectBook, onAdd }) {
       {sub === "para_ti" && (
         <>
           <CollaborativeRecommendations user={user} onAdd={onAdd} />
-          <RecommendFlow books={books} onSelectBook={onSelectBook} onAdd={onAdd} />
+          <RecommendFlow books={books} onSelectBook={onSelectBook} onAdd={onAdd} setTab={setTab} />
         </>
       )}
       {sub === "descubrir" && <BookTinder user={user} onAdd={onAdd} />}
@@ -9916,11 +9914,12 @@ function QuoteCard({ quote, onPress, onToggleFavorite, onShareToFeed }) {
   const moodLabel = MOOD_OPTIONS.find(m => m.key === quote.mood)?.label;
   return (
     <div
+      className="sema-card"
       style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", overflow: "hidden", boxShadow: "0 2px 8px rgba(42,31,26,0.05)" }}
     >
       <button
         onClick={onPress}
-        className="text-left"
+        className="text-left sema-no-hover"
         style={{ width: "100%", padding: "1.25rem 1.1rem 1rem", position: "relative", overflow: "hidden", cursor: "pointer", background: "none", border: "none" }}
       >
         <div style={{ position: "absolute", top: 6, left: 10, fontFamily: "Georgia, serif", fontSize: "4.5rem", lineHeight: 1, color: palette.accent + "12", pointerEvents: "none", userSelect: "none" }}>"</div>
@@ -10326,30 +10325,31 @@ function QuotesView({ user, books }) {
       )}
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: "3rem 0" }}>
-          <Loader2 size={26} color={palette.border} style={{ animation: "spin 1s linear infinite", display: "block", margin: "0 auto 0.5rem" }} />
-          <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Cargando frases...</p>
-        </div>
+        <SkeletonGroup label="Cargando frases" style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 12, padding: "1.25rem 1.1rem 1rem", display: "flex", flexDirection: "column", gap: 8 }}>
+              <Skeleton height={14} />
+              <Skeleton width="90%" height={14} />
+              <Skeleton width="60%" height={14} />
+              <Skeleton width="40%" height={11} style={{ marginTop: 6 }} />
+            </div>
+          ))}
+        </SkeletonGroup>
       ) : quotes.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "4rem 1.5rem" }}>
-          <div style={{ fontSize: "2.8rem", marginBottom: "0.85rem" }}>📖</div>
-          <p style={{ ...display, fontStyle: "italic", fontSize: "1.25rem", color: palette.ink, marginBottom: "0.45rem" }}>
-            Aún no guardas frases
-          </p>
-          <p style={{ ...body, color: palette.inkSoft, fontSize: "0.9rem", maxWidth: 300, margin: "0 auto 1.75rem" }}>
-            Cuando leas algo que te vuele la cabeza, guárdalo aquí
-          </p>
-          <button
-            onClick={() => setShowSaveModal(true)}
-            style={{ ...display, fontSize: "0.95rem", fontWeight: 600, backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "10px", padding: "0.7rem 1.5rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
-          >
-            <Plus size={16} /> Guardar primera frase
-          </button>
-        </div>
+        <EmptyState
+          icon={Feather}
+          title="Sin frases guardadas"
+          description="Las frases guardadas de cada libro aparecen aquí."
+          action={{ label: "Guardar frase", icon: Plus, onClick: () => setShowSaveModal(true) }}
+        />
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "2.5rem 1rem" }}>
-          <p style={{ ...body, color: palette.inkFaint, fontStyle: "italic" }}>No hay frases con este filtro</p>
-        </div>
+        <EmptyState
+          icon={Feather}
+          title="Sin frases con este filtro"
+          description="Las frases que coinciden con el filtro aparecen aquí."
+          action={{ label: "Ver todas", onClick: () => { setFilterFav(false); setFilterBook(""); setFilterMood(""); } }}
+          compact
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           {filtered.map(q => (
@@ -10418,7 +10418,7 @@ function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogo
       {sub === "libros" && <LibraryView books={books} onSelectBook={onSelectBook} setTab={setTab} isOnline={isOnline} />}
       {sub === "perfil" && <ProfileView user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={onSelectBook} onLogout={onLogout} theme={theme} setTheme={setTheme} />}
       {sub === "frases" && <QuotesView user={user} books={books} />}
-      {sub === "resumen" && <ReadingStatsView books={books} />}
+      {sub === "resumen" && <ReadingStatsView books={books} onAddBook={() => setTab("add")} />}
     </div>
   );
 }
@@ -11448,6 +11448,20 @@ function PWAUpdateBanner() {
   );
 }
 
+// Skeleton del arranque (MainApp espera los libros antes de pintar cualquier pestaña).
+// Tiene la forma de Inicio: saludo, tarjeta de racha, botón principal y "Seguir leyendo".
+function AppLoadingSkeleton() {
+  return (
+    <SkeletonGroup label="Cargando SEMA" style={{ padding: "1.25rem 1rem 2.5rem", maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.1rem" }}>
+      <Skeleton width="45%" height={16} />
+      <Skeleton height={104} radius={20} />
+      <Skeleton height={56} radius={16} />
+      <Skeleton width="35%" height={18} style={{ marginTop: "0.4rem" }} />
+      <SkeletonList count={2} lead="cover" gap="0.7rem" />
+    </SkeletonGroup>
+  );
+}
+
 // ============ MAIN APP ============
 function resolveTheme(pref) {
   if (pref === 'dark') return 'dark';
@@ -11503,6 +11517,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   // Sync palette synchronously on every render
   const isDark = resolveTheme(themePref) === 'dark';
   Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT);
+  applyPaletteCssVars(isDark);
 
   // Listen for OS-level preference changes when using "system"
   useEffect(() => {
@@ -12183,9 +12198,10 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       )}
       <AppHeader tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
       <main className="max-w-4xl mx-auto pb-24 sm:pb-10 fade-in" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
+        {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}
-        {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} /></div>}
+        {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} /></div>}

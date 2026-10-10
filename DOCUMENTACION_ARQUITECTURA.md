@@ -1,6 +1,6 @@
 # SEMA — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-10-07 (email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-10-10 (textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce SEMA y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -21,6 +21,8 @@
 - 2026-10-03 — Trueque v3: se quitan las 25 zonas fijas de CDMX de la interfaz (barra de zonas, onboarding/editor de zonas, chips en la tarjeta de match, aviso de Plus) y del matching (cercanía, alcance y requisito de ubicación usan SOLO `trueque_pins` + `max_radius_km`; el estado se queda). `user_exchange_zones` NO se borra (historial). Las cuentas que solo tenían zonas ven el mapa al entrar, igual que una nueva. Buscador de lugares con Nominatim (OpenStreetMap) arriba del mapa de "Mis lugares" (`placeSearchService`). Se re-corre `supabase/trueque_geo.sql`. Se borran `ZonesOnboarding.jsx`, `ZonesEditor.jsx` y `src/config/zones.js`
 - 2026-10-07 — Rebrand FOLIO → SEMA: texto visible de la app (títulos, manifest PWA, notificaciones, mensajes de compartir, tarjetas exportables, nombres de archivos descargados, disclaimers del Trueque) y documentación pasan a «SEMA»; íconos PWA y `logo.png` reemplazados por `SEMA LOGO PROVISIONAL.png` (`generate-icons.mjs` ahora lo reescala). Se conservan a propósito identificadores internos: claves `localStorage` `folio_*`, `__folio_type` en posts, mensaje `FOLIO_SCHEDULE_NOTIF` del service worker, función SQL `folio_award`, valor `before_folio`, dominio `folio-final.vercel.app`, proyecto Vercel `folio-final` y el nombre de carpeta `FOLIO FINAL/`
 - 2026-10-07 — Email de soporte actualizado a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado
+- 2026-10-10 — Estados de interfaz (solo UI, sin tocar servicios, Supabase ni RPCs): componentes reutilizables `EmptyState` y `Skeleton` (`src/components/`); 21 estados vacíos nuevos o reescritos (Biblioteca, buscador, listas, feed, amigos, solicitudes, chats, notificaciones, Citas, Recomiéndame, UAM, Trueque, Estadísticas) con textos sin segunda persona pendientes de revisión de León; skeletons con brillo en lugar de spinners/«Cargando…» (arranque de la app —antes en blanco—, perfil, calendario de lectura, amigos, chats, notificaciones, comentarios, frases, listas, buscador, Trueque y su chat), con retraso anti-parpadeo de 200 ms y sin animación con `prefers-reduced-motion`; hover solo en dispositivos con mouse (`@media (hover: hover)`, también para los `hover:` de Tailwind vía `hoverOnlyWhenSupported`), estado presionado `:active` para touch, `focus-visible` y `cursor: pointer` globales; los 6 hover hechos con JavaScript pasan a CSS. `theme.js` exporta `applyPaletteCssVars` (tokens de `palette` como variables `--sema-*`); `.hover-bg-soft` y `.timer-book-hover` dejan sus hex fijos de modo claro
+- 2026-10-10 — León aprueba tal cual los textos de los 21 estados vacíos (tabla en §VII «Estados de interfaz»). El logo fuente `SEMA LOGO PROVISIONAL.png` se renombra a `Sema Logo.png` (mismo archivo, mismo contenido) y `generate-icons.mjs` lo lee con el nombre nuevo
 
 ---
 
@@ -63,11 +65,12 @@ FOLIO FINAL/
 │   ├── supabase.js           # createClient(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)
 │   ├── theme.js              # PALETTE_LIGHT/DARK + objeto mutable `palette` + resolveTheme
 │   ├── haptics.js / sounds.js# Vibración y efectos de sonido (howler)
-│   ├── index.css             # Tailwind base + estilos globales
+│   ├── index.css             # Tailwind base + estilos globales (+ skeleton, hover/press/focus con variables --sema-*)
 │   ├── services/             # Capa de datos — 18 módulos (8 originales + 8 extraídos el 2026-09-22 + truequeGeoService y placeSearchService 2026-10-03), ver §VI
 │   │                         # (src/config/zones.js se eliminó en Trueque v3: las 25 zonas solo quedan en el enum exchange_zone de la BD)
-│   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal,
-│   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal
+│   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, EmptyState, ListDetailModal,
+│   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal, Skeleton
+│   │                         # (EmptyState y Skeleton: estados de interfaz reutilizables, 2026-10-10, ver §VII)
 │   │   └── trueque/          # Trueque de libros: TruequeMain + 13 modales/tarjetas (5 de v2; v3 quitó los 2 de zonas) + ui.jsx (ver §VII)
 │   ├── pets/                 # PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene
 │   ├── data/                 # cuentos.js + cuentos/*.txt: ~23 cuentos de dominio público para "Snacks"
@@ -103,7 +106,7 @@ FOLIO FINAL/
 ├── requirements.txt          # Deps de Python del job de entrenamiento
 ├── vite.config.js            # PWA manifest + estrategias de caché Workbox
 ├── vercel.json               # Cache-Control no-store para index.html/sw.js (¡crítico para PWA!)
-├── generate-icons.mjs        # Genera iconos PWA reescalando `SEMA LOGO PROVISIONAL.png` (usa @resvg/resvg-js)
+├── generate-icons.mjs        # Genera iconos PWA reescalando `Sema Logo.png` (antes `SEMA LOGO PROVISIONAL.png`; usa @resvg/resvg-js)
 ├── AUDITORIA_FASE1_REPORTE.md / SISTEMA_MASCOTAS_EVOLUTIVAS.md  # Reporte de auditoría de esquema y diseño futuro de mascotas
 └── .env / .env.example       # Ver "Variables de entorno" en §III (⚠️ .env.example está desactualizado)
 ```
@@ -124,7 +127,9 @@ FOLIO FINAL/
   - Datos de arte con nombre: `COVER_PALETTES`, `HEATMAP_COLORS`, `STREAK_PHASES`, `FRIEND_STREAK_GRADIENT`, `WRAPPED_SLIDE_GRADIENTS`, `QUOTE_POSTER_GRADIENTS`, `STATUS_COLORS`, `AVATAR_COLORS`, `SOCIAL_COLORS`, `genrePillStyle`, `genreColor`.
   - `ts.caption`/`ts.label` leen `palette.inkFaint` con un getter (antes tenían el hex claro fijo y no seguían al modo oscuro).
   - Quedan hex fuera de `theme.js` solo en `BookCoverImage.jsx` y `pets/PetScene.jsx` (ilustraciones), `main.jsx` (pantallas de error independientes del tema) y en algunos componentes del MVP del Trueque (`ui.jsx`, `MatchCard`, `ExchangeChat`, `ZonesEditor`). Los componentes del Trueque v2 (2026-10-03: `MyPlaces`, `TruequeRulesModal`, `LocationStep`, `ReportModal`) y las líneas tocadas de `TruequeMain` usan solo tokens (`BRAND.gradientFab`, `palette.onAccent`…); el mapa pinta pines y círculos con `palette.accent`/`palette.amber`.
+  - **Variables CSS (2026-10-10)**: `applyPaletteCssVars(isDark)` (en `theme.js`, la llama `MainApp` justo después del `Object.assign` del tema y una vez al cargar el módulo en modo claro) copia cada token de `palette` a `:root` como `--sema-<token-en-kebab>` (`bgSoft` → `--sema-bg-soft`) y añade `--sema-skel-base`/`--sema-skel-shine` (de `border`/`borderSoft`, invertidos en oscuro) y `--sema-hover-brightness`/`--sema-press-brightness`. Solo escribe en el DOM cuando cambia el tema. Así `index.css` usa colores del tema sin hex propios.
   - **z-index**: todavía no hay escala; el mapa real (de 10 a 99999) y los conflictos conocidos están en `AUDIT_SPRINT_REPORT.md` §C.
+- **Estados de interfaz (2026-10-10)**: vacíos con `EmptyState`, cargas con `Skeleton*` y hover/press/focus con clases CSS; detalle, textos y reglas en §VII «Estados de interfaz» y §X.20.
 - **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection`. El **overlay rojo de debug** (div en `document.body`) ahora solo se pinta con `import.meta.env.DEV`; en producción solo hace `console.error`. `RootErrorBoundary` también condiciona su fallback: en DEV muestra el stack trace rojo; en producción una pantalla amigable "Algo salió mal" con botón Recargar.
 
 ### Backend (Supabase)
@@ -453,7 +458,7 @@ await insertBook({ title, author, status: "want_to_read" }, user.id);
 
 ## VII. COMPONENTES PRINCIPALES
 
-Todo vive en `App.jsx` salvo lo extraído a `src/components/` (AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, ListDetailModal, ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal) y `src/pets/` (PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene), más `src/components/trueque/` (ver abajo). No existe `src/pages/`. Jerarquía:
+Todo vive en `App.jsx` salvo lo extraído a `src/components/` (AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, EmptyState, ListDetailModal, ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal, Skeleton) y `src/pets/` (PetDisplay, PetHub, PetLevelUpToast, PetOnboarding, PetScene), más `src/components/trueque/` (ver abajo). No existe `src/pages/`. Jerarquía:
 
 ```
 main.jsx → RootErrorBoundary → App
@@ -500,6 +505,59 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | `MatchCard` *(v2)* | + chip de rango de cercanía (`proximity`) |
 | `MyPlaces` *(v3)* | + buscador de lugares (`PlaceSearch`, Nominatim) arriba del mapa; sin menciones a zonas |
 | `LocationStep` *(v3)* | Todos los estados van al mapa (ya no hay atajo "solo estado" para CDMX) |
+
+### Estados de interfaz (2026-10-10)
+
+Tres piezas para que la app no muestre pantallas en blanco, spinners sueltos ni botones "muertos". **Solo UI:** no cambió ningún servicio, consulta de Supabase ni RPC (los únicos props nuevos son de navegación: `setTab` a `ExplorarView`/`RecommendFlow`, `onOpenAmigos` a `FeedView`, `onAddBook` a `ReadingStatsView`).
+
+**1. `EmptyState`** (`src/components/EmptyState.jsx`) — `<EmptyState icon={Icono} title="…" description="…" action={{ label, icon?, onClick }} compact? style? />`. Ícono de lucide-react (solo los que ya usa la app) en un círculo `bgCard`, título en Fraunces itálica, una línea en `inkSoft` y botón opcional `accent`. `compact` para modales, sheets y secciones internas.
+
+**2. `Skeleton`** (`src/components/Skeleton.jsx`):
+
+| Export | Uso |
+|---|---|
+| `Skeleton({ width, height, radius, circle })` | Bloque base (barra o círculo) |
+| `SkeletonGroup({ label, delay, style })` | Contenedor: `role="status"` + `aria-busy` + `aria-label`; espera `SKELETON_DELAY_MS` (200 ms) antes de verse y mientras tanto ocupa su lugar con `visibility: hidden` (si los datos llegan antes, no hay parpadeo ni salto) |
+| `SkeletonRow` / `SkeletonList({ count, lead: "avatar" / "cover" / null, lines, card, trailing })` | Filas: amigos, solicitudes, chats, notificaciones, comentarios, listas, resultados de búsqueda, libros del Trueque |
+| `SkeletonCardGrid({ count, columns, avatar })` | Tarjetas centradas: amigos, comparativa de perfiles |
+| `SkeletonBubbles({ count })` | Burbujas alternadas: chat de amigos y chat del Trueque |
+
+El brillo vive en `index.css` (`.sema-skeleton`, keyframe `semaShimmer`, colores `--sema-skel-*`); con `prefers-reduced-motion: reduce` queda un bloque fijo sin animación. Formas armadas a mano con `Skeleton`: arranque de la app (`AppLoadingSkeleton`, forma de Inicio; antes el área principal quedaba **en blanco** mientras cargaban los libros), perfil propio, perfil de amigo, calendario de lectura (7×5), frases, Trueque y la carga del mapa de «Mis lugares».
+
+**3. Hover / press / focus** (`index.css`, bloque «Estados de interfaz»):
+- Todo hover va dentro de `@media (hover: hover) and (pointer: fine)` → en celular no se queda "pegado". Los `hover:` de Tailwind también, con `future.hoverOnlyWhenSupported` en `tailwind.config.js`.
+- **Todos los `<button>`**: cambio leve de tono al pasar el mouse (`filter: brightness(--sema-hover-brightness)`: 0.96 en claro, 1.12 en oscuro) y estado presionado `:active` para touch (0.9 / 1.22), transición de 150 ms. Opt-out: clase `sema-no-hover` (filas que ya cambian de fondo).
+- Clases: `sema-card` (tarjeta clickeable: sube 2 px + sombra suave de `--sema-ink`; tarjetas de Inicio, amigos, frases, carrusel de Snacks, logros desbloqueados), `sema-row` (div clickeable: notificaciones, libros de una lista), `sema-chip` (chips inactivos: filtros de Biblioteca, áreas UAM, alcance del Trueque), `sema-tab` (pestañas inactivas: `SubTabBar`, sub-pestañas de Amigos y del Trueque), `sema-pill` (nav de escritorio), `sema-nav-item` + `sema-nav-pill` (íconos de la barra inferior). `hover-bg-soft` y `timer-book-hover` ya existían: ahora usan variables y `!important` (el fondo inline les ganaba y el hover nunca se veía).
+- **Foco con teclado**: `:focus-visible` global con contorno de 2 px `--sema-accent` en botones, links, selects y roles interactivos. **`cursor: pointer`** global en todo lo clickeable no deshabilitado.
+- Los 6 hover hechos con `onMouseEnter/onMouseLeave` (resultados del buscador, logros, libros y estados de ánimo de `ReadingLogModal`, botón y tarjetas de Snacks) pasaron a clases CSS. Se conserva el de `QuickRatingModal` (vista previa de estrellas, es lógica, no estilo).
+
+**Textos de los estados vacíos** (aprobados por León el 2026-10-10). Reglas: título factual + descripción directa, sin segunda persona («tú», «tu», «puedes»), sin «No es X, es Y» y sin frases de marketing.
+
+| Pantalla | Título | Descripción | Botón |
+|---|---|---|---|
+| Biblioteca (sin libros) | Sin libros en la biblioteca | Los libros agregados aparecen aquí. | Agregar libro → pestaña Agregar |
+| Biblioteca (filtro de estado vacío) | Sin libros en «Leyendo» (cambia con el filtro) | Los libros con este estado aparecen aquí. | Ver todos → filtro Todos |
+| Biblioteca (búsqueda) | Sin resultados | Ningún libro coincide con «texto buscado». | Limpiar búsqueda |
+| Buscador de libros | Sin resultados | Ningún libro coincide con ese título o autor. | — (debajo sigue «Agregar manualmente →») |
+| Hoja «Agregar a lista» | Sin listas | Las listas creadas aparecen aquí. | — (debajo sigue «Nueva lista») |
+| Detalle de lista | Lista sin libros | Los libros se agregan desde el detalle de cada libro. | — |
+| Social · Feed | Sin publicaciones en el feed | Las lecturas, frases y logros de las amistades aparecen aquí. | Buscar amigos → hoja Amigos |
+| Social · Amigos | Sin amigos agregados | Las amistades aceptadas aparecen aquí. | Invitar amigo → compartir link |
+| Social · Solicitudes | Sin solicitudes pendientes | Las solicitudes recibidas y enviadas aparecen aquí. | — |
+| Social · Chats | Sin conversaciones | Los chats con amistades aparecen aquí. | Ver amigos (solo si hay amigos) |
+| Social · Chat 1:1 | Sin mensajes | Los mensajes de esta conversación aparecen aquí. | — |
+| Notificaciones | Sin notificaciones | Los likes, comentarios y solicitudes de amistad aparecen aquí. | — |
+| Citas (Mis frases) | Sin frases guardadas | Las frases guardadas de cada libro aparecen aquí. | Guardar frase → modal |
+| Citas (filtro) | Sin frases con este filtro | Las frases que coinciden con el filtro aparecen aquí. | Ver todas |
+| Recomiéndame | Sin libros para recomendar | Las recomendaciones se basan en los libros de la biblioteca. | Agregar libro → pestaña Agregar |
+| Biblioteca UAM | Sin resultados | Ningún libro del catálogo UAM coincide con la búsqueda o el área. | Limpiar filtros |
+| Trueque · Ofrezco | Sin libros ofrecidos | Los libros físicos publicados para intercambio aparecen aquí. | — (arriba sigue «Ofrecer un libro») |
+| Trueque · Busco | Sin libros buscados | Los libros buscados y la lista «Por leer» se usan para encontrar matches. | — (arriba sigue «Buscar un libro») |
+| Trueque · Matches | Sin matches | Los matches aparecen después de buscar con libros en «Ofrezco» y «Busco». | — (arriba sigue «Buscar matches») |
+| Trueque · chat | Sin mensajes | Los mensajes de este intercambio aparecen aquí. | — |
+| Estadísticas (Perfil › Resumen) | Sin estadísticas | Las estadísticas se calculan con los libros de la biblioteca. | Agregar libro → pestaña Agregar |
+
+**Se quedaron igual a propósito** (ya tenían un estado decente): Inicio (secciones que se ocultan + tarjeta «Descubre tu próxima lectura»), `FeedSkeleton`, skeleton y vacíos de `BookTinder`, skeleton de `CollaborativeRecommendations`, `LoadingEntertainment` de Recomiéndame (frases y datos curiosos mientras piensa la IA), tarjeta «Crea tu primera lista» de `ListsSection`, vacío de `ReadingLogModal` con botón, mensajes en tercera persona del perfil de amigo y de la comparativa, «Sin comentarios aún.», Wrapped (historia con diseño propio), logros (siempre muestran la cuadrícula completa), Snacks (contenido embebido, nunca vacío), los estados «Sin conexión», el spinner de arranque de sesión (`App`, antes de saber si hay login), el «Cargando mapa…» interno de `MyPlaces` y todos los spinners **dentro de botones** (guardando, enviando, subiendo: indican una acción, no una carga de datos).
 
 **Navegación:** `NAV_ITEMS` pasó de 5 a 6 entradas (Trueque entre Social y Perfil). El padding lateral de cada ítem del `BottomNav` bajó de 14 px a 8 px para que las 6 quepan en ~360 px. El botón de Mascota deja de estar exactamente al centro.
 
@@ -656,6 +714,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 17. **Ubicación de usuarios (Trueque v2)**: se guarda ya degradada (redondeo en el servidor), en una tabla que solo su dueño lee, y se escribe solo por RPC con límite de cambios. Cualquier comparación entre dos usuarios (distancia, cercanía) se calcula dentro de una función SECURITY DEFINER **interna** y sale al cliente como un rango, nunca como número ni coordenada. Las funciones que reciben dos `user_id` arbitrarios jamás se exponen.
 18. **Cobro condicionado al resultado**: si una acción de pago solo debe cobrarse cuando entrega algo, va en UNA RPC: bloquear el saldo (`SELECT … FOR UPDATE`), ejecutar, y descontar al final solo si hubo resultado; un fallo en el descuento hace `RAISE` y revierte todo (`search_trueque_matches`). Sustituye al patrón de dos RPCs con crédito (§X.11) cuando el precio depende del resultado.
 19. **RPCs nuevas y migraciones pendientes**: si la RPC no existe (`PGRST202`), el servicio registra `code/message/details/hint` y la UI muestra un mensaje de "se está actualizando" en vez de romperse (`callGeoRpc`).
+20. **Estados de interfaz (2026-10-10)**: (a) cualquier lista o pantalla que pueda quedar vacía usa `EmptyState` con título factual, una línea de descripción sin segunda persona y, si existe, un botón a la acción lógica; (b) toda carga de datos usa un skeleton con la forma del contenido real (`SkeletonList`/`SkeletonCardGrid`/`SkeletonBubbles` o bloques `Skeleton` dentro de `SkeletonGroup`), nunca un spinner suelto ni «Cargando…»; los spinners se reservan para acciones dentro de botones; (c) hover solo en CSS y dentro de `@media (hover: hover) and (pointer: fine)` —nunca `onMouseEnter` para estilos— más `:active` para touch; (d) colores en CSS solo con variables `--sema-*` (salen de `palette` vía `applyPaletteCssVars`).
 
 ---
 
@@ -720,6 +779,11 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **PostHog:** no existe en el código, así que no se agregaron eventos (`trueque_pins_saved`, `trueque_search`, `trueque_chat_started`, `trueque_exchange_completed`); la medición vive en la vista `trueque_funnel_summary`.
     - **v3 (2026-10-03):** re-correr `trueque_geo.sql` antes de desplegar (si el cliente v3 sale antes, la búsqueda sigue aceptando zonas en el servidor hasta re-correrlo). Pendiente decidir si se eliminan del todo `user_exchange_zones`, el enum `exchange_zone`, `set_exchange_zones` y las claves `*_max_zones` de `trueque_gems_cost` (hoy se conservan como historial y por compatibilidad). Nominatim: uso justo de 1 solicitud/segundo **por app** en la práctica (no hay cuota por usuario); si crece el tráfico, mover a un proveedor con plan. La calidad de Nominatim varía (p. ej. "Metro Insurgentes" puede devolver primero "Metro Insurgentes Sur"): siempre se puede tocar el mapa.
     - **Fuera de alcance (a propósito):** bloqueo de usuarios, pantalla de moderación, condición del libro en el match, puntos de encuentro sugeridos, alertas de "alguien cerca", cadenas de 3 intercambios, geolocalización del navegador.
+18. **Estados de interfaz — pendientes (2026-10-10):**
+    - ~~Textos de los estados vacíos sin aprobar~~ — **aprobados 2026-10-10** tal como están en §VII. Sigue pendiente: varios vacíos que se dejaron igual siguen en segunda persona («Crea tu primera lista», «Primero agrega un libro como "Leyendo"», «Configura tus géneros primero» de BookTinder).
+    - **Skeletons previos con estilo propio:** `FeedSkeleton` (App.jsx), `BookTinder` y `CollaborativeRecommendations` tienen su propio shimmer/pulso y keyframes; se pueden migrar a `Skeleton` para unificar (sin cambio visible grande).
+    - **Hover global en `<button>`:** el `filter: brightness()` crea un *containing block* para hijos `position: fixed`; hoy ningún botón tiene hijos así, pero un modal o tooltip fijo puesto dentro de un `<button>` quedaría mal posicionado al pasar el mouse (usar `sema-no-hover` o sacarlo del botón).
+    - **Sin prueba visual con sesión iniciada:** se verificó con `vite build`; las pantallas con login no se revisaron en navegador en esta sesión.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 

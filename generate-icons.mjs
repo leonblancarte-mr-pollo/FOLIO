@@ -1,11 +1,11 @@
-// Genera los íconos de la PWA a partir del logo de SEMA ("SEMA LOGO PROVISIONAL.png").
+// Genera los íconos de la PWA a partir del logo de SEMA ("Sema Logo.png").
 // Requiere: npm i -D @resvg/resvg-js. El PNG fuente se incrusta en un SVG y se reescala.
 import { Resvg } from "@resvg/resvg-js";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 
 mkdirSync("public", { recursive: true });
 
-const b64 = readFileSync("SEMA LOGO PROVISIONAL.png").toString("base64");
+const b64 = readFileSync("Sema Logo.png").toString("base64");
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512">
   <image width="512" height="512" xlink:href="data:image/png;base64,${b64}"/>
 </svg>`;

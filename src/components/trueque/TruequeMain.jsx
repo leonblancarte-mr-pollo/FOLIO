@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
-import { Plus, Loader2, MapPin, Pencil } from "lucide-react";
+import { Plus, Loader2, MapPin, Pencil, BookOpen, Search } from "lucide-react";
 import { palette, body, display, BRAND } from "../../theme.js";
 import { estadoNombre } from "../../data/estados.js";
 import {
@@ -21,6 +21,8 @@ import { PlusUpsellModal } from "./PlusUpsellModal.jsx";
 import { TruequeRulesModal } from "./TruequeRulesModal.jsx";
 import { LocationStep } from "./LocationStep.jsx";
 import { Sheet } from "./ui.jsx";
+import { EmptyState } from "../EmptyState.jsx";
+import { Skeleton, SkeletonGroup, SkeletonList } from "../Skeleton.jsx";
 
 const TABS = [
   { id: "ofrezco", label: "Ofrezco" },
@@ -226,7 +228,16 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
   }
 
   if (loading) {
-    return <div style={{ display: "flex", justifyContent: "center", padding: "4rem 0" }}><Loader2 size={26} className="animate-spin" color={palette.inkFaint} /></div>;
+    return (
+      <SkeletonGroup label="Cargando Trueque" style={{ padding: "1rem 1rem 6rem", maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+        <Skeleton width="40%" height={30} radius={8} />
+        <Skeleton width="75%" height={14} />
+        <Skeleton height={40} radius={12} style={{ marginTop: "0.3rem" }} />
+        <Skeleton height={54} radius={16} />
+        <Skeleton height={40} radius={999} style={{ marginTop: "0.5rem" }} />
+        <SkeletonList count={3} lead="cover" gap="0.6rem" style={{ marginTop: "0.3rem" }} />
+      </SkeletonGroup>
+    );
   }
   if (fatal) {
     return <p style={{ ...body, textAlign: "center", color: palette.inkSoft, padding: "3rem 1rem" }}>{fatal}</p>;
@@ -286,7 +297,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
         {SEARCH_SCOPES.map((s) => {
           const on = scope === s;
           return (
-            <button key={s} role="radio" aria-checked={on} onClick={() => setScope(s)} disabled={blocked} style={{ padding: "0.3rem 0.7rem", borderRadius: 999, cursor: blocked ? "default" : "pointer", border: `1.5px solid ${on ? palette.accent : palette.border}`, backgroundColor: on ? palette.accentSoft : palette.bgCard, color: on ? palette.onAccent : palette.inkSoft, ...body, fontSize: "0.8rem" }}>
+            <button key={s} role="radio" aria-checked={on} onClick={() => setScope(s)} disabled={blocked} className={on ? undefined : "sema-chip"} style={{ padding: "0.3rem 0.7rem", borderRadius: 999, cursor: blocked ? "default" : "pointer", border: `1.5px solid ${on ? palette.accent : palette.border}`, backgroundColor: on ? palette.accentSoft : palette.bgCard, color: on ? palette.onAccent : palette.inkSoft, ...body, fontSize: "0.8rem" }}>
               {scopeLabel(s, geo?.maxRadiusKm ?? 6)}
             </button>
           );
@@ -299,7 +310,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
           const count = t.id === "ofrezco" ? offers.length : t.id === "busco" ? wants.length : matches.filter((m) => m.status !== "completed").length;
           const active = tab === t.id;
           return (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{ flex: 1, padding: "0.5rem", borderRadius: 999, border: "none", cursor: "pointer", backgroundColor: active ? palette.bgCard : "transparent", color: active ? palette.accent : palette.inkSoft, ...display, fontSize: "0.9rem", fontWeight: active ? 700 : 500, boxShadow: active ? `0 1px 4px ${palette.ink}1A` : "none" }}>
+            <button key={t.id} onClick={() => setTab(t.id)} className={active ? undefined : "sema-tab"} style={{ flex: 1, padding: "0.5rem", borderRadius: 999, border: "none", cursor: "pointer", backgroundColor: active ? palette.bgCard : "transparent", color: active ? palette.accent : palette.inkSoft, ...display, fontSize: "0.9rem", fontWeight: active ? 700 : 500, boxShadow: active ? `0 1px 4px ${palette.ink}1A` : "none" }}>
               {t.label} {count > 0 && <span style={{ ...body, fontWeight: 400, fontSize: "0.8rem" }}>({count})</span>}
             </button>
           );
@@ -312,7 +323,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
           onAdd={openOffer}
           addLabel="Ofrecer un libro"
           limit={status && !status.is_premium ? status.max_offered : null}
-          empty="Publica libros físicos que ya no necesites y quieras intercambiar."
+          empty={{ icon: BookOpen, title: "Sin libros ofrecidos", description: "Los libros físicos publicados para intercambio aparecen aquí." }}
           onDelete={removeOffer}
         />
       )}
@@ -322,7 +333,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
           onAdd={openWant}
           addLabel="Buscar un libro"
           limit={status && !status.is_premium ? status.max_wanted : null}
-          empty='Agrega los libros que quieres conseguir. Tu lista "Por leer" también cuenta para los matches.'
+          empty={{ icon: Search, title: "Sin libros buscados", description: "Los libros buscados y la lista «Por leer» se usan para encontrar matches." }}
           onDelete={removeWant}
         />
       )}
@@ -346,7 +357,7 @@ function TruequeMain({ user, gemBalance, onGemsChanged, onExit }) {
         <LocationStep onPickState={(st) => setPlacesOpen({ initialState: st })} onSkip={onExit} />
       )}
       {placesOpen && (
-        <Suspense fallback={<Sheet title="📍 Mis lugares"><div style={{ display: "flex", justifyContent: "center", padding: "2rem 0" }}><Loader2 size={24} className="animate-spin" color={palette.inkFaint} /></div></Sheet>}>
+        <Suspense fallback={<Sheet title="📍 Mis lugares"><SkeletonGroup label="Cargando mapa" style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}><Skeleton height={40} radius={10} /><Skeleton height={300} radius={14} /></SkeletonGroup></Sheet>}>
           <MyPlaces
             profile={geo}
             initialState={placesOpen.initialState}
@@ -387,7 +398,7 @@ function BookList({ books, onAdd, addLabel, limit, empty, onDelete }) {
         {limit != null && <span style={{ ...body, fontWeight: 400, fontSize: "0.8rem", color: palette.inkFaint }}>({books.length}/{limit})</span>}
       </button>
       {books.length === 0
-        ? <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, textAlign: "center", padding: "1.5rem 0.5rem", margin: 0 }}>{empty}</p>
+        ? <EmptyState icon={empty.icon} title={empty.title} description={empty.description} compact />
         : books.map((b) => <BookCard key={b.id} book={b} onDelete={onDelete} />)}
     </div>
   );

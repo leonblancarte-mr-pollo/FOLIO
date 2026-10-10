@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, Send, Loader2, CheckCircle2, Flag, ShieldCheck } from "lucide-react";
+import { ChevronLeft, Send, Loader2, CheckCircle2, Flag, ShieldCheck, MessageCircle } from "lucide-react";
 import { palette, body, display } from "../../theme.js";
 import { getMatchChat, sendMessage, completeExchange } from "../../services/truequeService.js";
 import { ReportModal } from "./ReportModal.jsx";
+import { EmptyState } from "../EmptyState.jsx";
+import { SkeletonBubbles } from "../Skeleton.jsx";
 
 const POLL_MS = 8000;
 
@@ -127,16 +129,14 @@ function ExchangeChat({ match, userId, onClose, onCompleted, onChanged }) {
       </p>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "1rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-        {loading && <Loader2 size={22} className="animate-spin" style={{ margin: "2rem auto", color: palette.inkFaint }} />}
+        {loading && <SkeletonBubbles count={4} />}
         {hasMore && (
           <button onClick={loadOlder} disabled={loadingMore} style={{ alignSelf: "center", background: "none", border: `1px solid ${palette.border}`, borderRadius: 999, padding: "0.3rem 0.9rem", cursor: "pointer", ...body, fontSize: "0.8rem", color: palette.inkSoft }}>
             {loadingMore ? "Cargando…" : "Cargar mensajes anteriores"}
           </button>
         )}
         {!loading && messages.length === 0 && (
-          <p style={{ ...body, textAlign: "center", color: palette.inkFaint, fontSize: "0.9rem", margin: "2rem 0" }}>
-            Rompe el hielo: propón un lugar público y un horario. 📚
-          </p>
+          <EmptyState icon={MessageCircle} title="Sin mensajes" description="Los mensajes de este intercambio aparecen aquí." compact style={{ margin: "1rem 0" }} />
         )}
         {messages.map((m) => {
           if (m.is_system) {

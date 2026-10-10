@@ -128,7 +128,8 @@
   transition: background-color 150ms ease;
 }
 @media (hover: hover) and (pointer: fine) {
-  .hover-bg-soft:hover { background-color: #EBE3D2; }
+  /* !important: las filas traen backgroundColor inline (antes este hover nunca se veía). */
+  .hover-bg-soft:not(:disabled):hover { background-color: var(--sema-bg-soft) !important; }
 }
 
 .hover-shadow-stat {
@@ -151,8 +152,8 @@
 }
 @media (hover: hover) and (pointer: fine) {
   .timer-book-hover:hover {
-    border-color: #7A2E2E;
-    background-color: rgba(122, 46, 46, 0.04);
+    border-color: var(--sema-accent) !important;
+    background-color: color-mix(in srgb, var(--sema-accent) 4%, transparent) !important;
   }
 }
 
@@ -322,4 +323,77 @@
 @keyframes slideInRight {
   from { transform: translateX(100%); }
   to   { transform: translateX(0); }
+}
+
+/* ═══ Estados de interfaz (2026-10-10): skeleton, hover, press y focus ═══════════
+   Colores: SOLO variables --sema-* que escribe applyPaletteCssVars() (theme.js) desde
+   `palette`, así todo sigue al modo claro/oscuro sin hex propios.
+   Hover: siempre dentro de @media (hover: hover) and (pointer: fine) para que en
+   celular no se quede "pegado" al tocar; en touch el feedback es :active (press). */
+
+/* ─── Skeleton con brillo suave ─── */
+.sema-skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--sema-skel-base) 25%, var(--sema-skel-shine) 50%, var(--sema-skel-base) 75%);
+  background-size: 200% 100%;
+  animation: semaShimmer 1.4s ease-in-out infinite;
+}
+@keyframes semaShimmer {
+  from { background-position: 100% 0; }
+  to   { background-position: -100% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sema-skeleton { animation: none; background: var(--sema-skel-base); }
+}
+
+/* ─── Cursor y foco con teclado ─── */
+button:not(:disabled), [role="button"], [role="radio"], [role="tab"], a[href], select, summary, label[for] {
+  cursor: pointer;
+}
+:where(button, a[href], select, summary, [role="button"], [role="radio"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--sema-accent);
+  outline-offset: 2px;
+}
+
+/* ─── Botones: cambio leve de tono (todas las pantallas) ─── */
+button {
+  transition: filter 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):not(.sema-no-hover):hover,
+  .sema-row:hover {
+    filter: brightness(var(--sema-hover-brightness));
+  }
+}
+button:not(:disabled):not(.sema-no-hover):active,
+.sema-row:active {
+  filter: brightness(var(--sema-press-brightness));
+}
+
+/* Fila clickeable que no es <button> (div con onClick). */
+.sema-row {
+  cursor: pointer;
+  transition: filter 150ms ease, background-color 150ms ease;
+}
+
+/* Tarjeta clickeable: elevación + sombra suave. */
+.sema-card {
+  transition: transform 150ms ease, box-shadow 150ms ease, filter 150ms ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sema-card:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--sema-ink) 14%, transparent) !important;
+  }
+}
+.sema-card:not(:disabled):active { transform: scale(0.98); }
+
+/* Pestañas, chips e íconos de navegación inactivos: fondo suave al pasar el mouse. */
+@media (hover: hover) and (pointer: fine) {
+  .sema-pill:not(:disabled):hover { background-color: var(--sema-bg-soft) !important; filter: none; }
+  .sema-chip:not(:disabled):hover { border-color: var(--sema-accent) !important; color: var(--sema-accent) !important; filter: none; }
+  .sema-tab:not(:disabled):hover { color: var(--sema-ink) !important; filter: none; }
+  .sema-nav-item:hover .sema-nav-pill { background-color: var(--sema-bg-soft) !important; }
+  .sema-nav-item:hover { filter: none; }
+  a[href]:hover { text-decoration: underline; }
 }

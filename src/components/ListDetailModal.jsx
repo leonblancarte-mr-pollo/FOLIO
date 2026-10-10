@@ -3,6 +3,7 @@ import { X, Pencil, Trash2, Lock, BookOpen, Loader2 } from "lucide-react";
 import { palette, body, display } from "../theme.js";
 import { updateUserList, deleteUserList, removeBookFromList } from "../services/listsService.js";
 import { ListFormModal } from "./ListFormModal.jsx";
+import { EmptyState } from "./EmptyState.jsx";
 
 // Detalle de una lista: sus libros, quitar libros, editar, y borrar la lista.
 function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDeleted, onClose }) {
@@ -68,14 +69,12 @@ function ListDetailModal({ list, books, userId, onSelectBook, onChanged, onDelet
           </p>
 
           {listBooks.length === 0 ? (
-            <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic", marginTop: "1.25rem" }}>
-              Lista vacía. Agrega libros desde el detalle de cualquier libro de tu biblioteca.
-            </p>
+            <EmptyState icon={BookOpen} title="Lista sin libros" description="Los libros se agregan desde el detalle de cada libro." compact style={{ marginTop: "0.75rem" }} />
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.55rem", marginTop: "1.1rem" }}>
               {listBooks.map((b) => (
                 <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.55rem 0.7rem" }}>
-                  <div onClick={() => onSelectBook?.(b)} style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0, cursor: onSelectBook ? "pointer" : "default" }}>
+                  <div onClick={() => onSelectBook?.(b)} className={onSelectBook ? "sema-row" : undefined} style={{ display: "flex", alignItems: "center", gap: "0.75rem", flex: 1, minWidth: 0, cursor: onSelectBook ? "pointer" : "default" }}>
                     {b.coverUrl ? (
                       <img src={b.coverUrl} alt={b.title} style={{ width: 36, height: 52, objectFit: "cover", borderRadius: 5, flexShrink: 0 }} />
                     ) : (
