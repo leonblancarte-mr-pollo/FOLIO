@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Bookmark, BookOpen, Eye, CheckCircle } from "lucide-react";
 import BookCoverImage from "./BookCoverImage.jsx";
 import { palette, BRAND, STATUS_COLORS } from "../theme.js";
-const serif = { fontFamily: "Fraunces, serif" };
-const body  = { fontFamily: "'EB Garamond', serif" };
+const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
+const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
 
 // Mismos colores de estado que el resto de la app (theme.js → STATUS_COLORS).
 const STATUS_OPTIONS = [
@@ -83,7 +83,7 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
             />
           </div>
           <div style={{ minWidth: 0 }}>
-            <p style={{ ...serif, fontSize: "1rem", fontWeight: 700, fontStyle: "italic", color: palette.ink, lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <p style={{ ...serif, fontSize: "1rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {book.title}
             </p>
             <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, margin: "2px 0 0" }}>{book.author}</p>

@@ -57,6 +57,9 @@ import {
   Snowflake,
   ExternalLink,
   Repeat,
+  Sun,
+  CloudSun,
+  Gem,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
@@ -77,7 +80,7 @@ import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { EmptyState } from "./components/EmptyState.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
-import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, ts, genrePillStyle, genreColor } from "./theme.js";
+import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
@@ -275,7 +278,7 @@ function LoadingEntertainment({ label = "Cargando…" }) {
       <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.28s ease", maxWidth: 380, margin: "0 auto" }}>
         {mode === "quotes" ? (
           <div>
-            <p style={{ ...display, fontStyle: "italic", fontSize: "1.05rem", color: palette.ink, lineHeight: 1.55, marginBottom: "0.8rem" }}>
+            <p style={{ ...display, fontSize: "1.05rem", color: palette.ink, lineHeight: 1.55, marginBottom: "0.8rem" }}>
               "{item.text}"
             </p>
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft }}>
@@ -356,7 +359,7 @@ function BookCoverPlaceholder({ title = "", author = "", width = 56, height = 80
         height,
         backgroundColor: p.bg,
         color: p.fg,
-        fontFamily: "Fraunces, serif",
+        fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -432,8 +435,7 @@ function StatusBadge({ status }) {
       style={{
         backgroundColor: meta.color + "1E",
         color: meta.color,
-        border: `1px solid ${meta.color}35`,
-        ...display,
+        ...body,
         fontWeight: 600,
         letterSpacing: "0.03em",
       }}
@@ -601,19 +603,18 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
         <span
           aria-label="SEMA"
           style={{
-            fontFamily: "Fraunces, serif",
-            fontStyle: "italic",
+            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
             fontWeight: 800,
-            fontSize: "2rem",
+            fontSize: "1.6rem",
             lineHeight: 1,
-            letterSpacing: "-0.02em",
-            color: palette.bg === PALETTE_DARK.bg ? palette.ink : palette.accentSoft,
+            letterSpacing: "-0.04em",
+            color: palette.bg === PALETTE_DARK.bg ? palette.ink : palette.accent,
             userSelect: "none",
           }}
-        >f</span>
+        >sema</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: "3px", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "999px", padding: "3px 10px 3px 8px", fontFamily: "system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 600, color: palette.amber }}>
-            💎 {gemBalance ?? 0}
+          <span style={{ display: "flex", alignItems: "center", gap: "4px", ...body, fontSize: "0.9rem", fontWeight: 600, color: palette.amberInk }}>
+            <Gem size={16} strokeWidth={1.8} /> {gemBalance ?? 0}
           </span>
           <button
             onClick={onOpenNotifs}
@@ -667,7 +668,6 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
           })}
         </div>
       </div>
-      <div style={{ height: 2, background: `linear-gradient(to right, ${BRAND.wine}, ${BRAND.amber}55, transparent)` }} />
     </header>
   );
 }
@@ -727,7 +727,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
                     </span>
                   )}
                 </span>
-                <span style={{ fontFamily: "Fraunces, serif", fontSize: "11px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.accent : palette.inkFaint, transition: "color 200ms ease" }}>{t.label}</span>
+                <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "11px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.accent : palette.inkFaint, transition: "color 200ms ease" }}>{t.label}</span>
               </div>
             )}
           </button>
@@ -739,73 +739,24 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
 
 function BookCard({ book, onClick }) {
   return (
-    <button
-      onClick={onClick}
-      className="text-left book-list-card"
-      style={{
-        backgroundColor: palette.bgCard,
-        border: `1px solid ${palette.borderSoft}`,
-        borderRadius: "8px",
-        padding: "1rem",
-        boxShadow: "0 1px 3px rgba(42,31,26,0.06)",
-      }}
-    >
+    <button onClick={onClick} className="text-left book-list-card" style={{ background: "none", border: "none", padding: "0.25rem 0" }}>
       <div className="flex gap-4">
         {book.coverUrl ? (
-          <img
-            src={book.coverUrl}
-            alt={book.title}
-            className="object-cover rounded-sm flex-shrink-0"
-            style={{ width: 60, height: 86, boxShadow: "0 2px 10px rgba(42,31,26,0.22)" }}
-          />
+          <img src={book.coverUrl} alt={book.title} className="object-cover rounded-sm flex-shrink-0" style={{ width: 60, height: 86, boxShadow: "0 2px 10px rgba(42,31,26,0.22)" }} />
         ) : (
           <BookCoverPlaceholder title={book.title} author={book.author} width={60} height={86} />
         )}
         <div className="flex-1 min-w-0">
-          <h3
-            style={{
-              ...ts.h3,
-              color: palette.ink,
-              marginBottom: "0.3rem",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
+          <h3 style={{ ...ts.h3, color: palette.ink, marginBottom: "0.2rem", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {book.title}
           </h3>
-          <p
-            style={{ ...ts.caption, marginBottom: "0.6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >
-            {book.author}
+          <p style={{ ...ts.caption, marginBottom: "0.6rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {book.author}{book.genre ? ` · ${book.genre}` : ""}
           </p>
-          <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
             <StatusBadge status={book.status} />
-            {book.genre && (
-              <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", fontWeight: 400, color: palette.inkSoft, padding: "0.1rem 0.5rem", borderRadius: "999px", border: `1px solid ${palette.border}`, backgroundColor: "transparent" }}>
-                {book.genre}
-              </span>
-            )}
             {book.rating > 0 && <StarRating value={book.rating} size={12} readOnly />}
           </div>
-          {book.summary && (
-            <p
-              style={{
-                ...body,
-                fontSize: "0.82rem",
-                color: palette.inkFaint,
-                lineHeight: 1.4,
-                fontStyle: "italic",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {book.summary}
-            </p>
-          )}
         </div>
       </div>
     </button>
@@ -839,7 +790,7 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
       return (
         <div className="text-center py-20 px-6">
           <WifiOff size={36} color={palette.border} style={{ margin: "0 auto 1rem", display: "block" }} />
-          <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.3rem", color: palette.ink, marginBottom: "0.5rem" }}>
+          <h2 style={{ ...display, fontSize: "1.3rem", color: palette.ink, marginBottom: "0.5rem" }}>
             Sin conexión
           </h2>
           <p style={{ ...body, color: palette.inkSoft, fontSize: "0.95rem", maxWidth: 340, margin: "0 auto" }}>
@@ -860,8 +811,8 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
   }
 
   return (
-    <div className="px-4 sm:px-6 py-5 sm:py-6">
-      <div className="relative mb-4">
+    <div className="px-5 sm:px-6 py-6 sm:py-8">
+      <div className="relative mb-5">
         <Search
           size={16}
           color={palette.inkFaint}
@@ -910,8 +861,8 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
                 fontWeight: active ? 600 : 400,
                 backgroundColor: active ? palette.accent : palette.bgSoft,
                 color: active ? palette.onAccent : palette.inkSoft,
-                border: `1px solid ${active ? palette.accent : palette.borderSoft}`,
-                minHeight: 34,
+                border: "none",
+                minHeight: 36,
                 cursor: "pointer",
               }}
             >
@@ -938,7 +889,7 @@ function LibraryView({ books, onSelectBook, setTab, isOnline = true }) {
           />
         )
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((book) => (
             <BookCard key={book.id} book={book} onClick={() => onSelectBook(book)} />
           ))}
@@ -1054,7 +1005,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
               </button>
             ))}
           </div>
-          <button onClick={handleSave} style={{ width: "100%", padding: "0.85rem", borderRadius: "999px", backgroundColor: palette.ink, color: palette.bg, border: "none", fontFamily: "Fraunces, serif", fontSize: "15px", fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={handleSave} style={{ width: "100%", padding: "0.85rem", borderRadius: "999px", backgroundColor: palette.ink, color: palette.bg, border: "none", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "15px", fontWeight: 600, cursor: "pointer" }}>
             Guardar libro
           </button>
           <button onClick={() => setSelectedBook(null)} style={{ width: "100%", marginTop: "0.65rem", padding: "0.6rem", background: "none", border: "none", color: palette.inkFaint, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", cursor: "pointer" }}>
@@ -1083,7 +1034,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Busca por título, autor o ISBN..."
-            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "'EB Garamond', serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
+            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "Figtree, system-ui, sans-serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
           />
           {query && (
             <button onClick={() => setQuery("")} style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "0.1rem", display: "flex" }}>
@@ -1143,7 +1094,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
                       <BookCoverPlaceholder title={book.title} author={book.author} width={50} height={75} />
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+                      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
                       <p style={{ ...ts.caption, marginBottom: book.year ? "0.15rem" : 0 }}>{book.author}</p>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.15rem", flexWrap: "wrap" }}>
                         {book.year && <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", color: palette.inkFaint }}>{book.year}</span>}
@@ -1281,7 +1232,7 @@ function AddBookView({ onAdd, setTab }) {
       >
         <ChevronLeft size={16} /> Atrás
       </button>
-      <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.5rem", color: palette.ink, marginBottom: "1rem" }}>
+      <h2 style={{ ...display, fontSize: "1.5rem", color: palette.ink, marginBottom: "1rem" }}>
         Agregar manualmente
       </h2>
       <BookForm form={form} setForm={setForm} onReadSelected={() => setShowRatingPrompt(true)} />
@@ -1883,8 +1834,7 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                       {bookQuotes.slice(0, 3).map(q => (
                         <div key={q.id} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "8px", padding: "0.65rem 0.85rem 0.65rem 1.1rem", position: "relative", overflow: "hidden" }}>
-                          <div style={{ position: "absolute", top: 2, left: 6, fontFamily: "Georgia, serif", fontSize: "1.8rem", lineHeight: 1, color: palette.accent + "20", userSelect: "none" }}>"</div>
-                          <p style={{ ...body, fontSize: "0.9rem", fontStyle: "italic", color: palette.ink, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                          <p style={{ ...quoteFont, fontSize: "1.05rem", color: palette.ink, lineHeight: 1.5, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                             {q.text}
                           </p>
                         </div>
@@ -1984,7 +1934,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
 
   return (
     <div className="px-4 sm:px-6 pt-2 pb-1 max-w-4xl mx-auto">
-      <p style={{ ...display, fontStyle: "italic", fontSize: "1.15rem", color: palette.ink, marginBottom: "0.7rem" }}>
+      <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, marginBottom: "0.7rem" }}>
         {personalized ? "Recomendado para ti" : "Los mejor valorados"}
       </p>
       <div style={{ display: "flex", gap: "0.9rem", overflowX: "auto", paddingBottom: "0.4rem" }}>
@@ -2121,7 +2071,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
             ✦ Para tu mood actual
           </p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-            <h2 style={{ ...display, fontStyle: "italic", fontSize: "1.6rem", color: palette.ink }}>
+            <h2 style={{ ...display, fontSize: "1.6rem", color: palette.ink }}>
               Mis sugerencias
             </h2>
             <button
@@ -2368,7 +2318,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     border: selected ? "none" : `1px solid ${palette.border}`,
     backgroundColor: selected ? BRAND.wineDeep : palette.bgSoft,
     color: selected ? palette.onAccent : palette.ink,
-    fontFamily: "'EB Garamond', serif",
+    fontFamily: "Figtree, system-ui, sans-serif",
     fontSize: "15px",
     fontWeight: 500,
     cursor: "pointer",
@@ -2407,7 +2357,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto fade-in">
         <ProgressBar />
         <p style={{ ...ts.caption, marginBottom: "0.4rem", fontWeight: 500 }}>Paso {step + 1} de 5</p>
-        <h2 style={{ fontFamily: "Fraunces, serif", fontSize: "24px", fontWeight: 700, fontStyle: "italic", color: palette.ink, lineHeight: 1.2, marginBottom: "1.5rem" }}>
+        <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "24px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "1.5rem" }}>
           {title}
         </h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
@@ -2437,7 +2387,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto fade-in">
       <ProgressBar />
       <p style={{ ...ts.caption, marginBottom: "0.4rem", fontWeight: 500 }}>Paso 5 de 5</p>
-      <h2 style={{ fontFamily: "Fraunces, serif", fontSize: "24px", fontWeight: 700, fontStyle: "italic", color: palette.ink, lineHeight: 1.2, marginBottom: "1.5rem" }}>
+      <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "24px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "1.5rem" }}>
         ¿Algo más que deba saber?
       </h2>
       <textarea
@@ -2446,7 +2396,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
         maxLength={200}
         rows={3}
         placeholder="Ej: No quiero nada muy largo, me gustan los finales abiertos, quiero algo mexicano..."
-        style={{ width: "100%", padding: "0.85rem", backgroundColor: palette.bgCard, border: `1.5px solid ${palette.border}`, borderRadius: "10px", fontFamily: "'EB Garamond', serif", fontSize: "15px", color: palette.ink, lineHeight: 1.5, outline: "none", resize: "none", boxSizing: "border-box" }}
+        style={{ width: "100%", padding: "0.85rem", backgroundColor: palette.bgCard, border: `1.5px solid ${palette.border}`, borderRadius: "10px", fontFamily: "Figtree, system-ui, sans-serif", fontSize: "15px", color: palette.ink, lineHeight: 1.5, outline: "none", resize: "none", boxSizing: "border-box" }}
       />
       <p style={{ ...ts.caption, textAlign: "right", marginTop: "0.2rem", marginBottom: "1rem" }}>{answers.extra.length}/200</p>
       {error && <p style={{ ...ts.caption, color: palette.accent, fontStyle: "italic", marginBottom: "0.75rem" }}>{error}</p>}
@@ -2905,7 +2855,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
         <div style={{ fontSize: "4rem", lineHeight: 1, marginBottom: "0.85rem", animation: "achievementBounce 0.6s ease-out 0.15s both", display: "inline-block" }}>
           {def.emoji}
         </div>
-        <p style={{ ...display, fontSize: "1.5rem", fontWeight: 700, fontStyle: "italic", color: palette.amber, marginBottom: "0.4rem", lineHeight: 1.2 }}>
+        <p style={{ ...display, fontSize: "1.5rem", fontWeight: 700, color: palette.amber, marginBottom: "0.4rem", lineHeight: 1.2 }}>
           {def.name}
         </p>
         <p style={{ ...body, fontSize: "0.92rem", color: palette.inkSoft, marginBottom: "1.75rem", lineHeight: 1.5 }}>
@@ -3594,7 +3544,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt="avatar" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
@@ -3736,7 +3686,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
             <button
               onClick={async () => { const ok = await handleSave(); if (ok) setTimeout(() => setEditModalOpen(false), 800); }}
               disabled={saving}
-              style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : palette.onAccent, border: "none", borderRadius: "12px", fontSize: "1rem", fontFamily: "Fraunces, serif", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
+              style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : palette.onAccent, border: "none", borderRadius: "12px", fontSize: "1rem", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
             >
               {saving ? "Guardando..." : "Guardar cambios"}
             </button>
@@ -3818,7 +3768,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                   minHeight: "88px",
                 }}
               >
-                <div style={{ fontFamily: "Fraunces, serif", fontSize: "28px", fontWeight: 700, color: numColor, lineHeight: 1, marginBottom: "0.4rem" }}>{value}</div>
+                <div style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "28px", fontWeight: 700, color: numColor, lineHeight: 1, marginBottom: "0.4rem" }}>{value}</div>
                 <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", fontWeight: 500, color: palette.inkFaint }}>{label}</div>
               </div>
             ))}
@@ -3831,7 +3781,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               ].map(({ label, value, unit, numColor, bg }) => (
                 <div key={label} style={{ backgroundColor: bg, borderRadius: "14px", padding: "1rem", display: "flex", flexDirection: "column", justifyContent: "flex-end", minHeight: "88px" }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", marginBottom: "0.4rem" }}>
-                    <span style={{ fontFamily: "Fraunces, serif", fontSize: "28px", fontWeight: 700, color: numColor, lineHeight: 1 }}>{value}</span>
+                    <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "28px", fontWeight: 700, color: numColor, lineHeight: 1 }}>{value}</span>
                     <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", color: numColor, opacity: 0.7 }}>{unit}</span>
                   </div>
                   <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", fontWeight: 500, color: palette.inkFaint }}>{label}</div>
@@ -4003,7 +3953,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                 <span className="sparkle-anim"><Sparkles size={20} color={BRAND.cream} /></span>
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", fontWeight: 500, color: "rgba(244,237,224,0.65)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.2rem" }}>{year}</div>
-                  <div style={{ fontFamily: "Fraunces, serif", fontSize: "1.1rem", fontWeight: 700, fontStyle: "italic", color: BRAND.cream }}>Wrapped</div>
+                  <div style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.1rem", fontWeight: 700, color: BRAND.cream }}>Wrapped</div>
                 </div>
               </div>
               <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 700, color: BRAND.cream }}>
@@ -4278,7 +4228,7 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontFamily: "Fraunces, serif",
+              fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
               fontSize: "1rem",
               fontWeight: 600,
               flexShrink: 0,
@@ -4572,7 +4522,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
         {avatarUrl ? (
           <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: `3px solid ${color}` }} />
         ) : (
-          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
         )}
         <span style={{ ...display, fontSize: "0.82rem", fontWeight: 600, color: palette.ink }}>{name}</span>
       </div>
@@ -4617,7 +4567,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
       {/* Column headers */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1.5rem" }}>
         <ColHeader name={userName} avatarUrl={user.avatar_url} initials={uInitials} color={U_COLOR} />
-        <span style={{ ...display, fontStyle: "italic", fontSize: "0.78rem", color: palette.inkFaint }}>vs</span>
+        <span style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint }}>vs</span>
         <ColHeader name={friendName} avatarUrl={friend.avatar_url} initials={fInitials} color={F_COLOR} />
       </div>
 
@@ -4694,8 +4644,8 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
                 const p = pt(i, 1.42);
                 return (
                   <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle">
-                    <tspan x={p.x} dy="-6" fontSize="9" fill={palette.inkSoft} fontFamily="EB Garamond, serif">{name}</tspan>
-                    <tspan x={p.x} dy="12" fontSize="7.5" fill={palette.amber} fontFamily="EB Garamond, serif">({uDisp} vs {fDisp})</tspan>
+                    <tspan x={p.x} dy="-6" fontSize="9" fill={palette.inkSoft} fontFamily="Figtree, sans-serif">{name}</tspan>
+                    <tspan x={p.x} dy="12" fontSize="7.5" fill={palette.amber} fontFamily="Figtree, sans-serif">({uDisp} vs {fDisp})</tspan>
                   </text>
                 );
               })}
@@ -4977,7 +4927,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
           <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, lineHeight: 1.3 }}>{label}</p>
         </div>
         <div style={{ textAlign: "center", flexShrink: 0 }}>
-          <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "2.6rem", fontWeight: 800, color: palette.accent, lineHeight: 1 }}>{score}%</p>
+          <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2.6rem", fontWeight: 800, color: palette.accent, lineHeight: 1 }}>{score}%</p>
         </div>
       </div>
 
@@ -5002,22 +4952,22 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
             <circle cx="200" cy="55" r="62" fill={palette.slate} fillOpacity="0.15" stroke={palette.slate} strokeOpacity="0.5" strokeWidth="1.5" />
             <circle cx="200" cy="55" r="62" fill={BRAND.amber} fillOpacity="0.28" clipPath="url(#lc-left)" />
             {onlyU.slice(0, 2).map((g, i) => (
-              <text key={g} x="75" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={BRAND.wine} fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
+              <text key={g} x="75" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={BRAND.wine} fontFamily="Figtree, sans-serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
             ))}
             {topCommon.slice(0, 2).map((g, i) => (
-              <text key={g} x="160" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.amberInk} fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
+              <text key={g} x="160" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.amberInk} fontFamily="Figtree, sans-serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
             ))}
             {onlyF.slice(0, 2).map((g, i) => (
-              <text key={g} x="245" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.slate} fontFamily="EB Garamond, serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
+              <text key={g} x="245" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.slate} fontFamily="Figtree, sans-serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
             ))}
             {onlyU.length === 0 && uGenres.size === 0 && (
-              <text x="75" y="57" textAnchor="middle" fontSize="8" fill={`${BRAND.wine}99`} fontFamily="EB Garamond, serif" fontStyle="italic">sin géneros</text>
+              <text x="75" y="57" textAnchor="middle" fontSize="8" fill={`${BRAND.wine}99`} fontFamily="Figtree, sans-serif" fontStyle="italic">sin géneros</text>
             )}
             {topCommon.length === 0 && (
-              <text x="160" y="57" textAnchor="middle" fontSize="8" fill={`${palette.amberInk}99`} fontFamily="EB Garamond, serif" fontStyle="italic">ninguno</text>
+              <text x="160" y="57" textAnchor="middle" fontSize="8" fill={`${palette.amberInk}99`} fontFamily="Figtree, sans-serif" fontStyle="italic">ninguno</text>
             )}
             {onlyF.length === 0 && fGenres.size === 0 && (
-              <text x="245" y="57" textAnchor="middle" fontSize="8" fill={`${palette.slate}99`} fontFamily="EB Garamond, serif" fontStyle="italic">sin géneros</text>
+              <text x="245" y="57" textAnchor="middle" fontSize="8" fill={`${palette.slate}99`} fontFamily="Figtree, sans-serif" fontStyle="italic">sin géneros</text>
             )}
           </svg>
 
@@ -5281,7 +5231,7 @@ function FriendProfileModal({ friend, user, onClose }) {
             {friend.avatar_url ? (
               <img src={friend.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
@@ -5407,7 +5357,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                         <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} size="medium" />
                       </div>
                       <div>
-                        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.15rem", color: palette.ink, lineHeight: 1.1 }}>
+                        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.15rem", color: palette.ink, lineHeight: 1.1 }}>
                           {friendPet.pet_name || "Su compañero"}
                         </p>
                         <p style={{ ...display, fontSize: "0.88rem", fontWeight: 600, color: palette.accent, marginTop: "0.25rem" }}>
@@ -5621,8 +5571,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                         const moodLabel = MOOD_OPTIONS.find(m => m.key === q.mood)?.label;
                         return (
                           <div key={q.id} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", padding: "1rem 0.9rem 0.85rem", position: "relative", overflow: "hidden" }}>
-                            <div style={{ position: "absolute", top: 4, left: 7, fontFamily: "Georgia, serif", fontSize: "2.8rem", lineHeight: 1, color: palette.accent + "18", userSelect: "none", pointerEvents: "none" }}>"</div>
-                            <p style={{ ...body, fontSize: "0.95rem", fontStyle: "italic", color: palette.ink, lineHeight: 1.6, paddingLeft: "0.6rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                            <p style={{ ...quoteFont, fontSize: "1.1rem", color: palette.ink, lineHeight: 1.5, paddingLeft: "0.6rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                               {q.text}
                             </p>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.6rem", paddingLeft: "0.6rem", flexWrap: "wrap" }}>
@@ -5821,21 +5770,21 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
 
       {/* Story content */}
       <div ref={containerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "2rem 1.5rem 5rem", WebkitOverflowScrolling: "touch" }}>
-        <h1 style={{ fontFamily: "'EB Garamond', serif", fontSize: "1.7rem", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.25 }}>
+        <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "1.7rem", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.25 }}>
           {cuento.titulo}
         </h1>
-        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: palette.inkFaint, marginBottom: "2.5rem" }}>
+        <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", color: palette.inkFaint, marginBottom: "2.5rem" }}>
           {cuento.autor} · {cuento.duracion}
         </p>
 
         {cuento.texto.split(/\n\n+/).filter(p => p.trim()).map((para, i) => (
-          <p key={i} style={{ fontFamily: "'EB Garamond', serif", fontSize: "18px", lineHeight: 1.85, color: palette.ink, marginBottom: "1.3rem", textAlign: "justify" }}>
+          <p key={i} style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "21px", lineHeight: 1.85, color: palette.ink, marginBottom: "1.3rem", textAlign: "left" }}>
             {para.trim()}
           </p>
         ))}
 
         {finished && (
-          <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: palette.inkFaint, textAlign: "center", padding: "1.5rem 0 0.5rem" }}>
+          <p style={{ ...display, fontSize: "1.1rem", color: palette.inkFaint, textAlign: "center", padding: "1.5rem 0 0.5rem" }}>
             Fin.
           </p>
         )}
@@ -5852,7 +5801,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
             style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bgCard, borderRadius: "1.5rem 1.5rem 0 0", padding: "1.75rem 1.5rem 2.25rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.18)", animation: "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
           >
             <div style={{ width: 36, height: 4, backgroundColor: "rgba(42,31,26,0.18)", borderRadius: 999, margin: "0 auto 1.5rem" }} />
-            <p style={{ ...display, fontSize: "1.3rem", fontStyle: "italic", color: palette.ink, textAlign: "center", marginBottom: "0.25rem" }}>¿Qué te pareció?</p>
+            <p style={{ ...display, fontSize: "1.3rem", color: palette.ink, textAlign: "center", marginBottom: "0.25rem" }}>¿Qué te pareció?</p>
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, textAlign: "center", marginBottom: "1.25rem" }}>{cuento.titulo} · {cuento.autor}</p>
 
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
@@ -5946,7 +5895,7 @@ function PeakInviteCard({ message, url, userInitial, onClose, dark = false }) {
         animation: "slideUp 380ms cubic-bezier(0.32, 0.72, 0, 1)",
         textAlign: "center",
       }}>
-        <p style={{ ...display, fontSize: "1.1rem", fontStyle: "italic", color: ink, lineHeight: 1.3, marginBottom: "1rem" }}>
+        <p style={{ ...display, fontSize: "1.1rem", color: ink, lineHeight: 1.3, marginBottom: "1rem" }}>
           SEMA es mejor<br />con alguien más
         </p>
         <div style={{ display: "flex", justifyContent: "center", gap: "0.5rem", marginBottom: "1rem" }}>
@@ -6225,7 +6174,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
           height: size,
           backgroundColor: getAvatarColor(profile.id || profile.nombre),
           color: palette.onAccent,
-          fontFamily: "Fraunces, serif",
+          fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
           fontSize: size * 0.35,
           fontWeight: 600,
         }}
@@ -6251,7 +6200,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
     return (
       <div className="px-4 sm:px-6 py-5 max-w-lg mx-auto" style={{ textAlign: "center", paddingTop: "4rem" }}>
         <WifiOff size={32} color={palette.border} style={{ margin: "0 auto 1rem", display: "block" }} />
-        <p style={{ ...display, fontSize: "1.2rem", fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.5rem" }}>Sin conexión</p>
+        <p style={{ ...display, fontSize: "1.2rem", color: palette.inkSoft, marginBottom: "0.5rem" }}>Sin conexión</p>
         <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem", lineHeight: 1.5 }}>
           El chat y la sección de amigos requieren conexión a internet.
         </p>
@@ -6555,7 +6504,7 @@ function AmigosSheet({ user, onClose, onPendingChange, onMessagesRead }) {
         style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(440px, 100%)", backgroundColor: palette.bg, overflowY: "auto", boxShadow: "-8px 0 30px rgba(0,0,0,0.25)", animation: "slideInRight 280ms cubic-bezier(0.32,0.72,0,1)", paddingTop: "env(safe-area-inset-top)" }}
       >
         <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.9rem 1rem", borderBottom: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bg + "F5", backdropFilter: "blur(8px)" }}>
-          <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink }}>Amigos</h2>
+          <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink }}>Amigos</h2>
           <button onClick={onClose} aria-label="Cerrar" className="btn-press" style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex" }}>
             <X size={22} color={palette.inkSoft} />
           </button>
@@ -6576,7 +6525,7 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
   return (
     <div>
       <div style={{ maxWidth: "42rem", margin: "0 auto", padding: "1rem 1rem 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "1.4rem", color: palette.ink }}>Social</h1>
+        <h1 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800, fontSize: "1.4rem", color: palette.ink }}>Social</h1>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <button onClick={onOpenAmigos} aria-label="Amigos" className="btn-press" style={{ position: "relative", background: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem 0.8rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Users size={18} color={palette.inkSoft} />
@@ -6659,7 +6608,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "65vh", backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0", zIndex: 1001, display: "flex", flexDirection: "column", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}>
         <div style={{ width: 40, height: 4, backgroundColor: palette.border, borderRadius: 2, margin: "12px auto 0", flexShrink: 0 }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", flexShrink: 0 }}>
-          <span style={{ fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, color: palette.ink }}>Notificaciones</span>
+          <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 20, fontWeight: 700, color: palette.ink }}>Notificaciones</span>
           {notifications.length > 0 && (
             <button
               onClick={async () => {
@@ -6837,7 +6786,7 @@ function UAMLibraryView({ books, onAdd }) {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* Título */}
-                  <p style={{ ...display, fontWeight: 600, fontStyle: "italic", fontSize: "0.92rem", color: palette.ink, lineHeight: 1.2, marginBottom: "0.15rem" }}>
+                  <p style={{ ...display, fontWeight: 600, fontSize: "0.92rem", color: palette.ink, lineHeight: 1.2, marginBottom: "0.15rem" }}>
                     {uamBook.title}
                   </p>
                   {/* Autor + edición */}
@@ -7021,7 +6970,7 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
           style={{ position: "absolute", opacity: liked ? 1 : 0, transition: "opacity 120ms ease" }}
         />
       </span>
-      {count > 0 && <span style={{ fontSize: size <= 14 ? "0.72rem" : "0.82rem", color: palette.inkFaint, fontFamily: "'EB Garamond', serif", lineHeight: 1 }}>{count}</span>}
+      {count > 0 && <span style={{ fontSize: size <= 14 ? "0.72rem" : "0.82rem", color: palette.inkFaint, fontFamily: "Figtree, system-ui, sans-serif", lineHeight: 1 }}>{count}</span>}
     </button>
   );
 }
@@ -7280,7 +7229,7 @@ function BookPreviewModal({ post, onClose, onAdd }) {
             <BookCoverPlaceholder title={book.title} author={book.author} width={72} height={104} />
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "0.25rem", lineHeight: 1.2 }}>{book.title}</p>
+            <p style={{ ...display, fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "0.25rem", lineHeight: 1.2 }}>{book.title}</p>
             <p style={{ ...body, fontStyle: "italic", color: palette.inkSoft, fontSize: "0.9rem", marginBottom: "0.5rem" }}>{book.author}</p>
             {book.genre && (
               <span style={{ ...display, fontSize: "0.72rem", padding: "0.2rem 0.6rem", borderRadius: "999px", ...genreColor(book.genre) }}>{book.genre}</span>
@@ -7425,7 +7374,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             <div style={{ display: "flex", alignItems: "baseline", gap: "7px", flexWrap: "wrap" }}>
               {hasStreak && (
                 <span style={{
-                  fontFamily: "Fraunces, serif", fontWeight: 800,
+                  fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800,
                   fontSize: "clamp(32px, 8vw, 44px)",
                   color: palette.onAccent, lineHeight: 0.9,
                   textShadow: "0 2px 10px rgba(0,0,0,0.22)",
@@ -7434,12 +7383,12 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
                   {days}
                 </span>
               )}
-              <span style={{ fontFamily: "'EB Garamond', serif", fontSize: "16px", color: "rgba(255,255,255,0.92)", lineHeight: 1.2, fontStyle: hasStreak ? "normal" : "italic" }}>
+              <span style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "16px", color: "rgba(255,255,255,0.92)", lineHeight: 1.2, fontStyle: hasStreak ? "normal" : "italic" }}>
                 {hasStreak ? "días de racha" : hasLoggedToday ? "¡Leíste hoy!" : "¿Leíste hoy?"}
               </span>
             </div>
             {pagesLoggedToday > 0 && (
-              <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "13px", color: "rgba(255,255,255,0.72)", margin: "3px 0 0", lineHeight: 1 }}>
+              <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "13px", color: "rgba(255,255,255,0.72)", margin: "3px 0 0", lineHeight: 1 }}>
                 {pagesLoggedToday} {pagesLoggedToday === 1 ? "página" : "páginas"} hoy
               </p>
             )}
@@ -7458,7 +7407,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             border: "1.5px solid rgba(255,255,255,0.7)",
             borderRadius: "22px",
             padding: "10px 18px",
-            fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "14px",
+            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "14px",
             flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer",
           }}
         >
@@ -7590,7 +7539,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
         {/* Paso 1: ¿Qué libro? */}
         {step === 1 && (
           <>
-            <p style={{ ...display, fontStyle: "italic", fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Qué libro leíste hoy?</p>
+            <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Qué libro leíste hoy?</p>
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "1.25rem" }}>Paso 1 de 3</p>
             {loadingBooks ? (
               <SkeletonList count={2} lead="cover" label="Cargando libros" />
@@ -7639,7 +7588,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
             <button onClick={() => setStep(1)} style={{ background: "none", border: "none", color: palette.inkFaint, cursor: "pointer", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.3rem", ...body, fontSize: "0.85rem", padding: 0 }}>
               ← Volver
             </button>
-            <p style={{ ...display, fontStyle: "italic", fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Cuántas páginas leíste?</p>
+            <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Cuántas páginas leíste?</p>
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: pagesLoggedToday > 0 ? "0.65rem" : "1.5rem" }}>
               Paso 2 de 3 · <em style={{ color: palette.inkSoft }}>{selectedBook?.title}</em>
             </p>
@@ -7682,7 +7631,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
             <button onClick={() => setStep(2)} style={{ background: "none", border: "none", color: palette.inkFaint, cursor: "pointer", marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: "0.3rem", ...body, fontSize: "0.85rem", padding: 0 }}>
               ← Volver
             </button>
-            <p style={{ ...display, fontStyle: "italic", fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Cómo te fue?</p>
+            <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, marginBottom: "0.15rem" }}>¿Cómo te fue?</p>
             <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "1.5rem" }}>
               Paso 3 de 3 · <em style={{ color: palette.inkSoft }}>{selectedBook?.title}</em>
             </p>
@@ -7767,7 +7716,7 @@ function FiveMinutesModal({ books, onClose, onGoToLog }) {
           {/* Phase: choose book */}
           {phase === "choose" && (
             <>
-              <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "1.5rem" }}>¿Cuál abrimos?</p>
+              <p style={{ ...display, fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "1.5rem" }}>¿Cuál abrimos?</p>
               <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.65rem" }}>
                 {books.map(b => (
                   <button
@@ -7779,7 +7728,7 @@ function FiveMinutesModal({ books, onClose, onGoToLog }) {
                     {b.coverUrl ? (
                       <img src={b.coverUrl} alt="" style={{ width: 48, height: 70, objectFit: "cover", borderRadius: 4, flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.18)" }} />
                     ) : (
-                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
                         {(b.title || "?")[0]}
                       </div>
                     )}
@@ -7800,12 +7749,12 @@ function FiveMinutesModal({ books, onClose, onGoToLog }) {
                 {selectedBook.coverUrl ? (
                   <img src={selectedBook.coverUrl} alt="" style={coverStyle} />
                 ) : (
-                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: palette.onAccent, fontFamily: "Fraunces, serif", fontSize: 36, fontWeight: 700 }}>
+                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 36, fontWeight: 700 }}>
                     {(selectedBook.title || "?")[0]}
                   </div>
                 )}
               </div>
-              <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "0.35rem", lineHeight: 1.25 }}>{selectedBook.title}</p>
+              <p style={{ ...display, fontWeight: 700, fontSize: "1.25rem", color: palette.ink, textAlign: "center", marginBottom: "0.35rem", lineHeight: 1.25 }}>{selectedBook.title}</p>
               <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, textAlign: "center", marginBottom: "1.5rem" }}>{selectedBook.author}</p>
             </>
           )}
@@ -7838,7 +7787,7 @@ function FiveMinutesModal({ books, onClose, onGoToLog }) {
           {/* Phase: done */}
           {phase === "done" && (
             <>
-              <p style={{ ...display, fontStyle: "italic", fontWeight: 700, fontSize: "1.5rem", color: palette.ink, marginBottom: "0.5rem", textAlign: "center" }}>¡Tiempo!</p>
+              <p style={{ ...display, fontWeight: 700, fontSize: "1.5rem", color: palette.ink, marginBottom: "0.5rem", textAlign: "center" }}>¡Tiempo!</p>
               <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, textAlign: "center" }}>¿Cuántas páginas leíste?</p>
             </>
           )}
@@ -7945,7 +7894,7 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
       >
         <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: palette.border, margin: "0 auto 1.5rem" }} />
 
-        <p style={{ ...display, fontStyle: "italic", fontSize: "1.25rem", color: palette.ink, marginBottom: "0.25rem", textAlign: "center" }}>¿Compartir tu sesión?</p>
+        <p style={{ ...display, fontSize: "1.25rem", color: palette.ink, marginBottom: "0.25rem", textAlign: "center" }}>¿Compartir tu sesión?</p>
         <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint, textAlign: "center", marginBottom: "1.5rem" }}>Aparecerá en el feed de tus amigos</p>
 
         {/* Preview card */}
@@ -8079,10 +8028,10 @@ function SnacksHero({ onRead }) {
         <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.65rem", fontWeight: 600, color: palette.accent, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
           cuento del día
         </p>
-        <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "1.3rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "0.3rem" }}>
+        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.3rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "0.3rem" }}>
           {cuento.titulo}
         </p>
-        <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "0.65rem" }}>
+        <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontStyle: "italic", fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "0.65rem" }}>
           {cuento.autor}
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
@@ -8095,7 +8044,7 @@ function SnacksHero({ onRead }) {
             </span>
           )}
         </div>
-        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.88rem", color: palette.inkSoft, lineHeight: 1.5, marginBottom: "1rem", fontStyle: "italic" }}>
+        <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.88rem", color: palette.inkSoft, lineHeight: 1.5, marginBottom: "1rem", fontStyle: "italic" }}>
           {cuento.desc}
         </p>
         <button
@@ -8109,7 +8058,7 @@ function SnacksHero({ onRead }) {
             onRead(cuento);
           }}
           style={{
-            fontFamily: "Fraunces, serif", fontSize: "0.92rem", fontWeight: 700,
+            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.92rem", fontWeight: 700,
             backgroundColor: palette.accent, color: BRAND.cream,
             border: "none", borderRadius: 12, padding: "0.75rem 1.5rem",
             cursor: "pointer", width: "100%",
@@ -8134,7 +8083,7 @@ function SnacksCarousel({ onRead }) {
 
   return (
     <div style={{ marginTop: "1.75rem", marginBottom: "0.5rem" }}>
-      <p style={{ fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "1rem", color: palette.ink, marginBottom: "0.75rem" }}>
+      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, fontSize: "1rem", color: palette.ink, marginBottom: "0.75rem" }}>
         Más cuentos
       </p>
       <div style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.5rem", scrollbarWidth: "none", msOverflowStyle: "none" }}>
@@ -8154,10 +8103,10 @@ function SnacksCarousel({ onRead }) {
             }}
             className="sema-card"
           >
-            <p style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontSize: "0.88rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
+            <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.88rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
               {c.titulo}
             </p>
-            <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.75rem", color: palette.inkSoft, margin: 0 }}>
+            <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontStyle: "italic", fontSize: "0.75rem", color: palette.inkSoft, margin: 0 }}>
               {c.autor}
             </p>
             <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.65rem", color: palette.inkFaint, marginTop: "0.25rem" }}>
@@ -8202,16 +8151,16 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
             <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", flexWrap: "wrap" }}>
               {post.user_id !== userId && onAuthorClick ? (
                 <button onClick={() => onAuthorClick(post.author)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                  <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
+                  <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
                     {post.author?.nombre || "Usuario"}
                   </span>
                 </button>
               ) : (
-              <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
+              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
                 {post.author?.nombre || "Usuario"}
               </span>
               )}
-              <span style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.8rem", color: "rgba(244,237,224,0.55)", fontStyle: "italic" }}>
+              <span style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.8rem", color: "rgba(244,237,224,0.55)", fontStyle: "italic" }}>
                 guardó una frase
               </span>
             </div>
@@ -8222,16 +8171,15 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
         </div>
 
         {/* Decorative opening quote */}
-        <div style={{ fontFamily: "Georgia, serif", fontSize: "4.5rem", lineHeight: 0.85, color: "rgba(200,146,74,0.35)", marginBottom: "0.1rem", marginLeft: "-0.15rem", userSelect: "none" }}>"</div>
 
         {/* Quote text */}
-        <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "clamp(1.1rem, 4.5vw, 1.3rem)", lineHeight: 1.65, color: "rgba(244,237,224,0.95)", marginBottom: isLong && !expanded ? "0.5rem" : "1.4rem", letterSpacing: "0.01em" }}>
+        <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: "clamp(1.35rem, 5.5vw, 1.65rem)", lineHeight: 1.4, color: "rgba(244,237,224,0.95)", marginBottom: isLong && !expanded ? "0.5rem" : "1.4rem", letterSpacing: "0.01em" }}>
           {displayText}
         </p>
         {isLong && (
           <button
             onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
-            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "'EB Garamond', serif", fontSize: "0.85rem", color: "rgba(200,146,74,0.8)", padding: "0 0 1.2rem", display: "block" }}
+            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(200,146,74,0.8)", padding: "0 0 1.2rem", display: "block" }}
           >
             {expanded ? "Leer menos ↑" : "Leer más ↓"}
           </button>
@@ -8240,7 +8188,7 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
         {/* Book info */}
         {quote?.bookTitle && (
           <div style={{ borderTop: "1px solid rgba(244,237,224,0.12)", paddingTop: "0.75rem", marginBottom: moodLabel ? "0.65rem" : 0 }}>
-            <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.85rem", color: "rgba(244,237,224,0.6)", fontStyle: "italic" }}>
+            <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(244,237,224,0.6)", fontStyle: "italic" }}>
               — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
             </p>
           </div>
@@ -8282,24 +8230,17 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
 }
 
 // ============ HOME (dashboard personalizado) ============
-// Barra de progreso reutilizable por libro (% leído, color rojo→verde)
-function ProgressBarBook({ current = 0, total = 0, height = 9 }) {
+// Barra de progreso reutilizable por libro (% leído; vino mientras avanza, salvia al terminar)
+function ProgressBarBook({ current = 0, total = 0, height = 6 }) {
   const has = total > 0;
   const pct = has ? Math.min(100, Math.round((current / total) * 100)) : 0;
-  const hue = Math.round(pct * 1.2); // 0=rojo, 120=verde
   return (
     <div style={{ width: "100%" }}>
       <div style={{ height, borderRadius: 999, backgroundColor: palette.border, overflow: "hidden" }}>
-        {has && (
-          <div style={{
-            width: `${Math.max(pct, 3)}%`, height: "100%", borderRadius: 999,
-            background: `linear-gradient(90deg, hsl(${hue},70%,42%), hsl(${hue},62%,52%))`,
-            transition: "width 500ms cubic-bezier(0.23,1,0.32,1)",
-          }} />
-        )}
+        {has && <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", borderRadius: 999, backgroundColor: pct >= 100 ? palette.sage : palette.accent, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />}
       </div>
-      <p style={{ ...body, fontSize: "0.76rem", color: palette.inkFaint, marginTop: "0.35rem" }}>
-        {has ? `Vas en ${pct}% · ${current} de ${total} páginas` : `${current} páginas leídas`}
+      <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, marginTop: "0.4rem" }}>
+        {has ? `${pct}% · ${current} de ${total} páginas` : `${current} páginas leídas`}
       </p>
     </div>
   );
@@ -8319,11 +8260,11 @@ function RachaModal({ streak, onClose }) {
     <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ background: BRAND.gradient, padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
         <Flame size={48} color={BRAND.cream} style={{ margin: "0 auto" }} className={cur > 7 ? "fire-pulse" : ""} />
-        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "3rem", color: palette.onAccent, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
+        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800, fontSize: "3rem", color: palette.onAccent, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
         <p style={{ ...display, fontSize: "1rem", color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
         <p style={{ ...body, fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", marginTop: "0.3rem" }}>Mejor racha: {best} {best === 1 ? "día" : "días"}</p>
         <p style={{ ...body, fontSize: "0.92rem", color: palette.onAccent, lineHeight: 1.4, marginTop: "1.25rem" }}>{msg}</p>
-        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.95)", color: BRAND.wine, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem" }}>
+        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.95)", color: BRAND.wine, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem" }}>
           ¡A leer!
         </button>
       </div>
@@ -8338,7 +8279,7 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
   return (
     <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "1.5rem 1.25rem 2rem", maxHeight: "85vh", overflowY: "auto", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center" }}>¿Qué quieres leer?</h2>
+        <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center" }}>¿Qué quieres leer?</h2>
         {primary && (
           <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.accent}`, backgroundColor: `${palette.accent}10`, display: "flex", alignItems: "center", gap: "0.85rem" }}>
             <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -8346,7 +8287,7 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "0.72rem", color: palette.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
-              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
+              <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{primary.author}</p>
             </div>
           </button>
@@ -8358,7 +8299,7 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "0.72rem", color: palette.amber, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
-              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
+              <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{cuento.autor}</p>
             </div>
           </button>
@@ -8392,9 +8333,9 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
 
   const firstName = (user.name || "").trim().split(" ")[0] || "lector";
   const h = new Date().getHours();
-  const timeOfDay = (h >= 6 && h < 12) ? { text: "Buenos días", emoji: "☀️" }
-    : (h >= 12 && h < 18) ? { text: "Buenas tardes", emoji: "🌤️" }
-    : { text: "Buenas noches", emoji: "🌙" };
+  const timeOfDay = (h >= 6 && h < 12) ? { text: "Buenos días", Icon: Sun }
+    : (h >= 12 && h < 18) ? { text: "Buenas tardes", Icon: CloudSun }
+    : { text: "Buenas noches", Icon: Moon };
   const readingBooks = books.filter((b) => b.status === "reading");
   const wantBooks = books.filter((b) => b.status === "want_to_read" || b.status === "wish").slice(0, 4);
   const cuento = getCuentoDelDia();
@@ -8414,7 +8355,6 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
       });
   }, [user.id, isOnline, books.map((b) => b.id).join(","), progressNonce]);
 
-  const sectionTitle = { ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink, marginBottom: "0.7rem" };
 
   function openRead(book) {
     if (!book) return;
@@ -8434,105 +8374,92 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
     }
   }
 
+  // Principio 8: los primeros días solo lo mínimo; "Descubre" aparece con 3+ libros.
+  const showDiscover = books.length >= 3;
+  const primaryBtn = { width: "100%", padding: "1.1rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: palette.onAccent, ...display, fontWeight: 700, fontSize: "1.15rem" };
+  const quietRow = { width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: sp.sm };
+
   return (
-    <div style={{ padding: "1.25rem 1rem 2.5rem", maxWidth: "42rem", margin: "0 auto" }}>
-      {/* 1. Saludo + hora */}
-      <p style={{ ...body, fontSize: "0.92rem", color: palette.inkSoft, marginBottom: "1.1rem" }}>
-        {timeOfDay.text}, {firstName} {timeOfDay.emoji}
-      </p>
+    <div style={{ padding: `${sp.lg} 1.25rem ${sp.xxl}`, maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: sp.xl }}>
+      <h1 style={{ ...ts.h1, color: palette.ink, display: "flex", alignItems: "center", gap: sp.xs }}>
+        <timeOfDay.Icon size={24} color={palette.amber} strokeWidth={1.8} />
+        {timeOfDay.text}, {firstName}
+      </h1>
 
-      {/* 2. Racha prominente */}
-      <button
-        onClick={() => setRachaOpen(true)}
-        className="btn-press"
-        style={{ width: "100%", textAlign: "left", marginBottom: "1.25rem", padding: "1.25rem 1.4rem", borderRadius: 20, cursor: "pointer", border: "none", background: cur > 0 ? BRAND.gradient : palette.bgCard, boxShadow: cur > 0 ? "0 8px 28px rgba(122,46,46,0.3)" : "none", display: "flex", alignItems: "center", gap: "1.1rem", ...(cur > 0 ? {} : { borderWidth: 1, borderStyle: "dashed", borderColor: palette.border }) }}
-      >
-        <Flame size={44} color={cur > 0 ? BRAND.cream : palette.inkFaint} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          {cur > 0 ? (
-            <>
-              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "2.6rem", color: BRAND.cream, lineHeight: 1 }}>{cur}</p>
-              <p style={{ ...display, fontSize: "0.95rem", color: BRAND.cream, fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
-              <p style={{ ...body, fontSize: "0.78rem", color: "rgba(244,237,224,0.75)", marginTop: "0.15rem" }}>Mejor: {best} {best === 1 ? "día" : "días"}</p>
-            </>
-          ) : (
-            <>
-              <p style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "1.3rem", color: palette.ink, lineHeight: 1.1 }}>Empieza tu racha hoy</p>
-              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginTop: "0.2rem" }}>Lee aunque sea 5 minutos</p>
-            </>
-          )}
-        </div>
+      {/* Progreso siempre visible: racha como texto, sin caja */}
+      <button onClick={() => setRachaOpen(true)} className="sema-no-hover" style={{ ...quietRow, gap: sp.md }}>
+        <Flame size={40} strokeWidth={1.6} color={cur > 0 ? palette.accent : palette.inkFaint} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
+        {cur > 0 ? (
+          <div>
+            <p style={{ ...display, fontWeight: 800, fontSize: "2.4rem", color: palette.ink, lineHeight: 1 }}>{cur} <span style={{ fontSize: "1rem", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</span></p>
+            <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Tu mejor: {best} {best === 1 ? "día" : "días"}</p>
+          </div>
+        ) : (
+          <div>
+            <p style={{ ...display, fontWeight: 700, fontSize: "1.3rem", color: palette.ink, lineHeight: 1.15 }}>Empieza tu racha hoy</p>
+            <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Con 5 minutos cuenta. Slow motion {">"} no motion.</p>
+          </div>
+        )}
       </button>
 
-      {/* 3. CTA principal */}
-      <button
-        onClick={() => setLeerOpen(true)}
-        className="btn-press"
-        style={{ width: "100%", marginBottom: "1.5rem", padding: "1.15rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: palette.onAccent, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.15rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)" }}
-      >
-        Leer ahora →
-      </button>
+      {/* Única acción principal */}
+      <button onClick={() => setLeerOpen(true)} className="btn-press" style={primaryBtn}>Leer ahora</button>
 
-      {/* 4. Seguir leyendo (con progreso) */}
       {readingBooks.length > 0 && (
-        <div style={{ marginBottom: "1.75rem" }}>
-          <p style={sectionTitle}>Seguir leyendo</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+        <section>
+          <h2 style={{ ...ts.h2, marginBottom: sp.md }}>Seguir leyendo</h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: sp.lg }}>
             {readingBooks.slice(0, 3).map((b) => (
-              <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-card" style={{ width: "100%", textAlign: "left", padding: "0.85rem 1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, display: "flex", gap: "0.85rem", alignItems: "center" }}>
-                <div style={{ width: 48, height: 70, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-no-hover" style={{ ...quietRow, alignItems: "flex-start", gap: sp.md }}>
+                <div style={{ width: 52, height: 76, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {b.coverUrl ? <img src={b.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={22} color={palette.inkFaint} />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.98rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
-                  <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, marginBottom: "0.5rem" }}>{b.author}</p>
+                  <p style={{ ...ts.h3, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
+                  <p style={{ ...ts.caption, marginBottom: sp.xs }}>{b.author}</p>
                   <ProgressBarBook current={bookProgress[b.id] || 0} total={b.totalPages || 0} />
                 </div>
               </button>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* 5. Mascota teaser */}
+      {/* La mascota guía los avisos */}
       {pet && (
-        <button onClick={onOpenPet} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "1.75rem", padding: "0.85rem 1rem", borderRadius: 16, cursor: "pointer", border: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.85rem" }}>
-          <div style={{ flexShrink: 0 }}>
-            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={56} showShadow={false} />
-          </div>
+        <button onClick={onOpenPet} className="btn-press sema-no-hover" style={quietRow}>
+          <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={56} showShadow={false} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15 }}>{pet.pet_name}</p>
-            <p style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, marginTop: "0.15rem" }}>Nivel {pet.level} · ver mascota</p>
+            <p style={{ ...ts.h3, color: palette.ink }}>{pet.pet_name} · nivel {pet.level}</p>
+            <p style={ts.caption}>{cur > 0 ? "Te espera tu libro, sin prisa." : "Hoy toca una página, aunque sea una."}</p>
           </div>
           <ChevronRight size={20} color={palette.inkFaint} style={{ flexShrink: 0 }} />
         </button>
       )}
 
-      {/* 6. Descubre tu siguiente */}
-      {wantBooks.length > 0 ? (
-        <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.7rem" }}>
-            <p style={{ ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink }}>Descubre tu siguiente</p>
-            <button onClick={() => setTab("explorar")} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.82rem", color: palette.accent, fontWeight: 600 }}>Ver más</button>
+      {showDiscover && (
+        <section>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: sp.md }}>
+            <h2 style={ts.h2}>Descubre tu siguiente</h2>
+            <button onClick={() => setTab("explorar")} className="sema-no-hover" style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.88rem", color: palette.accent, fontWeight: 600 }}>Ver más</button>
           </div>
-          <div className="scrollbar-hide" style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.25rem" }}>
-            {wantBooks.map((b) => (
-              <button key={b.id} onClick={() => onSelectBook(b)} className="btn-press sema-card" style={{ flexShrink: 0, width: 92, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                <div style={{ width: 92, height: 138, borderRadius: 10, overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {b.coverUrl ? <img src={b.coverUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={24} color={palette.inkFaint} />}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setTab("explorar")} className="btn-press" style={{ width: "100%", padding: "1.1rem", borderRadius: 16, cursor: "pointer", border: `1px dashed ${palette.border}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <Compass size={26} color={palette.accent} style={{ flexShrink: 0 }} />
-          <div style={{ textAlign: "left" }}>
-            <p style={{ ...display, fontWeight: 700, fontSize: "0.95rem", color: palette.ink }}>Descubre tu próxima lectura</p>
-            <p style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint }}>Recomendaciones para ti</p>
-          </div>
-        </button>
+          {wantBooks.length > 0 ? (
+            <div className="scrollbar-hide" style={{ display: "flex", gap: sp.md, overflowX: "auto", paddingBottom: "0.25rem" }}>
+              {wantBooks.map((b) => (
+                <button key={b.id} onClick={() => onSelectBook(b)} className="btn-press sema-card" style={{ flexShrink: 0, width: 92, background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                  <div style={{ width: 92, height: 138, borderRadius: 10, overflow: "hidden", backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {b.coverUrl ? <img src={b.coverUrl} alt={b.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={24} color={palette.inkFaint} />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button onClick={() => setTab("explorar")} className="sema-no-hover" style={quietRow}>
+              <Compass size={24} color={palette.accent} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+              <p style={ts.caption}>Recomendaciones hechas con tus libros.</p>
+            </button>
+          )}
+        </section>
       )}
 
       {rachaOpen && <RachaModal streak={streak} onClose={() => setRachaOpen(false)} />}
@@ -8996,13 +8923,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
                     ) : (
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 16, fontWeight: 600 }}>
                         {(friend.nombre || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                     )}
                     <div className="pulse-dot" style={{ position: "absolute", bottom: 1, right: 1, width: 8, height: 8, borderRadius: "50%", backgroundColor: palette.session, border: `2px solid ${palette.bgCard}` }} />
                   </div>
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
+                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 10, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
                     {displayName}
                   </p>
                 </button>
@@ -9037,17 +8964,17 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   <img src={book.cover_url} style={{ width: 40, height: 60, borderRadius: 4, objectFit: "cover", flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.15)" }} alt="" />
                 ) : (
                   <div style={{ width: 40, height: 60, borderRadius: 4, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: "4px", border: `1px solid ${palette.borderSoft}` }}>
-                    <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 8, color: palette.inkSoft, textAlign: "center", lineHeight: 1.3, margin: 0, display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 8, color: palette.inkSoft, textAlign: "center", lineHeight: 1.3, margin: 0, display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                       {book.title}
                     </p>
                   </div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 11, fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.2rem", margin: "0 0 3px" }}>está leyendo</p>
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 13, fontWeight: 700, color: palette.ink, lineHeight: 1.3, marginBottom: "0.2rem", margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 11, fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.2rem", margin: "0 0 3px" }}>está leyendo</p>
+                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: palette.ink, lineHeight: 1.3, marginBottom: "0.2rem", margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {book.title}
                   </p>
-                  <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 11, color: palette.inkSoft, margin: 0 }}>
+                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 11, color: palette.inkSoft, margin: 0 }}>
                     {book.author}
                   </p>
                 </div>
@@ -9156,7 +9083,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       ) : feedState === 'offline' ? (
         <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
           <WifiOff size={28} color={palette.border} style={{ margin: "0 auto 0.75rem", display: "block" }} />
-          <p style={{ ...display, fontSize: "1.15rem", fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.4rem" }}>Sin conexión</p>
+          <p style={{ ...display, fontSize: "1.15rem", color: palette.inkSoft, marginBottom: "0.4rem" }}>Sin conexión</p>
           <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Necesitas conexión para ver el feed de tus amigos.</p>
         </div>
       ) : feedState === 'empty' ? (
@@ -9441,7 +9368,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={44} height={64} />
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ ...display, fontWeight: 700, fontStyle: "italic", fontSize: "1.05rem", color: palette.ink, marginBottom: "0.15rem", lineHeight: 1.25 }}>{post.book.title}</p>
+                      <p style={{ ...display, fontWeight: 700, fontSize: "1.05rem", color: palette.ink, marginBottom: "0.15rem", lineHeight: 1.25 }}>{post.book.title}</p>
                       <p style={{ ...body, fontStyle: "italic", fontSize: "0.84rem", color: palette.inkSoft, marginBottom: "0.3rem" }}>{post.book.author}</p>
                       {isFinished && post.book.rating > 0 && (
                         <p style={{ fontSize: "0.85rem", color: palette.amberRich, letterSpacing: "0.05em" }}>
@@ -9659,7 +9586,7 @@ function RatingDistribution({ books }) {
   return (
     <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "14px", padding: "1rem 1.1rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-        <span style={{ fontFamily: "Fraunces, serif", fontSize: "0.82rem", fontWeight: 600, color: palette.inkSoft }}>Calificaciones</span>
+        <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 600, color: palette.inkSoft }}>Calificaciones</span>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", fontWeight: 700, color: palette.amber }}>{avg} ★ promedio</span>
       </div>
       {[5, 4, 3, 2, 1].map(star => (
@@ -9711,7 +9638,7 @@ function ReadingStatsView({ books, onAddBook }) {
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-xl mx-auto">
-      <h2 style={{ ...display, fontSize: "1.3rem", fontStyle: "italic", fontWeight: 700, color: palette.ink, marginBottom: "1.5rem" }}>Tu resumen lector</h2>
+      <h2 style={{ ...display, fontSize: "1.3rem", fontWeight: 700, color: palette.ink, marginBottom: "1.5rem" }}>Tu resumen lector</h2>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
         {stats.map((s) => (
           <div key={s.label} style={{ backgroundColor: s.bg, border: `1px solid ${s.border}`, borderRadius: "14px", padding: "1.2rem 1rem", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -9922,9 +9849,8 @@ function QuoteCard({ quote, onPress, onToggleFavorite, onShareToFeed }) {
         className="text-left sema-no-hover"
         style={{ width: "100%", padding: "1.25rem 1.1rem 1rem", position: "relative", overflow: "hidden", cursor: "pointer", background: "none", border: "none" }}
       >
-        <div style={{ position: "absolute", top: 6, left: 10, fontFamily: "Georgia, serif", fontSize: "4.5rem", lineHeight: 1, color: palette.accent + "12", pointerEvents: "none", userSelect: "none" }}>"</div>
         <div style={{ paddingLeft: "0.4rem", paddingTop: "0.35rem" }}>
-          <p style={{ ...body, fontSize: "1.05rem", fontStyle: "italic", color: palette.ink, lineHeight: 1.62, marginBottom: "0.8rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <p style={{ ...quoteFont, fontSize: "1.3rem", color: palette.ink, lineHeight: 1.62, marginBottom: "0.8rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {quote.text}
           </p>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "0.5rem" }}>
@@ -9969,19 +9895,18 @@ function QuoteShareCard({ quote, cardRef }) {
     <div ref={cardRef} style={{ width: "320px", background: BRAND.gradientShareCard, borderRadius: "20px", padding: "2.5rem 2rem 1.75rem", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: "1rem", minHeight: "380px" }}>
       <div style={{ position: "absolute", top: -60, right: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
-      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>SEMA</p>
-      <div style={{ fontFamily: "Georgia, serif", fontSize: "4rem", lineHeight: 0.9, color: "rgba(42,31,26,0.18)", margin: 0 }}>"</div>
-      <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "1.15rem", lineHeight: 1.62, color: BRAND.ink, margin: 0, flex: 1 }}>
+      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>SEMA</p>
+      <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: "1.45rem", lineHeight: 1.4, color: BRAND.ink, margin: 0, flex: 1 }}>
         {(quote.text || "").length > 220 ? (quote.text || "").slice(0, 220) + "…" : quote.text}
       </p>
       {quote.bookTitle && (
         <div style={{ borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem" }}>
-          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.85rem", color: "rgba(42,31,26,0.6)", margin: 0 }}>
+          <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(42,31,26,0.6)", margin: 0 }}>
             — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
           </p>
         </div>
       )}
-      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.65rem", color: "rgba(42,31,26,0.4)", letterSpacing: "0.06em", margin: 0 }}>
+      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.65rem", color: "rgba(42,31,26,0.4)", letterSpacing: "0.06em", margin: 0 }}>
         folio-final.vercel.app
       </p>
     </div>
@@ -10031,7 +9956,7 @@ function QuoteShareModal({ quote, onClose }) {
             {generating ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={16} />}
             {shared ? "¡Listo!" : generating ? "Generando..." : "Compartir imagen"}
           </button>
-          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onAccent, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "Fraunces, serif" }}>
+          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onAccent, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" }}>
             Cerrar
           </button>
         </div>
@@ -10134,11 +10059,9 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
           ) : (
             <div>
               <div style={{ position: "relative", marginBottom: "1.5rem", padding: "0.75rem 0.5rem" }}>
-                <div style={{ position: "absolute", top: -4, left: -2, fontFamily: "Georgia, serif", fontSize: "5rem", lineHeight: 0.85, color: palette.accent + "22", userSelect: "none", pointerEvents: "none" }}>"</div>
-                <p style={{ ...body, fontSize: "1.18rem", fontStyle: "italic", lineHeight: 1.68, color: palette.ink, paddingLeft: "1.25rem", paddingRight: "0.5rem" }}>
+                <p style={{ ...quoteFont, fontSize: "1.5rem", lineHeight: 1.45, color: palette.ink, paddingLeft: "1.25rem", paddingRight: "0.5rem" }}>
                   {quote.text}
                 </p>
-                <div style={{ position: "absolute", bottom: -8, right: -2, fontFamily: "Georgia, serif", fontSize: "5rem", lineHeight: 0.85, color: palette.accent + "22", userSelect: "none", pointerEvents: "none" }}>"</div>
               </div>
 
               {quote.bookTitle && (
@@ -10475,7 +10398,7 @@ function GemToast({ amount, label, id, onDismiss }) {
         whiteSpace: "nowrap",
       }}>
         <img src="/gema.png" alt="" style={{ width: 22, height: 22, objectFit: "contain", flexShrink: 0 }} />
-        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", color: palette.onAccent, lineHeight: 1, letterSpacing: "-0.01em" }}>
+        <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.05rem", color: palette.onAccent, lineHeight: 1, letterSpacing: "-0.01em" }}>
           {label || `+${amount} gemas`} ✨
         </span>
       </div>
@@ -10613,8 +10536,8 @@ function WrappedStoryExperience({ wrap, onClose }) {
 
   function SlideContent() {
     const textShadow = "0 2px 12px rgba(0,0,0,0.4)";
-    const big = { fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 900, color: BRAND.cream, textShadow, lineHeight: 1 };
-    const sub = { fontFamily: "'EB Garamond', serif", color: "rgba(245,237,224,0.75)", lineHeight: 1.45 };
+    const big = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 900, color: BRAND.cream, textShadow, lineHeight: 1 };
+    const sub = { fontFamily: "Figtree, system-ui, sans-serif", color: "rgba(245,237,224,0.75)", lineHeight: 1.45 };
 
     if (slide.type === "intro") return (
       <div style={{ textAlign: "center" }}>
@@ -10717,7 +10640,7 @@ function WrappedStoryExperience({ wrap, onClose }) {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", maxWidth: 260, margin: "0 auto" }}>
           <ShareButton wrap={wrap} setPaused={setPaused} slideRef={slideRef} />
-          <button onClick={onClose} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", color: "rgba(245,237,224,0.6)", background: "none", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", color: "rgba(245,237,224,0.6)", background: "none", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer" }}>
             Cerrar
           </button>
         </div>
@@ -10767,10 +10690,10 @@ function WrappedStoryExperience({ wrap, onClose }) {
 
     return (
       <>
-        <button onClick={handleShare} style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1rem", backgroundColor: BRAND.cream, color: BRAND.wine, border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
+        <button onClick={handleShare} style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", backgroundColor: BRAND.cream, color: BRAND.wine, border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
           <Share2 size={17} />{shared ? "¡compartido!" : "compartir wrapped"}
         </button>
-        <button onClick={handleDownload} disabled={sharing} style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: BRAND.cream, border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+        <button onClick={handleDownload} disabled={sharing} style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: BRAND.cream, border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
           {sharing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={14} />}
           guardar imagen
         </button>
@@ -10851,7 +10774,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 130, height: 130, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
 
       {/* Logo */}
-      <p style={{ fontFamily: "Fraunces, serif", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>SEMA</p>
+      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>SEMA</p>
 
       {/* Book cover */}
       <div style={{ position: "relative", marginTop: "0.25rem", marginBottom: "0.25rem" }}>
@@ -10864,15 +10787,15 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       </div>
 
       {/* Caption */}
-      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.72rem", color: "rgba(42,31,26,0.55)", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>Terminé de leer</p>
+      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.72rem", color: "rgba(42,31,26,0.55)", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>Terminé de leer</p>
 
       {/* Title */}
-      <p style={{ fontFamily: "Fraunces, serif", fontSize: "1.3rem", fontWeight: 800, color: BRAND.ink, textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
+      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.3rem", fontWeight: 800, color: BRAND.ink, textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
         {book.title}
       </p>
 
       {/* Author */}
-      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.88rem", color: "rgba(42,31,26,0.65)", margin: 0 }}>
+      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.88rem", color: "rgba(42,31,26,0.65)", margin: 0 }}>
         de {book.author}
       </p>
 
@@ -10887,7 +10810,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
 
       {/* Review snippet */}
       {reviewSnippet && (
-        <p style={{ fontFamily: "'EB Garamond', serif", fontStyle: "italic", fontSize: "0.84rem", color: "rgba(42,31,26,0.6)", textAlign: "center", lineHeight: 1.5, maxWidth: "88%", margin: "0.1rem 0" }}>
+        <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: "0.84rem", color: "rgba(42,31,26,0.6)", textAlign: "center", lineHeight: 1.5, maxWidth: "88%", margin: "0.1rem 0" }}>
           "{reviewSnippet}"
         </p>
       )}
@@ -10896,14 +10819,14 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       <div style={{ width: "100%", borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem", marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <BookOpen size={13} color={BRAND.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
+          <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
             Libro #{booksThisYear} de {year}
           </p>
         </div>
         {streak?.current_streak > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
             <Flame size={13} color={BRAND.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-            <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
+            <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
               {streak.current_streak} {streak.current_streak === 1 ? "día" : "días"} de racha
             </p>
           </div>
@@ -10911,7 +10834,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       </div>
 
       {/* CTA */}
-      <p style={{ fontFamily: "'EB Garamond', serif", fontSize: "0.67rem", color: "rgba(42,31,26,0.42)", letterSpacing: "0.06em", marginTop: "0.15rem" }}>
+      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.67rem", color: "rgba(42,31,26,0.42)", letterSpacing: "0.06em", marginTop: "0.15rem" }}>
         folio-final.vercel.app
       </p>
     </div>
@@ -10978,7 +10901,7 @@ function BookShareModal({ book, rating, review, streak, booksThisYear, onClose }
     }}>
       <div style={{ width: "100%", maxWidth: 400 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-          <h2 style={{ ...display, fontSize: "1.1rem", color: palette.onDark, fontStyle: "italic" }}>¡Comparte tu logro!</h2>
+          <h2 style={{ ...display, fontSize: "1.1rem", color: palette.onDark }}>¡Comparte tu logro!</h2>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: palette.onDarkFaint, padding: "0.25rem" }}>
             <X size={20} />
           </button>
@@ -11154,7 +11077,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
                 : <BookOpen size={38} color={palette.onDark} />}
             </div>
           </div>
-          <h1 style={{ ...display, fontSize: "clamp(2rem,7vw,3rem)", color: palette.onDark, fontStyle: "italic", marginBottom: "0.5rem" }}>
+          <h1 style={{ ...display, fontSize: "clamp(2rem,7vw,3rem)", color: palette.onDark, marginBottom: "0.5rem" }}>
             ¡Libro terminado!
           </h1>
           <p style={{ ...body, fontSize: "1.15rem", color: palette.onDarkSoft, marginBottom: "0.25rem" }}>{book.title}</p>
@@ -11165,7 +11088,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
       {/* STEP 2 — Rating */}
       {step === 2 && (
         <div style={{ width: "100%", maxWidth: 400, animation: "celebCardIn 0.45s ease-out" }}>
-          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, fontStyle: "italic", textAlign: "center", marginBottom: "0.2rem" }}>
+          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, textAlign: "center", marginBottom: "0.2rem" }}>
             ¿Qué te pareció?
           </h2>
           <p style={{ ...body, fontSize: "0.9rem", color: palette.onDarkFaint, textAlign: "center", marginBottom: "1.75rem" }}>
@@ -11242,7 +11165,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
       {/* STEP 3 — Summary */}
       {step === 3 && (
         <div style={{ width: "100%", maxWidth: 420, animation: "celebCardIn 0.45s ease-out" }}>
-          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, fontStyle: "italic", textAlign: "center", marginBottom: "1.5rem" }}>
+          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, textAlign: "center", marginBottom: "1.5rem" }}>
             Tu resumen
           </h2>
 
@@ -11339,7 +11262,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
       {step === 4 && (
         <div style={{ width: "100%", maxWidth: 400, textAlign: "center", animation: "celebCardIn 0.45s ease-out" }}>
           <Sparkles size={42} color={BRAND.amber} style={{ marginBottom: "1rem" }} />
-          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, fontStyle: "italic", marginBottom: "0.5rem" }}>
+          <h2 style={{ ...display, fontSize: "1.9rem", color: palette.onDark, marginBottom: "0.5rem" }}>
             ¿Listo para el siguiente?
           </h2>
           <p style={{ ...body, color: palette.onDarkFaint, fontSize: "0.9rem", marginBottom: "2rem" }}>
@@ -12527,7 +12450,7 @@ function OnboardingStep1({ selectedGenres, setSelectedGenres, onNext }) {
   }
   return (
     <div style={{ padding: "0 1.25rem 2.5rem", maxWidth: 480, margin: "0 auto", width: "100%", boxSizing: "border-box" }}>
-      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
+      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
         Bienvenido a SEMA
       </h1>
       <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "1.75rem", lineHeight: 1.55 }}>
@@ -12646,7 +12569,7 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
         <button onClick={() => { setMode("search"); setAddErr(""); }} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
           <ChevronLeft size={16} />Volver al buscador
         </button>
-        <h2 style={{ ...display, fontSize: "1.6rem", fontStyle: "italic", color: palette.ink, marginBottom: "1.25rem" }}>Agregar manualmente</h2>
+        <h2 style={{ ...display, fontSize: "1.6rem", color: palette.ink, marginBottom: "1.25rem" }}>Agregar manualmente</h2>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           <div>
             <label style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft, display: "block", marginBottom: "0.3rem" }}>Título *</label>
@@ -12697,7 +12620,7 @@ function OnboardingStep2({ user, onNext, onBack, onSkip }) {
       <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
         <ChevronLeft size={16} />Atrás
       </button>
-      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.15 }}>
+      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.15 }}>
         Tu primer libro
       </h1>
       <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, marginBottom: "1.25rem", lineHeight: 1.5 }}>
@@ -12836,7 +12759,7 @@ function OnboardingStep3Avatar({ selectedAvatar, setSelectedAvatar, onBack, onNe
       <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
         <ChevronLeft size={16} />Atrás
       </button>
-      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
+      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
         Elige tu avatar
       </h1>
       <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "1.5rem", lineHeight: 1.55 }}>
@@ -12948,7 +12871,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
       <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: 0 }}>
         <ChevronLeft size={16} />Atrás
       </button>
-      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", fontStyle: "italic", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
+      <h1 style={{ ...display, fontSize: "clamp(1.9rem,6vw,2.5rem)", color: palette.ink, marginBottom: "0.4rem", lineHeight: 1.15 }}>
         Encuentra a tus amigos
       </h1>
       <p style={{ ...body, fontSize: "1rem", color: palette.inkSoft, marginBottom: "1.5rem", lineHeight: 1.55 }}>
@@ -13076,7 +12999,7 @@ function NewUserOnboarding({ user, onComplete }) {
 
       {/* Top bar */}
       <div style={{ padding: "1.1rem 1.5rem 0", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <span style={{ ...display, fontSize: "1.05rem", fontStyle: "italic", color: palette.accent }}>SEMA</span>
+        <span style={{ ...display, fontSize: "1.05rem", color: palette.accent }}>SEMA</span>
         <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
           {[1, 2, 3, 4].map(n => (
             <div key={n} style={{

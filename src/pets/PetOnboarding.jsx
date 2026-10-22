@@ -41,7 +41,7 @@ function PetOnboarding({ user, onComplete }) {
     }}>
       <style>{FONT_LINK}</style>
       <div style={{ maxWidth: 420, width: "100%", textAlign: "center", animation: "obFadeUp 500ms cubic-bezier(0.23,1,0.32,1) both" }}>
-        <h1 style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "1.75rem", color: palette.ink, lineHeight: 1.15, marginBottom: "0.5rem" }}>
+        <h1 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800, fontSize: "1.75rem", color: palette.ink, lineHeight: 1.15, marginBottom: "0.5rem" }}>
           Escoge a tu compañero de lectura
         </h1>
         <p style={{ ...body, fontSize: "0.95rem", color: palette.inkFaint, marginBottom: "1.75rem" }}>
@@ -53,7 +53,7 @@ function PetOnboarding({ user, onComplete }) {
           borderRadius: 20, padding: "1.75rem 1.25rem 1.5rem", boxShadow: "0 10px 36px rgba(122,46,46,0.14)",
         }}>
           <PetDisplay petType="gato" petName={info.title} size="large" />
-          <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.35rem", color: palette.ink, marginTop: "1rem", lineHeight: 1.1 }}>
+          <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.35rem", color: palette.ink, marginTop: "1rem", lineHeight: 1.1 }}>
             {info.title}
           </p>
           <p style={{ ...body, fontStyle: "italic", fontSize: "0.88rem", color: palette.inkFaint, marginTop: "0.4rem" }}>
@@ -68,7 +68,7 @@ function PetOnboarding({ user, onComplete }) {
             style={{
               marginTop: "1.75rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: "pointer",
               background: BRAND.gradient, color: palette.onAccent,
-              fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
+              fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
             }}
           >
             ¡Este es mi compañero!
@@ -98,7 +98,7 @@ function PetOnboarding({ user, onComplete }) {
               style={{
                 marginTop: "1rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: saving ? "default" : "pointer",
                 background: BRAND.gradient, color: palette.onAccent,
-                fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
+                fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
                 opacity: saving ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
               }}
             >

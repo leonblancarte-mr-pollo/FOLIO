@@ -14,8 +14,8 @@ import BookCoverImage from "./BookCoverImage.jsx";
 import { haptic } from "../haptics.js";
 import { palette } from "../theme.js";
 
-const serif = { fontFamily: "Fraunces, serif" };
-const body  = { fontFamily: "'EB Garamond', serif" };
+const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
+const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
 
 const SWIPE_THRESHOLD = 100;   // px para confirmar el swipe
 const MAX_ROTATION = 16;       // grados
@@ -160,7 +160,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
         )}
 
         <h2 style={{
-          ...serif, fontSize: "clamp(1.45rem, 5.5vw, 1.75rem)", fontWeight: 700, fontStyle: "italic",
+          ...serif, fontSize: "clamp(1.45rem, 5.5vw, 1.75rem)", fontWeight: 700,
           color: palette.onAccent, lineHeight: 1.15, margin: "0 0 0.28rem",
           textShadow: "0 2px 10px rgba(0,0,0,0.5)",
         }}>
@@ -211,7 +211,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
             cursor: "pointer",
           }}
         >
-          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, fontStyle: "italic", color: palette.onAccent, margin: "0 0 0.3rem" }}>
+          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onAccent, margin: "0 0 0.3rem" }}>
             {book.title}
           </h3>
           <p style={{ ...body, fontSize: "0.97rem", color: "rgba(255,255,255,0.72)", margin: "0 0 1rem" }}>
@@ -617,7 +617,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8, marginBottom: "0.55rem" }}>
           <span aria-hidden style={{ fontSize: "1.05rem" }}>📖</span>
           <span style={{
-            ...serif, fontSize: "1.45rem", fontWeight: 700, fontStyle: "italic",
+            ...serif, fontSize: "1.45rem", fontWeight: 700,
             color: savesLeft > 0 ? palette.ink : palette.accent,
           }}>
             {savesLeft > 0 ? `${savesLeft} restantes hoy` : "Límite alcanzado"}

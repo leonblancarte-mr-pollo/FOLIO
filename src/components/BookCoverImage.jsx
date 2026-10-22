@@ -10,8 +10,8 @@ import { useState, useEffect, useRef } from "react";
  * dentro de un wrapper con position:relative y overflow:hidden.
  */
 
-const serif = { fontFamily: "Fraunces, serif" };
-const body = { fontFamily: "'EB Garamond', serif" };
+const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
+const body = { fontFamily: "Figtree, system-ui, sans-serif" };
 
 // Gradiente + emoji por género principal. Tonos oscuros y cinemáticos
 // para que el texto blanco de la card siempre contraste.
@@ -120,7 +120,7 @@ function Fallback({ title, author, genres, compact }) {
         }}>
           <div style={{ width: 36, height: 1, backgroundColor: accent, opacity: 0.7, margin: "0 auto 0.9rem" }} />
           <h3 style={{
-            ...serif, fontSize: "clamp(1.05rem, 4vw, 1.45rem)", fontWeight: 700, fontStyle: "italic",
+            ...serif, fontSize: "clamp(1.05rem, 4vw, 1.45rem)", fontWeight: 700,
             color: "#FDFAF3", lineHeight: 1.22, margin: 0,
             textShadow: "0 2px 12px rgba(0,0,0,0.45)",
             overflowWrap: "break-word",
