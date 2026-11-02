@@ -177,18 +177,19 @@ const COVER_PALETTES = [
   { bg: "#0D3350", fg: "#E4EFF8", accent: "#E8A84A" },
 ];
 
-// Portadas genéricas SEMA (2026-11-02, BookCoverImage › GenericCover). Arte fijo, igual en claro y
-// oscuro; solo valores de sema-paleta. field = bloque superior (título y autor en fieldInk),
-// band = franja inferior (texto encima en bandInk), mark = motivo geométrico (decorativo, nunca
-// debajo de texto). Contrastes: #483A58 sobre lila 5.21 / durazno 5.04 / superficie 7.36;
-// #FFFFFF sobre #483A58 10.39 / sobre #456990 5.71.
+// Portadas genéricas SEMA (2026-11-02, ronda 2; BookCoverImage › GenericCover). Arte fijo, igual en
+// claro y oscuro; solo valores de sema-paleta. El campo grande nunca es un vivo (sema-identidad §2):
+// superficie, tinta o azul acero. El único recurso gráfico es un boleto troquelado (aprobado en §5)
+// en lila o superficie. El durazno no aparece: queda para la acción principal (el corazón).
+// Contrastes: #483A58 sobre #E7D7C1 7.36 / sobre #BBADFF 5.21; #FFFFFF sobre #483A58 10.39 /
+// sobre #456990 5.71.
 const SEMA_COVER_COMBOS = [
-  { field: "#BBADFF", fieldInk: "#483A58", band: "#483A58", bandInk: "#FFFFFF", mark: "#F79F79" },
-  { field: "#F79F79", fieldInk: "#483A58", band: "#483A58", bandInk: "#FFFFFF", mark: "#BBADFF" },
-  { field: "#E7D7C1", fieldInk: "#483A58", band: "#456990", bandInk: "#FFFFFF", mark: "#F79F79" },
-  { field: "#483A58", fieldInk: "#FFFFFF", band: "#BBADFF", bandInk: "#483A58", mark: "#F79F79" },
-  { field: "#456990", fieldInk: "#FFFFFF", band: "#E7D7C1", bandInk: "#483A58", mark: "#BBADFF" },
-  { field: "#E7D7C1", fieldInk: "#483A58", band: "#483A58", bandInk: "#FFFFFF", mark: "#BBADFF" },
+  { field: "#E7D7C1", fieldInk: "#483A58", ticket: "#BBADFF", ticketInk: "#483A58" },
+  { field: "#483A58", fieldInk: "#FFFFFF", ticket: "#BBADFF", ticketInk: "#483A58" },
+  { field: "#456990", fieldInk: "#FFFFFF", ticket: "#E7D7C1", ticketInk: "#483A58" },
+  { field: "#483A58", fieldInk: "#FFFFFF", ticket: "#E7D7C1", ticketInk: "#483A58" },
+  { field: "#456990", fieldInk: "#FFFFFF", ticket: "#BBADFF", ticketInk: "#483A58" },
+  { field: "#E7D7C1", fieldInk: "#483A58", ticket: "#483A58", ticketInk: "#FFFFFF" },
 ];
 
 // Heatmap de lectura: 4 intensidades (1-5, 6-15, 16-30, 31+ páginas).

@@ -571,23 +571,28 @@ const MOOD_OPTIONS = [
 function SubTabBar({ tabs, active, onChange }) {
   return (
     <div
+      role="tablist"
       className="flex scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0"
       style={{ borderBottom: `1px solid ${palette.border}`, marginBottom: "1.25rem", overflowX: "auto" }}
     >
       {tabs.map((t) => (
         <button
           key={t.id}
+          role="tab"
+          aria-selected={active === t.id}
           onClick={() => onChange(t.id)}
           className={active === t.id ? undefined : "sema-tab"}
           style={{
             ...display,
             padding: "0.6rem 1.1rem",
+            minHeight: 44,
             fontSize: "0.88rem",
             fontWeight: active === t.id ? 600 : 400,
             color: palette.ink,
             backgroundColor: "transparent",
             border: "none",
-            borderBottom: `2px solid ${active === t.id ? palette.accent : "transparent"}`,
+            // Línea activa en tinta (el durazno sobre blanco da 2.06:1, no llega a 3:1).
+            borderBottom: `2px solid ${active === t.id ? palette.ink : "transparent"}`,
             cursor: "pointer",
             whiteSpace: "nowrap",
             flexShrink: 0,

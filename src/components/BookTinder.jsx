@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, Heart, Loader2, Gem, RefreshCw, BookOpen, Info } from "lucide-react";
+import { X, Heart, Loader2, Gem, RefreshCw, Info } from "lucide-react";
 import { loadGems } from "../services/gemsService.js";
 import {
   getPreferredGenres,
@@ -10,7 +10,7 @@ import {
   DAILY_LIMIT,
 } from "../services/recommendationService.js";
 import ReadingStatusModal from "./ReadingStatusModal.jsx";
-import BookCoverImage, { genericCoverScheme, GENERIC_BAND_PCT } from "./BookCoverImage.jsx";
+import BookCoverImage, { GenericCover } from "./BookCoverImage.jsx";
 import { haptic } from "../haptics.js";
 import { palette, ts } from "../theme.js";
 
@@ -21,7 +21,7 @@ const SWIPE_THRESHOLD = 100;   // px para confirmar el swipe
 const MAX_ROTATION = 16;       // grados
 
 // Estrella de calificación (SVG propio, sema-identidad §6: nada de emoji). Relleno cálido y
-// contorno del color del texto que la acompaña, para que se lea sobre foto, franja o fondo.
+// contorno del color del texto que la acompaña, para que se lea sobre foto o sobre la portada genérica.
 function Star({ size = 15, stroke }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0, display: "block" }}>
@@ -33,17 +33,20 @@ function Star({ size = 15, stroke }) {
   );
 }
 
-// Línea de géneros + calificación, en texto plano (sin píldoras: principio 2).
+// Línea de géneros + calificación, en texto plano (sin píldoras: principio 2). Siempre una sola
+// línea: los géneros se cortan con «…» y la calificación no se encoge.
 function MetaLine({ genres, rating, color }) {
   if (genres.length === 0 && !rating) return null;
   return (
     <p style={{
       ...body, fontSize: "14px", fontWeight: 600, color, lineHeight: 1.3,
-      display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, margin: "0 0 0.45rem",
+      display: "flex", alignItems: "center", gap: 6, margin: "0 0 0.45rem", minWidth: 0,
     }}>
-      {genres.length > 0 && <span>{genres.join(" · ")}</span>}
+      {genres.length > 0 && (
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{genres.join(" · ")}</span>
+      )}
       {rating && (
-        <span aria-label={`Calificación ${rating} de 5`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+        <span aria-label={`Calificación ${rating} de 5`} style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
           {genres.length > 0 && <span aria-hidden>·</span>}
           <Star stroke={color} />
           <span aria-hidden>{rating}</span>
@@ -53,19 +56,35 @@ function MetaLine({ genres, rating, color }) {
   );
 }
 
+// Estado vacío con el gato (principio 6: la mascota habla en los vacíos). Imagen pequeña.
+function CatEmpty({ title, line, children }) {
+  return (
+    <div style={{ textAlign: "center", padding: "2.5rem 1.5rem" }}>
+      <img src="/pets/cat.png" alt="" width={80} height={80} style={{ display: "block", margin: "0 auto 1rem", objectFit: "contain" }} />
+      <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 700, color: palette.ink, margin: "0 0 0.5rem" }}>
+        {title}
+      </h3>
+      <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.55, margin: "0 auto", maxWidth: 320 }}>
+        {line}
+      </p>
+      {children}
+    </div>
+  );
+}
+
 function Toast({ msg, onDismiss }) {
   useEffect(() => {
     const t = setTimeout(onDismiss, 2800);
     return () => clearTimeout(t);
   }, [onDismiss]);
   return (
-    <div style={{
+    <div role="status" aria-live="polite" style={{
       position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
+      width: "max-content", maxWidth: "calc(100vw - 32px)", textAlign: "center",
       backgroundColor: palette.ink, color: palette.bg,
       borderRadius: 12, padding: "10px 20px",
-      ...body, fontSize: "15px", fontWeight: 500,
-      zIndex: 300, whiteSpace: "nowrap",
-      boxShadow: "0 4px 20px rgba(0,0,0,0.22)",
+      ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.4,
+      zIndex: 300,
       animation: "tinderToastIn 220ms ease-out",
     }}>
       {msg}
@@ -74,33 +93,39 @@ function Toast({ msg, onDismiss }) {
 }
 
 function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 150,
         backgroundColor: "rgba(0,0,0,0.6)",
-        backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         animation: "backdropIn 180ms ease-out",
       }}
       onClick={onClose}
     >
       <div
+        role="dialog" aria-modal="true" aria-labelledby="tinder-limit-title"
         style={{
           width: "100%", maxWidth: 480, backgroundColor: palette.bg,
           borderRadius: "20px 20px 0 0", padding: "1.5rem 1.5rem 2.5rem",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.15)",
           animation: "sheetUp 300ms cubic-bezier(0.32, 0.72, 0, 1)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
-          <h2 style={{ ...serif, fontSize: "1.2rem", fontWeight: 700, color: palette.ink }}>
-            Límite de hoy alcanzado
+          <h2 id="tinder-limit-title" style={{ ...serif, fontSize: "1.2rem", fontWeight: 700, color: palette.ink }}>
+            Ya van {savesUsed} guardados hoy.
           </h2>
-          <p style={{ ...body, fontSize: "0.97rem", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5 }}>
-            Has guardado {savesUsed} libros hoy. Vuelve mañana o<br />
-            gasta 5 gemas para desbloquear 5 más.
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5 }}>
+            Mañana hay otros {DAILY_LIMIT}.
+          </p>
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.5 }}>
+            O 5 gemas y van 5 más ahora.
           </p>
         </div>
         {/* Saldo como fila de texto, sin caja dentro de la hoja (principio 2) */}
@@ -108,7 +133,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
           padding: "0.25rem 0", marginBottom: "1rem",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <span style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft }}>Tu saldo</span>
+          <span style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>Tienes</span>
           <span style={{ display: "flex", alignItems: "center", gap: 5, ...serif, fontWeight: 700, fontSize: "1.05rem", color: palette.ink }}>
             <Gem size={16} /> {gemBalance} gemas
           </span>
@@ -127,17 +152,17 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
           }}
         >
           {buying ? <Loader2 size={18} className="animate-spin" /> : <Gem size={18} />}
-          {buying ? "Procesando…" : gemBalance < 5 ? "Gemas insuficientes" : "Gastar 5 gemas · +5 guardados"}
+          {buying ? "Un momento…" : gemBalance < 5 ? "Hacen falta 5 gemas" : "Gastar 5 gemas · +5 guardados"}
         </button>
         <button
           onClick={onClose}
           style={{
             width: "100%", padding: "0.75rem", minHeight: 44,
             backgroundColor: "transparent", border: "none", cursor: "pointer",
-            ...body, fontSize: "0.95rem", color: palette.inkFaint, marginTop: "0.5rem",
+            ...body, fontSize: "15px", color: palette.inkFaint, marginTop: "0.5rem",
           }}
         >
-          Volver mañana
+          Ahora no
         </button>
       </div>
     </div>
@@ -145,47 +170,59 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
 }
 
 // ─── Contenido visual de una card (portada + info) ──────────────────────────
-// Con portada: foto + velo negro abajo, texto en onDark / onDarkSoft.
-// Sin portada: la portada genérica ya lleva título y autor; el resto de la info va sobre su
-// franja plana inferior, en el color de texto de esa franja (sin velo, sin repetir el título).
+// Decide por el estado REAL de la imagen, no solo por book.coverUrl:
+//  - cargando o sin foto (o la foto falló / tardó más de 3 s): portada genérica con géneros,
+//    calificación y sinopsis al pie, en el color de texto de su campo plano. Sin velo y sin
+//    repetir el título. Mientras carga la foto, se ve la genérica (nada de shimmer bajo un velo).
+//  - foto cargada: foto + bloque de texto con su propio velo, que crece con el contenido (el
+//    texto siempre queda sobre negro ≥ 86 %: #E7D7C1 da > 10:1 aunque la foto sea blanca).
 function CardFace({ book, showInfo, onToggleInfo }) {
   const rating = book.rating ? Number(book.rating).toFixed(1) : null;
   const genres = (book.genres || []).slice(0, 3);
-  const scheme = book.coverUrl ? null : genericCoverScheme(book.title || "", book.author || "");
+  const [imgStatus, setImgStatus] = useState(book.coverUrl ? "loading" : "failed");
+  const photo = imgStatus === "loaded";
+  // Pantallas bajas: la tarjeta se encoge. < 760 px → sinopsis en 2 líneas; < 700 px (p. ej. 375×667,
+  // tarjeta de ~275 px) → sin sinopsis en la portada genérica (se lee en el botón de info).
+  const vh = typeof window !== "undefined" ? window.innerHeight : 844;
+  const descLines = vh < 760 ? 2 : 3;
+  const genericDesc = vh >= 700;
+  const label = book.author ? `${book.title}, de ${book.author}` : book.title;
+
+  const genericFooter = (s) => (
+    <>
+      <MetaLine genres={genres} rating={rating} color={s.fieldInk} />
+      {book.description && genericDesc && (
+        <p style={{
+          ...body, fontSize: "15px", color: s.fieldInk, lineHeight: 1.45, margin: 0,
+          display: "-webkit-box", WebkitLineClamp: descLines, WebkitBoxOrient: "vertical", overflow: "hidden",
+        }}>
+          {book.description}
+        </p>
+      )}
+    </>
+  );
+
   return (
     <>
-      <BookCoverImage
-        coverUrl={book.coverUrl}
-        title={book.title}
-        author={book.author}
-        genres={book.genres}
-      />
+      {!photo && <GenericCover title={book.title} author={book.author} label={label} footer={genericFooter} />}
 
-      {scheme ? (
+      {book.coverUrl && imgStatus !== "failed" && (
+        <BookCoverImage
+          coverUrl={book.coverUrl}
+          title={book.title}
+          author={book.author}
+          genres={book.genres}
+          alt=""
+          skeleton={false}
+          onStatus={setImgStatus}
+        />
+      )}
+
+      {photo && (
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0,
-          height: `${GENERIC_BAND_PCT}%`,
-          padding: "1rem 1.25rem",
-          display: "flex", flexDirection: "column", justifyContent: "flex-start",
-          overflow: "hidden", pointerEvents: "none",
-        }}>
-          <MetaLine genres={genres} rating={rating} color={scheme.bandInk} />
-          {book.description && (
-            <p style={{
-              ...body, fontSize: "15px", color: scheme.bandInk, lineHeight: 1.45, margin: 0,
-              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
-            }}>
-              {book.description}
-            </p>
-          )}
-        </div>
-      ) : (
-        <div style={{
-          position: "absolute", bottom: 0, left: 0, right: 0,
-          height: "66%",
-          background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.8) 40%, rgba(0,0,0,0.55) 72%, transparent 100%)",
-          display: "flex", flexDirection: "column", justifyContent: "flex-end",
-          padding: "1.4rem 1.25rem 1.25rem",
+          padding: "4rem 1.25rem 1.25rem",
+          background: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.86) calc(100% - 4rem), rgba(0,0,0,0) 100%)",
           pointerEvents: "none",
         }}>
           <MetaLine genres={genres} rating={rating} color={palette.onDarkSoft} />
@@ -202,7 +239,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
             <p style={{
               ...body, fontSize: "15px", color: palette.onDarkSoft,
               lineHeight: 1.45, margin: 0,
-              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+              display: "-webkit-box", WebkitLineClamp: descLines, WebkitBoxOrient: "vertical", overflow: "hidden",
             }}>
               {book.description}
             </p>
@@ -220,7 +257,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
             padding: "1.75rem 1.5rem",
             display: "flex", flexDirection: "column", justifyContent: "center",
             animation: "backdropIn 200ms ease-out",
-            cursor: "pointer",
+            cursor: "pointer", overflow: "hidden",
           }}
         >
           <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onDark, margin: "0 0 0.3rem" }}>
@@ -255,10 +292,10 @@ function LoadingSkeleton() {
   return (
     <div style={{ padding: "0.75rem 1rem 1rem", maxWidth: 480, margin: "0 auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-        <div style={{ ...pulse, height: 20, width: 140, borderRadius: 8 }} />
-        <div style={{ ...pulse, height: 16, width: 56, borderRadius: 8 }} />
+        <div style={{ ...pulse, height: 20, width: 160, borderRadius: 8 }} />
+        <div style={{ ...pulse, height: 16, width: 72, borderRadius: 8 }} />
       </div>
-      <div style={{ ...pulse, height: 8, borderRadius: 999, marginBottom: "1rem" }} />
+      <div style={{ ...pulse, height: 10, borderRadius: 999, marginBottom: "1rem" }} />
       <div style={{ ...pulse, borderRadius: 22, height: CARD_HEIGHT }} />
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.25rem", marginTop: "1rem" }}>
         <div style={{ ...pulse, width: 56, height: 56, borderRadius: "50%" }} />
@@ -272,10 +309,10 @@ function LoadingSkeleton() {
 // ─── Main component ───────────────────────────────────────────────────────────
 // demoBooks: catálogo inyectado para pruebas/demos sin auth ni Supabase
 // Alto de la tarjeta: la pantalla menos lo que ocupa todo lo demás (cabecera, pestañas,
-// fila «N restantes · N de M», barra, botones y la barra inferior con su borde rasgado).
+// fila «Quedan N guardados hoy · Libro N de M», barra, botones y la barra inferior con su borde rasgado).
 // 2026-11-02: «N de M» sube a la fila del contador y el alto se recalcula para que los
 // botones queden por encima del borde rasgado (antes «1 de 20 libros» quedaba debajo).
-const CARD_HEIGHT = "clamp(320px, calc(100dvh - 372px), 620px)";
+const CARD_HEIGHT = "clamp(260px, calc(100dvh - 392px), 620px)";
 
 export default function BookTinder({ user, onAdd, demoBooks = null }) {
   const [books, setBooks]               = useState([]);
@@ -333,7 +370,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         if (!cancelled) { setBooks(recs); setIndex(0); setLoading(false); }
       } catch (err) {
         console.error("[BookTinder] init error:", err);
-        if (!cancelled) { setError("No se pudieron cargar las recomendaciones."); setLoading(false); }
+        if (!cancelled) { setError("Los libros no cargaron esta vez."); setLoading(false); }
       }
     }
 
@@ -384,14 +421,14 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     if (!el) return;
     const p = Math.min(1, Math.abs(dx) / (SWIPE_THRESHOLD * 1.6));
     el.style.transition = "none";
-    el.style.transform = `scale(${0.95 + 0.05 * p}) translateY(${8 - 8 * p}px)`;
+    el.style.transform = `scale(${0.95 + 0.05 * p}) translateY(${20 - 20 * p}px)`;
   }
 
   function springBack() {
     setCardTransform(0, 0, { transition: "transform 420ms cubic-bezier(0.175, 0.885, 0.32, 1.18)", rotation: 0 });
     setOverlays(0, { fade: true });
     const next = nextRef.current;
-    if (next) { next.style.transition = "transform 300ms ease"; next.style.transform = "scale(0.95) translateY(8px)"; }
+    if (next) { next.style.transition = "transform 300ms ease"; next.style.transform = "scale(0.95) translateY(20px)"; }
   }
 
   function flyOut(dir) {
@@ -510,10 +547,12 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     setBuyingGems(false);
 
     if (!result.success) {
+      // El código técnico va a la consola; la persona solo ve el texto en voz SEMA.
+      console.error("[BookTinder] buyExtraSaves:", result.error);
       if (result.error === "GEMS_INSUFFICIENT") showToast("No alcanzan las gemas");
-      else if (result.error === "GEMS_NO_BALANCE") showToast("Error al leer saldo");
-      else if (result.error === "GEMS_RPC_MISSING") showToast("La tienda de gemas no está disponible. Intenta más tarde.");
-      else showToast(`Error al gastar gemas: ${result.error}`);
+      else if (result.error === "GEMS_NO_BALANCE") showToast("No se pudieron ver las gemas. Prueba otra vez.");
+      else if (result.error === "GEMS_RPC_MISSING") showToast("La tienda de gemas no responde. Prueba en un rato.");
+      else showToast("No se pudieron usar las gemas. Prueba en un rato.");
       return; // el modal se queda abierto
     }
 
@@ -548,49 +587,33 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
 
   if (noGenres) {
     return (
-      <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ margin: "0 auto 1rem" }} />
-        <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>
-          Configura tus géneros primero
-        </h3>
-        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55 }}>
-          Configura tus géneros favoritos en tu perfil para empezar a descubrir libros.
-        </p>
-      </div>
+      <CatEmpty
+        title="Faltan los géneros favoritos."
+        line="Al elegirlos en el perfil, aquí empiezan a salir libros."
+      />
     );
   }
 
   if (books.length === 0) {
     return (
-      <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ margin: "0 auto 1rem" }} />
-        <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>
-          No hay libros disponibles
-        </h3>
-        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55, marginBottom: "1.25rem" }}>
-          Vuelve en un rato: estamos rellenando la estantería.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 0.75rem", textDecoration: "underline", textUnderlineOffset: 3 }}
-        >
+      <CatEmpty
+        title="No hay libros disponibles"
+        line="Vuelve en un rato: estamos rellenando la estantería."
+      >
+        <button onClick={() => window.location.reload()} style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 0.75rem", textDecoration: "underline", textUnderlineOffset: 3 }}>
           <RefreshCw size={15} /> Reintentar
         </button>
-      </div>
+      </CatEmpty>
     );
   }
 
+  // La pila no rota por día: getRecommendations baraja al azar en cada carga.
   if (isLast) {
     return (
-      <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ margin: "0 auto 1rem" }} />
-        <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 600, color: palette.ink, margin: "0 0 0.5rem" }}>
-          Ya pasaron todos los de hoy.
-        </h3>
-        <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55 }}>
-          Mañana llegan más.
-        </p>
-      </div>
+      <CatEmpty
+        title="Se acabó la pila por ahora."
+        line="Al volver a entrar se arma otra. Empezar de nuevo también es un plan."
+      />
     );
   }
 
@@ -621,18 +644,18 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
 
       <div style={{ padding: "0.75rem 1rem 1rem", maxWidth: 480, margin: "0 auto" }}>
 
-        {/* ── Contador + posición en una fila, y barra de avance (principio 4) ── */}
+        {/* ── Guardados de hoy (texto y barra cuentan lo mismo) + posición en la pila (principio 4) ── */}
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: "0.5rem" }}>
           <span style={{ ...ts.h3, color: palette.ink }}>
-            {savesLeft > 0 ? `${savesLeft} restantes hoy` : "Límite de hoy alcanzado"}
+            {savesLeft <= 0 ? "Ya no quedan guardados hoy" : savesLeft === 1 ? "Queda 1 guardado hoy" : `Quedan ${savesLeft} guardados hoy`}
           </span>
-          <span style={{ ...ts.caption, color: palette.inkSoft }}>
-            {index + 1} de {books.length}
+          <span style={{ ...ts.caption, color: palette.inkSoft, flexShrink: 0 }}>
+            Libro {index + 1} de {books.length}
           </span>
         </div>
 
         {/* Pista con borde de tinta: el durazno no llega a 3:1 sobre blanco (sema-paleta §5) */}
-        <div style={{ height: 8, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, overflow: "hidden", marginBottom: "1rem" }}>
+        <div role="presentation" style={{ height: 10, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, overflow: "hidden", marginBottom: "1rem" }}>
           <div style={{
             height: "100%",
             width: `${progress}%`,
@@ -655,8 +678,8 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
               style={{
                 position: "absolute", inset: 0,
                 borderRadius: 22, overflow: "hidden",
-                transform: "scale(0.95) translateY(8px)",
-                boxShadow: "0 8px 22px rgba(0,0,0,0.12)",
+                transform: "scale(0.95) translateY(20px)",
+                border: `1.5px solid ${palette.inkSoft}`,
                 pointerEvents: "none",
               }}
             >
@@ -676,7 +699,8 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
               style={{
                 position: "absolute", inset: 0,
                 borderRadius: 22, overflow: "hidden",
-                boxShadow: "0 14px 34px rgba(0,0,0,0.2)",
+                // Sin sombra difusa: la profundidad la dan el contorno de tinta y la tarjeta de atrás.
+                border: `1.5px solid ${palette.inkSoft}`,
                 userSelect: "none", WebkitUserSelect: "none",
                 touchAction: "none",
                 cursor: "grab",
@@ -686,51 +710,47 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             >
               <CardFace book={currentBook} showInfo={showInfo} onToggleInfo={() => setShowInfo(false)} />
 
-              {/* Overlay GUARDAR (drag derecha) */}
+              {/* Sello GUARDAR (drag derecha): sticker lila, texto onFirma (5.21:1) */}
               <div
                 ref={likeRef}
                 aria-hidden
                 style={{
                   position: "absolute", top: 26, left: 20,
-                  transform: "rotate(-14deg)",
-                  border: `3.5px solid ${palette.session}`,
-                  color: palette.session,
+                  transform: "rotate(-10deg)",
+                  backgroundColor: palette.firma, color: palette.onFirma,
+                  border: `2px solid ${palette.onFirma}`,
                   borderRadius: 10, padding: "4px 14px",
                   ...serif,
-                  fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.08em",
-                  backgroundColor: "rgba(0,0,0,0.18)",
-                  textShadow: "0 1px 6px rgba(0,0,0,0.3)",
+                  fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.06em",
                   opacity: 0, pointerEvents: "none",
                 }}
               >
                 GUARDAR
               </div>
 
-              {/* Overlay NOPE (drag izquierda) */}
+              {/* Sello PASO (drag izquierda): sticker ciruela, texto blanco (10.39:1) */}
               <div
                 ref={nopeRef}
                 aria-hidden
                 style={{
                   position: "absolute", top: 26, right: 20,
-                  transform: "rotate(14deg)",
-                  border: `3.5px solid ${palette.danger}`,
-                  color: palette.danger,
+                  transform: "rotate(10deg)",
+                  backgroundColor: palette.onFirma, color: palette.onColor,
+                  border: `2px solid ${palette.onColor}`,
                   borderRadius: 10, padding: "4px 14px",
                   ...serif,
-                  fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.08em",
-                  backgroundColor: "rgba(0,0,0,0.18)",
-                  textShadow: "0 1px 6px rgba(0,0,0,0.3)",
+                  fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.06em",
                   opacity: 0, pointerEvents: "none",
                 }}
               >
-                NOPE
+                PASO
               </div>
             </div>
           )}
         </div>
 
         {/* ── Botones: un solo relleno (corazón durazno, principio 1); X e info silenciosos ── */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.25rem", marginTop: "1rem" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.25rem", marginTop: "1.5rem" }}>
           <button
             onClick={commitSkip}
             disabled={disabled}
