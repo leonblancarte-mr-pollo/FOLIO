@@ -587,7 +587,8 @@ function SubTabBar({ tabs, active, onChange }) {
           className={active === t.id ? undefined : "sema-tab"}
           style={{
             ...display,
-            padding: "0.6rem 1.1rem",
+            // Ronda 2 de Perfil: 0.7rem a los lados para que las 4 pestañas de Perfil quepan a 390 px (antes «Resumen» se cortaba).
+            padding: "0.6rem 0.7rem",
             minHeight: 44,
             fontSize: "0.88rem",
             fontWeight: active === t.id ? 600 : 400,
@@ -3047,27 +3048,28 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
         style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bg, borderRadius: "1.25rem 1.25rem 0 0", padding: "1.75rem 1.5rem 2rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.2)", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0.85rem" }}>
-          <div style={{ width: 76, height: 76, borderRadius: "50%", background: isUnlocked ? BRAND.gradient : palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isUnlocked ? "0 6px 24px rgba(122,46,46,0.3)" : "none" }}>
-            <IconComp size={34} color={isUnlocked ? palette.onColor : palette.inkFaint} strokeWidth={1.5} />
+          {/* Desbloqueado: sticker lila con canto (firma + onFirma 5.21). Bloqueado: contorno en inkSoft. */}
+          <div style={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: isUnlocked ? palette.firma : "transparent", border: isUnlocked ? `3px solid ${palette.bg}` : `1.5px dashed ${palette.inkSoft}`, boxShadow: isUnlocked ? `0 0 0 1.5px ${palette.ink}` : "none", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <IconComp size={34} color={isUnlocked ? palette.onFirma : palette.inkSoft} strokeWidth={1.75} aria-hidden />
           </div>
           <div>
             <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2 }}>{def.name}</p>
-            <p style={{ ...body, fontSize: "0.84rem", marginTop: "0.3rem", color: isUnlocked ? palette.amber : palette.inkFaint, fontWeight: isUnlocked ? 500 : 400 }}>
+            <p style={{ ...body, fontSize: "14px", marginTop: "0.3rem", color: palette.inkSoft, fontWeight: isUnlocked ? 600 : 400 }}>
               {isUnlocked ? `Desbloqueado el ${dateStr}` : "Aún no desbloqueado"}
             </p>
           </div>
-          <div style={{ backgroundColor: isUnlocked ? `${BRAND.amber}10` : palette.bgSoft, border: `1px solid ${isUnlocked ? "${BRAND.amber}30" : palette.borderSoft}`, borderRadius: 12, padding: "0.85rem 1.1rem", width: "100%", textAlign: "left" }}>
-            <p style={{ ...display, fontSize: "0.75rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.3rem" }}>
-              {isUnlocked ? "Lo conseguiste así" : "Qué necesitas"}
+          <div style={{ borderTop: `1px solid ${palette.borderSoft}`, padding: "0.85rem 0 0", width: "100%", textAlign: "left" }}>
+            <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, fontWeight: 600, marginBottom: "0.3rem" }}>
+              {isUnlocked ? "Lo conseguiste así" : "Cómo se desbloquea"}
             </p>
-            <p style={{ ...body, fontSize: "0.9rem", color: palette.ink, lineHeight: 1.5 }}>
+            <p style={{ ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5 }}>
               {isUnlocked ? def.desc : (ACHIEVEMENT_CONDITION_MAP[def.key] || def.desc)}
             </p>
           </div>
         </div>
         <button
           onClick={handleClose}
-          style={{ display: "block", width: "100%", marginTop: "1.25rem", ...body, fontSize: "0.9rem", color: palette.inkSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "999px", padding: "0.65rem", cursor: "pointer", backgroundColor: "transparent" }}
+          style={{ display: "block", width: "100%", minHeight: 44, marginTop: "1.25rem", ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 1rem", cursor: "pointer", backgroundColor: "transparent" }}
         >
           Cerrar
         </button>
@@ -3076,11 +3078,15 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
   );
 }
 
-function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
+function AchievementGrid({ unlockedAchievements, friendOnly = false, onlyUnlocked = false }) {
+  // Rediseño de Perfil 2026-11-02 (ronda 2, accesibilidad): desbloqueados como sticker lila
+  // (firma + onFirma 5.21, canto bg + filo ink); bloqueados sin opacidad, con contorno punteado,
+  // ícono y candado en inkSoft (6.91 / 14.89). Texto en Figtree ≥ 13 px. Antes: ámbar sobre
+  // blanco (2.06), opacidad 0.6 (2.75), 9–10 px system-ui y borde/sombra rgba fuera de paleta.
   const [selectedAch, setSelectedAch] = useState(null);
   const unlockedMap = {};
   (unlockedAchievements || []).forEach((a) => { unlockedMap[a.achievement_key] = a.unlocked_at; });
-  const toShow = friendOnly
+  const toShow = friendOnly || onlyUnlocked
     ? ACHIEVEMENT_DEFS.filter((d) => unlockedMap[d.key])
     : ACHIEVEMENT_DEFS;
   const unlockedCount = ACHIEVEMENT_DEFS.filter((d) => unlockedMap[d.key]).length;
@@ -3091,11 +3097,17 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
 
   if (friendOnly && toShow.length === 0) {
     return (
-      <p style={{ ...body, fontSize: "0.88rem", color: palette.inkFaint, fontStyle: "italic", textAlign: "center", padding: "0.5rem 0" }}>
+      <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, fontStyle: "italic", textAlign: "center", padding: "0.5rem 0" }}>
         Aún no tiene logros desbloqueados.
       </p>
     );
   }
+
+  const openDetail = (def) => setSelectedAch({ def, unlockedAt: unlockedMap[def.key] || null });
+  const sticker = {
+    backgroundColor: palette.firma, color: palette.onFirma,
+    border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
+  };
 
   return (
     <div>
@@ -3105,20 +3117,43 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
       {!friendOnly && (
         <div style={{ marginBottom: "1rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-            <span style={{ ...body, fontSize: "14px", color: palette.inkSoft }}>{unlockedCount} / {total} logros desbloqueados</span>
+            <span style={{ ...body, fontSize: "14px", color: palette.inkSoft }}>{unlockedCount} de {total} logros</span>
             <span style={{ ...display, fontSize: "15px", fontWeight: 700, color: palette.ink }}>{pct}%</span>
           </div>
-          <div style={{ height: 10, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", overflow: "hidden", boxSizing: "content-box" }}>
+          <div role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={unlockedCount} aria-label="Logros desbloqueados" style={{ height: 10, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", overflow: "hidden", boxSizing: "content-box" }}>
             <div style={{ width: `${pct}%`, height: "100%", background: SEMA_GRADIENTS.acento, borderRadius: "999px", transition: "width 0.5s ease" }} />
           </div>
         </div>
       )}
-      {cats.map((cat) => {
+
+      {/* Vista corta: solo los desbloqueados, como stickers en fila (sin difuminado que los corte) */}
+      {onlyUnlocked ? (
+        toShow.length === 0 ? (
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>Todavía ninguno. El primero llega solo, leyendo.</p>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", padding: "2px" }}>
+            {toShow.map((def, i) => {
+              const IconComp = ACHIEVEMENT_ICON_MAP[def.key] || Award;
+              return (
+                <button
+                  key={def.key}
+                  onClick={() => openDetail(def)}
+                  className="btn-press sema-papel sema-focus-onfirma"
+                  style={{ ...sticker, minHeight: 44, borderRadius: 12, padding: "0.4rem 0.85rem 0.4rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.45rem", cursor: "pointer", transform: `rotate(${i % 2 ? 1.2 : -1.5}deg)` }}
+                >
+                  <IconComp size={18} color={palette.onFirma} strokeWidth={2} aria-hidden />
+                  <span style={{ ...body, fontSize: "14px", fontWeight: 700, color: palette.onFirma }}>{def.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )
+      ) : cats.map((cat) => {
         const defs = toShow.filter((d) => d.cat === cat);
         return (
-          <div key={cat} style={{ marginBottom: "1.1rem" }}>
-            <p style={{ ...display, fontSize: "0.75rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.5rem" }}>{cat}</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
+          <div key={cat} style={{ marginBottom: "1.25rem" }}>
+            <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, marginBottom: "0.5rem" }}>{cat}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
               {defs.map((def) => {
                 const isUnlocked = !!unlockedMap[def.key];
                 const IconComp = ACHIEVEMENT_ICON_MAP[def.key] || Award;
@@ -3126,28 +3161,25 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
                 return (
                   <button
                     key={def.key}
-                    onClick={() => setSelectedAch({ def, unlockedAt: unlockedMap[def.key] || null })}
-                    className={isUnlocked ? "sema-card" : undefined}
+                    onClick={() => openDetail(def)}
+                    aria-label={`${def.name}${isUnlocked ? (date ? `, desbloqueado el ${date}` : ", desbloqueado") : ", bloqueado"}`}
+                    className={isUnlocked ? "btn-press sema-papel sema-focus-onfirma" : "btn-press"}
                     style={{
-                      backgroundColor: isUnlocked ? palette.bgCard : palette.bgSoft,
-                      border: isUnlocked ? "1px solid rgba(200,146,74,0.35)" : "none",
-                      borderRadius: "10px", padding: "0.6rem 0.35rem", textAlign: "center",
+                      ...(isUnlocked ? sticker : { backgroundColor: "transparent", border: `1.5px dashed ${palette.inkSoft}` }),
+                      borderRadius: 12, padding: "0.65rem 0.4rem 0.6rem", minHeight: 96, textAlign: "center",
                       cursor: "pointer", position: "relative",
-                      opacity: isUnlocked ? 1 : 0.6,
-                      boxShadow: isUnlocked ? "0 2px 6px rgba(200,146,74,0.15)" : "none",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: "0.3rem",
                     }}
                   >
                     {!isUnlocked && (
-                      <Lock size={10} color={palette.border} style={{ position: "absolute", top: 5, right: 5 }} />
+                      <Lock size={14} color={palette.inkSoft} aria-hidden style={{ position: "absolute", top: 6, right: 6 }} />
                     )}
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginBottom: "0.25rem", height: "1.6rem" }}>
-                      <IconComp size={28} color={isUnlocked ? palette.amber : palette.border} strokeWidth={1.5} />
-                    </div>
-                    <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.6rem", color: isUnlocked ? palette.ink : palette.inkFaint, fontWeight: isUnlocked ? 600 : 400, lineHeight: 1.2, marginBottom: "0.1rem" }}>
+                    <IconComp size={26} color={isUnlocked ? palette.onFirma : palette.inkSoft} strokeWidth={1.75} aria-hidden />
+                    <span style={{ ...body, fontSize: "13px", color: isUnlocked ? palette.onFirma : palette.inkSoft, fontWeight: isUnlocked ? 700 : 500, lineHeight: 1.2 }}>
                       {def.name}
-                    </p>
+                    </span>
                     {isUnlocked && date && (
-                      <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.55rem", color: palette.inkFaint }}>{date}</p>
+                      <span style={{ ...body, fontSize: "13px", color: palette.onFirma }}>{date}</span>
                     )}
                   </button>
                 );
@@ -3165,7 +3197,9 @@ const DAY_HEADERS_ES = ["D", "L", "M", "Mi", "J", "V", "S"];
 
 // Escala del calendario (rediseño de Perfil 2026-11-02): solo tokens de sema-paleta.
 // Claro: superficie suave -> firma -> frío -> tinta (de claro a oscuro sobre blanco).
-// Oscuro: superficie suave -> frío -> firma -> tinta (de oscuro a claro sobre negro).
+// Oscuro: fondo con filo -> frío -> firma -> tinta (de oscuro a claro sobre negro). Ronda 2: el nivel 1
+// oscuro era superficieSuave #483A58, que casi desaparecía sobre negro (2.02); ahora es bg con el filo ink.
+// El nivel 4 se distingue del 3 también por el canto interior en bg (no solo por color).
 // Los dos primeros niveles no llegan a 3:1 contra el fondo por sí solos: todo día con lectura
 // lleva filo de 1.5 px en tinta (10.39 / 21.00), así la cuadrícula se lee sin depender del relleno.
 function getCalLevel(pages) {
@@ -3179,7 +3213,7 @@ function getCalScale() {
   const dark = palette.bg === PALETTE_DARK.bg;
   return dark
     ? [
-        { bg: palette.superficieSuave, fg: palette.onColor },
+        { bg: palette.bg,              fg: palette.ink },
         { bg: palette.complementoFrio, fg: palette.onColor },
         { bg: palette.firma,           fg: palette.onFirma },
         { bg: palette.ink,             fg: palette.onFirma },
@@ -3327,7 +3361,8 @@ function ReadingHeatmap({ userId }) {
               return (
                 <div
                   key={dateStr}
-                  aria-label={pages > 0 ? `${day}: ${pages} ${pages === 1 ? "página" : "páginas"}` : undefined}
+                  role={pages > 0 ? "img" : undefined}
+                  aria-label={pages > 0 ? `${day} de ${MONTHS_ES[viewMonth].toLowerCase()}: ${pages} ${pages === 1 ? "página" : "páginas"}` : undefined}
                   style={{
                     aspectRatio: "1",
                     display: "flex",
@@ -3348,7 +3383,8 @@ function ReadingHeatmap({ userId }) {
                     fontSize: "13px",
                     fontWeight: isToday || cell ? 700 : 400,
                     color: cell ? cell.fg : palette.inkSoft,
-                    opacity: !cell && isFuture ? 0.45 : 1,
+                    // Días por venir: 0.85 (claro 4.78:1, oscuro 10.7:1). Antes 0.45 no llegaba (2.06 / 3.43).
+                    opacity: !cell && isFuture ? 0.85 : 1,
                     lineHeight: 1,
                     userSelect: "none",
                   }}>
@@ -3359,18 +3395,18 @@ function ReadingHeatmap({ userId }) {
             })}
           </div>
 
-          {/* Pie: días con lectura + leyenda Menos -> Más */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.75rem", gap: "0.5rem", flexWrap: "wrap" }}>
-            <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>
-              {activeDaysThisMonth} {activeDaysThisMonth === 1 ? "día con lectura" : "días con lectura"} este mes
-            </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 4 }} aria-hidden>
-              <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginRight: 2 }}>Menos</span>
-              {scale.map((c, i) => (
-                <div key={i} style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: c.bg, border: `1.5px solid ${palette.ink}`, boxShadow: i === 3 ? `inset 0 0 0 1px ${palette.bg}` : "none", flexShrink: 0 }} />
-              ))}
-              <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginLeft: 2 }}>Más</span>
-            </div>
+          {/* Pie: días con lectura + leyenda con los rangos de páginas (la lectora no entendía «Menos / Más») */}
+          <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.75rem" }}>
+            {activeDaysThisMonth} {activeDaysThisMonth === 1 ? "día con lectura" : "días con lectura"} este mes
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.3rem 0.75rem", marginTop: "0.4rem", flexWrap: "wrap" }}>
+            <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>Páginas al día:</span>
+            {["1–5", "6–15", "16–30", "31+"].map((label, i) => (
+              <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                <span aria-hidden style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: scale[i].bg, border: `1.5px solid ${palette.ink}`, boxShadow: i === 3 ? `inset 0 0 0 1px ${palette.bg}` : "none", flexShrink: 0 }} />
+                <span style={{ ...body, fontSize: "13px", color: palette.ink }}>{label}</span>
+              </span>
+            ))}
           </div>
         </>
       )}
@@ -3497,7 +3533,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         return next;
       });
     } catch (e) {
-      setError(e.message || "Error al subir la imagen.");
+      console.error("[perfil] no se pudo subir la foto:", e?.message || e);
+      setError("No se pudo subir la foto. Prueba otra vez.");
     } finally {
       setUploading(false);
     }
@@ -3523,7 +3560,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         return next;
       });
     } catch (e) {
-      setError(e.message || "Error al subir la portada.");
+      console.error("[perfil] no se pudo subir la portada:", e?.message || e);
+      setError("No se pudo subir la portada. Prueba otra vez.");
     } finally {
       setUploadingCover(false);
     }
@@ -3535,8 +3573,10 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
     setSuccess("");
     try {
       // Nombre de display (separado del username, que no cambia de reglas)
+      // Los avisos propios llevan friendly: se muestran tal cual; lo demás se resume (sema-voz).
+      const friendly = (m) => Object.assign(new Error(m), { friendly: true });
       const cleanName = displayName.trim();
-      if (!cleanName) throw new Error("El nombre no puede quedar vacío.");
+      if (!cleanName) throw friendly("El nombre no puede quedar vacío.");
       if (cleanName !== user.name) {
         const saved = await updateDisplayName(user.id, cleanName);
         if (!saved) throw new Error("No se pudo actualizar el nombre.");
@@ -3550,7 +3590,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           .eq("username", username)
           .neq("id", user.id)
           .maybeSingle();
-        if (taken) throw new Error("Ese nombre de usuario ya está en uso.");
+        if (taken) throw friendly("Ese @usuario ya lo tiene alguien más.");
       }
       const { error: updateErr } = await supabase
         .from("users")
@@ -3562,7 +3602,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       setTimeout(() => setSuccess(""), 3000);
       return true;
     } catch (e) {
-      setError(e.message || "Error al guardar.");
+      if (!e?.friendly) console.error("[perfil] no se pudo guardar:", e?.message || e);
+      setError(e?.friendly ? e.message : "No se guardó. Prueba otra vez.");
       return false;
     } finally {
       setSaving(false);
@@ -3642,22 +3683,26 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
     <div style={{ maxWidth: "56rem", margin: "0 auto", paddingBottom: "2rem" }}>
 
       {/* ── Cover banner ── */}
-      {/* Sin foto de portada: superficie suave plana (antes degradado vino → ámbar, fuera de paleta) */}
-      <div style={{ position: "relative", height: 180, backgroundColor: profile.coverUrl ? "transparent" : palette.superficieSuave }}>
+      {/* Portada. Con foto: 180 px. Sin foto (ronda 2): franja baja de 104 px en bg con filete de tinta abajo;
+          el detalle es el avatar con canto, no un bloque de color vacío de un tercio de pantalla. */}
+      <div style={{ position: "relative", height: profile.coverUrl ? 180 : 104, backgroundColor: palette.bg, borderBottom: profile.coverUrl ? "none" : `1.5px solid ${palette.ink}` }}>
         {profile.coverUrl && (
-          <img src={profile.coverUrl} alt="portada" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          <img src={profile.coverUrl} alt="Foto de portada" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         )}
 
         {/* Avatar overlapping bottom-left */}
-        <div
-          style={{ position: "absolute", bottom: -46, left: 20, cursor: uploading ? "default" : "pointer" }}
+        <button
+          type="button"
+          aria-label="Cambiar foto de perfil"
+          disabled={uploading}
+          style={{ position: "absolute", bottom: -46, left: 20, padding: 0, background: "none", border: "none", borderRadius: "50%", cursor: uploading ? "default" : "pointer" }}
           onClick={() => !uploading && fileInput.current?.click()}
           className="group"
         >
           {/* Canto de sticker: filo del fondo + línea de tinta (antes anillo con degradado vino y sombra) */}
           <div style={{ position: "relative", borderRadius: "50%", border: `4px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}` }}>
             {profile.avatarUrl ? (
-              <img src={profile.avatarUrl} alt="avatar" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+              <img src={profile.avatarUrl} alt="Foto de perfil" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
               <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
@@ -3667,7 +3712,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               {uploading ? <Loader2 size={20} color={palette.onColor} className="animate-spin" /> : <Camera size={18} color={palette.onColor} />}
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Change cover button */}
         <button
@@ -3703,8 +3748,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         const pagesTotal = streak?.total_pages_read || 0;
         const dayWord = (n) => (n === 1 ? "día" : "días");
         const sub = cur === 0
-          ? "Con 5 minutos arranca."
-          : cur >= best ? "Esto ya es récord." : `Récord: ${best} ${dayWord(best)}`;
+          ? "Con 5 minutos arranca"
+          : cur >= best ? "Esto ya es récord" : `Récord: ${best} ${dayWord(best)}`;
         return (
           <div style={{ padding: "0.75rem 1.25rem 0.5rem" }}>
             <div
@@ -3722,9 +3767,12 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                 <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
                   {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
                 </p>
-                <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.35rem" }}>
-                  {sub}{pagesTotal > 0 ? ` · ${pagesTotal.toLocaleString("es")} ${pagesTotal === 1 ? "página" : "páginas"} en total` : ""}
-                </p>
+                <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, marginTop: "0.35rem" }}>{sub}</p>
+                {pagesTotal > 0 && (
+                  <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.1rem" }}>
+                    {pagesTotal.toLocaleString("es")} {pagesTotal === 1 ? "página" : "páginas"} en total
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -3740,8 +3788,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           <div className="scrollbar-hide" style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.25rem 2.5rem", width: "100%", maxWidth: 560, maxHeight: "88vh", overflowY: "auto" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
               <p style={{ ...ts.h2, color: palette.ink }}>Editar perfil</p>
-              <button onClick={() => setEditModalOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.25rem" }}>
-                <X size={20} color={palette.inkSoft} />
+              <button onClick={() => setEditModalOpen(false)} aria-label="Cerrar" style={{ width: 44, height: 44, marginRight: -10, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 999, cursor: "pointer", padding: 0 }}>
+                <X size={22} color={palette.ink} aria-hidden />
               </button>
             </div>
             <div className="space-y-4">
@@ -3754,10 +3802,10 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                   placeholder="Tu nombre"
                   style={inputStyle}
                 />
-                <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Es el nombre que ven los demás. Tu @usuario no cambia.</p>
+                <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Es el nombre que ven los demás. Cambiarlo no toca el @usuario.</p>
               </div>
               <div>
-                <label style={labelStyle}>Email</label>
+                <label style={labelStyle}>Correo</label>
                 <p style={{ ...ts.body15, color: palette.inkFaint }}>{user.email}</p>
               </div>
               <div>
@@ -3779,7 +3827,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                 <textarea
                   value={profile.bio}
                   onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value.slice(0, 160) }))}
-                  placeholder="Lectora empedernida, fan de la ciencia ficción..."
+                  placeholder="Fan del terror, lectura lenta, cero spoilers…"
                   rows={3}
                   style={{ ...inputStyle, resize: "none", lineHeight: 1.5 }}
                 />
@@ -3793,7 +3841,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               disabled={saving}
               style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : palette.onAccent, border: "none", borderRadius: "12px", fontSize: "1rem", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
             >
-              {saving ? "Guardando..." : "Guardar cambios"}
+              {saving ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
         </div>
@@ -3822,10 +3870,10 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           onClick={async () => {
             const username = profile.username || user.name || "Alguien";
             const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-            const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común.`;
+            const msg = `Llevo ${books.length} ${books.length === 1 ? "libro" : "libros"} en Sema. ¿Vemos qué tenemos en común?`;
             try {
               if (navigator.share) {
-                await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
+                await navigator.share({ title: "Sema · libros, racha y frases", text: msg, url: refUrl });
               } else {
                 setInviteModalOpen(true);
               }
@@ -3843,7 +3891,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       {inviteModalOpen && (() => {
         const username = profile.username || user.name || "Alguien";
         const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-        const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común.`;
+        const msg = `Llevo ${books.length} ${books.length === 1 ? "libro" : "libros"} en Sema. ¿Vemos qué tenemos en común?`;
         return <InviteShareModal message={msg} url={refUrl} onClose={() => setInviteModalOpen(false)} />;
       })()}
 
@@ -3853,7 +3901,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       {books.length > 0 && (
         <div className="mt-8 pt-7 border-t md:mt-0 md:pt-0 md:border-0 md:flex-1 md:min-w-0" style={{ borderColor: palette.border }}>
           <h3 style={{ ...ts.h2, color: palette.ink, marginBottom: "1rem" }}>
-            Tu biblioteca
+            Mi biblioteca
           </h3>
 
           {/* Cifras grandes en Bricolage separadas con filetes, sin cajitas (principio 2).
@@ -3961,7 +4009,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           {topRated.length > 0 && (
             <div>
               <p style={{ ...ts.h2, color: palette.ink, marginBottom: "0.25rem" }}>
-                Mejor valorados
+                Mejor calificados
               </p>
               {/* Filas separadas con filete, sin tarjeta con borde por cada libro */}
               <div style={{ display: "flex", flexDirection: "column" }}>
@@ -3999,18 +4047,13 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       <div style={{ padding: "0.5rem 0 1.5rem" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
           <p style={{ ...ts.h2, color: palette.ink }}>Mis logros{unlockedAchievements.length > 0 ? ` (${unlockedAchievements.length})` : ""}</p>
-          {unlockedAchievements.length > 0 && (
-            <button onClick={() => setAchievementsExpanded((v) => !v)} style={{ minHeight: 44, padding: "0 0.25rem", background: "none", border: "none", cursor: "pointer", ...body, fontSize: "15px", color: palette.ink, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>
+          {(
+            <button onClick={() => setAchievementsExpanded((v) => !v)} aria-expanded={achievementsExpanded} style={{ minHeight: 44, padding: "0 0.25rem", background: "none", border: "none", cursor: "pointer", ...body, fontSize: "15px", color: palette.ink, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>
               {achievementsExpanded ? "Ver menos" : "Ver todos"}
             </button>
           )}
         </div>
-        <div style={{ position: "relative", maxHeight: achievementsExpanded ? "none" : 132, overflow: "hidden" }}>
-          <AchievementGrid unlockedAchievements={unlockedAchievements} />
-          {!achievementsExpanded && unlockedAchievements.length > 0 && (
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 50, background: `linear-gradient(to bottom, transparent, ${palette.bg})`, pointerEvents: "none" }} />
-          )}
-        </div>
+        <AchievementGrid unlockedAchievements={unlockedAchievements} onlyUnlocked={!achievementsExpanded} />
       </div>
 
       {/* ── Wrapped anual (solo en temporada nov–ene) ── */}
@@ -4028,7 +4071,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
             <button
               onClick={() => annualWrap ? setActiveWrap(annualWrap) : handleGenerateWrap(null, year, "annual")}
               disabled={generatingWrap}
-              className="btn-press sema-focus-onaccent"
+              className="btn-press sema-focus-wrapped"
               aria-label={annualWrap ? `Ver Wrapped ${year}` : `Generar Wrapped ${year}`}
               style={{
                 width: "100%", minHeight: 96, padding: "1.1rem 1.1rem 1.1rem 1.25rem",
@@ -4038,7 +4081,6 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
-                <span className="sparkle-anim" style={{ display: "inline-flex" }}><Sparkles size={26} color={palette.onAccent} strokeWidth={2} aria-hidden /></span>
                 <span style={{ ...display, fontSize: "26px", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.05, color: palette.onAccent, textAlign: "left" }}>
                   Wrapped {year}
                 </span>
@@ -4061,11 +4103,13 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
 
       {/* Privacidad */}
       <div style={{ padding: "0 0 1.5rem" }}>
-        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Privacidad</p>
-        <div style={{ display: "flex", gap: "0.4rem" }}>
+        <p id="perfil-privacidad" style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>Privacidad</p>
+        <div role="radiogroup" aria-labelledby="perfil-privacidad" style={{ display: "flex", gap: "0.4rem" }}>
           {[{ v: true, label: "Perfil público" }, { v: false, label: "Perfil privado" }].map(({ v, label }) => (
             <button
               key={String(v)}
+              role="radio"
+              aria-checked={isPublicProfile === v}
               disabled={savingPrivacy}
               onClick={async () => {
                 if (isPublicProfile === v || savingPrivacy) return;
@@ -4096,17 +4140,20 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           ))}
         </div>
         <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.5rem", lineHeight: 1.45 }}>
-          Con el perfil privado, solo tus amigos ven tus libros, stats, racha y mascota. Tu nombre y foto siguen visibles para que puedan enviarte solicitudes.
+          Perfil privado: solo las amistades ven libros, estadísticas, racha y mascota.<br />
+          El nombre y la foto siguen a la vista para recibir solicitudes.
         </p>
       </div>
 
       {/* Apariencia */}
       <div style={{ padding: "0 0 1.5rem" }}>
-        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Apariencia</p>
-        <div style={{ display: "flex", gap: "0.4rem" }}>
+        <p id="perfil-apariencia" style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>Apariencia</p>
+        <div role="radiogroup" aria-labelledby="perfil-apariencia" style={{ display: "flex", gap: "0.4rem" }}>
           {[{ id: "system", label: "Sistema" }, { id: "light", label: "Claro" }, { id: "dark", label: "Oscuro" }].map(({ id, label }) => (
             <button
               key={id}
+              role="radio"
+              aria-checked={theme === id}
               onClick={() => setTheme?.(id)}
               style={{
                 flex: 1, minHeight: 44, padding: "0 0.25rem", borderRadius: 999,
@@ -5735,7 +5782,7 @@ function InviteShareModal({ message, url, onClose }) {
             onClick={copyLink}
             style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.75rem", backgroundColor: copied ? palette.sage : palette.accent, color: copied ? palette.onColor : palette.onAccent, border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
           >
-            {copied ? "¡Copiado! ✓" : "Copiar"}
+            {copied ? "Copiado" : "Copiar"}
           </button>
         </div>
 
@@ -10438,7 +10485,7 @@ function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogo
   const TABS = [
     { id: "perfil", label: "Mi perfil" },
     { id: "libros", label: "Mis libros" },
-    { id: "frases", label: "Mis Frases" },
+    { id: "frases", label: "Mis frases" },
     { id: "resumen", label: "Resumen" },
   ];
   return (
@@ -10446,10 +10493,11 @@ function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogo
       <div className="px-4 sm:px-6 pt-5 max-w-4xl mx-auto">
         <SubTabBar tabs={TABS} active={sub} onChange={setSub} />
         {!isOnline && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.6rem", marginBottom: "0.25rem" }}>
-            <WifiOff size={12} color={palette.amber} strokeWidth={2} />
-            <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", color: palette.amber }}>
-              Modo sin conexión — mostrando datos guardados
+          // Aviso sin conexión: inkSoft Figtree 13 px e ícono ink (antes ámbar como texto sobre blanco, 2.06:1).
+          <div role="status" style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "-0.6rem", marginBottom: "0.9rem" }}>
+            <WifiOff size={16} color={palette.ink} strokeWidth={2} aria-hidden />
+            <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>
+              Sin conexión. Se ve lo último guardado.
             </span>
           </div>
         )}

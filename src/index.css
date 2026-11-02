@@ -525,3 +525,7 @@ button:not(:disabled):not(.sema-no-hover):active,
 .sema-sticker {
   transform: rotate(-1.5deg);
 }
+
+/* Wrapped de Perfil (ronda 2): el contorno va por fuera en tinta. El de onAccent (#483A58) por fuera
+   sobre negro daba 2.02:1; ink por fuera da 10.39 en claro y 21.00 en oscuro. */
+.sema-focus-wrapped:focus-visible { outline-color: var(--sema-ink) !important; outline-offset: 3px !important; }

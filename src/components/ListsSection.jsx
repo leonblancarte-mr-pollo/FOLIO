@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Lock, Bookmark, ChevronRight } from "lucide-react";
-import { palette, body, display } from "../theme.js";
+import { palette, body, display, ts } from "../theme.js";
 import { fetchUserLists, createUserList } from "../services/listsService.js";
 import { ListFormModal } from "./ListFormModal.jsx";
 import { ListDetailModal } from "./ListDetailModal.jsx";
@@ -24,7 +24,8 @@ function ListsSection({ user, books, onSelectBook }) {
   return (
     <div style={{ padding: "0 0 1.5rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, textTransform: "uppercase", letterSpacing: "0.08em" }}>Mis listas</p>
+        {/* Mismo sistema de títulos que «Mi biblioteca» y «Mis logros» (ts.h2), no versalitas */}
+        <p style={{ ...ts.h2, color: palette.ink }}>Mis listas</p>
         {/* «Nueva» en tinta (el durazno como texto sobre blanco da 2.06:1) y con 44 px de toque */}
         <button onClick={() => setCreateOpen(true)} style={{ display: "flex", alignItems: "center", gap: "0.3rem", minHeight: 44, background: "none", border: "none", cursor: "pointer", color: palette.ink, ...body, fontSize: "15px", fontWeight: 600, padding: "0 0.25rem" }}>
           <Plus size={16} aria-hidden /> Nueva
@@ -34,11 +35,12 @@ function ListsSection({ user, books, onSelectBook }) {
       {lists === null ? (
         <SkeletonList count={2} lead={null} lines={2} label="Cargando listas" />
       ) : lists.length === 0 ? (
-        <button onClick={() => setCreateOpen(true)} style={{ width: "100%", borderRadius: 14, padding: "1rem 1.25rem", backgroundColor: palette.bgCard, border: `1px dashed ${palette.border}`, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <Bookmark size={22} color={palette.inkFaint} style={{ flexShrink: 0 }} />
+        // Vacío sin caja punteada (principio 2). Textos aprobados el 2026-10-10: se quedan; solo comillas «».
+        <button onClick={() => setCreateOpen(true)} style={{ width: "100%", minHeight: 44, padding: "0.4rem 0", background: "none", border: "none", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          <Bookmark size={22} color={palette.ink} style={{ flexShrink: 0 }} aria-hidden />
           <div>
-            <p style={{ ...display, fontWeight: 700, fontSize: "0.92rem", color: palette.inkSoft, margin: 0 }}>Crea tu primera lista</p>
-            <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, margin: 0 }}>"Favoritos", "No entendí nada", lo que quieras</p>
+            <p style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink, margin: 0 }}>Crea tu primera lista</p>
+            <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, margin: 0 }}>«Favoritos», «No entendí nada», lo que quieras</p>
           </div>
         </button>
       ) : (
@@ -48,7 +50,7 @@ function ListsSection({ user, books, onSelectBook }) {
               {l.isPublic ? <Bookmark size={16} color={palette.ink} style={{ flexShrink: 0 }} /> : <Lock size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ ...display, fontSize: "0.95rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
-                <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: 0 }}>
+                <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, margin: 0 }}>
                   {l.bookIds.length} {l.bookIds.length === 1 ? "libro" : "libros"} · {l.isPublic ? "pública" : "privada"}
                 </p>
               </div>

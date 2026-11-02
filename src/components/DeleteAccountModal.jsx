@@ -19,7 +19,7 @@ function DeleteAccountModal({ onClose, onDeleted }) {
     const { error } = await supabase.rpc("delete_my_account");
     if (error) {
       console.error("[CUENTA] delete_my_account error:", error);
-      setErr("No se pudo eliminar la cuenta. Intenta de nuevo o contacta soporte.");
+      setErr("No se pudo eliminar la cuenta. Prueba otra vez en un rato.");
       setDeleting(false);
       return;
     }
