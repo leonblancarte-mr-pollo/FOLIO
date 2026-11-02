@@ -111,7 +111,12 @@ export function GenericCover({ title, author, compact = false, label = "", foote
           )}
         </div>
         {footer && (
-          <div style={{ marginTop: "auto", paddingTop: 12, minHeight: 0, overflow: "hidden", color: s.fieldInk }}>
+          // Ocupa TODO el espacio libre bajo el boleto (flex 1 1 0): su alto no depende del contenido,
+          // así el pie puede medirlo y decidir cuántas líneas caben (BookTinder › FitFooter).
+          <div style={{
+            flex: "1 1 0", minHeight: 0, paddingTop: 12, overflow: "hidden", color: s.fieldInk,
+            display: "flex", flexDirection: "column", justifyContent: "flex-end",
+          }}>
             {footer(s)}
           </div>
         )}

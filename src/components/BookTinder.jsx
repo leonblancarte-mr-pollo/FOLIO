@@ -46,13 +46,60 @@ function MetaLine({ genres, rating, color }) {
         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{genres.join(" · ")}</span>
       )}
       {rating && (
-        <span aria-label={`Calificación ${rating} de 5`} style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0 }}>
           {genres.length > 0 && <span aria-hidden>·</span>}
           <Star stroke={color} />
           <span aria-hidden>{rating}</span>
+          <span className="sr-only">Calificación {rating} de 5</span>
         </span>
       )}
     </p>
+  );
+}
+
+// Alto de la ventana, vivo (escucha resize): nada de una lectura vieja de window.innerHeight.
+function useViewportHeight() {
+  const [h, setH] = useState(() => (typeof window !== "undefined" ? window.innerHeight : 844));
+  useEffect(() => {
+    const on = () => setH(window.innerHeight);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return h;
+}
+
+// Pie de la portada genérica: ocupa el espacio libre bajo el boleto, lo mide (ResizeObserver) y
+// muestra solo las líneas de sinopsis que caben completas (máx. 3, con «…»). Si no cabe ni una,
+// no se muestra: se lee en el botón de info. Nunca corta una línea a la mitad.
+const DESC_LINE_PX = 15 * 1.45;
+function FitFooter({ genres, rating, color, description }) {
+  const boxRef = useRef(null);
+  const metaRef = useRef(null);
+  const [lines, setLines] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const meta = metaRef.current ? metaRef.current.offsetHeight + 7 : 0;
+      setLines(Math.max(0, Math.min(3, Math.floor((el.clientHeight - meta) / DESC_LINE_PX))));
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    measure();
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={boxRef} style={{ flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column", justifyContent: "flex-end", overflow: "hidden" }}>
+      <div ref={metaRef}><MetaLine genres={genres} rating={rating} color={color} /></div>
+      {description && lines > 0 && (
+        <p style={{
+          ...body, fontSize: "15px", color, lineHeight: 1.45, margin: 0, flexShrink: 0,
+          display: "-webkit-box", WebkitLineClamp: lines, WebkitBoxOrient: "vertical", overflow: "hidden",
+        }}>
+          {description}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -60,7 +107,13 @@ function MetaLine({ genres, rating, color }) {
 function CatEmpty({ title, line, children }) {
   return (
     <div style={{ textAlign: "center", padding: "2.5rem 1.5rem" }}>
-      <img src="/pets/cat.png" alt="" width={80} height={80} style={{ display: "block", margin: "0 auto 1rem", objectFit: "contain" }} />
+      {/* Disco firma detrás del gato (como en Inicio): el gato negro no se pierde sobre el negro del modo oscuro */}
+      <div aria-hidden style={{
+        width: 96, height: 96, borderRadius: "50%", backgroundColor: palette.firma,
+        margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <img src="/pets/cat.png" alt="" width={72} height={72} style={{ display: "block", objectFit: "contain" }} />
+      </div>
       <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 700, color: palette.ink, margin: "0 0 0.5rem" }}>
         {title}
       </h3>
@@ -181,25 +234,14 @@ function CardFace({ book, showInfo, onToggleInfo }) {
   const genres = (book.genres || []).slice(0, 3);
   const [imgStatus, setImgStatus] = useState(book.coverUrl ? "loading" : "failed");
   const photo = imgStatus === "loaded";
-  // Pantallas bajas: la tarjeta se encoge. < 760 px → sinopsis en 2 líneas; < 700 px (p. ej. 375×667,
-  // tarjeta de ~275 px) → sin sinopsis en la portada genérica (se lee en el botón de info).
-  const vh = typeof window !== "undefined" ? window.innerHeight : 844;
+  // Pantallas bajas: la sinopsis sobre foto baja a 2 líneas (< 760 px de alto). En la genérica,
+  // FitFooter decide según el espacio real de la tarjeta.
+  const vh = useViewportHeight();
   const descLines = vh < 760 ? 2 : 3;
-  const genericDesc = vh >= 700;
   const label = book.author ? `${book.title}, de ${book.author}` : book.title;
 
   const genericFooter = (s) => (
-    <>
-      <MetaLine genres={genres} rating={rating} color={s.fieldInk} />
-      {book.description && genericDesc && (
-        <p style={{
-          ...body, fontSize: "15px", color: s.fieldInk, lineHeight: 1.45, margin: 0,
-          display: "-webkit-box", WebkitLineClamp: descLines, WebkitBoxOrient: "vertical", overflow: "hidden",
-        }}>
-          {book.description}
-        </p>
-      )}
-    </>
+    <FitFooter genres={genres} rating={rating} color={s.fieldInk} description={book.description} />
   );
 
   return (
@@ -255,9 +297,9 @@ function CardFace({ book, showInfo, onToggleInfo }) {
             position: "absolute", inset: 0,
             backgroundColor: "rgba(0,0,0,1)",
             padding: "1.75rem 1.5rem",
-            display: "flex", flexDirection: "column", justifyContent: "center",
+            display: "flex", flexDirection: "column", justifyContent: "flex-start",
             animation: "backdropIn 200ms ease-out",
-            cursor: "pointer", overflow: "hidden",
+            cursor: "pointer", overflowY: "auto", overscrollBehavior: "contain", touchAction: "pan-y",
           }}
         >
           <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onDark, margin: "0 0 0.3rem" }}>
@@ -312,7 +354,9 @@ function LoadingSkeleton() {
 // fila «Quedan N guardados hoy · Libro N de M», barra, botones y la barra inferior con su borde rasgado).
 // 2026-11-02: «N de M» sube a la fila del contador y el alto se recalcula para que los
 // botones queden por encima del borde rasgado (antes «1 de 20 libros» quedaba debajo).
-const CARD_HEIGHT = "clamp(260px, calc(100dvh - 392px), 620px)";
+// Ronda 2 (corrección): 24 px más de aire entre la fila de botones y el borde rasgado (antes ~25 px,
+// ahora ~49 px). Solo CSS (dvh): no depende de ninguna lectura de window.innerHeight.
+const CARD_HEIGHT = "clamp(236px, calc(100dvh - 416px), 600px)";
 
 export default function BookTinder({ user, onAdd, demoBooks = null }) {
   const [books, setBooks]               = useState([]);
@@ -589,7 +633,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     return (
       <CatEmpty
         title="Faltan los géneros favoritos."
-        line="Al elegirlos en el perfil, aquí empiezan a salir libros."
+        line="Sin géneros favoritos no se arma la pila."
       />
     );
   }
@@ -597,7 +641,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (books.length === 0) {
     return (
       <CatEmpty
-        title="No hay libros disponibles"
+        title="No hay libros disponibles."
         line="Vuelve en un rato: estamos rellenando la estantería."
       >
         <button onClick={() => window.location.reload()} style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 0.75rem", textDecoration: "underline", textUnderlineOffset: 3 }}>
@@ -612,13 +656,14 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     return (
       <CatEmpty
         title="Se acabó la pila por ahora."
-        line="Al volver a entrar se arma otra. Empezar de nuevo también es un plan."
+        line={<>Al volver a entrar se arma otra.<br />Empezar de nuevo también es un plan.</>}
       />
     );
   }
 
   const savesLeft = limitStatus.savesLeft;
-  const progress  = Math.min(100, (limitStatus.savesUsed / limitStatus.effectiveLimit) * 100);
+  // La barra muestra lo que QUEDA (igual que su texto): llena al empezar, vacía al agotarse.
+  const progress  = Math.max(0, Math.min(100, (savesLeft / Math.max(1, limitStatus.effectiveLimit)) * 100));
   const disabled  = saving;
 
   return (
