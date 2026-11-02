@@ -79,7 +79,7 @@ import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { EmptyState } from "./components/EmptyState.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
-import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
+import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
@@ -555,7 +555,8 @@ const NAV_ITEMS = [
   // renderiza TruequeMain cuando tab === "trueque". Para reactivarlo: importar
   // `Repeat` de lucide-react y descomentar esta línea:
   // { id: "trueque", label: "Trueque", icon: Repeat },
-  { id: "perfil", label: "Perfil", icon: User },
+  // Perfil ya no va en la barra (2026-11-02): se abre desde la foto de perfil de la cabecera
+  // (AppHeader, data-tutorial="nav-perfil"). La pestaña `perfil` sigue existiendo como tab.
 ];
 
 const MOOD_OPTIONS = [
@@ -601,14 +602,14 @@ function SubTabBar({ tabs, active, onChange }) {
   );
 }
 
-function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, onOpenPet, userName = "" }) {
-  // Foto de perfil: el usuario de la app no trae avatar_url, así que va la inicial (decisión pendiente de León).
+function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, onOpenPet, userName = "", avatarUrl = null }) {
+  // Foto de perfil real (users.avatar_url, la carga MainApp). Sin foto, la inicial sobre superficieSuave.
   const initial = ((userName || "").trim()[0] || "?").toUpperCase();
   return (
     <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}`, paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span
-          aria-label="SEMA"
+          aria-label="Sema"
           style={{
             fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
             fontWeight: 800,
@@ -618,7 +619,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
             color: palette.ink,
             userSelect: "none",
           }}
-        >sema</span>
+        >Sema</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
           <span aria-label={(gemBalance ?? 0) === 1 ? "1 gema" : `${gemBalance ?? 0} gemas`} style={{ display: "flex", alignItems: "center", gap: "4px", ...body, fontSize: "0.9rem", fontWeight: 600, color: palette.amberInk, marginRight: "0.25rem" }}>
             <Gem size={16} strokeWidth={1.8} /> {gemBalance ?? 0}
@@ -639,12 +640,17 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
           <button
             onClick={() => setTab("perfil")}
             aria-label="Mi perfil"
+            data-tutorial="nav-perfil"
             className="sema-no-hover btn-press"
             style={{ background: "none", border: "none", cursor: "pointer", width: 44, height: 44, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
-            <span aria-hidden style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: palette.superficieSuave, color: palette.ink, ...display, fontWeight: 800, fontSize: "1rem", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {initial}
-            </span>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", display: "block", backgroundColor: palette.superficieSuave }} />
+            ) : (
+              <span aria-hidden style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: palette.superficieSuave, color: palette.ink, ...display, fontWeight: 800, fontSize: "1rem", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {initial}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -8315,7 +8321,8 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
 }
 
 // ============ HOME (dashboard personalizado) ============
-// Barra de progreso reutilizable por libro (% leído; vino mientras avanza, salvia al terminar)
+// Barra de progreso reutilizable por libro (% leído; degradado cereza→durazno mientras avanza,
+// salvia al terminar; sema-paleta §5)
 function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
   const has = total > 0;
   const pct = has ? Math.min(100, Math.round((current / total) * 100)) : 0;
@@ -8327,11 +8334,11 @@ function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
       </p>
     );
   }
-  // Pista con borde de tinta: el relleno durazno no llega a 3:1 sobre blanco; el contorno sí.
+  // Pista con borde de tinta: el degradado no llega a 3:1 sobre blanco por sí solo; el contorno sí.
   return (
     <div style={{ width: "100%" }}>
       <div style={{ height, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, overflow: "hidden" }}>
-        <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", backgroundColor: pct >= 100 ? palette.sage : palette.accent, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
+        <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", background: pct >= 100 ? palette.sage : SEMA_GRADIENTS.acento, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
       </div>
       <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {current} de {total} páginas</p>
     </div>
@@ -8350,7 +8357,7 @@ function RachaModal({ streak, paused = false, onClose }) {
     : cur < 30 ? "Una semana o más leyendo. Ya es costumbre."
     : "Más de un mes leyendo. Eso ya se presume.";
   return (
-    <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
         <Flame size={44} color={palette.ink} strokeWidth={1.8} style={{ margin: "0 auto" }} className={cur > 7 && !paused ? "fire-pulse" : ""} />
         <p style={{ ...display, fontWeight: 800, fontSize: "3rem", color: palette.ink, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
@@ -8370,7 +8377,7 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
   const primary = booksReading[0] || null;
   const rest = booksReading.slice(1);
   return (
-    <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
+    <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
       <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "1.5rem 1.25rem 2rem", maxHeight: "85vh", overflowY: "auto", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
         <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center" }}>¿Qué quieres leer?</h2>
         {primary && (
@@ -8498,7 +8505,15 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
 
   // Principio 8: los primeros días solo lo mínimo; "Descubre" aparece con 3+ libros.
   const showDiscover = books.length >= 3;
-  const primaryBtn = { width: "100%", minHeight: 56, padding: "1.1rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: palette.onAccent, ...display, fontWeight: 700, fontSize: "1.15rem" };
+  // Único botón relleno (principio 1). Recurso de sticker/zine: borde de tinta y sombra dura
+  // desplazada sin desenfoque, para despegarlo del fondo sin degradado ni textura.
+  const primaryBtn = {
+    width: "100%", minHeight: 64, padding: "1rem 1.25rem", borderRadius: 16, cursor: "pointer",
+    background: palette.accent, color: palette.onAccent,
+    border: `2px solid ${palette.ink}`, boxShadow: `4px 4px 0 ${palette.ink}`,
+    display: "flex", alignItems: "center", justifyContent: "center", gap: "0.6rem",
+    ...display, fontWeight: 800, fontSize: "1.25rem", letterSpacing: "-0.01em",
+  };
   const quietRow = { width: "100%", minHeight: 44, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: sp.sm };
   const dayWord = (n) => (n === 1 ? "día" : "días");
 
@@ -8537,18 +8552,22 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         </div>
       </button>
 
-      {/* La mascota habla pegada al sticker: pequeña, nunca ocupa la pantalla (principio 6) */}
+      {/* La mascota habla pegada al sticker: pequeña, nunca ocupa la pantalla (principio 6).
+          Frase en Bricolage (armoniza con los títulos); en oscuro el gato lleva halo lila. */}
       {pet && (
-        <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.sm }}>
-          <span style={{ flexShrink: 0, display: "inline-flex", filter: isDarkMode ? `drop-shadow(0 0 1px ${palette.firma}) drop-shadow(0 0 1px ${palette.firma})` : "none" }}>
-            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={48} showShadow={false} />
+        <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.md }}>
+          <span style={{ flexShrink: 0, display: "inline-flex", filter: isDarkMode ? `drop-shadow(0 0 1.5px ${palette.firma}) drop-shadow(0 0 1.5px ${palette.firma})` : "none" }}>
+            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={80} showShadow={false} />
           </span>
-          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.3, color: palette.ink, minWidth: 0 }}>«{petLine}»</p>
+          <p style={{ ...display, fontWeight: 700, fontSize: "18px", lineHeight: 1.25, letterSpacing: "-0.01em", color: palette.ink, minWidth: 0 }}>{petLine}</p>
         </button>
       )}
 
       {/* Única acción principal */}
-      <button onClick={() => setLeerOpen(true)} className="btn-press" style={primaryBtn}>Leer ahora</button>
+      <button onClick={() => setLeerOpen(true)} className="btn-press" style={primaryBtn}>
+        <BookOpen size={26} strokeWidth={2.2} color={palette.onAccent} aria-hidden style={{ flexShrink: 0 }} />
+        Leer ahora
+      </button>
 
       {readingBooks.length > 0 && (
         <section>
@@ -11567,6 +11586,8 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   function showGemToast(_amount, _label) {}
   const [activeWrap, setActiveWrap] = useState(null);
   const [mainUsername, setMainUsername] = useState(null);
+  // Foto de perfil para la cabecera (users.avatar_url). Se lee una vez por sesión.
+  const [mainAvatarUrl, setMainAvatarUrl] = useState(null);
   const [refModalUser, setRefModalUser] = useState(initialRefUser || null);
   const isOnline = useOnlineStatus();
 
@@ -11593,8 +11614,11 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   }
 
   useEffect(() => {
-    supabase.from("users").select("username").eq("id", user.id).single()
-      .then(({ data }) => { if (data?.username) setMainUsername(data.username); });
+    supabase.from("users").select("username, avatar_url").eq("id", user.id).single()
+      .then(({ data }) => {
+        if (data?.username) setMainUsername(data.username);
+        setMainAvatarUrl(data?.avatar_url || null);
+      });
   }, [user.id]);
 
   useEffect(() => {
@@ -12278,7 +12302,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           </span>
         </div>
       )}
-      <AppHeader userName={user.name} tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
+      <AppHeader userName={user.name} avatarUrl={mainAvatarUrl} tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
       <main className="max-w-4xl mx-auto fade-in main-fab-clearance" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
         {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
@@ -12500,7 +12524,8 @@ function TutorialOverlay({ onDone }) {
     { key: 'nav-mascota', text: 'Tu compañero de lectura. ¡Sube de nivel!',    dir: 'above' },
     { key: 'snacks-hero', text: 'Lee un cuento en 5 min. ¡Empieza tu racha!', dir: 'below' },
     { key: 'gems',        text: 'Gana gemas leyendo. Cada acción cuenta',      dir: 'below' },
-    { key: 'nav-perfil',  text: 'Tu biblioteca, logros y estadísticas',        dir: 'above' },
+    // 2026-11-02: nav-perfil es la foto de perfil de la cabecera; el globo va debajo.
+    { key: 'nav-perfil',  text: 'Tu biblioteca, logros y estadísticas',        dir: 'below' },
   ];
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
