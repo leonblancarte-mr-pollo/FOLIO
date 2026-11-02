@@ -3639,7 +3639,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt="avatar" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
@@ -5327,7 +5327,7 @@ function FriendProfileModal({ friend, user, onClose }) {
             {friend.avatar_url ? (
               <img src={friend.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
@@ -6268,7 +6268,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
         style={{
           width: size,
           height: size,
-          backgroundColor: getAvatarColor(profile.id || profile.nombre),
+          backgroundColor: getAvatarColor(profile.id || profile.nombre), ...avatarEdge(),
           color: palette.onColor,
           fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
           fontSize: size * 0.35,
@@ -6786,7 +6786,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                   className="sema-row hover-bg-soft"
                   style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 8px", backgroundColor: notif.read ? "transparent" : palette.unreadBg, borderRadius: 10, marginBottom: 4, cursor: "pointer" }}
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: getAvatarColor(actor.id || actorName), display: "flex", alignItems: "center", justifyContent: "center", color: palette.onColor, fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: getAvatarColor(actor.id || actorName), ...avatarEdge(), display: "flex", alignItems: "center", justifyContent: "center", color: palette.onColor, fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
                     {actor.avatar_url ? (
                       <img src={actor.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} alt="" />
                     ) : initials}
@@ -6999,14 +6999,19 @@ function UAMLibraryView({ books, onAdd }) {
 }
 
 // ============ FEED COMPONENTS ============
+// Filo de los avatares sin foto (getAvatarColor). En oscuro, 1.5 px inkSoft (#E7D7C1): el ciruela
+// #483A58 sobre negro da 2.02 y sobre la fila no leída de notificaciones (unreadBg #483A58) desaparecía.
+// En claro no lleva filo. Se usa en los 7 sitios que pintan getAvatarColor.
+function avatarEdge() {
+  return { boxShadow: palette.bg === PALETTE_DARK.bg ? `0 0 0 1.5px ${palette.inkSoft}` : "none" };
+}
 function Avatar({ author, size = 36 }) {
   const letter = (author?.nombre || author?.name || "U")[0].toUpperCase();
   return (
     <div
       style={{
         width: size, height: size, borderRadius: "50%",
-        backgroundColor: getAvatarColor(author?.id || author?.nombre || author?.name || ""),
-        boxShadow: palette.bg === PALETTE_DARK.bg ? `0 0 0 1.5px ${palette.inkSoft}` : "none",
+        backgroundColor: getAvatarColor(author?.id || author?.nombre || author?.name || ""), ...avatarEdge(),
         display: "flex", alignItems: "center", justifyContent: "center",
         flexShrink: 0, overflow: "hidden",
         fontSize: size * 0.38, fontWeight: 700, color: palette.onColor,
@@ -9352,7 +9357,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
                     ) : (
-                      <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), boxShadow: isDarkFeed ? `0 0 0 1.5px ${palette.inkSoft}` : "none", color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: 17, fontWeight: 700 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), ...avatarEdge(), color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: 17, fontWeight: 700 }}>
                         {(friend.nombre || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                     )}
@@ -13052,7 +13057,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
               <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", backgroundColor: palette.bgCard, borderRadius: 12, border: `1px solid ${palette.borderSoft}` }}>
                 {u.avatar_url
                   ? <img src={u.avatar_url} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                  : <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: getAvatarColor(u.id || u.nombre), display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: "1rem", color: palette.onColor, flexShrink: 0 }}>{initials}</div>
+                  : <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: getAvatarColor(u.id || u.nombre), ...avatarEdge(), display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: "1rem", color: palette.onColor, flexShrink: 0 }}>{initials}</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.nombre}</p>
