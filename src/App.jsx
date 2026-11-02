@@ -7006,6 +7006,7 @@ function Avatar({ author, size = 36 }) {
       style={{
         width: size, height: size, borderRadius: "50%",
         backgroundColor: getAvatarColor(author?.id || author?.nombre || author?.name || ""),
+        boxShadow: palette.bg === PALETTE_DARK.bg ? `0 0 0 1.5px ${palette.inkSoft}` : "none",
         display: "flex", alignItems: "center", justifyContent: "center",
         flexShrink: 0, overflow: "hidden",
         fontSize: size * 0.38, fontWeight: 700, color: palette.onColor,
@@ -7031,13 +7032,27 @@ function timeAgo(ts) {
   return new Date(ts).toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
+// Nombre de pila para saludos y textos propios: mismo recorte que el saludo de Inicio y Social.
+// Si el nombre llega como correo o handle («leon.blancarte+prueba») se corta en @ . + y se capitaliza.
+function shortFirstName(name) {
+  const raw = (name || "").trim().split(/\s+/)[0] || "";
+  const cut = raw.split(/[@+.]/)[0];
+  return cut && cut !== raw ? cut[0].toUpperCase() + cut.slice(1) : cut;
+}
+// Nombre de autor en el feed: solo se recorta si parece correo o handle (contiene @ o +);
+// los nombres reales («María José López») se dejan tal cual.
+function displayAuthorName(name) {
+  const n = (name || "").trim();
+  return /[@+]/.test(n) ? (shortFirstName(n) || n) : n;
+}
+
 function PostDraftModal({ pendingPost, user, onPublish, onSkip }) {
   const [content, setContent] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState("");
 
   const book = pendingPost.book;
-  const actionLabel = pendingPost.action === "started" ? "empezaste a leer" : "terminaste";
+  const actionLabel = pendingPost.action === "started" ? "empezó a leer" : "terminó";
 
   async function handlePublish() {
     setPublishing(true);
@@ -7057,16 +7072,18 @@ function PostDraftModal({ pendingPost, user, onPublish, onSkip }) {
           </span>
         </p>
         <p style={{ ...body, color: palette.inkSoft, fontSize: "0.9rem", marginBottom: "1rem", lineHeight: 1.5 }}>
-          {user.name.split(" ")[0]} {actionLabel}{" "}
+          {shortFirstName(user.name) || "Alguien"} {actionLabel}{" "}
           <em style={{ color: palette.ink }}>{book?.title || "un libro"}</em>
           {pendingPost.action === "finished" && book?.rating > 0 && (
-            <span style={{ color: palette.amber }}>{" · "}{"★".repeat(book.rating)}</span>
+            <span role="img" aria-label={`${book.rating} de 5 estrellas`} style={{ display: "inline-flex", gap: 2, marginLeft: 6, verticalAlign: "-2px" }}>
+              {[1, 2, 3, 4, 5].map(n => <Star key={n} size={14} strokeWidth={1.8} color={palette.ink} fill={n <= book.rating ? palette.ink : "transparent"} aria-hidden />)}
+            </span>
           )}
         </p>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Añade un comentario… (opcional)"
+          placeholder="Un comentario, si se antoja."
           rows={3}
           style={{ ...body, width: "100%", padding: "0.65rem 0.9rem", borderRadius: "8px", border: `1px solid ${palette.border}`, backgroundColor: palette.bg, color: palette.ink, fontSize: "0.95rem", resize: "none", marginBottom: "0.75rem", boxSizing: "border-box", outline: "none" }}
         />
@@ -7506,8 +7523,8 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           {goalReached
             ? `${pagesLoggedToday} ${pagesWord} hoy · meta del día cumplida`
             : pagesLoggedToday > 0
-              ? `${pagesLoggedToday} de ${DAILY_GOAL} páginas de la meta de hoy`
-              : `Meta de hoy: ${DAILY_GOAL} páginas. Con una basta.`}
+              ? `${pagesLoggedToday} de ${DAILY_GOAL} páginas hoy`
+              : `Una página ya cuenta. La meta del día es ${DAILY_GOAL}.`}
         </p>
         <div role="progressbar" aria-label="Meta de páginas de hoy" aria-valuemin={0} aria-valuemax={DAILY_GOAL} aria-valuenow={Math.min(pagesLoggedToday, DAILY_GOAL)} style={{ height: 10, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.onFirma}`, overflow: "hidden" }}>
           {pct > 0 && <div style={{ height: "100%", width: `${pct}%`, backgroundColor: goalReached ? palette.success : palette.accent, borderRight: goalReached ? "none" : `1.5px solid ${palette.onFirma}`, boxSizing: "border-box", transition: "width 600ms ease-out" }} />}
@@ -8236,7 +8253,7 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
             onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
             className="sema-focus-oncolor"
             aria-expanded={expanded}
-            style={{ ...body, background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: palette.onColor, textDecoration: "underline", textUnderlineOffset: 3, minHeight: 44, padding: 0, marginBottom: "0.5rem", display: "block" }}
+            style={{ ...body, background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: palette.onColor, textDecoration: "underline", textUnderlineOffset: 3, minHeight: 44, padding: "0 6px", marginLeft: -6, marginBottom: "0.5rem", display: "block" }}
           >
             {expanded ? "Leer menos" : "Leer más"}
           </button>
@@ -9037,7 +9054,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   );
   const postHeader = (post, verb) => {
     const other = post.user_id !== user.id;
-    const name = post.author?.nombre || 'Usuario';
+    const name = displayAuthorName(post.author?.nombre) || 'Usuario';
     return (
       <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", padding: "12px 8px 0 12px" }}>
         {other ? (
@@ -9121,7 +9138,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                         <span style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.onFirma, letterSpacing: "-0.01em" }}>{achDef ? achDef.name : "Logro"}</span>
                       </div>
                     </div>
-                    <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginTop: "0.75rem" }}>{achDef ? achDef.desc : post.content}</p>
+                    {/* Sin achDef.desc: viene de achievementsService en 2.ª persona. Solo el nombre del logro. */}
+                    {!achDef && post.content && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginTop: "0.75rem" }}>{post.content}</p>}
                   </div>
                   {postFooter(post)}
                 </div>
@@ -9334,7 +9352,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
                     ) : (
-                      <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: 17, fontWeight: 700 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), boxShadow: isDarkFeed ? `0 0 0 1.5px ${palette.inkSoft}` : "none", color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: 17, fontWeight: 700 }}>
                         {(friend.nombre || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                     )}
