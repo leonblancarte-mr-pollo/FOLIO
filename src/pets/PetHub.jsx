@@ -46,7 +46,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
 
       {/* Barra superior */}
       <div style={{ position: "relative", zIndex: 3, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top) + 0.85rem) 1rem 0.5rem" }}>
-        <button onClick={onGoToProfile} className="btn-press" style={{ ...topBtn, width: "auto", borderRadius: 999, padding: "0 0.95rem", gap: "0.4rem", fontFamily: "Fraunces, serif", fontWeight: 600, fontSize: "0.85rem" }}>
+        <button onClick={onGoToProfile} className="btn-press" style={{ ...topBtn, width: "auto", borderRadius: 999, padding: "0 0.95rem", gap: "0.4rem", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, fontSize: "0.85rem" }}>
           <User size={16} /> Mi perfil
         </button>
         <button onClick={onClose} aria-label="Cerrar" className="btn-press" style={topBtn}>
@@ -66,7 +66,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
                 value={nameDraft} autoFocus maxLength={40}
                 onChange={(e) => setNameDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
-                style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 12, border: "none", backgroundColor: "rgba(255,255,255,0.94)", color: BRAND.ink, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.2rem", textAlign: "center", outline: "none", minWidth: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
+                style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 12, border: "none", backgroundColor: "rgba(255,255,255,0.94)", color: BRAND.ink, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", textAlign: "center", outline: "none", minWidth: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
               />
               <button onClick={saveName} disabled={savingName} className="btn-press" style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 12, border: "none", background: BRAND.wine, color: palette.onAccent, cursor: "pointer", ...display, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}>
                 {savingName ? "…" : "OK"}
@@ -74,7 +74,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
             </div>
           ) : (
             <button onClick={() => setEditing(true)} style={{ background: "none", border: "none", padding: "0.2rem 0.5rem", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.55rem" }}>
-              <span style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: "2.1rem", color: onSceneText, textShadow, lineHeight: 1.05 }}>{pet.pet_name || "Mi compañero"}</span>
+              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800, fontSize: "2.1rem", color: onSceneText, textShadow, lineHeight: 1.05 }}>{pet.pet_name || "Mi compañero"}</span>
               <Pencil size={19} color={onSceneText} style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", opacity: 0.9 }} />
             </button>
           )}
@@ -82,7 +82,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
 
         {flash && <span style={{ marginTop: "0.3rem", ...body, fontSize: "0.85rem", color: onSceneText, textShadow }}>{flash}</span>}
 
-        <p style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.25rem", color: onSceneText, textShadow, marginTop: "0.45rem" }}>Nivel {pet.level}</p>
+        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.25rem", color: onSceneText, textShadow, marginTop: "0.45rem" }}>Nivel {pet.level}</p>
 
         {/* Barra XP grande */}
         <div style={{ width: "100%", maxWidth: 360, marginTop: "1.35rem" }}>
@@ -108,10 +108,10 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
 
         {/* Acciones */}
         <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.5rem", width: "100%", maxWidth: 360, paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
-          <button onClick={onGoToProfile} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.92)", color: BRAND.wine, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
+          <button onClick={onGoToProfile} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.92)", color: BRAND.wine, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
             Mi perfil
           </button>
-          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: palette.onAccent, fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
+          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
             Ver galería
           </button>
         </div>

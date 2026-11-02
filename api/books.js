@@ -10,15 +10,25 @@ export default async function handler(req, res) {
     const esRes = await fetch(esUrl);
     const esData = await esRes.json();
     let items = esData.items || [];
+    // Google responde errores (cuota 429, clave inválida 400/403) como JSON con
+    // `error` y sin `items`: antes se devolvía 200 con [] y la app decía
+    // "Sin resultados" sin avisar.
+    let gbError = esRes.ok ? null : { status: esRes.status, message: esData.error?.message || 'Google Books error' };
 
     if (items.length < 3) {
       const allUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12${keyParam}`;
       const allRes = await fetch(allUrl);
       const allData = await allRes.json();
+      if (!allRes.ok) gbError = { status: allRes.status, message: allData.error?.message || 'Google Books error' };
       const existingIds = new Set(items.map(i => i.id));
       for (const item of allData.items || []) {
         if (!existingIds.has(item.id)) items.push(item);
       }
+    }
+
+    if (gbError && items.length === 0) {
+      console.error('Google Books API error:', gbError.status, gbError.message, apiKey ? '(con API key)' : '(sin API key)');
+      return res.status(gbError.status === 429 ? 429 : 502).json({ error: gbError.message, gbStatus: gbError.status });
     }
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');

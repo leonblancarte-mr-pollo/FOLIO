@@ -33,7 +33,7 @@ function EmptyState({ icon: Icon, title, description, action, compact = false, s
           <Icon size={compact ? 20 : 26} color={palette.inkSoft} strokeWidth={1.5} />
         </div>
       )}
-      <p style={{ ...display, fontStyle: "italic", fontWeight: 600, fontSize: compact ? "1.02rem" : "1.2rem", color: palette.ink, margin: 0, lineHeight: 1.25 }}>
+      <p style={{ ...display, fontWeight: 600, fontSize: compact ? "1.02rem" : "1.2rem", color: palette.ink, margin: 0, lineHeight: 1.25 }}>
         {title}
       </p>
       {description && (

@@ -27,7 +27,11 @@ function mapGBItem(item) {
 
 async function gbFetch(url) {
   const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!r.ok) throw new Error('GB API error');
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}));
+    console.error('[books] /api/books falló:', r.status, body.gbStatus ?? '', body.error ?? '');
+    throw new Error(r.status === 429 ? 'Google Books alcanzó su límite de búsquedas. Intenta en unos minutos.' : 'GB API error');
+  }
   return r.json();
 }
 

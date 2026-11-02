@@ -82,11 +82,26 @@ async function fetchFeed(userId) {
   const bookIds = [...new Set(posts.filter((p) => p.book_id).map((p) => p.book_id))];
   let bookMap = {};
   if (bookIds.length > 0) {
-    const { data: bks } = await supabase
+    let { data: bks, error: booksError } = await supabase
       .from("books")
       .select("id, title, author, cover_url, rating, review, status")
       .in("id", bookIds);
+    if (booksError) {
+      // Antes este error se ignoraba y TODOS los posts quedaban sin libro.
+      // Reintento con lo mínimo para la tarjeta (portada, título, autor).
+      console.error("[fetchFeed] Error al leer books del feed:", booksError?.code, booksError?.message, booksError?.details, booksError?.hint);
+      ({ data: bks, error: booksError } = await supabase
+        .from("books")
+        .select("id, title, author, cover_url")
+        .in("id", bookIds));
+      if (booksError) console.error("[fetchFeed] Reintento de books también falló:", booksError?.code, booksError?.message);
+    }
     (bks || []).forEach((b) => { bookMap[b.id] = b; });
+    const missing = bookIds.filter((id) => !bookMap[id]);
+    if (missing.length > 0) {
+      // Sin error pero sin fila: libro borrado o bloqueado por RLS (books_select_scoped).
+      console.warn(`[fetchFeed] ${missing.length} post(s) con book_id cuyo libro no llegó (borrado o RLS):`, missing);
+    }
   }
 
   const authorIds = [...new Set(posts.map((p) => p.user_id))];
@@ -188,6 +203,11 @@ async function compressAndUploadPostImage(file, userId) {
 }
 
 async function createFeedPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead }) {
+  // Un post de libro sin libro no sirve: no se crea (ni se encola offline).
+  if ((type === "book_update" || type === "reading_session") && !bookId) {
+    console.error(`[createFeedPost] post "${type}" sin bookId: no se crea`);
+    return;
+  }
   if (!navigator.onLine) {
     addPendingPost({ userId, type, bookId, action, content, imageUrl, pagesRead, minutesRead });
     return;

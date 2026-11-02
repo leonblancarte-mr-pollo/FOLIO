@@ -15,3 +15,6 @@ topleche_dashboard.html
 crop_avatars.py
 .claude/
 .agents/
+
+# Capturas locales del lote UI (Playwright)
+capturas_lote_ui/

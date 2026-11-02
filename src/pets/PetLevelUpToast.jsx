@@ -19,7 +19,7 @@ function PetLevelUpToast({ petName, level, petType, id, onDismiss }) {
         boxShadow: "0 8px 28px rgba(122,46,46,0.5), 0 2px 6px rgba(0,0,0,0.2)", whiteSpace: "nowrap",
       }}>
         <img src={petImageSrc(petType)} alt="" style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }} />
-        <span style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: "1.02rem", color: palette.onAccent, lineHeight: 1.1, letterSpacing: "-0.01em" }}>
+        <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.02rem", color: palette.onAccent, lineHeight: 1.1, letterSpacing: "-0.01em" }}>
           ¡{petName || "Tu compañero"} subió a nivel {level}! 🎉
         </span>
       </div>

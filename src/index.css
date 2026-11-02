@@ -203,16 +203,13 @@
 
 /* BookCard — hover + press en CSS, sin JS */
 .book-list-card {
-  transition: box-shadow 200ms ease, transform 150ms ease;
+  transition: opacity 150ms ease, transform 150ms ease;
 }
 .book-list-card:active {
   transform: scale(0.98);
 }
 @media (hover: hover) and (pointer: fine) {
-  .book-list-card:hover {
-    box-shadow: 0 4px 16px rgba(122, 46, 46, 0.12);
-    transform: translateY(-2px);
-  }
+  .book-list-card:hover { opacity: 0.85; }
 }
 
 /* Tab transitions — fade-up al cambiar de sección */
