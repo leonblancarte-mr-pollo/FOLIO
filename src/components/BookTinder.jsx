@@ -245,7 +245,7 @@ function LoadingSkeleton() {
       <div style={{ height: 5, borderRadius: 5, backgroundColor: palette.bgSoft, marginBottom: "1.1rem", animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
       <div style={{
         position: "relative", borderRadius: 22, overflow: "hidden",
-        height: "clamp(420px, 64vh, 620px)",
+        height: CARD_HEIGHT,
         backgroundColor: palette.bgSoft,
       }}>
         <div style={{
@@ -270,6 +270,12 @@ function LoadingSkeleton() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 // demoBooks: catálogo inyectado para pruebas/demos sin auth ni Supabase
+// Alto de la tarjeta: la pantalla menos lo que ocupa todo lo demás (encabezado,
+// pestañas, contador, botones, "N de M" y barra inferior ≈ 390 px). Antes era
+// 64vh y en un celular de 844 px los botones X / corazón quedaban detrás de la
+// barra inferior.
+const CARD_HEIGHT = "clamp(340px, calc(100dvh - 390px), 620px)";
+
 export default function BookTinder({ user, onAdd, demoBooks = null }) {
   const [books, setBooks]               = useState([]);
   const [index, setIndex]               = useState(0);
@@ -637,7 +643,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         </div>
 
         {/* ── Stack de cards ── */}
-        <div style={{ position: "relative", height: "clamp(420px, 64vh, 620px)" }}>
+        <div style={{ position: "relative", height: CARD_HEIGHT }}>
 
           {/* Card siguiente (detrás) */}
           {nextBook && (

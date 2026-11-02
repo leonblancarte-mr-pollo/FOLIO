@@ -70,7 +70,10 @@ function Shimmer() {
 function Fallback({ title, author, genres, compact }) {
   const { gradient, emoji, accent } = getGenreStyle(genres);
   return (
-    <div style={{ position: "absolute", inset: 0, background: gradient, overflow: "hidden" }}>
+    // containerType: el texto se mide contra el ancho de LA PORTADA (cqw), no de la
+    // pantalla (vw). Antes, en tarjetas de 130 px (Explorar › Recomendado para ti)
+    // el título partía palabras ("Fundaci/ón") y el autor quedaba cortado abajo.
+    <div style={{ position: "absolute", inset: 0, background: gradient, overflow: "hidden", containerType: "inline-size" }}>
       {/* Detalle geométrico: doble marco editorial */}
       {!compact && (
         <>
@@ -116,21 +119,22 @@ function Fallback({ title, author, genres, compact }) {
       {!compact && (
         <div style={{
           position: "absolute", left: 0, right: 0, top: "44%",
-          padding: "0 2rem", textAlign: "center",
+          padding: "0 9cqw", textAlign: "center",
         }}>
           <div style={{ width: 36, height: 1, backgroundColor: accent, opacity: 0.7, margin: "0 auto 0.9rem" }} />
           <h3 style={{
-            ...serif, fontSize: "clamp(1.05rem, 4vw, 1.45rem)", fontWeight: 700,
+            ...serif, fontSize: "clamp(0.8rem, 4.6cqw, 1.45rem)", fontWeight: 700,
             color: "#FDFAF3", lineHeight: 1.22, margin: 0,
             textShadow: "0 2px 12px rgba(0,0,0,0.45)",
-            overflowWrap: "break-word",
-            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+            overflowWrap: "normal", wordBreak: "normal",
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
           }}>
             {title}
           </h3>
           <p style={{
-            ...body, fontSize: "0.95rem", color: "rgba(255,255,255,0.72)",
+            ...body, fontSize: "clamp(0.68rem, 4.4cqw, 0.95rem)", color: "rgba(255,255,255,0.72)",
             margin: "0.55rem 0 0", letterSpacing: "0.04em",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
           }}>
             {author}
           </p>
