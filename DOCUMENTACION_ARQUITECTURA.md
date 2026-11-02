@@ -1,6 +1,6 @@
 # SEMA — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-10-11 (design system: paleta de 5 colores, Bricolage Grotesque / Figtree / Instrument Serif, ver §III «Sistema visual (2026-10-11)» y `design-system/sema/MASTER.md`; antes, 2026-10-10: textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-11-02 (sistema de agentes de diseño en `.claude/`: skills `sema-*`, 6 agentes y comandos `/paleta`, `/revisa`, `/redisena`; ver §III «Sistema de agentes de diseño». Antes, 2026-10-11: design system: paleta de 5 colores, Bricolage Grotesque / Figtree / Instrument Serif, ver §III «Sistema visual (2026-10-11)» y `design-system/sema/MASTER.md`; antes, 2026-10-10: textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce SEMA y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -34,6 +34,9 @@
 - 2026-11-01 — Cierre del bug de posts sin libro: León confirmó en el feed que los posts vinculados muestran su libro («Hooked», «El túnel», «Terapia para Llevar» y un post nuevo de hoy con «¿Por qué hacemos lo que hacemos?»). Quedan 8 publicaciones viejas sin libro por no tener un candidato seguro: NO se emparejan y se muestran sin recuadro (solo acción, comentario y páginas). No se encontró un paso de la app que perdiera el libro en la lectura
 
 - 2026-11-01 — Lote UI (rama `lote-ui-2026-11-01`, commits `fd57771` → `3e25ae8`): **racha** con una sola lectura normalizada (`streakService.fetchStreakRow` / `normalizeStreak`: mejor ≥ actual) para Home, Social, Perfil, RachaModal y celebración (Home pedía solo `current_streak` y mostraba «Tu mejor: 0»); calendario de Perfil y Wrapped cuentan por `reading_logs.log_date` (antes `logged_at`, que puede ser NULL). **Seguir leyendo**: `booksService.fillMissingPageCount` completa `total_pages` desde Google Books (ISBN o título+apellido) al guardar y al mostrar; BookTinder manda `pageCount`; sin total se lee «N páginas leídas · total desconocido». **Banner de racha**: el copo comparte fila con «+ Páginas». **Espacio inferior** `.main-fab-clearance` (156 px + safe area) en `<main>`. **Likes**: `notifyLike` crea la notificación solo si el like se guardó y una vez por sesión; la hoja de notificaciones muestra a qué publicación/comentario fue (`attachNotifTargets`); limpieza e índice único en `supabase/lote_ui_2026-11-01.sql` (sin ejecutar). **Géneros**: `genreService.normalizeGenre` (Google Books → español, unificado) en guardado y lectura. **Carruseles**: `.scrollbar-hide` definido en `index.css` (el plugin de Tailwind nunca se instaló) y aplicado a todos. **Leyendo ahora**: nombre de pila completo. **Navegación**: Trueque fuera de `NAV_ITEMS` (decisión 16 oct; código intacto), Social sin campana propia, PetHub con un solo «Mi perfil». **Recomendaciones** (`api/recommendations.js`): géneros del usuario (`preferred_genres` + top de su biblioteca) primero y sin libros propios, en ruta personalizada y respaldo; `GENRE_MAP`/`expandGenres` pasan a `src/data/genreMap.js`. Revisión visual: `BookCoverImage` mide el texto contra la portada (`cqw`) y la tarjeta de BookTinder usa `calc(100dvh - 390px)`
+
+- 2026-11-02 — `.gitignore`: se quita la regla que ignoraba `.claude/` (ahora entra a git); quedan ignorados `.claude/settings.local.json` y una regla por cada una de las 60 carpetas de skills de terceros de `.claude/skills/` (las que no empiezan con `sema-`, que sí entran); se agrega `capturas/`. `.env.local` sigue ignorado (`.env.local` y `.env.*.local`). Sin cambios de código de la app. Ver §XII #21
+- 2026-11-02 — Sistema de agentes de diseño (sin tocar código de la app): 5 skills (`.claude/skills/sema-identidad`, `sema-paleta`, `sema-voz`, `sema-capturas` con la plantilla `captura.js`, `sema-prompts`), 6 agentes (`.claude/agents/`: `disenador`, `critico`, `lectora`, `accesibilidad`, `copy`, `qa`) y 3 comandos (`.claude/commands/`: `/paleta`, `/revisa`, `/redisena`) para rediseñar SEMA una pantalla a la vez con la paleta nueva (blanco/negro puro, tinta `#483A58`, acción `#F45B69`, firma lila `#BBADFF`). Ver §III «Sistema de agentes de diseño». ⚠️ `.claude/` está en `.gitignore`: estos archivos viven solo en el disco local
 
 ---
 
@@ -93,6 +96,10 @@ FOLIO FINAL/
 ├── public/                   # Iconos PWA, `logo.png`, `gema.png`, `avatars/avatar-1..10.png`, `pets/` (cat.png, cat-blink.png,
 │                             # cat-video.mp4), `sw-notifications.js` (notificaciones programadas, importado por el SW de Workbox)
 ├── design-system/sema/MASTER.md  # Design system de SEMA: paleta, tipografía, espacio y los 8 principios (2026-10-11)
+├── .claude/                  # Config de Claude Code para el proyecto. Versionada desde 2026-11-02 (solo `settings.local.json` queda ignorado). Sistema de agentes de diseño:
+│   ├── skills/sema-*/SKILL.md  # sema-identidad, sema-paleta, sema-voz, sema-capturas (+ captura.js), sema-prompts
+│   ├── agents/*.md             # disenador, critico, lectora, accesibilidad, copy, qa
+│   └── commands/*.md           # /paleta, /revisa, /redisena
 ├── supabase/                 # Migraciones SQL (correr a mano en el SQL Editor, EN ESTE ORDEN)
 │   ├── auth_rls_migration.sql            # 1. RLS de TODAS las tablas core (+ policies de Storage)
 │   ├── features_migration.sql            # 2. user_lists + delete_my_account()
@@ -207,6 +214,59 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 - **dev**: `vite` 5, `@vitejs/plugin-react`, `vite-plugin-pwa`, `tailwindcss` 3 + `postcss` + `autoprefixer`, `@resvg/resvg-js` (`generate-icons.mjs`), `pg` (sin uso detectado en el repo).
 - **Python** (`requirements.txt`, solo el job de GitHub Actions): `supabase`, `pandas`, `numpy`, `scipy`, `scikit-surprise`, `fuzzywuzzy`, `python-Levenshtein`.
 - No hay dependencia de email transaccional (Resend/SMTP/etc.): el código no envía emails propios, solo los de Supabase Auth.
+
+### Sistema de agentes de diseño (2026-11-02)
+
+Sistema de skills, agentes y comandos de Claude Code para rediseñar SEMA **una pantalla a la vez**.
+- **Reglas comunes:** todos los agentes leen las mismas skills antes de actuar, así nadie inventa colores, tono ni reglas.
+- **Proceso:** nada se fusiona a `main` sin aprobación de León con captura, y ningún comando despliega.
+- **Dónde viven:** `.claude/`, la carpeta que Claude Code lee para el proyecto. Desde el 2026-11-02 `.claude/` entra a git: se quitó la regla que la ignoraba, y las 60 carpetas de skills de terceros se ignoran una por una en `.gitignore` (quedan en disco). Ignorados: `.claude/settings.local.json` y esas 60 carpetas. Ver §XII #21.
+
+**Skills** (`.claude/skills/<nombre>/SKILL.md`):
+
+| Skill | Qué contiene |
+|---|---|
+| `sema-identidad` | Base neutra: blanco `#FFFFFF`; modo oscuro en negro puro `#000000`. Los colores vivos solo como acento. Interfaz limpia, con la actitud en los detalles y los momentos. Referencias (zine, stickers, boletos, Soko). Aprobado: borde rasgado lila de la barra inferior, stickers y boletos, gato pequeño en Inicio, papel arrugado sutil en CSS/SVG. Rechazado: pasteles, degradados, app de bienestar, look de IA, biblioteca seria. Tipografía, sin textos de 8–11 px. Los 8 principios de `MASTER.md` copiados tal cual, con la equivalencia vino → acción principal y salvia → éxito. Regla de una pantalla a la vez |
+| `sema-paleta` | Valores exactos en claro y oscuro: tinta `#483A58`, secundario `#5E5768`, acción `#F45B69`, firma `#BBADFF`, acento cálido `#F79F79`, superficie suave `#E7D7C1` (`#483A58` en oscuro), complemento frío `#456990`, éxito (`success` actual) y error `#B03A2E` (`#E5675B` en oscuro). Reglas y tabla de contrastes medidos. Tabla «token → claro → oscuro → uso» para `theme.js`: conserva todos los tokens y agrega `firma`, `onFirma`, `acentoCalido`, `superficieSuave` y `complementoFrio` |
+| `sema-voz` | Compa de 23 años, regla cero culpa. Mascotas con personalidad: gato existencialista, cuervo de terror cósmico, zorro detective, mapache de novela y fantasía. Formato corto. 10 textos buenos y 5 malos de referencia |
+| `sema-capturas` | Rutina única: `npm run dev`, login con `SEMA_TEST_EMAIL`/`SEMA_TEST_PASSWORD` (`.env.local`), Playwright a 390×844 en claro y oscuro, archivos en `capturas/<pantalla>/<fecha>-<antes\|despues>-<claro\|oscuro>.png`. Plantilla `captura.js`, que se copia a `scripts/captura.js` en el primer uso. Uso: `node scripts/captura.js home antes [claro\|oscuro\|ambos] [--full]` |
+| `sema-prompts` | Reglas de todo trabajo de código: actualizar `.md` y `.docx` al terminar; alcance chico; lista NO TOCAR (`folio_*`, dominio de Vercel, `authService`); sin fusionar, desplegar, ejecutar SQL ni instalar dependencias sin aprobación; reporte en tres partes |
+
+**Agentes** (`.claude/agents/<nombre>.md`). Todos leen primero `sema-identidad`, `sema-paleta`, `sema-voz` y `sema-prompts`:
+
+| Agente | Escribe código | Qué hace y entrega |
+|---|---|---|
+| `disenador` | Sí, solo la pantalla pedida (y `theme.js` si falta un token de sema-paleta, o dentro de `/paleta`) | Captura el antes, implementa y captura el después en claro y oscuro. Entrega cambios con archivo:línea, decisiones propias pendientes de León y el build. Al final de `/redisena` actualiza la documentación |
+| `critico` | No | Tres listas con archivo:línea: qué rompe los 8 principios, qué se ve «hecho con IA» o de app de bienestar, qué no se vería bien en una historia de Instagram |
+| `lectora` | No | Usuaria de 22 años, en primera persona: ¿abriría la app?, ¿qué no entiende?, ¿dónde se iría?, ¿qué compartiría? |
+| `accesibilidad` | No | Tabla de elementos con archivo:línea, contraste medido, si pasa y qué cambiar. Revisa contraste, texto de 12 px o más y áreas de toque de al menos 44 px |
+| `copy` | No (propone) | Tabla «texto actual → texto propuesto → razón» según sema-voz |
+| `qa` | No | Build, avisos nuevos de ESLint (o el comando para instalarlo), capturas de regresión de Explorar, Perfil y Social, y lista de lo roto |
+
+**Comandos** (`.claude/commands/`) y orden de uso:
+1. **`/paleta`** (sin argumentos, primero):
+   - En la rama `paleta-<fecha>`, aplica sema-paleta en `PALETTE_LIGHT`/`PALETTE_DARK` de `theme.js`. No cambia `BRAND`, los datos de arte ni los componentes; solo lista los usos de `accent` como texto que ya no pasan contraste.
+   - `qa` verifica y se capturan Inicio, Explorar y Perfil en claro y oscuro, antes y después.
+   - No fusiona.
+2. **`/revisa <pantalla>`** (opcional): diagnóstico sin cambiar código. Captura la pantalla y la revisan `critico`, `lectora`, `accesibilidad` y `copy` en paralelo.
+3. **`/redisena <pantalla>`**, empezando por `/redisena home`, en la rama `redisena-<pantalla>-<fecha>`:
+   1. `disenador` captura el antes, propone e implementa.
+   2. Los 4 revisores revisan en paralelo.
+   3. `disenador` corrige.
+   4. Segunda revisión de los 4.
+   5. `qa` verifica.
+   6. `disenador` actualiza esta documentación.
+   7. El agente principal entrega a León las capturas antes y después, los cambios, lo que dijo cada revisor y lo que quedó sin resolver.
+
+   Máximo dos rondas, sin fusionar ni desplegar.
+
+Pantallas que entiende el script de capturas: `home`, `explorar`, `social`, `perfil`, `mascota`.
+
+**Requisitos para correrlos** (al 2026-11-02 no se cumple ninguno):
+- Playwright en `devDependencies`: `npm install -D playwright` y `npx playwright install chromium`.
+- `SEMA_TEST_EMAIL` y `SEMA_TEST_PASSWORD` en `.env.local`, de un usuario de prueba con racha, libro en «Leyendo», mascota y onboarding terminado.
+- `capturas/` agregado a `.gitignore` (2026-11-02).
+- ESLint es opcional: `qa` reporta si no está.
 
 ---
 
@@ -819,6 +879,12 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **ESLint** no está instalado ni configurado: no hay conteo de avisos que comparar.
     - **Registro sin «Fantasía»:** `ONBOARDING_GENRES` no la ofrece; las recomendaciones la toman de la biblioteca del usuario.
     - **`fillMissingPageCount`** solo acepta coincidencia de título y apellido; libros sin coincidencia en Google Books se quedan con «total desconocido».
+
+21. **Sistema de agentes de diseño — pendientes (2026-11-02):**
+    - **`.claude/` entra a git (2026-11-02):** la regla `.claude/` se quitó de `.gitignore`. Las 60 carpetas de skills de terceros que ya estaban en disco (herramientas de seguridad `sast-*`, `dast-*`, `webapp-*`, `pentest-*`, etc., más `supabase-audit-*`, `supabase-extract-*`, `ui-ux-pro-max`, `skill-name`, entre otras) se ignoran una por una, sin moverlas ni borrarlas, así que siguen funcionando en la computadora de León. Quedan sin ignorar y visibles para git: los 5 skills `sema-*`, los 6 agentes, los 3 comandos y `.claude/settings.json`. Esto revierte la decisión del 2026-09-19, que sacó `.claude/` del repo por higiene. **Pendiente de León:** revisar `.claude/settings.json` antes del commit, y decidir si las carpetas de terceros deben quedar fuera del repo para siempre o solo mientras se decide.
+    - **Faltan requisitos para correr los comandos:** `playwright` ya está en `devDependencies` y en `node_modules` (lo agregó León fuera de esta tarea; aparece en `package.json` y `package-lock.json` sin commit). Falta `SEMA_TEST_EMAIL`/`SEMA_TEST_PASSWORD` en `.env.local`, y no se verificó que el navegador Chromium esté descargado (`npx playwright install chromium`). (`capturas/` ya está en `.gitignore` desde el 2026-11-02.)
+    - **Contraste de la acción principal:** blanco sobre `#F45B69` da 3.21:1, solo apto para texto grande. `sema-paleta` fija el mínimo en **19 px en negritas** (León pidió 18; WCAG cuenta negritas como texto grande desde 18.66 px). `#F45B69` no sirve como color de texto normal sobre blanco, así que los links pasan a `complementoFrio`.
+    - **`MASTER.md` sigue describiendo la paleta anterior** (crema, vino, ámbar, salvia). `sema-paleta` manda; `MASTER.md` se actualiza cuando `/paleta` se apruebe.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 
