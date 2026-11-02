@@ -724,6 +724,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
             key={t.id}
             data-tutorial={`nav-${t.id}`}
             aria-label={isCenter ? "Mascota" : undefined}
+            aria-current={active && !isCenter ? "page" : undefined}
             onClick={() => { haptic(HAPTIC.NAV); if (isCenter && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 sema-nav-item${isCenter ? " nav-add-btn" : ""}`}
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
@@ -747,6 +748,8 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
                 padding: "6px 12px",
                 borderRadius: "999px",
                 backgroundColor: active ? palette.accent : "transparent",
+                // En claro el durazno contra la barra beige da 1.46: contorno de tinta para que la píldora se lea.
+                boxShadow: active && palette.bg !== PALETTE_DARK.bg ? `inset 0 0 0 1.5px ${palette.ink}` : "none",
                 transition: "background-color 200ms ease",
               }}>
                 <span style={{ position: "relative", display: "inline-flex" }}>
@@ -7040,7 +7043,7 @@ function PostDraftModal({ pendingPost, user, onPublish, onSkip }) {
     setPublishing(true);
     setPublishError("");
     try { await onPublish(content.trim() || null); }
-    catch (err) { setPublishError(err?.message || "Error al publicar. Revisa la consola."); }
+    catch (err) { console.error("[PostDraftModal] no se publicó:", err); setPublishError("No se publicó. El texto sigue aquí para otro intento."); }
     finally { setPublishing(false); }
   }
 
@@ -7068,13 +7071,13 @@ function PostDraftModal({ pendingPost, user, onPublish, onSkip }) {
           style={{ ...body, width: "100%", padding: "0.65rem 0.9rem", borderRadius: "8px", border: `1px solid ${palette.border}`, backgroundColor: palette.bg, color: palette.ink, fontSize: "0.95rem", resize: "none", marginBottom: "0.75rem", boxSizing: "border-box", outline: "none" }}
         />
         {publishError && (
-          <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginBottom: "0.75rem" }}>⚠️ {publishError}</p>
+          <p role="alert" style={{ ...body, fontSize: "14px", color: palette.danger, marginBottom: "0.75rem", display: "flex", alignItems: "center", gap: 6 }}><AlertCircle size={16} aria-hidden /> {publishError}</p>
         )}
         <div style={{ display: "flex", gap: "0.6rem", justifyContent: "flex-end" }}>
           <button onClick={onSkip} style={{ ...display, fontSize: "0.88rem", color: palette.inkSoft, backgroundColor: "transparent", border: `1px solid ${palette.border}`, padding: "0.5rem 1rem", borderRadius: "999px", cursor: "pointer" }}>
             No publicar
           </button>
-          <button onClick={handlePublish} disabled={publishing} style={{ ...display, fontSize: "0.88rem", fontWeight: 600, color: palette.bg, backgroundColor: palette.accent, border: "none", padding: "0.5rem 1.25rem", borderRadius: "999px", cursor: publishing ? "default" : "pointer", opacity: publishing ? 0.7 : 1 }}>
+          <button onClick={handlePublish} disabled={publishing} style={{ ...display, minHeight: 44, fontSize: "15px", fontWeight: 700, color: palette.onAccent, backgroundColor: palette.accent, border: "none", padding: "0.5rem 1.25rem", borderRadius: "999px", cursor: publishing ? "default" : "pointer", opacity: publishing ? 0.7 : 1 }}>
             {publishing ? "Publicando…" : "Publicar"}
           </button>
         </div>
@@ -7415,7 +7418,7 @@ function BookPreviewModal({ post, onClose, onAdd }) {
   );
 }
 
-function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, onFreeze }) {
+function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, onFreeze, ready = true }) {
   const [showFreezeModal, setShowFreezeModal] = useState(false);
   const days = streak?.current_streak || 0;
   const hasStreak = days > 0;
@@ -7427,15 +7430,19 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   const pct = pagesLoggedToday > 0 ? Math.min(100, Math.round((pagesLoggedToday / DAILY_GOAL) * 100)) : 0;
   const goalReached = pagesLoggedToday >= DAILY_GOAL;
 
-  // Confeti al alcanzar meta (solo en la transición, nunca al montar). Colores de la paleta SEMA.
-  const prevGoalRef = useRef(goalReached);
+  // Confeti al alcanzar la meta: solo en una transición real DESPUÉS de la carga inicial.
+  // Antes el primer valor era 0 (datos aún sin llegar) y al llegar «99 páginas» se celebraba en
+  // cada visita. Ahora el primer valor ya cargado (`ready`) solo se guarda como punto de partida.
+  const prevGoalRef = useRef(null);
   useEffect(() => {
+    if (!ready) return;
+    if (prevGoalRef.current === null) { prevGoalRef.current = goalReached; return; }
     if (goalReached && !prevGoalRef.current && typeof confetti === "function") {
       confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: [palette.firma, palette.accent, SEMA_GRADIENTS.cereza, palette.superficieSuave] });
       setTimeout(() => confetti({ particleCount: 35, spread: 55, origin: { y: 0.28 }, colors: [palette.firma, palette.accent, SEMA_GRADIENTS.cereza, palette.superficieSuave] }), 650);
     }
     prevGoalRef.current = goalReached;
-  }, [goalReached]);
+  }, [goalReached, ready]);
 
   const dayWord = days === 1 ? "día" : "días";
   const pagesWord = pagesLoggedToday === 1 ? "página" : "páginas";
@@ -7443,6 +7450,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   // Rediseño 2026-11-02: la racha es el mismo sticker lila con papel de Inicio (sema-identidad §2/§5).
   // Antes: degradado ámbar/café con texto blanco (fuera de paleta, 2.2:1) y brillo rojo de «peligro»
   // de noche (presión: rompe la regla cero culpa). Todo el texto va en onFirma (5.21:1 sobre lila).
+  // Ronda 2: más compacto (en Social lo primero es la gente) y la barra dice qué mide.
   return (
     <>
     <div
@@ -7454,23 +7462,18 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
         // Canto de sticker recortado: filo del fondo + línea de tinta (igual que Inicio).
         border: `3px solid ${palette.bg}`,
         boxShadow: `0 0 0 1.5px ${palette.ink}`,
-        margin: "0 2px 2rem",
+        margin: "0 2px 1.5rem",
         cursor: hasLoggedToday ? "default" : "pointer",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "16px 16px 12px 18px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
-          <Flame size={32} color={palette.onFirma} strokeWidth={2} className={days > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
-          <div style={{ minWidth: 0 }}>
-            <p style={{ ...display, fontWeight: 800, fontSize: hasStreak ? "40px" : "20px", lineHeight: 0.95, letterSpacing: hasStreak ? "-0.03em" : "-0.01em", color: palette.onFirma }}>
-              {hasStreak
-                ? <>{days} <span style={{ fontSize: "17px", fontWeight: 700, letterSpacing: 0 }}>{dayWord} de racha</span></>
-                : hasLoggedToday ? "Hoy ya hubo lectura" : "¿Hubo lectura hoy?"}
-            </p>
-            <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.4rem", lineHeight: 1.2 }}>
-              {pagesLoggedToday > 0 ? `${pagesLoggedToday} ${pagesWord} hoy` : "Con una página basta."}
-            </p>
-          </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "12px 12px 8px 14px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
+          <Flame size={26} color={palette.onFirma} strokeWidth={2} className={days > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} aria-hidden />
+          <p style={{ ...display, fontWeight: 800, fontSize: hasStreak ? "30px" : "19px", lineHeight: 1, letterSpacing: hasStreak ? "-0.03em" : "-0.01em", color: palette.onFirma, minWidth: 0 }}>
+            {hasStreak
+              ? <>{days} <span style={{ fontSize: "16px", fontWeight: 700, letterSpacing: 0 }}>{dayWord} de racha</span></>
+              : hasLoggedToday ? "Hoy ya hubo lectura" : "¿Hubo lectura hoy?"}
+          </p>
         </div>
 
         {/* Congelar + páginas en la misma fila. Botones silenciosos: la acción rellena de Social es «Leer ahora». */}
@@ -7480,7 +7483,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
               onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
               aria-label="Congelar racha"
               title="Congelar racha"
-              className="btn-press"
+              className="btn-press sema-focus-onfirma"
               style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, background: "transparent", border: `1.5px solid ${palette.onFirma}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
             >
               <Snowflake size={18} color={palette.onFirma} strokeWidth={2} />
@@ -7488,17 +7491,27 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           )}
           <button
             onClick={(e) => { e.stopPropagation(); onLog(); }}
-            className="btn-press"
+            className="btn-press sema-focus-onfirma"
             style={{ minHeight: 44, background: "transparent", color: palette.onFirma, border: `1.5px solid ${palette.onFirma}`, borderRadius: 999, padding: "0 14px", ...display, fontWeight: 700, fontSize: "15px", flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
           >
-            <Plus size={16} strokeWidth={2.4} /> Páginas
+            <Plus size={16} strokeWidth={2.4} aria-hidden /> Páginas
           </button>
         </div>
       </div>
 
-      {/* Progreso del día siempre visible (principio 4): pista con borde de tinta, relleno de tinta */}
-      <div role="progressbar" aria-label="Páginas de hoy" aria-valuemin={0} aria-valuemax={DAILY_GOAL} aria-valuenow={Math.min(pagesLoggedToday, DAILY_GOAL)} style={{ margin: "0 18px 14px", height: 8, borderRadius: 999, border: `1.5px solid ${palette.onFirma}`, overflow: "hidden" }}>
-        {pct > 0 && <div style={{ height: "100%", width: `${pct}%`, backgroundColor: palette.onFirma, transition: "width 600ms ease-out" }} />}
+      {/* Progreso del día siempre visible (principio 4): durazno con borde de tinta mientras avanza,
+          éxito al llegar a la meta (antes era tinta llena y no se distinguía 5/20 de 99/20). */}
+      <div style={{ padding: "0 14px 12px" }}>
+        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, marginBottom: 6, lineHeight: 1.2 }}>
+          {goalReached
+            ? `${pagesLoggedToday} ${pagesWord} hoy · meta del día cumplida`
+            : pagesLoggedToday > 0
+              ? `${pagesLoggedToday} de ${DAILY_GOAL} páginas de la meta de hoy`
+              : `Meta de hoy: ${DAILY_GOAL} páginas. Con una basta.`}
+        </p>
+        <div role="progressbar" aria-label="Meta de páginas de hoy" aria-valuemin={0} aria-valuemax={DAILY_GOAL} aria-valuenow={Math.min(pagesLoggedToday, DAILY_GOAL)} style={{ height: 10, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.onFirma}`, overflow: "hidden" }}>
+          {pct > 0 && <div style={{ height: "100%", width: `${pct}%`, backgroundColor: goalReached ? palette.success : palette.accent, borderRight: goalReached ? "none" : `1.5px solid ${palette.onFirma}`, boxSizing: "border-box", transition: "width 600ms ease-out" }} />}
+        </div>
       </div>
     </div>
 
@@ -7512,11 +7525,11 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           style={{ backgroundColor: palette.bg, borderRadius: "20px 20px 0 0", padding: "1.5rem 1.25rem 2.5rem", width: "100%", maxWidth: 480 }}
           onClick={(e) => e.stopPropagation()}
         >
-          <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, marginBottom: "0.5rem" }}>
-            ¿Congelar tu racha hoy?
+          <p style={{ ...display, fontSize: "20px", fontWeight: 700, color: palette.ink, marginBottom: "0.5rem" }}>
+            ¿Congelar la racha hoy?
           </p>
           <p style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "1.5rem", lineHeight: 1.55 }}>
-            Tienes 1 congelador este mes. Tu racha de <strong style={{ color: palette.ink }}>{days} {days === 1 ? "día" : "días"}</strong> estará protegida aunque no leas hoy.
+            {freezesRemaining === 1 ? "Queda 1 congelador" : `Quedan ${freezesRemaining} congeladores`} este mes. La racha de <strong style={{ color: palette.ink }}>{days} {days === 1 ? "día" : "días"}</strong> se guarda aunque hoy no haya lectura.
           </p>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button
@@ -7559,10 +7572,10 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
   function motivational(p) {
     const n = parseInt(p) || 0;
     if (n <= 0) return "";
-    if (n <= 10) return "¡Cada página cuenta!";
-    if (n <= 50) return "¡Buen ritmo!";
-    if (n <= 100) return "¡Estás en llamas!";
-    return "¡Eres una máquina lectora!";
+    if (n <= 10) return "Cuentan igual.";
+    if (n <= 50) return "Buen ritmo.";
+    if (n <= 100) return "Eso fue un buen rato.";
+    return "Maratón de lectura. Bien ahí.";
   }
 
   async function handleMoodSelect(mood) {
@@ -7585,7 +7598,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
       onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0 });
     } catch (err) {
       console.error("[reading] Error registrando sesión:", err);
-      setSaveError("No se pudo registrar la sesión. Revisa tu conexión e intenta de nuevo.");
+      setSaveError("No se guardó la sesión. Puede ser el internet; otro intento y listo.");
     } finally {
       setSaving(false);
     }
@@ -8202,7 +8215,7 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
         {/* Cabecera: autor + hora */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.1rem" }}>
           {canOpenAuthor ? (
-            <button onClick={(e) => { e.stopPropagation(); onAuthorClick(post.author); }} aria-label={`Ver perfil de ${post.author?.nombre || "Usuario"}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0, minWidth: 44, minHeight: 44, display: "flex", alignItems: "center" }}>
+            <button onClick={(e) => { e.stopPropagation(); onAuthorClick(post.author); }} aria-label={`Ver perfil de ${post.author?.nombre || "Usuario"}`} className="sema-focus-oncolor" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0, minWidth: 44, minHeight: 44, display: "flex", alignItems: "center" }}>
               <Avatar author={post.author} size={36} />
             </button>
           ) : <Avatar author={post.author} size={36} />}
@@ -8221,6 +8234,8 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
         {isLong && (
           <button
             onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+            className="sema-focus-oncolor"
+            aria-expanded={expanded}
             style={{ ...body, background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: palette.onColor, textDecoration: "underline", textUnderlineOffset: 3, minHeight: 44, padding: 0, marginBottom: "0.5rem", display: "block" }}
           >
             {expanded ? "Leer menos" : "Leer más"}
@@ -8678,6 +8693,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // La racha ya llegó (para que el confeti de meta no se dispare con la carga inicial).
+  const [streakLoaded, setStreakLoaded] = useState(false);
 
   const greetingHour = new Date().getHours();
   const greeting = greetingHour < 13 ? "Buenos días" : greetingHour < 20 ? "Buenas tardes" : "Buenas noches";
@@ -8755,6 +8772,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     setStreak(s);
     setHasLoggedToday(logged);
     setPagesLoggedToday(pages);
+    setStreakLoaded(true);
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yStr = localDateStr(yesterday);
@@ -8854,7 +8872,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     } catch (err) {
       if (thisRun !== runIdRef.current) return;
       console.error('Feed error:', err);
-      setFeedError(err?.message === 'timeout' ? 'La carga tardó demasiado. ¿Tienes buena conexión?' : err?.message || 'No se pudo cargar el feed.');
+      setFeedError(err?.message === 'timeout' ? 'El feed tardó en llegar. Puede ser el internet.' : 'El feed no cargó. Puede ser el internet; otro intento y listo.');
       setFeedState('error');
     }
   }
@@ -8870,7 +8888,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           imageUrl = await compressAndUploadPostImage(postImageFile, user.id);
         } catch (imgErr) {
           console.error("Error subiendo imagen:", imgErr);
-          setPostError("No se pudo subir la imagen. Revisa el bucket 'post-images' en Supabase.");
+          setPostError("La imagen no se subió. El texto sigue aquí para otro intento.");
           setPosting(false);
           return;
         }
@@ -8880,7 +8898,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       await loadFeed();
     } catch (err) {
       console.error("Error creando post:", err);
-      setPostError(err?.message || "Error al publicar. Revisa la consola.");
+      setPostError("No se publicó. El texto sigue aquí para otro intento.");
     }
     finally { setPosting(false); }
   }
@@ -8947,9 +8965,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   async function handleInvite() {
     const username = user.username || user.name || "Alguien";
     const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-    const msg = `${user.name || username} te invita a SEMA. Lleva tu biblioteca, comparte lo que lees y descubre nuevos libros con tus amigos.`;
+    const msg = `${user.name || username} te invita a Sema. Ahí anota lo que lee y comparte frases y lecturas.`;
     try {
-      if (navigator.share) await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
+      if (navigator.share) await navigator.share({ title: "Sema, para leer con amistades", text: msg, url: refUrl });
     } catch (e) { /* user cancelled */ }
   }
 
@@ -8974,7 +8992,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   } else if (s >= 3) {
     motivationalPhrase = `${s} días seguidos. Buen ritmo.`;
   } else if (!loggedYesterday) {
-    motivationalPhrase = "Ayer fue día de descanso. Hoy es buen día para volver.";
+    motivationalPhrase = hasLoggedToday ? "Ayer, descanso. Hoy ya hubo lectura." : "Ayer fue día de descanso. Cualquier día sirve para volver.";
   } else if (recentlyFinished) {
     const daysAgo = Math.round((Date.now() - recentlyFinished.finishedAt) / (24 * 3600 * 1000));
     const daysStr = daysAgo <= 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
@@ -8984,17 +9002,20 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   } else if (wantToReadCount > 20) {
     motivationalPhrase = `${wantToReadCount} libros en espera. Uno a la vez.`;
   } else {
-    motivationalPhrase = "Un buen libro espera. Con una página basta.";
+    motivationalPhrase = "Un buen libro espera. Sin prisa.";
   }
 
   // ── Piezas comunes de las publicaciones (rediseño 2026-11-02) ──
   // Tarjeta base neutra: fondo de la app, borde suave, sin sombras de color. El color de cada
   // tipo vive solo en su franja o zona (sema-identidad §2; mapa en sema-paleta §6).
-  const cardStyle = (post) => ({
+  // Ronda 2: las publicaciones sin color (texto, sesión sin libro) no llevan tarjeta: van sobre el
+  // fondo, separadas con un filete abajo y espacio (principio 2).
+  const cardStyle = (post, neutral = false) => ({
     position: "relative", overflow: "hidden",
     backgroundColor: palette.bg,
-    border: `1px solid ${palette.border}`,
-    borderRadius: 16,
+    border: neutral ? "none" : `1px solid ${palette.border}`,
+    borderBottom: `1px solid ${palette.border}`,
+    borderRadius: neutral ? 0 : 16,
     boxShadow: highlightedPost === post.id ? `0 0 0 2px ${palette.ink}` : "none",
     transition: "box-shadow 200ms ease",
     cursor: "default",
@@ -9006,8 +9027,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     </div>
   );
   // Franja superior del tipo de publicación (texto 14 px en negritas; contraste en la tabla de §6).
-  const band = (bg, color, Icon, label, extra) => (
-    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 16px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3 }}>
+  const isDarkFeed = palette.bg === PALETTE_DARK.bg;
+  const band = (bg, color, Icon, label, extra, extraStyle = {}) => (
+    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 16px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
       <Icon size={17} strokeWidth={2.1} color={color} aria-hidden />
       <span>{label}</span>
       {extra}
@@ -9026,23 +9048,23 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.3 }}>
             {other ? (
-              <button onClick={(e) => { e.stopPropagation(); openAuthor(post); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</button>
+              <button tabIndex={-1} onClick={(e) => { e.stopPropagation(); openAuthor(post); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</button>
             ) : <span style={{ ...display, fontWeight: 700, color: palette.ink }}>{name}</span>}
             {verb ? <> {verb}</> : null}
           </p>
           <span style={{ ...ts.caption, color: palette.inkSoft }}>{timeAgo(post.created_at)}</span>
         </div>
         {post.user_id === user.id && (
-          <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} aria-label="Eliminar publicación" title="Eliminar" style={{ width: 44, height: 44, flexShrink: 0, color: palette.inkSoft, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} aria-label="Borrar publicación" title="Borrar" style={{ width: 44, height: 44, flexShrink: 0, color: palette.inkSoft, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Trash2 size={16} strokeWidth={2} />
           </button>
         )}
       </div>
     );
   };
-  const postFooter = (post) => (
+  const postFooter = (post, neutral = false) => (
     <>
-      <div style={{ borderTop: `1px solid ${palette.borderSoft}`, marginTop: 12, padding: "0 8px", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+      <div style={{ borderTop: neutral ? "none" : `1px solid ${palette.borderSoft}`, marginTop: neutral ? 4 : 12, padding: "0 8px", display: "flex", alignItems: "center", gap: "0.25rem" }}>
         <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={18} />
         <CommentsToggle open={openComments.has(post.id)} count={commentCounts[post.id]} onClick={(e) => { e.stopPropagation(); toggleComments(post.id); }} />
       </div>
@@ -9057,11 +9079,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       aria-label={`Ver detalles de ${post.book.title}`}
       style={{ display: "flex", gap: "0.85rem", alignItems: "center", background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: "pointer", minHeight: 44 }}
     >
-      {post.book.cover_url ? (
-        <img src={post.book.cover_url} alt="" style={{ width: 48, height: 72, objectFit: "cover", borderRadius: 4, flexShrink: 0, border: `1px solid ${palette.border}` }} />
-      ) : (
-        <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={48} height={72} />
-      )}
+      {/* Portada real o genérica compacta de SEMA (monograma), con el mismo respaldo que Explorar */}
+      <span style={{ position: "relative", display: "block", width: 48, height: 72, borderRadius: 4, overflow: "hidden", flexShrink: 0, border: `1px solid ${palette.border}` }}>
+        <BookCoverImage coverUrl={post.book.cover_url} title={post.book.title} author={post.book.author} compact alt="" />
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ ...display, fontWeight: 700, fontSize: "17px", color: palette.ink, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.book.title}</p>
         {post.book.author && <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, marginTop: "0.15rem" }}>{post.book.author}</p>}
@@ -9076,6 +9097,165 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     </span>
   );
   const pagesText = (p) => `${p} ${p === 1 ? "página" : "páginas"}`;
+
+  // Una publicación del feed según su tipo (mapa de color en sema-paleta §6).
+  const renderPost = (post) => {
+            const isFinished = post.type === "book_update" && post.action === "finished";
+            const isStarted = post.type === "book_update" && post.action === "started";
+            // Logros: tipo nuevo o texto viejo con el patrón (sin contar frases)
+            const isAchievement = post.type === "achievement" || (post.type === "text" && !post.quote && post.content?.includes("¡Logro desbloqueado!"));
+            const achDef = isAchievement ? ACHIEVEMENT_DEFS.find(a => post.content?.includes(`"${a.name}"`)) : null;
+            const AchIcon = achDef ? (ACHIEVEMENT_ICON_MAP[achDef.key] || Award) : Award;
+
+            // ── Logro: sticker lila (firma) ──
+            if (isAchievement) {
+              return (
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postHeader(post, "desbloqueó un logro")}
+                  {/* Ronda 2: el logro es un sticker con su nombre (lila, papel, canto del fondo, filo de tinta y giro), no un ícono en círculo */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "1rem 16px 0" }}>
+                    <div className="sema-sticker">
+                      <div className="achieve-icon-enter sema-papel" style={{ display: "inline-flex", alignItems: "center", gap: 10, backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, borderRadius: 12, padding: "10px 18px 10px 14px" }}>
+                        <AchIcon size={26} color={palette.onFirma} strokeWidth={2} aria-hidden />
+                        <span style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.onFirma, letterSpacing: "-0.01em" }}>{achDef ? achDef.name : "Logro"}</span>
+                      </div>
+                    </div>
+                    <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginTop: "0.75rem" }}>{achDef ? achDef.desc : post.content}</p>
+                  </div>
+                  {postFooter(post)}
+                </div>
+              );
+            }
+
+            // ── Frase: ciruela + Instrument Serif ──
+            if (post.type === "quote") {
+              return (
+                <QuotePostCard
+                  key={post.id}
+                  post={post}
+                  userId={user.id}
+                  liked={likedPosts.has(post.id)}
+                  likeCount={likeCounts[post.id] || 0}
+                  commentCount={commentCounts[post.id] || 0}
+                  commentsOpen={openComments.has(post.id)}
+                  doubleTapId={doubleTapPost}
+                  highlighted={highlightedPost === post.id}
+                  onLike={(id, isDoubleTap) => { if (isDoubleTap) { handleDoubleTap(id); } else { toggleLike(id); } }}
+                  onToggleComments={toggleComments}
+                  onAuthorClick={(author) => setProfileModalAuthor({ ...(author || {}), name: author?.nombre || 'Usuario' })}
+                >
+                  <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>
+                </QuotePostCard>
+              );
+            }
+
+            // ── Sesión de lectura: lila si hay libro (leyó hoy), neutra si no ──
+            if (post.type === "reading_session") {
+              const sesPages = post.pages_read || post.pagesRead || 0;
+              const sesMinutes = post.minutes_read || post.minutesRead || null;
+              devLog('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
+              const stats = [sesPages > 0 ? pagesText(sesPages) : null, sesMinutes > 0 ? `${sesMinutes} min` : null].filter(Boolean).join(" · ");
+              return (
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post, !post.book)}>
+                  {heartOverlay(post)}
+                  {post.book && band(palette.firma, palette.onFirma, BookOpen, "Leyó", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
+                  {postHeader(post, post.book ? null : "leyó")}
+                  <div style={{ padding: "10px 16px 0" }}>
+                    {post.book ? bookRow(post) : stats && (
+                      <p style={{ ...display, fontSize: "24px", fontWeight: 800, color: palette.ink, letterSpacing: "-0.02em" }}>{stats}</p>
+                    )}
+                    {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{post.content}</p>}
+                  </div>
+                  {postFooter(post, !post.book)}
+                </div>
+              );
+            }
+
+            // ── Libro terminado: degradado cereza → durazno con la portada al frente ──
+            if (isFinished) {
+              const reviewText = post.book?.review || post.content || "";
+              const extraText = post.content && post.content !== reviewText ? post.content : "";
+              const rating = post.book?.rating || 0;
+              return (
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postHeader(post, "terminó de leer")}
+                  <div style={{ background: SEMA_GRADIENTS.acento, margin: "12px 0 0", padding: "16px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
+                    {/* Sticker: texto chico sobre el fondo de la app, no sobre el degradado (sema-paleta §5) */}
+                    <span className="sema-sticker" style={{ alignSelf: "flex-start", ...body, fontSize: "13px", fontWeight: 700, color: palette.ink, backgroundColor: palette.bg, border: `1.5px solid ${palette.onAccent}`, borderRadius: 8, padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: "0.75rem" }}>
+                      <BookmarkCheck size={15} strokeWidth={2.2} aria-hidden /> Libro terminado
+                    </span>
+                    {post.book ? (
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} className="sema-focus-onaccent" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 6 }}>
+                        <span style={{ position: "relative", display: "block", width: 116, height: 174, borderRadius: 6, overflow: "hidden", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }}>
+                          <BookCoverImage coverUrl={post.book.cover_url} title={post.book.title} author={post.book.author} compact alt="" />
+                        </span>
+                      </button>
+                    ) : null}
+                    {/* Título grande en onAccent #483A58: 3.24:1 sobre la cereza y 5.04:1 sobre el durazno (≥ 22 px negritas) */}
+                    {post.book?.title && (
+                      <p style={{ ...display, fontSize: "22px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: palette.onAccent, marginTop: "1rem", maxWidth: "18rem" }}>
+                        {post.book.title}
+                      </p>
+                    )}
+                  </div>
+                  <div style={{ padding: "12px 16px 0" }}>
+                    {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
+                    {/* Reseña (ronda 2): un solo sticker por tarjeta («Libro terminado»). Aquí «Reseña» es texto
+                        de tinta con estrellas y el azul acero queda solo en el filete del texto. */}
+                    {(reviewText || rating > 0) && (
+                      <div style={{ marginTop: "0.9rem" }}>
+                        <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700 }}>
+                          Reseña {rating > 0 && starsOn(rating, palette.ink)}
+                        </p>
+                        {reviewText && (
+                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
+                            «{reviewText}»
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {extraText && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{extraText}</p>}
+                  </div>
+                  {postFooter(post)}
+                </div>
+              );
+            }
+
+            // ── Empezó a leer (superficie suave, sobria) · Reseña suelta (azul acero) · Texto (neutro) ──
+            const hasReview = post.type === "book_update" && !isStarted && (post.book?.review || post.book?.rating > 0);
+            const neutral = post.type !== "book_update";
+            return (
+              <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post, neutral)}>
+                {heartOverlay(post)}
+                {isStarted && band(isDarkFeed ? "transparent" : palette.superficieSuave, palette.ink, BookOpen, "Empezó a leer", null, isDarkFeed ? { borderBottom: `1px solid ${palette.border}` } : {})}
+                {hasReview && band(palette.complementoFrio, palette.onColor, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, palette.onColor) : null)}
+                {postHeader(post, null)}
+                <div style={{ padding: "10px 16px 0" }}>
+                  {post.type === "book_update" && bookRow(post)}
+                  {hasReview && post.book?.review && (
+                    <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.75rem" }}>
+                      «{post.book.review}»
+                    </p>
+                  )}
+                  {post.content && (
+                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
+                  )}
+                  {post.image_url && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setLightboxImage(post.image_url); }}
+                      aria-label="Ver imagen completa"
+                      style={{ display: "block", width: "100%", border: "none", padding: 0, cursor: "pointer", marginTop: "0.75rem", borderRadius: 12, overflow: "hidden" }}
+                    >
+                      <img src={post.image_url} alt="" style={{ width: "100%", display: "block", borderRadius: 12 }} />
+                    </button>
+                  )}
+                </div>
+                {postFooter(post, neutral)}
+              </div>
+            );
+  };
 
   return (
     <div className="px-4 sm:px-6 pt-4 pb-6 max-w-xl mx-auto">
@@ -9125,18 +9305,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           {motivationalPhrase}
         </p>
       </div>
-
-      {/* Racha diaria: sticker lila */}
-      <DailyReadingBanner
-        streak={streak}
-        hasLoggedToday={hasLoggedToday}
-        pagesLoggedToday={pagesLoggedToday}
-        onLog={() => setShowLogModal(true)}
-        onFreeze={applyFreeze}
-      />
-
-      {/* Cuento del día */}
-      <SnacksHero onRead={setActiveReader} />
 
       {/* Tira: Leyendo ahora */}
       {friendsReading.length > 0 && (
@@ -9205,11 +9373,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               }}
             >
               <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                {book.cover_url ? (
-                  <img src={book.cover_url} style={{ width: 40, height: 60, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} alt="" />
-                ) : (
-                  <BookCoverPlaceholder title={book.title} author={book.author} width={40} height={60} />
-                )}
+                <span style={{ position: "relative", display: "block", width: 40, height: 60, borderRadius: 4, overflow: "hidden", flexShrink: 0 }}>
+                  <BookCoverImage coverUrl={book.cover_url} title={book.title} author={book.author} compact alt="" />
+                </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...body, fontSize: 13, color: palette.inkSoft, margin: "0 0 3px" }}>está leyendo</p>
                   <p style={{ ...display, fontSize: 15, fontWeight: 700, color: palette.ink, lineHeight: 1.25, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
@@ -9225,12 +9391,22 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         );
       })()}
 
+      {/* Racha diaria: sticker lila */}
+      <DailyReadingBanner
+        streak={streak}
+        hasLoggedToday={hasLoggedToday}
+        pagesLoggedToday={pagesLoggedToday}
+        onLog={() => setShowLogModal(true)}
+        onFreeze={applyFreeze}
+        ready={streakLoaded}
+      />
+
       {/* Tengo 5 minutos: botón silencioso (la acción rellena es «Leer ahora») */}
       {readingBooks.length > 0 && (
         <button
           onClick={() => setShowTimerModal(true)}
-          className="btn-press"
-          style={{ width: "100%", minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "transparent", border: `1px solid ${palette.border}`, borderRadius: 14, padding: "0 16px", cursor: "pointer", marginBottom: "0.75rem" }}
+          className="btn-press sema-composer-fab"
+          style={{ minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "transparent", border: `1px solid ${palette.border}`, borderRadius: 14, padding: "0 16px", cursor: "pointer", marginBottom: "0.75rem" }}
         >
           <span style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
             <Timer size={19} color={palette.ink} strokeWidth={2} aria-hidden />
@@ -9252,12 +9428,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             <span style={{ ...ts.body15, color: palette.inkSoft }}>¿Qué estás leyendo?</span>
           </button>
         ) : (
-          <div className="post-compose-enter" style={{ border: `1px solid ${palette.inkSoft}`, borderRadius: 14, padding: "0.75rem 1rem 0.5rem" }}>
+          <div className="post-compose-enter sema-compose" style={{ border: `1px solid ${palette.inkSoft}`, borderRadius: 14, padding: "0.75rem 1rem 0.5rem" }}>
             <textarea
               autoFocus
               value={newPostText}
               onChange={(e) => setNewPostText(e.target.value)}
-              placeholder="¿Qué estás leyendo o pensando sobre libros?"
+              placeholder="¿Qué estás leyendo? Una línea basta."
               aria-label="Texto de la publicación"
               rows={3}
               style={{ ...body, width: "100%", padding: "0.25rem 0", border: "none", backgroundColor: "transparent", color: palette.ink, fontSize: "16px", resize: "none", outline: "none", boxSizing: "border-box" }}
@@ -9269,7 +9445,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 <button
                   onClick={() => { setPostImageFile(null); setPostImagePreview(null); }}
                   aria-label="Quitar imagen"
-                  style={{ position: "absolute", top: -12, right: -12, width: 32, height: 32, borderRadius: "50%", backgroundColor: palette.bg, color: palette.ink, border: `1.5px solid ${palette.ink}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+                  style={{ position: "absolute", top: -16, right: -16, width: 44, height: 44, borderRadius: "50%", backgroundColor: palette.bg, color: palette.ink, border: `1.5px solid ${palette.ink}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
                   <X size={16} strokeWidth={2.4} />
                 </button>
@@ -9339,170 +9515,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", animation: "feedFadeIn 200ms ease-out" }}>
-          {posts.map((post) => {
-            const isFinished = post.type === "book_update" && post.action === "finished";
-            const isStarted = post.type === "book_update" && post.action === "started";
-            // Logros: tipo nuevo o texto viejo con el patrón (sin contar frases)
-            const isAchievement = post.type === "achievement" || (post.type === "text" && !post.quote && post.content?.includes("¡Logro desbloqueado!"));
-            const achDef = isAchievement ? ACHIEVEMENT_DEFS.find(a => post.content?.includes(`"${a.name}"`)) : null;
-            const AchIcon = achDef ? (ACHIEVEMENT_ICON_MAP[achDef.key] || Award) : Award;
-
-            // ── Logro: sticker lila (firma) ──
-            if (isAchievement) {
-              return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
-                  {heartOverlay(post)}
-                  {postHeader(post, "desbloqueó un logro")}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0.75rem 16px 0" }}>
-                    <div className="achieve-icon-enter sema-papel sema-sticker" style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.75rem" }}>
-                      <AchIcon size={32} color={palette.onFirma} strokeWidth={2} aria-hidden />
-                    </div>
-                    {achDef ? (
-                      <>
-                        <p style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.ink, marginBottom: "0.2rem" }}>{achDef.name}</p>
-                        <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>{achDef.desc}</p>
-                      </>
-                    ) : (
-                      <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>{post.content}</p>
-                    )}
-                  </div>
-                  {postFooter(post)}
-                </div>
-              );
-            }
-
-            // ── Frase: ciruela + Instrument Serif ──
-            if (post.type === "quote") {
-              return (
-                <QuotePostCard
-                  key={post.id}
-                  post={post}
-                  userId={user.id}
-                  liked={likedPosts.has(post.id)}
-                  likeCount={likeCounts[post.id] || 0}
-                  commentCount={commentCounts[post.id] || 0}
-                  commentsOpen={openComments.has(post.id)}
-                  doubleTapId={doubleTapPost}
-                  highlighted={highlightedPost === post.id}
-                  onLike={(id, isDoubleTap) => { if (isDoubleTap) { handleDoubleTap(id); } else { toggleLike(id); } }}
-                  onToggleComments={toggleComments}
-                  onAuthorClick={(author) => setProfileModalAuthor({ ...(author || {}), name: author?.nombre || 'Usuario' })}
-                >
-                  <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>
-                </QuotePostCard>
-              );
-            }
-
-            // ── Sesión de lectura: lila si hay libro (leyó hoy), neutra si no ──
-            if (post.type === "reading_session") {
-              const sesPages = post.pages_read || post.pagesRead || 0;
-              const sesMinutes = post.minutes_read || post.minutesRead || null;
-              devLog('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
-              const stats = [sesPages > 0 ? pagesText(sesPages) : null, sesMinutes > 0 ? `${sesMinutes} min` : null].filter(Boolean).join(" · ");
-              return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
-                  {heartOverlay(post)}
-                  {post.book && band(palette.firma, palette.onFirma, BookOpen, "Leyó hoy", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
-                  {postHeader(post, post.book ? null : "leyó hoy")}
-                  <div style={{ padding: "10px 16px 0" }}>
-                    {post.book ? bookRow(post) : stats && (
-                      <p style={{ ...display, fontSize: "24px", fontWeight: 800, color: palette.ink, letterSpacing: "-0.02em" }}>{stats}</p>
-                    )}
-                    {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{post.content}</p>}
-                  </div>
-                  {postFooter(post)}
-                </div>
-              );
-            }
-
-            // ── Libro terminado: degradado cereza → durazno con la portada al frente ──
-            if (isFinished) {
-              const reviewText = post.book?.review || post.content || "";
-              const extraText = post.content && post.content !== reviewText ? post.content : "";
-              const rating = post.book?.rating || 0;
-              return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
-                  {heartOverlay(post)}
-                  {postHeader(post, "terminó de leer")}
-                  <div style={{ background: SEMA_GRADIENTS.acento, margin: "12px 0 0", padding: "16px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
-                    {/* Sticker: texto chico sobre el fondo de la app, no sobre el degradado (sema-paleta §5) */}
-                    <span className="sema-sticker" style={{ alignSelf: "flex-start", ...body, fontSize: "13px", fontWeight: 700, color: palette.ink, backgroundColor: palette.bg, border: `1.5px solid ${palette.onAccent}`, borderRadius: 8, padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: "0.75rem" }}>
-                      <BookmarkCheck size={15} strokeWidth={2.2} aria-hidden /> Libro terminado
-                    </span>
-                    {post.book ? (
-                      <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                        {post.book.cover_url ? (
-                          <img src={post.book.cover_url} alt="" style={{ width: 116, height: 174, objectFit: "cover", borderRadius: 6, display: "block", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }} />
-                        ) : (
-                          <span style={{ display: "block", border: `2px solid ${palette.onAccent}`, borderRadius: 6, boxShadow: `5px 5px 0 ${palette.onAccent}`, overflow: "hidden" }}>
-                            <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={116} height={174} />
-                          </span>
-                        )}
-                      </button>
-                    ) : null}
-                    {/* Título grande en onAccent #483A58: 3.24:1 sobre la cereza y 5.04:1 sobre el durazno (≥ 22 px negritas) */}
-                    {post.book?.title && (
-                      <p style={{ ...display, fontSize: "22px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: palette.onAccent, marginTop: "1rem", maxWidth: "18rem" }}>
-                        {post.book.title}
-                      </p>
-                    )}
-                  </div>
-                  <div style={{ padding: "12px 16px 0" }}>
-                    {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
-                    {/* Reseña: azul acero (complementoFrio). Rótulo con texto blanco sobre el azul (5.71:1) en los dos modos */}
-                    {(reviewText || rating > 0) && (
-                      <div style={{ marginTop: "0.9rem" }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: palette.complementoFrio, color: palette.onColor, borderRadius: 8, padding: "0.3rem 0.65rem", ...body, fontSize: "13px", fontWeight: 700 }}>
-                          Reseña {rating > 0 && starsOn(rating, palette.onColor)}
-                        </span>
-                        {reviewText && (
-                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
-                            «{reviewText}»
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {extraText && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{extraText}</p>}
-                  </div>
-                  {postFooter(post)}
-                </div>
-              );
-            }
-
-            // ── Empezó a leer (superficie suave, sobria) · Reseña suelta (azul acero) · Texto (neutro) ──
-            const hasReview = post.type === "book_update" && !isStarted && (post.book?.review || post.book?.rating > 0);
-            return (
-              <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
-                {heartOverlay(post)}
-                {isStarted && band(palette.superficieSuave, palette.ink, BookOpen, "Empezó a leer")}
-                {hasReview && band(palette.complementoFrio, palette.onColor, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, palette.onColor) : null)}
-                {postHeader(post, null)}
-                <div style={{ padding: "10px 16px 0" }}>
-                  {post.type === "book_update" && bookRow(post)}
-                  {hasReview && post.book?.review && (
-                    <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.75rem" }}>
-                      «{post.book.review}»
-                    </p>
-                  )}
-                  {post.content && (
-                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
-                  )}
-                  {post.image_url && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setLightboxImage(post.image_url); }}
-                      aria-label="Ver imagen completa"
-                      style={{ display: "block", width: "100%", border: "none", padding: 0, cursor: "pointer", marginTop: "0.75rem", borderRadius: 12, overflow: "hidden" }}
-                    >
-                      <img src={post.image_url} alt="" style={{ width: "100%", display: "block", borderRadius: 12 }} />
-                    </button>
-                  )}
-                </div>
-                {postFooter(post)}
-              </div>
-            );
-          })}
+          {posts.slice(0, 2).map(renderPost)}
+          {/* Cuento del día después de las dos primeras publicaciones: al entrar se ve primero a la gente */}
+          <div key="cuento-del-dia" style={{ padding: "0.5rem 0 0" }}><SnacksHero onRead={setActiveReader} /></div>
+          {posts.slice(2).map(renderPost)}
         </div>
       )}
+      {feedState !== 'ready' && <SnacksHero onRead={setActiveReader} />}
 
       {/* Más cuentos + invitar: al final del feed, separados con espacio (sin caja) */}
       {(feedState === 'ready' || feedState === 'empty') && (
@@ -9568,7 +9587,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         >
           <button
             onClick={() => setLightboxImage(null)}
-            style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.onColor }}
+            aria-label="Cerrar imagen"
+            style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: `1.5px solid ${palette.onDark}`, borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.onColor }}
           >
             <X size={18} />
           </button>
@@ -9596,7 +9616,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         <>
           <div
             onClick={() => !deleting && setPostToDelete(null)}
-            style={{ position: "fixed", inset: 0, backgroundColor: "rgba(42,31,26,0.55)", zIndex: 300, animation: "backdropIn 200ms ease-out" }}
+            style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", zIndex: 300, animation: "backdropIn 200ms ease-out" }}
           />
           <div style={{
             position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 301,
@@ -9604,7 +9624,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             borderRadius: "20px 20px 0 0",
             padding: "1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom))",
             maxWidth: 480, margin: "0 auto",
-            boxShadow: "0 -4px 32px rgba(42,31,26,0.18)",
+            borderTop: `1px solid ${palette.border}`,
             animation: "slideUp 300ms cubic-bezier(0.32, 0.72, 0, 1)",
           }}>
             <div style={{ width: 36, height: 4, backgroundColor: palette.border, borderRadius: 999, margin: "0 auto 1.25rem" }} />
@@ -9613,8 +9633,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 <Trash2 size={18} color={palette.danger} strokeWidth={2} />
               </div>
               <div>
-                <p style={{ ...display, fontWeight: 700, fontSize: "1rem", color: palette.ink }}>¿Borrar este post?</p>
-                <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginTop: "0.1rem" }}>Esta acción no se puede deshacer.</p>
+                <p style={{ ...display, fontWeight: 700, fontSize: "17px", color: palette.ink }}>¿Borrar esta publicación?</p>
+                <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, marginTop: "0.1rem" }}>Se va del feed y no hay vuelta atrás.</p>
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "1.1rem" }}>
@@ -9622,8 +9642,9 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 onClick={() => handleDeletePost(postToDelete)}
                 disabled={deleting}
                 style={{
-                  width: "100%", padding: "0.85rem", borderRadius: 12,
-                  backgroundColor: palette.danger, color: palette.onColor,
+                  width: "100%", minHeight: 48, padding: "0.85rem", borderRadius: 12,
+                  // badge #B03A2E en ambos modos: danger oscuro #E5675B con blanco daba 3.27
+                  backgroundColor: palette.badge, color: palette.onColor,
                   border: "none", cursor: deleting ? "default" : "pointer",
                   ...display, fontSize: "0.97rem", fontWeight: 600,
                   opacity: deleting ? 0.7 : 1,
@@ -9631,16 +9652,16 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 }}
               >
                 {deleting && <Loader2 size={16} className="animate-spin" />}
-                {deleting ? "Borrando…" : "Sí, borrar post"}
+                {deleting ? "Borrando…" : "Borrar"}
               </button>
               <button
                 onClick={() => setPostToDelete(null)}
                 disabled={deleting}
                 style={{
-                  width: "100%", padding: "0.85rem", borderRadius: 12,
-                  backgroundColor: "transparent", color: palette.inkSoft,
-                  border: `1px solid ${palette.border}`, cursor: "pointer",
-                  ...body, fontSize: "0.95rem",
+                  width: "100%", minHeight: 48, padding: "0.85rem", borderRadius: 12,
+                  backgroundColor: "transparent", color: palette.ink,
+                  border: `1.5px solid ${palette.ink}`, cursor: "pointer",
+                  ...body, fontSize: "15px", fontWeight: 600,
                 }}
               >
                 Cancelar

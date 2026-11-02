@@ -104,18 +104,19 @@ Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pi
 | Sesión sin libro | Neutro: `bg` con texto `ink` y `inkSoft`, sin color | `ink` |
 | Logro | `firma` (sticker) | `onFirma` |
 
-**Implementación en Social (2026-11-02, ronda 1, pendiente de León).** La tarjeta base es neutra (`bg` + borde `border`, sin sombras de color); el color de cada tipo vive solo en su franja o zona:
+**Implementación en Social (2026-11-02, ronda 2, pendiente de León).** Las publicaciones con color van en tarjeta neutra (`bg` + borde `border`, sin sombras de color) y el color vive solo en su franja o zona. Las que no tienen color (texto, sesión sin libro) no llevan tarjeta: van sobre el fondo, separadas con un filete abajo.
 
 | Tipo | Zona de color | Fondo | Texto encima | Contraste (claro / oscuro) |
 |---|---|---|---|---|
-| Leyó hoy (`reading_session` con libro) | Franja superior «Leyó hoy · N páginas · M min» | `firma` `#BBADFF` | `onFirma` `#483A58`, 14 px negritas | 5.21 / 5.21 |
-| Sesión sin libro | Ninguna; el número de páginas en grande | `bg` | `ink` (24 px) y `inkSoft` | 10.39 / 21.00 |
-| Empezó a leer (`book_update` started) | Franja superior «Empezó a leer» | `superficieSuave` (`#E7D7C1` / `#483A58`) | `ink` (`#483A58` / `#FFFFFF`) | 7.36 / 10.39 |
-| Libro terminado (`book_update` finished) | Zona central con la portada grande al frente | `SEMA_GRADIENTS.acento` | Título en `onAccent` `#483A58` 22 px 800 (grande); rótulo «Libro terminado» como sticker sobre `bg`; autor y reseña debajo, sobre `bg` | Título 3.24 (cereza) – 5.04 (durazno); rótulo 10.39 / 21.00 |
-| Reseña (dentro de «terminado», o suelta si hay reseña o calificación) | Rótulo «Reseña» + estrellas Lucide, y filete izquierdo del texto | `complementoFrio` `#456990` | `onColor` `#FFFFFF`, 13 px negritas; la reseña en `ink` sobre `bg` | 5.71 / 5.71 (el rótulo es relleno, así que pasa también en oscuro) |
-| Frase (`quote`) | Toda la tarjeta salvo el pie | `#483A58` (`ink` en claro / `superficieSuave` en oscuro) | `onColor` en Instrument Serif; secundario `onDarkSoft` `#E7D7C1`; ánimo como sticker `firma` + `onFirma` | 10.39 · 7.36 · 5.21 |
-| Texto | Ninguna | `bg` | `ink` | 10.39 / 21.00 |
-| Logro | Sticker circular con papel | `firma` | Ícono `onFirma` | 5.21 |
+| Leyó (`reading_session` con libro) | Franja superior «Leyó · N páginas · M min» (sin «hoy»: la hora va en la cabecera) | `firma` `#BBADFF` | `onFirma` `#483A58`, 14 px negritas | 5.21 / 5.21 |
+| Sesión sin libro | Sin tarjeta; el número de páginas en grande | `bg` | `ink` (24 px) y `inkSoft` | 10.39 / 21.00 |
+| Empezó a leer (`book_update` started) | Franja superior «Empezó a leer». En oscuro, sin relleno y con filete abajo (la superficie `#483A58` era igual a la frase) | Claro `superficieSuave` `#E7D7C1`; oscuro `bg` | `ink` (`#483A58` / `#FFFFFF`) | 7.36 / 21.00 |
+| Libro terminado (`book_update` finished) | Zona central con la portada grande al frente (real o genérica compacta) | `SEMA_GRADIENTS.acento` | Título en `onAccent` `#483A58` 22 px 800 (grande); único sticker «Libro terminado» sobre `bg`; autor y reseña debajo, sobre `bg` | Título 3.24 (cereza) – 5.04 (durazno); sticker 10.39 / 21.00 |
+| Reseña dentro de «terminado» | Solo el filete izquierdo de 3 px del texto de la reseña | `complementoFrio` `#456990` (filete) | «Reseña» + estrellas Lucide en `ink`; la reseña en `ink` sobre `bg` | Filete 5.71 / 3.68 (objeto ≥ 3:1); texto 10.39 / 21.00 |
+| Reseña suelta (`book_update` sin started/finished con reseña o calificación) | Franja superior «Reseña» + estrellas | `complementoFrio` | `onColor` `#FFFFFF` | 5.71 / 5.71 |
+| Frase (`quote`) | Toda la tarjeta salvo el pie | `#483A58` (`ink` en claro / `superficieSuave` en oscuro) | `onColor` en Instrument Serif; secundario `onDarkSoft` `#E7D7C1`; ánimo como sticker `firma` + `onFirma` (sin el emoji de la etiqueta) | 10.39 · 7.36 · 5.21 |
+| Texto | Sin tarjeta | `bg` | `ink` | 10.39 / 21.00 |
+| Logro | Sticker rectangular con papel, canto `bg`, filo `ink` y giro, con el nombre del logro | `firma` | Ícono y nombre en `onFirma` (20 px 800) | 5.21 |
 
 ## 4. Regla de implementación
 

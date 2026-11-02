@@ -150,9 +150,14 @@ const STATUS_COLORS = {
   read: "#5C6B3D",
 };
 
+// Avatares sin foto (2026-11-02, Social ronda 2): colores de sema-paleta que pasan con la inicial
+// blanca (onColor) encima: ciruela 10.39, azul acero 5.71, éxito 5.79, error 6.02. Antes eran vino,
+// ladrillo y café de la paleta vieja (#B07A35 con blanco daba 3.70). Se mantienen 8 entradas para que
+// el hash (% 8) conserve su reparto. Lo usan Avatar, perfil propio, perfil de amigo, notificaciones,
+// Leyendo ahora y la búsqueda de usuarios; en todos el texto encima es onColor.
 const AVATAR_COLORS = [
-  "#7A2E2E", "#5C6B3D", "#8A5A1A", "#5C4A3F",
-  "#96403B", "#B07A35", "#6B1E2A", "#46552C",
+  "#483A58", "#456990", "#5C6B3D", "#B03A2E",
+  "#456990", "#483A58", "#B03A2E", "#5C6B3D",
 ];
 function getAvatarColor(id) {
   const str = String(id || "");
