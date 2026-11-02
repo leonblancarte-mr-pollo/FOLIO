@@ -149,7 +149,8 @@ function Fallback({ title, author, genres, compact }) {
   );
 }
 
-export default function BookCoverImage({ coverUrl, title, author, genres = [], compact = false, timeoutMs = 3000 }) {
+// `alt` opcional: por defecto el título; se pasa "" cuando el título ya está escrito al lado.
+export default function BookCoverImage({ coverUrl, title, author, genres = [], compact = false, timeoutMs = 3000, alt = title }) {
   // idle → loading → loaded | failed
   const [status, setStatus] = useState(coverUrl ? "loading" : "failed");
   const timerRef = useRef(null);
@@ -170,7 +171,7 @@ export default function BookCoverImage({ coverUrl, title, author, genres = [], c
       {coverUrl && status !== "failed" && (
         <img
           src={coverUrl}
-          alt={title}
+          alt={alt}
           draggable={false}
           onLoad={() => { clearTimeout(timerRef.current); setStatus("loaded"); }}
           onError={() => { clearTimeout(timerRef.current); setStatus("failed"); }}

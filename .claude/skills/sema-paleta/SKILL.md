@@ -140,7 +140,7 @@ Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pi
 | `success` | `#5C6B3D` | `#7A9B5C` | Éxito, «Leído» (valor actual) |
 | `warnBg` / `warnBorder` / `warnInk` | sin cambio | sin cambio | Banner offline y avisos: conservan su valor actual |
 | `like` | `#B03A2E` | `#E5675B` | Corazón (= danger) |
-| `badge` | `#B03A2E` | `#E5675B` | Contador de no leídos (= danger) |
+| `badge` | `#B03A2E` | `#B03A2E` | Contador de no leídos. En oscuro NO es `danger` (`#E5675B` con blanco encima da 3.27 y falla a 12 px); `#B03A2E` da 6.02 con blanco y 3.49 sobre negro como objeto |
 | `unreadBg` | `#E7D7C1` | `#483A58` | Notificación no leída (= superficie suave) |
 | `session` | `#5C6B3D` | `#7A9B5C` | Post de sesión de lectura (= éxito) |
 | `sessionInk` | `#5C6B3D` | `#7A9B5C` | Texto del post de sesión |

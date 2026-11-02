@@ -621,7 +621,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
           }}
         >Sema</span>
         <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-          <span aria-label={(gemBalance ?? 0) === 1 ? "1 gema" : `${gemBalance ?? 0} gemas`} style={{ display: "flex", alignItems: "center", gap: "4px", ...body, fontSize: "0.9rem", fontWeight: 600, color: palette.amberInk, marginRight: "0.25rem" }}>
+          <span role="img" aria-label={(gemBalance ?? 0) === 1 ? "1 gema" : `${gemBalance ?? 0} gemas`} style={{ display: "flex", alignItems: "center", gap: "4px", ...body, fontSize: "0.9rem", fontWeight: 600, color: palette.amberInk, marginRight: "0.25rem" }}>
             <Gem size={16} strokeWidth={1.8} /> {gemBalance ?? 0}
           </span>
           <button
@@ -8338,7 +8338,8 @@ function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
   return (
     <div style={{ width: "100%" }}>
       <div style={{ height, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, overflow: "hidden" }}>
-        <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", background: pct >= 100 ? palette.sage : SEMA_GRADIENTS.acento, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
+        {/* Filete de tinta al frente del relleno: el extremo durazno da 2.06:1 contra la pista blanca */}
+        <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", background: pct >= 100 ? palette.sage : SEMA_GRADIENTS.acento, borderRight: pct < 100 ? `1.5px solid ${palette.ink}` : "none", boxSizing: "border-box", transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
       </div>
       <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {current} de {total} páginas</p>
     </div>
@@ -8349,6 +8350,13 @@ function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
 function RachaModal({ streak, paused = false, onClose }) {
   const cur = streak?.current_streak || 0;
   const best = streak?.longest_streak || 0;
+  const panelRef = useRef(null);
+  useEffect(() => {
+    panelRef.current?.focus();
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const msg = cur === 0
     ? "Con 5 minutos arranca. Cualquier día sirve para volver."
     : paused ? "En pausa, no rota. Cualquier día sirve para volver."
@@ -8358,11 +8366,11 @@ function RachaModal({ streak, paused = false, onClose }) {
     : "Más de un mes leyendo. Eso ya se presume.";
   return (
     <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Racha" className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "2rem 1.5rem", textAlign: "center", outline: "none", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
         <Flame size={44} color={palette.ink} strokeWidth={1.8} style={{ margin: "0 auto" }} className={cur > 7 && !paused ? "fire-pulse" : ""} />
         <p style={{ ...display, fontWeight: 800, fontSize: "3rem", color: palette.ink, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
         <p style={{ ...display, fontSize: "1rem", color: palette.ink, fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}{paused ? " · en pausa" : ""}</p>
-        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>Récord: {best} {best === 1 ? "día" : "días"}</p>
+        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>{cur > 0 && cur >= best ? "Esto ya es récord." : `Récord: ${best} ${best === 1 ? "día" : "días"}`}</p>
         <p style={{ ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.45, marginTop: "1.25rem" }}>{msg}</p>
         <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", minHeight: 48, padding: "0.85rem", borderRadius: 12, border: `1.5px solid ${palette.ink}`, cursor: "pointer", backgroundColor: "transparent", color: palette.ink, ...display, fontWeight: 700, fontSize: "0.95rem" }}>
           Listo
@@ -8376,10 +8384,20 @@ function RachaModal({ streak, paused = false, onClose }) {
 function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }) {
   const primary = booksReading[0] || null;
   const rest = booksReading.slice(1);
+  const panelRef = useRef(null);
+  useEffect(() => {
+    panelRef.current?.focus();
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "1.5rem 1.25rem 2rem", maxHeight: "85vh", overflowY: "auto", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center" }}>¿Qué quieres leer?</h2>
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="leer-ahora-titulo" className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ position: "relative", backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "1.5rem 1.25rem 2rem", maxHeight: "85vh", overflowY: "auto", outline: "none", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} aria-label="Cerrar" className="sema-no-hover" style={{ position: "absolute", top: 8, right: 8, width: 44, height: 44, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <X size={22} color={palette.ink} strokeWidth={2} />
+        </button>
+        <h2 id="leer-ahora-titulo" style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center", padding: "0 2.5rem" }}>¿Qué leemos?</h2>
         {primary && (
           <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.accent}`, backgroundColor: `${palette.accent}10`, display: "flex", alignItems: "center", gap: "0.85rem" }}>
             <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -8437,9 +8455,10 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const rawName = (user.name || "").trim().split(/\s+/)[0] || "";
   const cutName = rawName.split(/[@+.]/)[0];
   const firstName = cutName && cutName !== rawName ? cutName[0].toUpperCase() + cutName.slice(1) : cutName;
+  // Mismos umbrales que el saludo de FeedView: días hasta las 13, tardes hasta las 20.
   const h = new Date().getHours();
-  const timeOfDay = (h >= 6 && h < 12) ? { text: "Buenos días", Icon: Sun }
-    : (h >= 12 && h < 18) ? { text: "Buenas tardes", Icon: CloudSun }
+  const timeOfDay = h < 13 ? { text: "Buenos días", Icon: Sun }
+    : h < 20 ? { text: "Buenas tardes", Icon: CloudSun }
     : { text: "Buenas noches", Icon: Moon };
   const readingBooks = books.filter((b) => b.status === "reading");
   const wantBooks = books.filter((b) => b.status === "want_to_read" || b.status === "wish").slice(0, 4);
@@ -8448,7 +8467,10 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const best = streak?.longest_streak || 0;
   const isDarkMode = palette.bg === PALETTE_DARK.bg;
   // Voz del gato (existencialista, sema-voz). Hoy todas las mascotas nuevas son gato.
-  const petLine = cur > 0 ? "Sin prisa. Los libros, a diferencia de todo, se quedan." : "Nada tiene mucho sentido. Una página, quizá sí.";
+  // Prioridad: noche > racha en cero > con racha.
+  const petLine = h >= 21 ? "Ya es tarde. Una página y a dormir."
+    : cur === 0 ? "Nada tiene mucho sentido. Una página, quizá sí."
+    : "Sin prisa. Los libros, a diferencia de todo, se quedan.";
   // Racha en pausa: mismo criterio que checkStreakOnLoad (streakService) sobre la fila que
   // ya trae Home — más de un día sin leer y sin protector usado ayer. Solo se lee, no se escribe.
   const streakPaused = (() => {
@@ -8510,7 +8532,8 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const primaryBtn = {
     width: "100%", minHeight: 64, padding: "1rem 1.25rem", borderRadius: 16, cursor: "pointer",
     background: palette.accent, color: palette.onAccent,
-    border: `2px solid ${palette.ink}`, boxShadow: `4px 4px 0 ${palette.ink}`,
+    // En oscuro la sombra va en firma (lila): en ink (blanco) leía como marco doble.
+    border: `2px solid ${palette.ink}`, boxShadow: `4px 4px 0 ${isDarkMode ? palette.firma : palette.ink}`,
     display: "flex", alignItems: "center", justifyContent: "center", gap: "0.6rem",
     ...display, fontWeight: 800, fontSize: "1.25rem", letterSpacing: "-0.01em",
   };
@@ -8540,26 +8563,38 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         <Flame size={34} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
         <div style={{ minWidth: 0 }}>
           <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
-            {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}</span>
+            {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
           </p>
+          {/* «En pausa» en su propia línea: dentro del número de 48 px podía pisar la cifra al saltar de línea */}
+          {streakPaused && (
+            <p style={{ ...display, fontSize: "16px", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>En pausa</p>
+          )}
           <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.35rem" }}>
             {cur === 0
               ? "Con 5 minutos arranca."
               : streakPaused
-                ? "En pausa, no rota. Cualquier día sirve para volver."
-                : `Récord: ${best} ${dayWord(best)}`}
+                ? "No rota. Cualquier día sirve para volver."
+                : cur >= best
+                  ? "Esto ya es récord."
+                  : `Récord: ${best} ${dayWord(best)}`}
           </p>
         </div>
       </button>
 
       {/* La mascota habla pegada al sticker: pequeña, nunca ocupa la pantalla (principio 6).
-          Frase en Bricolage (armoniza con los títulos); en oscuro el gato lleva halo lila. */}
+          Frase en Bricolage 600 / inkSoft para no competir con los títulos de libro.
+          El sprite de 80 px trae ~26 px de aire a la izquierda: se compensa con margen negativo
+          para que el gato (en claro) o el disco (en oscuro) alineen con el margen de la pantalla.
+          En oscuro, un disco plano de superficieSuave recorta al gato negro del fondo negro. */}
       {pet && (
-        <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.md }}>
-          <span style={{ flexShrink: 0, display: "inline-flex", filter: isDarkMode ? `drop-shadow(0 0 1.5px ${palette.firma}) drop-shadow(0 0 1.5px ${palette.firma})` : "none" }}>
-            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={80} showShadow={false} />
+        <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.sm }}>
+          <span style={{ flexShrink: 0, position: "relative", display: "inline-flex", width: 80, height: 80, marginLeft: isDarkMode ? -8 : -24 }}>
+            {isDarkMode && (
+              <span aria-hidden style={{ position: "absolute", left: 8, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.superficieSuave }} />
+            )}
+            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={80} showShadow={false} style={{ position: "relative" }} />
           </span>
-          <p style={{ ...display, fontWeight: 700, fontSize: "18px", lineHeight: 1.25, letterSpacing: "-0.01em", color: palette.ink, minWidth: 0 }}>{petLine}</p>
+          <p style={{ ...display, fontWeight: 600, fontSize: "17px", lineHeight: 1.3, color: palette.inkSoft, minWidth: 0 }}>{petLine}</p>
         </button>
       )}
 
@@ -8578,7 +8613,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
                 {/* Portada a la izquierda: BookCoverImage si hay URL; sin URL, el título como lomo sobre superficie */}
                 <div style={{ position: "relative", width: 60, height: 90, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.4rem 0.3rem" }}>
                   {b.coverUrl
-                    ? <BookCoverImage coverUrl={b.coverUrl} title={b.title} author={b.author} compact />
+                    ? <BookCoverImage coverUrl={b.coverUrl} title={b.title} author={b.author} alt="" compact />
                     : <span aria-hidden lang="es" style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.02em", color: palette.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "normal", wordBreak: "normal", hyphens: "none" }}>{b.title}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -12313,7 +12348,8 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} /></div>}
       </main>
       <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
-      {/* FAB flotante para agregar (el centro de la nav ahora es Mascota) */}
+      {/* FAB flotante para agregar. La barra inferior lleva Inicio, Explorar, Mascota y Social
+          (sin centro fijo desde 2026-11-02); Perfil se abre desde la foto de la cabecera. */}
       {!petHubOpen && (
         <button
           onClick={() => setShowFabMenu(true)}
@@ -12520,10 +12556,11 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
 // ============ FIRST-LOGIN TUTORIAL ============
 function TutorialOverlay({ onDone }) {
   const STEPS = [
-    { key: 'nav-home',    text: 'Tu inicio: cuento del día y tus lecturas',    dir: 'above' },
-    { key: 'nav-mascota', text: 'Tu compañero de lectura. ¡Sube de nivel!',    dir: 'above' },
-    { key: 'snacks-hero', text: 'Lee un cuento en 5 min. ¡Empieza tu racha!', dir: 'below' },
-    { key: 'gems',        text: 'Gana gemas leyendo. Cada acción cuenta',      dir: 'below' },
+    // Voz sema-voz (2026-11-02): corto, sin admiraciones ni tono de coach.
+    { key: 'nav-home',    text: 'Inicio: el cuento del día y lo que estás leyendo', dir: 'above' },
+    { key: 'nav-mascota', text: 'El gato sube de nivel contigo',                   dir: 'above' },
+    { key: 'snacks-hero', text: 'Un cuento de 5 minutos. Una página ya cuenta',    dir: 'below' },
+    { key: 'gems',        text: 'Las gemas se ganan leyendo',                      dir: 'below' },
     // 2026-11-02: nav-perfil es la foto de perfil de la cabecera; el globo va debajo.
     { key: 'nav-perfil',  text: 'Tu biblioteca, logros y estadísticas',        dir: 'below' },
   ];
