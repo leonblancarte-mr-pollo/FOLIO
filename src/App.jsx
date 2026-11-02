@@ -56,7 +56,6 @@ import {
   Download,
   Snowflake,
   ExternalLink,
-  Repeat,
   Sun,
   CloudSun,
   Gem,
@@ -550,7 +549,12 @@ const NAV_ITEMS = [
   { id: "explorar", label: "Explorar", icon: Compass },
   { id: "mascota", label: "Mascota", icon: PawPrint },
   { id: "social", label: "Social", icon: MessageCircle },
-  { id: "trueque", label: "Trueque", icon: Repeat },
+  // Trueque queda FUERA del lanzamiento (decisión del 16 oct 2026): no aparece en
+  // la barra inferior ni en las pastillas de escritorio. Su código, componentes
+  // (src/components/trueque/), RPCs y datos siguen intactos, y MainApp todavía
+  // renderiza TruequeMain cuando tab === "trueque". Para reactivarlo: importar
+  // `Repeat` de lucide-react y descomentar esta línea:
+  // { id: "trueque", label: "Trueque", icon: Repeat },
   { id: "perfil", label: "Perfil", icon: User },
 ];
 
@@ -1892,7 +1896,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
         const data = await fetchCollaborativeRecommendations();
         if (cancelled) return;
         setItems(data.items);
-        setPersonalized(data.personalized);
+        setPersonalized(data.personalized || data.byGenre);
       } catch (err) {
         console.warn("[CollaborativeRecommendations] fallback silencioso:", err.message);
         if (!cancelled) setItems([]);
@@ -6529,7 +6533,7 @@ function AmigosSheet({ user, onClose, onPendingChange, onMessagesRead }) {
 }
 
 // Social — feed de amigos con acceso a amigos y notificaciones
-function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, onNavigationDone, onOpenAmigos, onOpenNotifs, unreadNotifs = 0, pendingCount = 0 }) {
+function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, onNavigationDone, onOpenAmigos, pendingCount = 0 }) {
   return (
     <div>
       <div style={{ maxWidth: "42rem", margin: "0 auto", padding: "1rem 1rem 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -6542,12 +6546,7 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
               <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
             )}
           </button>
-          <button onClick={onOpenNotifs} aria-label="Notificaciones" className="btn-press" style={{ position: "relative", background: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem", display: "flex" }}>
-            <Bell size={18} color={palette.inkSoft} />
-            {unreadNotifs > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{unreadNotifs > 9 ? "9+" : unreadNotifs}</span>
-            )}
-          </button>
+          {/* Sin campana propia: la del encabezado global abre las mismas notificaciones. */}
         </div>
       </div>
       <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} onOpenAmigos={onOpenAmigos} />
@@ -12235,7 +12234,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       <main className="max-w-4xl mx-auto fade-in main-fab-clearance" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
         {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
-        {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}
+        {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} pendingCount={pendingCount} /></div>}
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}

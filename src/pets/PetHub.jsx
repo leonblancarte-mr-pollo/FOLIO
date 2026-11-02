@@ -106,11 +106,8 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
           </button>
         </div>
 
-        {/* Acciones */}
+        {/* Acciones ("Mi perfil" vive solo en la pastilla de arriba; antes estaba duplicado aquí) */}
         <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.5rem", width: "100%", maxWidth: 360, paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
-          <button onClick={onGoToProfile} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.92)", color: BRAND.wine, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem", boxShadow: "0 4px 14px rgba(0,0,0,0.18)" }}>
-            Mi perfil
-          </button>
           <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
             Ver galería
           </button>

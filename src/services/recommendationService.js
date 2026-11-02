@@ -1,28 +1,12 @@
 import { supabase } from "../supabase.js";
 import { localDateStr } from "./streakService.js";
 import { devLog } from "./devLog.js";
+import { expandGenres } from "../data/genreMap.js";
 
 export const DAILY_LIMIT = 3;
 const GEMS_PER_PACK = 5;
 const SAVES_PER_PACK = 5;
 
-// Maps onboarding IDs → genre labels used in books_curated.genres
-// Onboarding saves: "ciencia-ficcion", "filosofia", etc.
-// books_curated uses: "Ciencia Ficción", "Filosofía", etc.
-const GENRE_MAP = {
-  "novela":              ["Clásicos", "Drama", "Realismo Mágico", "Vanguardia", "Ficción", "Épica", "Novela Contemporánea"],
-  "filosofia":           ["Filosofía", "Filosófico"],
-  "historia":            ["Historia", "Biografía"],
-  "ciencia":             ["Ciencia", "Hard SF", "Educación"],
-  "terror":              ["Terror", "Horror", "Misterio", "Thriller"],
-  "romance":             ["Romance"],
-  "biografia":           ["Biografía", "Historia"],
-  "desarrollo-personal": ["Ensayo", "Psicología", "Educación"],
-  "poesia":              ["Poesía"],
-  "ciencia-ficcion":     ["Ciencia Ficción", "Distopía", "Cyberpunk", "Hard SF"],
-  "ensayo":              ["Ensayo", "Filosófico", "Política", "Educación"],
-  "arte":                ["Arte", "Creatividad"],
-};
 
 // Fila de books_curated → libro del catálogo en camelCase.
 function dbToCuratedBook(row) {
@@ -41,19 +25,6 @@ function dbToCuratedBook(row) {
   };
 }
 
-function expandGenres(preferredGenres) {
-  const expanded = new Set();
-  for (const g of preferredGenres) {
-    const mapped = GENRE_MAP[g];
-    if (mapped) {
-      mapped.forEach((m) => expanded.add(m));
-    } else {
-      // Already a label (e.g. "Ciencia Ficción") — pass through
-      expanded.add(g);
-    }
-  }
-  return [...expanded];
-}
 
 export async function getPreferredGenres(userId) {
   const { data, error } = await supabase
@@ -251,6 +222,8 @@ export async function fetchCollaborativeRecommendations() {
   const data = await res.json();
   return {
     personalized: !!data.personalized,
+    // Respaldo filtrado por los géneros del usuario (no solo "mejor valorados").
+    byGenre: !!data.byGenre,
     items: (data.items || []).map((it) => ({
       bookId: it.book_id,
       title: it.title,
