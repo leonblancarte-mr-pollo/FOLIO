@@ -35,6 +35,16 @@ export function genericCoverScheme(title = "", author = "") {
   };
 }
 
+// Inicial de la portada compacta: se saltan artículos y preposiciones del inicio («El extranjero» → «E»
+// de extranjero, «Los días del abandono» → «D»).
+const COVER_STOPWORDS = new Set(["el", "la", "los", "las", "un", "una", "unos", "unas", "lo", "de", "del", "the", "a", "an", "y"]);
+function coverInitial(title = "") {
+  const words = String(title).trim().split(/\s+/).filter(Boolean);
+  const word = words.find((w) => !COVER_STOPWORDS.has(w.toLowerCase())) || words[0] || "";
+  const ch = word.replace(/^[^\p{L}\p{N}]+/u, "").charAt(0);
+  return ch ? ch.toLocaleUpperCase("es-MX") : "";
+}
+
 // Troquel: dos medias lunas recortadas en los costados (es una máscara de alfa, no un color).
 const TICKET_MASK =
   "radial-gradient(circle at 0 50%, transparent 6px, black 6.5px) left / 51% 100% no-repeat, " +
@@ -88,9 +98,17 @@ export function GenericCover({ title, author, compact = false, label = "", foote
       }}>
         <div {...art} style={{ flexShrink: 0 }}>
           {compact ? (
+            // Compacta (2026-11-02, Para ti ronda 2): monograma con la inicial de la primera palabra con
+            // peso del título, en Bricolage, para que no parezca un skeleton de rayas.
             <>
-              <div style={{ width: "55%", height: 3, backgroundColor: s.fieldInk, marginBottom: "18cqw" }} />
-              <div style={{ width: "75%", height: 3, backgroundColor: s.fieldInk, marginBottom: "22cqw" }} />
+              <div style={{ width: "30%", height: 3, backgroundColor: s.fieldInk, marginBottom: "8cqw" }} />
+              <p style={{
+                fontFamily: FONT_DISPLAY, fontWeight: 800, color: s.fieldInk,
+                fontSize: "clamp(20px, 52cqw, 64px)", lineHeight: 1, letterSpacing: "-0.03em",
+                margin: "0 0 10cqw",
+              }}>
+                {coverInitial(title)}
+              </p>
               <Ticket scheme={s} compact />
             </>
           ) : (

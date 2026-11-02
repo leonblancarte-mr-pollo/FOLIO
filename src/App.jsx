@@ -59,6 +59,7 @@ import {
   Sun,
   CloudSun,
   Gem,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
@@ -1994,7 +1995,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
                   ...body, fontSize: "14px", fontWeight: 600,
                 }}
               >
-                {added ? <><Check size={15} /> Guardado</> : <><Plus size={15} /> Guardar</>}
+                {added ? <><Check size={15} /> En Quiero leer</> : <><Bookmark size={15} /> Quiero leer</>}
               </button>
             </div>
           );
@@ -2005,34 +2006,58 @@ function CollaborativeRecommendations({ user, onAdd }) {
 }
 
 // ── «Recomiéndame» como conversación (Explorar → Para ti) ──
-// El gato pregunta en globos (superficieSuave + ink) y las opciones son burbujas
-// tocables del lado del usuario; la respuesta elegida queda en el hilo como globo
-// firma (lila + onFirma). Los VALORES de las opciones (lo que recibe
-// getMoodRecommendations) no cambian: solo el texto que dice el gato.
+// El gato pregunta en globos (superficieSuave + ink, colita recta) y las opciones son burbujas
+// tocables del lado del usuario; la respuesta elegida queda en el hilo como globo firma
+// (lila + onFirma). Cada opción separa `value` (lo que va a answers[key] y a
+// getMoodRecommendations, SIN CAMBIOS) de `label` (lo que se ve, en voz del usuario y neutro).
 const RECO_QUIZ_STEPS = [
   {
     key: "mood",
     ask: "Para empezar: ¿cómo andas ahorita?",
-    options: ["Contemplativo, reflexivo", "Aventurero, con ganas de acción", "Melancólico, introspectivo", "Curioso, con ganas de aprender", "Ligero, divertido", "Intenso, profundo"],
+    options: [
+      { value: "Contemplativo, reflexivo", label: "Con ganas de pensar" },
+      { value: "Aventurero, con ganas de acción", label: "Con ganas de acción" },
+      { value: "Melancólico, introspectivo", label: "Con el ánimo bajito" },
+      { value: "Curioso, con ganas de aprender", label: "Con curiosidad" },
+      { value: "Ligero, divertido", label: "Con ganas de algo ligero" },
+      { value: "Intenso, profundo", label: "Con ganas de algo intenso" },
+    ],
   },
   {
     key: "time",
     ask: "¿Cuánto tiempo hay para leer? Un ratito cuenta igual.",
-    options: ["Ratitos cortos (5-15 min por sesión)", "Sesiones medianas (15-40 min)", "Sesiones largas (40 min a 1 hora+)"],
+    options: [
+      { value: "Ratitos cortos (5-15 min por sesión)", label: "Ratitos (5 a 15 min)" },
+      { value: "Sesiones medianas (15-40 min)", label: "Un rato (15 a 40 min)" },
+      { value: "Sesiones largas (40 min a 1 hora+)", label: "Un buen rato (40 min o más)" },
+    ],
   },
   {
     key: "challenge",
     ask: "¿Qué tan pesado lo quieres? Sin juicio: a veces la cabeza pide tregua.",
-    options: ["Fácil de leer, que fluya solo", "Ni fácil ni difícil, equilibrado", "Retadora, que me haga pensar"],
+    options: [
+      { value: "Fácil de leer, que fluya solo", label: "Que fluya solo" },
+      { value: "Ni fácil ni difícil, equilibrado", label: "Ni muy muy, ni tan tan" },
+      { value: "Retadora, que me haga pensar", label: "Que me haga pensar" },
+    ],
   },
   {
     key: "openness",
-    ask: "¿Algo parecido a lo que ya te gustó, o te avientas a lo desconocido?",
-    options: ["Algo similar a lo que ya me gustó", "Salir de mi zona de confort", "Sorpréndeme, lo que sea"],
+    ask: "¿Algo parecido a lo que ya te gustó, o saltamos al vacío?",
+    options: [
+      { value: "Algo similar a lo que ya me gustó", label: "Algo parecido" },
+      { value: "Salir de mi zona de confort", label: "Algo nuevo para mí" },
+      { value: "Sorpréndeme, lo que sea", label: "Sorpréndeme, lo que sea" },
+    ],
   },
 ];
-const RECO_INTRO = "Elegir qué leer es de las pocas decisiones que sí dependen de uno. Te hago unas preguntas y te paso ideas.";
+const RECO_INTRO = "Elegir qué leer sí depende de uno. Unas preguntas rápidas y te paso ideas.";
 const RECO_EXTRA_ASK = "Última, y es opcional: ¿algo más que deba saber? Un autor, un país, un final abierto…";
+// Texto visible de una respuesta guardada (el valor sigue siendo el de la IA).
+function recoLabel(key, value) {
+  const q = RECO_QUIZ_STEPS.find((s) => s.key === key);
+  return q?.options.find((o) => o.value === value)?.label || value;
+}
 
 // Avatar del gato en disco firma (como en Inicio y Descubrir): el gato negro no se pierde en oscuro.
 function RecoCatAvatar({ hidden = false }) {
@@ -2047,7 +2072,8 @@ function RecoCatAvatar({ hidden = false }) {
   );
 }
 
-// Globo del gato. `avatar={false}` en globos seguidos del gato: deja el hueco sin repetir la cara.
+// Globo del gato. El avatar va en el ÚLTIMO globo de una racha seguida (como en mensajería);
+// los anteriores dejan el hueco. Colita recta (esquina inferior izquierda en 0).
 function RecoCatBubble({ children, avatar = true }) {
   return (
     <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: "88%" }}>
@@ -2055,27 +2081,29 @@ function RecoCatBubble({ children, avatar = true }) {
       <div style={{
         ...body, fontSize: "15px", lineHeight: 1.45, color: palette.ink,
         backgroundColor: palette.superficieSuave,
-        padding: "0.65rem 0.95rem", borderRadius: "18px 18px 18px 6px",
+        padding: "0.65rem 0.95rem", borderRadius: "16px 16px 16px 0",
       }}>
-        <span className="sr-only">El gato dice: </span>
+        <span className="sr-only">El gato: </span>
         {children}
       </div>
     </div>
   );
 }
 
-// Globo del usuario (respuesta ya elegida). Tocarlo regresa a esa pregunta.
+// Globo del usuario (respuesta ya elegida). Tocarlo regresa a esa pregunta; el lápiz lo avisa.
 function RecoUserBubble({ children, onEdit }) {
   const style = {
     ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.4, textAlign: "left",
     color: palette.onFirma, backgroundColor: palette.firma, border: "none",
-    padding: "0.65rem 0.95rem", minHeight: 44, borderRadius: "18px 18px 6px 18px",
+    padding: "0.65rem 0.95rem", minHeight: 44, borderRadius: "16px 16px 0 16px",
     alignSelf: "flex-end", maxWidth: "82%",
+    display: "inline-flex", alignItems: "center", gap: "0.5rem",
   };
-  if (!onEdit) return <p style={{ ...style, margin: 0 }}>{children}</p>;
+  if (!onEdit) return <p style={{ ...style, margin: 0 }}><span className="sr-only">Tú: </span>{children}</p>;
   return (
-    <button onClick={onEdit} className="quiz-pill-press" aria-label={`Cambiar respuesta: ${children}`} style={{ ...style, cursor: "pointer" }}>
+    <button onClick={onEdit} className="quiz-pill-press" aria-label={`Tú: ${children}. Cambiar respuesta`} style={{ ...style, cursor: "pointer" }}>
       {children}
+      <Pencil size={14} aria-hidden style={{ flexShrink: 0 }} />
     </button>
   );
 }
@@ -2085,7 +2113,7 @@ function RecoTyping() {
   return (
     <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }} role="status">
       <RecoCatAvatar />
-      <div style={{ backgroundColor: palette.superficieSuave, padding: "0.95rem 1.05rem", borderRadius: "18px 18px 18px 6px", display: "flex", gap: 5 }}>
+      <div style={{ backgroundColor: palette.superficieSuave, padding: "0.95rem 1.05rem", borderRadius: "16px 16px 16px 0", display: "flex", gap: 5 }}>
         <span className="sr-only">El gato está pensando</span>
         {[0, 1, 2].map((i) => (
           <span key={i} aria-hidden className="reco-typing-dot" style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: palette.ink, animationDelay: `${i * 160}ms` }} />
@@ -2104,30 +2132,50 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
   const [addedTitles, setAddedTitles] = useState(new Set());
+  const [threadOpen, setThreadOpen] = useState(false); // con resultados, el hilo se colapsa en una línea
   const endRef = useRef(null);
-  const lastThreadKey = useRef(null);
   const resultsRef = useRef(null);
+  const rootRef = useRef(null);
+  const optionsRef = useRef(null);
+  const extraRef = useRef(null);
+  const retryRef = useRef(null);
+  const lastThreadKey = useRef(null);
 
-  // Scroll natural: cada mensaje nuevo baja el hilo hasta el último globo. Se compara con el
-  // estado anterior (no con «ya montó») para que el doble efecto de StrictMode no mueva la
-  // pantalla al abrir la pestaña.
+  // Cada mensaje nuevo: el foco va a lo siguiente que se puede tocar (opciones, caja de texto,
+  // resultados o «Intentar otra vez») y la pantalla baja hasta ahí. Se compara con el estado
+  // anterior (no con «ya montó») para que el doble efecto de StrictMode no mueva la pantalla al
+  // abrir la pestaña.
   useEffect(() => {
     const key = `${step}|${sent}|${loading}|${error}|${results ? 1 : 0}`;
     if (lastThreadKey.current === null || lastThreadKey.current === key) { lastThreadKey.current = key; return; }
     lastThreadKey.current = key;
-    // Con resultados se muestra desde el «Listo» del gato (no desde el final de la lista).
-    const target = results ? resultsRef.current : endRef.current;
-    target?.scrollIntoView({ behavior: "smooth", block: results ? "start" : "nearest" });
+    if (results) {
+      // Se muestra desde arriba del flujo: resumen de la plática + «Listo» del gato + libros.
+      resultsRef.current?.focus({ preventScroll: true });
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (error && !loading) retryRef.current?.focus({ preventScroll: true });
+    else if (step < 4 && !loading) optionsRef.current?.querySelector("button")?.focus({ preventScroll: true });
+    else if (step >= 4 && !sent) extraRef.current?.focus({ preventScroll: true });
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [step, sent, loading, error, results]);
 
   if (books.length === 0) {
+    // Principio 6: el vacío lo dice el gato (texto ya aprobado).
     return (
-      <EmptyState
-        icon={Sparkles}
-        title="Sin libros para recomendar"
-        description="Las recomendaciones se basan en los libros de la biblioteca."
-        action={setTab ? { label: "Agregar libro", icon: Plus, onClick: () => setTab("add") } : undefined}
-      />
+      <div className="px-4 sm:px-6 pt-4 max-w-xl mx-auto" style={{ paddingBottom: "6.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <RecoCatBubble>Sin libros para recomendar. Las recomendaciones se basan en los libros de la biblioteca.</RecoCatBubble>
+        {setTab && (
+          <button
+            onClick={() => setTab("add")}
+            className="btn-press"
+            style={{ alignSelf: "flex-end", minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...body, fontSize: "15px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}
+          >
+            <Plus size={16} /> Agregar libro
+          </button>
+        )}
+      </div>
     );
   }
 
@@ -2135,6 +2183,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     setLoading(true);
     setError("");
     setResults(null);
+    setThreadOpen(false);
     try {
       const ans = answersOverride ?? answers;
       const res = await getMoodRecommendations(books, ans);
@@ -2144,7 +2193,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       // El gato no repite errores técnicos: solo distingue «mucha gente» del resto.
       setError(/solicitudes/i.test(e?.message || "")
         ? "Hay mucha gente preguntando ahorita. Dame un minuto y lo volvemos a intentar."
-        : "Se me trabó algo y no pude pensar bien. No es tu culpa; lo intentamos otra vez.");
+        : "Se me trabó algo. Cosas del absurdo. Lo intentamos otra vez.");
     } finally {
       setLoading(false);
     }
@@ -2158,10 +2207,11 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     setResults(null);
     setError("");
     setAddedTitles(new Set());
+    setThreadOpen(false);
   }
 
-  function choose(key, opt) {
-    setAnswers({ ...answers, [key]: opt });
+  function choose(key, value) {
+    setAnswers({ ...answers, [key]: value });
     setStep(step + 1);
   }
 
@@ -2176,6 +2226,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     setSent(false);
     setResults(null);
     setError("");
+    setThreadOpen(false);
     setStep(i);
   }
 
@@ -2213,21 +2264,39 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     background: "none", border: "none", minHeight: 44, padding: "0 0.5rem",
     display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer",
   };
+  const filledBtn = {
+    minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent,
+    border: "none", ...body, fontSize: "15px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.4rem", cursor: "pointer",
+  };
+  // Progreso (principio 4): va pegado a la pregunta actual, así nunca se va con el scroll.
+  const counter = (n) => (
+    <p key="counter" style={{ ...ts.label, margin: "-0.2rem 0 0 calc(36px + 0.5rem)" }}>
+      Pregunta {n} de 5{n === 5 ? " · opcional" : ""}
+    </p>
+  );
 
-  // ── Hilo de la conversación ──
+  // ── Hilo de la conversación (role="log": el lector de pantalla anuncia cada globo nuevo) ──
   const thread = [];
-  thread.push(<RecoCatBubble key="intro">{RECO_INTRO}</RecoCatBubble>);
+  thread.push(<RecoCatBubble key="intro" avatar={false}>{RECO_INTRO}</RecoCatBubble>);
   RECO_QUIZ_STEPS.forEach((q, i) => {
     if (i > step) return;
-    thread.push(<RecoCatBubble key={`q${i}`} avatar={i !== 0}>{q.ask}</RecoCatBubble>);
+    thread.push(<RecoCatBubble key={`q${i}`}>{q.ask}</RecoCatBubble>);
+    if (i === step && !results) thread.push(counter(i + 1));
     if (i < step && answers[q.key]) {
-      thread.push(<RecoUserBubble key={`a${i}`} onEdit={loading ? null : () => editStep(i)}>{answers[q.key]}</RecoUserBubble>);
+      thread.push(<RecoUserBubble key={`a${i}`} onEdit={loading ? null : () => editStep(i)}>{recoLabel(q.key, answers[q.key])}</RecoUserBubble>);
     }
   });
   if (step >= 4) {
     thread.push(<RecoCatBubble key="qextra">{RECO_EXTRA_ASK}</RecoCatBubble>);
+    if (!sent) thread.push(counter(5));
     if (sent) thread.push(<RecoUserBubble key="aextra">{answers.extra || "Nada más, así está bien."}</RecoUserBubble>);
   }
+
+  // Resumen de una línea del hilo (cuando hay resultados): «Con el ánimo bajito · Un rato…»
+  const summary = [
+    ...RECO_QUIZ_STEPS.map((q) => recoLabel(q.key, answers[q.key])).filter(Boolean),
+    answers.extra,
+  ].filter(Boolean).join(" · ");
 
   // ── Resultados ──
   let resultsBlock = null;
@@ -2246,17 +2315,17 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     const sectionTitle = { ...display, fontSize: "18px", fontWeight: 700, color: palette.ink, margin: "1.75rem 0 0.25rem" };
     const rowTitle = { ...display, fontSize: "17px", fontWeight: 700, color: palette.ink, lineHeight: 1.25, margin: 0 };
     const rowAuthor = { ...body, fontSize: "14px", color: palette.inkSoft, margin: "0.15rem 0 0" };
-    const rowReason = { ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, margin: "0.5rem 0 0" };
+    const rowReason = { ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, margin: "0.45rem 0 0" };
     const coverBox = { position: "relative", width: 64, height: 92, borderRadius: 6, overflow: "hidden", flexShrink: 0 };
 
     resultsBlock = (
       <>
-        <div ref={resultsRef} style={{ scrollMarginTop: 80, marginTop: "0.6rem" }}>
-        <RecoCatBubble>
-          {empty
-            ? "Esta vez no di con nada que te quede. Pasa. ¿Probamos con otro ánimo?"
-            : "Listo. Esto es lo que yo leería en tu lugar hoy."}
-        </RecoCatBubble>
+        <div ref={resultsRef} tabIndex={-1} aria-label="Recomendaciones del gato" style={{ scrollMarginTop: 80, marginTop: "0.6rem", outline: "none" }}>
+          <RecoCatBubble>
+            {empty
+              ? "Esta vez no di con nada que te quede. Pasa a veces. ¿Probamos con otro ánimo?"
+              : "Listo. Esto es lo que yo leería en tu lugar hoy."}
+          </RecoCatBubble>
         </div>
 
         {fromLibraryMatched.length > 0 && (
@@ -2275,10 +2344,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={rowTitle}>{r.book.title}</p>
-                      <p style={rowAuthor}>
-                        {r.book.author}
-                        {STATUS_META[r.book.status] && <> · {STATUS_META[r.book.status].label}</>}
-                      </p>
+                      <p style={rowAuthor}>{r.book.author}</p>
                       <p style={rowReason}>{r.reason}</p>
                     </div>
                   </button>
@@ -2302,23 +2368,20 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={rowTitle}>{s.title}</p>
                       <p style={rowAuthor}>{s.author}{s.genre && <> · {s.genre}</>}</p>
-                      {s.summary && <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, lineHeight: 1.45, margin: "0.4rem 0 0" }}>{s.summary}</p>}
+                      {/* Una sola línea de contenido por libro: la razón. La sinopsis se guarda en el libro al agregarlo. */}
                       <p style={rowReason}>{s.reason}</p>
                       <button
                         onClick={() => handleAddSuggestion(s)}
                         disabled={isAdded}
+                        aria-label={isAdded ? `${s.title}: en Quiero leer` : `Agregar ${s.title} a Quiero leer`}
                         className="btn-press"
                         style={{
-                          marginTop: "0.6rem", minHeight: 44, padding: isAdded ? "0" : "0 1rem", borderRadius: 999,
-                          display: "inline-flex", alignItems: "center", gap: "0.4rem",
-                          ...body, fontSize: "15px", fontWeight: 600,
-                          backgroundColor: "transparent",
+                          ...quietBtn, padding: 0, marginTop: "0.25rem", fontWeight: 600,
                           color: isAdded ? palette.success : palette.ink,
-                          border: isAdded ? "none" : `1.5px solid ${palette.inkSoft}`,
                           cursor: isAdded ? "default" : "pointer",
                         }}
                       >
-                        {isAdded ? <><Check size={16} /> En Quiero leer</> : <><Bookmark size={16} /> Agregar a Quiero leer</>}
+                        {isAdded ? <><Check size={16} /> En Quiero leer</> : <><Bookmark size={16} /> Quiero leer</>}
                       </button>
                     </div>
                   </li>
@@ -2333,33 +2396,49 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
             <ChevronLeft size={16} /> Empezar de nuevo
           </button>
           <button onClick={() => fetchRecs(answers)} style={{ ...quietBtn, color: palette.ink }}>
-            <Wand2 size={16} /> Otras ideas
+            <RefreshCw size={16} /> Otras ideas
           </button>
         </div>
       </>
     );
   }
 
-  const questionNumber = Math.min(step + 1, 5);
-  const current = step < 4 ? RECO_QUIZ_STEPS[step] : null;
+  const current = step < 4 && !results ? RECO_QUIZ_STEPS[step] : null;
 
   return (
-    <div className="px-4 sm:px-6 pt-4 pb-8 max-w-xl mx-auto">
-      {!results && (
-        <p style={{ ...ts.label, margin: "0 0 1rem" }} aria-live="polite">
-          Pregunta {questionNumber} de 5{step >= 4 ? " · opcional" : ""}
-        </p>
-      )}
-
+    // Padding inferior: deja libre el espacio del FAB y de la barra inferior.
+    <div ref={rootRef} className="px-4 sm:px-6 pt-5 max-w-xl mx-auto" style={{ paddingBottom: "6.5rem", scrollMarginTop: 64 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        {thread}
+        {results && !threadOpen ? (
+          <button
+            onClick={() => setThreadOpen(true)}
+            aria-expanded={false}
+            style={{ ...quietBtn, padding: 0, justifyContent: "space-between", width: "100%", textAlign: "left", color: palette.inkSoft }}
+          >
+            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span className="sr-only">Ver la plática: </span>{summary}
+            </span>
+            <ChevronDown size={18} aria-hidden style={{ flexShrink: 0 }} />
+          </button>
+        ) : (
+          <>
+            {results && (
+              <button onClick={() => setThreadOpen(false)} aria-expanded style={{ ...quietBtn, padding: 0, color: palette.inkSoft }}>
+                Ocultar la plática <ChevronDown size={18} aria-hidden style={{ transform: "rotate(180deg)" }} />
+              </button>
+            )}
+            <div role="log" aria-live="polite" aria-label="Plática con el gato" style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+              {thread}
+            </div>
+          </>
+        )}
 
         {/* Opciones de la pregunta actual: burbujas tocables del lado del usuario */}
         {current && (
-          <div role="group" aria-label={current.ask} className="fade-in" style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.4rem" }}>
+          <div ref={optionsRef} role="group" aria-label={current.ask} className="fade-in" style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.4rem" }}>
             {current.options.map((opt) => (
-              <button key={opt} onClick={() => choose(current.key, opt)} className="quiz-pill-press" style={optionStyle}>
-                {opt}
+              <button key={opt.value} onClick={() => choose(current.key, opt.value)} className="quiz-pill-press" style={optionStyle}>
+                {opt.label}
               </button>
             ))}
           </div>
@@ -2379,12 +2458,14 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
             <label htmlFor="reco-extra" className="sr-only">Algo más para el gato (opcional)</label>
             <textarea
               id="reco-extra"
+              ref={extraRef}
+              className="reco-extra"
               value={draftExtra}
               onChange={(e) => setDraftExtra(e.target.value.slice(0, 200))}
               maxLength={200}
               rows={3}
               placeholder="Ej.: nada muy largo, algo mexicano…"
-              style={{ width: "100%", padding: "0.75rem 1rem", backgroundColor: palette.bg, border: `1.5px solid ${palette.inkSoft}`, borderRadius: 18, ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, outline: "none", resize: "none", boxSizing: "border-box" }}
+              style={{ width: "100%", padding: "0.75rem 1rem", backgroundColor: palette.bg, border: `1.5px solid ${palette.inkSoft}`, borderRadius: 16, ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, resize: "none", boxSizing: "border-box" }}
             />
             <p style={{ ...ts.caption, textAlign: "right", margin: "0.2rem 0 0.6rem" }}>{draftExtra.length}/200</p>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
@@ -2393,11 +2474,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
               </button>
               <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
                 <button onClick={() => send("")} style={quietBtn}>Saltar</button>
-                <button
-                  onClick={() => send(draftExtra.trim())}
-                  className="btn-press"
-                  style={{ minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...body, fontSize: "15px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}
-                >
+                <button onClick={() => send(draftExtra.trim())} className="btn-press" style={filledBtn}>
                   <Send size={16} /> Ver ideas
                 </button>
               </div>
@@ -2409,14 +2486,12 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
 
         {error && !loading && (
           <>
-            <RecoCatBubble>{error}</RecoCatBubble>
+            <div role="alert">
+              <RecoCatBubble>{error}</RecoCatBubble>
+            </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.25rem", marginTop: "0.2rem" }}>
               <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>
-              <button
-                onClick={() => fetchRecs(answers)}
-                className="btn-press"
-                style={{ minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...body, fontSize: "15px", fontWeight: 600, cursor: "pointer" }}
-              >
+              <button ref={retryRef} onClick={() => fetchRecs(answers)} className="btn-press" style={filledBtn}>
                 Intentar otra vez
               </button>
             </div>

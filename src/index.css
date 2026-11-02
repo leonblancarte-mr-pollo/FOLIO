@@ -156,6 +156,13 @@
   0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
   30% { opacity: 1; transform: translateY(-3px); }
 }
+@media (prefers-reduced-motion: reduce) {
+  .reco-typing-dot { animation: none; opacity: 0.7; }
+}
+/* Caja de texto del paso 5: placeholder legible (inkFaint) y foco visible */
+.reco-extra::placeholder { color: var(--sema-ink-faint); opacity: 1; }
+.reco-extra:focus { outline: none; }
+.reco-extra:focus-visible, .reco-extra:focus { border-color: var(--sema-ink) !important; box-shadow: 0 0 0 1px var(--sema-ink); }
 
 .timer-book-hover {
   transition: border-color 150ms ease, background-color 150ms ease;
