@@ -7,6 +7,23 @@ function localDateStr(date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// ÚNICA fuente de verdad de la racha para la UI (Home, Social, Perfil, RachaModal,
+// celebración): toda fila de user_streaks pasa por aquí. Garantiza que la mejor
+// racha nunca sea menor que la actual (antes Home pedía solo current_streak y
+// mostraba "Tu mejor: 0" mientras Perfil decía 12).
+function normalizeStreak(row) {
+  if (!row) return row;
+  const current = row.current_streak || 0;
+  return { ...row, current_streak: current, longest_streak: Math.max(row.longest_streak || 0, current) };
+}
+
+// Fila completa de user_streaks, normalizada. Lanza si falla la lectura.
+async function fetchStreakRow(userId) {
+  const { data, error } = await supabase.from("user_streaks").select("*").eq("user_id", userId).maybeSingle();
+  if (error) throw error;
+  return normalizeStreak(data);
+}
+
 // Racha + páginas de hoy. Lanza si falla alguna lectura (el caller decide el fallback).
 // Nota: `streak` es la fila cruda de user_streaks (snake_case), igual que la que devuelven
 // las RPC de racha; ver "Excepciones a la convención" en DOCUMENTACION_ARQUITECTURA.md §X.
@@ -18,7 +35,7 @@ async function fetchStreakData(userId) {
   ]);
   if (streakRes.error) throw streakRes.error;
   if (logsRes.error) throw logsRes.error;
-  const streakRow = streakRes.data;
+  const streakRow = normalizeStreak(streakRes.data);
   const todayLogs = logsRes.data;
   const hasLoggedToday = (todayLogs || []).length > 0;
   const pagesLoggedToday = (todayLogs || []).reduce((sum, r) => sum + (r.pages_read || 0), 0);
@@ -78,14 +95,14 @@ async function checkStreakOnLoad(userId) {
 async function resetMonthlyFreeze() {
   const { data, error } = await supabase.rpc("reset_monthly_freeze");
   if (error) throw error;
-  return data || null;
+  return normalizeStreak(data) || null;
 }
 
 async function applyStreakFreeze() {
   const { data, error } = await supabase.rpc("use_streak_freeze");
   if (error) throw error;
-  return data || null;
+  return normalizeStreak(data) || null;
 }
 
 
-export { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, resetMonthlyFreeze, applyStreakFreeze };
+export { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze };

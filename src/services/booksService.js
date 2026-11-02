@@ -1,5 +1,7 @@
 import { supabase } from "../supabase.js";
 import { devLog } from "./devLog.js";
+import { searchGoogleBooks } from "./googleBooksService.js";
+import { normalizeGenre } from "./genreService.js";
 
 // Etiqueta legible de cada estado de lectura (la UI añade icono y color en App.jsx).
 const STATUS_LABELS = {
@@ -16,7 +18,7 @@ function dbToBook(row) {
     title: row.title,
     author: row.author,
     status: row.status,
-    genre: row.genre || "",
+    genre: normalizeGenre(row.genre),
     summary: row.summary || "",
     rating: row.rating || 0,
     review: row.review || "",
@@ -37,7 +39,7 @@ function bookToDb(book, userId) {
     title: book.title,
     author: book.author,
     status: book.status,
-    genre: book.genre ? (book.genre.trim().charAt(0).toUpperCase() + book.genre.trim().slice(1).toLowerCase()) : null,
+    genre: book.genre ? normalizeGenre(book.genre) : null,
     summary: book.summary || null,
     rating: book.rating || 0,
     review: book.review || null,
@@ -168,5 +170,48 @@ async function deleteBookFromDB(id, userId) {
   if (!data || data.length === 0) throw new Error("DELETE_NO_ROWS");
 }
 
+// ============ PÁGINAS FALTANTES (Google Books) ============
+// Los libros agregados desde BookTinder, recomendaciones, la vista previa del
+// feed o a mano llegaban sin total_pages y "Seguir leyendo" no podía mostrar
+// porcentaje. Se completa desde Google Books (ISBN primero, si no título+autor)
+// y se guarda en books.total_pages. Solo acepta un resultado cuyo título y
+// apellido del autor coincidan: si no hay coincidencia clara, no inventa nada.
+const _normPg = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+const _pageFillTried = new Set();
 
-export { STATUS_LABELS, dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, addPendingLog, getPendingPosts, addPendingPost, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB };
+async function lookupPageCount({ title, author, isbn }) {
+  const t = _normPg(title);
+  if (!t && !isbn) return null;
+  const surname = _normPg((author || "").trim().split(/\s+/).pop());
+  const results = await searchGoogleBooks(isbn ? `isbn:${isbn}` : `${title} ${author || ""}`);
+  const match = results.find((r) => {
+    if (!(r.pageCount > 0)) return false;
+    if (isbn) return true;
+    const rt = _normPg(r.title);
+    const titleOk = rt.startsWith(t) || t.startsWith(rt);
+    const authorOk = !surname || _normPg(r.author).includes(surname);
+    return titleOk && authorOk;
+  });
+  return match?.pageCount || null;
+}
+
+// Devuelve el total de páginas (el que ya tenía o el encontrado) o null.
+// Un intento por libro y por sesión, para no gastar cuota de Google Books.
+async function fillMissingPageCount(book, userId) {
+  if (book.totalPages) return book.totalPages;
+  if (!book.id || _pageFillTried.has(book.id)) return null;
+  _pageFillTried.add(book.id);
+  let pages = null;
+  try {
+    pages = await lookupPageCount(book);
+  } catch (err) {
+    console.error("[books] no se pudo buscar el número de páginas en Google Books:", err?.message || err);
+    return null;
+  }
+  if (!pages) return null;
+  const { error } = await supabase.from("books").update({ total_pages: pages }).eq("id", book.id).eq("user_id", userId);
+  if (error && !isUnknownColumnError(error)) console.error("[books] no se pudo guardar total_pages:", error.message);
+  return pages;
+}
+
+export { STATUS_LABELS, dbToBook, bookToDb, isUnknownColumnError, stripTotalPages, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, addPendingLog, getPendingPosts, addPendingPost, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB, lookupPageCount, fillMissingPageCount };

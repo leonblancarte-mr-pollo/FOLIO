@@ -1,4 +1,5 @@
 import { devLog } from "./devLog.js";
+import { normalizeGenre } from "./genreService.js";
 
 // ============ GOOGLE BOOKS (proxy /api/books) ============
 const _gbSearchCache = new Map();
@@ -19,7 +20,7 @@ function mapGBItem(item) {
     isbn: (vi.industryIdentifiers?.find(i => i.type === 'ISBN_13') || vi.industryIdentifiers?.[0])?.identifier || null,
     pageCount: vi.pageCount || null,
     description: vi.description || '',
-    genre: vi.categories?.[0] || null,
+    genre: normalizeGenre(vi.categories?.[0]) || null,
     publisher: vi.publisher || null,
     language: vi.language || null,
   };

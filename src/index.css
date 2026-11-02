@@ -394,3 +394,25 @@ button:not(:disabled):not(.sema-no-hover):active,
   .sema-nav-item:hover { filter: none; }
   a[href]:hover { text-decoration: underline; }
 }
+
+/* Espacio inferior del área principal: ningún contenido queda debajo de la barra
+   inferior (≈54 px + safe area) ni del botón flotante "+" (58 px a 80 px del borde
+   → ocupa hasta ~138 px). Antes era pb-24 (96 px) y el "+" tapaba el sábado del
+   calendario, "Mis listas" y bordes de tarjetas. En escritorio no hay barra
+   inferior, pero el "+" sigue fijo, así que se deja el mismo margen. */
+.main-fab-clearance {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 156px);
+}
+
+/* Carruseles horizontales sin barra gris del navegador. `scrollbar-hide` se usaba
+   desde antes pero era la clase de un plugin de Tailwind que nunca se instaló,
+   así que no hacía nada. El desplazamiento táctil y con trackpad se conserva
+   (solo se oculta la barra, overflow sigue en auto). */
+.scrollbar-hide {
+  scrollbar-width: none;          /* Firefox */
+  -ms-overflow-style: none;       /* Edge antiguo */
+  -webkit-overflow-scrolling: touch;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;                  /* Chrome, Safari, Android */
+}

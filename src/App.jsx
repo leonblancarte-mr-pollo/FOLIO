@@ -81,10 +81,11 @@ import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { EmptyState } from "./components/EmptyState.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
 import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
-import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB } from "./services/booksService.js";
+import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
-import { localDateStr, checkStreakOnLoad, fetchStreakData, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
+import { normalizeGenre } from "./services/genreService.js";
+import { localDateStr, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
 import { fetchQuotes, fetchQuotesForBook, insertQuote, updateQuoteInDB, deleteQuoteFromDB, toggleQuoteFavorite, setQuotePublic } from "./services/quotesService.js";
 import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
 import { logReadingSession, syncPendingLogs } from "./services/readingService.js";
@@ -1920,7 +1921,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
 
   if (items === null) {
     return (
-      <div className="px-4 sm:px-6 pt-2" style={{ display: "flex", gap: "0.8rem", overflowX: "auto" }}>
+      <div className="px-4 sm:px-6 pt-2 scrollbar-hide" style={{ display: "flex", gap: "0.8rem", overflowX: "auto" }}>
         {[0, 1, 2].map((i) => (
           <div key={i} style={{ width: 130, flexShrink: 0 }}>
             <div style={{ width: 130, height: 180, borderRadius: 10, backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
@@ -1938,7 +1939,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
       <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, marginBottom: "0.7rem" }}>
         {personalized ? "Recomendado para ti" : "Los mejor valorados"}
       </p>
-      <div style={{ display: "flex", gap: "0.9rem", overflowX: "auto", paddingBottom: "0.4rem" }}>
+      <div className="scrollbar-hide" style={{ display: "flex", gap: "0.9rem", overflowX: "auto", paddingBottom: "0.4rem" }}>
         {items.map((item) => {
           const added = addedIds.has(item.bookId);
           return (
@@ -3099,27 +3100,33 @@ function ReadingHeatmap({ userId }) {
       start.setMonth(start.getMonth() - 6);
       start.setDate(1);
       start.setHours(0, 0, 0, 0);
+      // Se agrupa por log_date, la misma fecha con la que el servidor cuenta la
+      // racha (update_streak). Antes se usaba logged_at, que puede venir NULL y
+      // dejaba el calendario en "0 días activos" con una racha activa.
       let rows = [];
+      const startStr = localDateStr(start);
       const { data, error } = await supabase
         .from("reading_logs")
-        .select("pages_read, logged_at, books(title)")
+        .select("pages_read, log_date, logged_at, books(title)")
         .eq("user_id", userId)
-        .gte("logged_at", start.toISOString());
+        .gte("log_date", startStr);
       if (!error && data) {
         rows = data;
       } else {
-        const { data: d2 } = await supabase
+        if (error) console.error("[heatmap] lectura con libros falló, reintento sin libros:", error.message);
+        const { data: d2, error: e2 } = await supabase
           .from("reading_logs")
-          .select("pages_read, logged_at")
+          .select("pages_read, log_date, logged_at")
           .eq("user_id", userId)
-          .gte("logged_at", start.toISOString());
+          .gte("log_date", startStr);
+        if (e2) console.error("[heatmap] no se pudo leer reading_logs:", e2.message);
         rows = d2 || [];
       }
       if (cancelled) return;
       const map = {};
       rows.forEach(log => {
-        if (!log.logged_at) return;
-        const day = localDateStr(new Date(log.logged_at));
+        const day = log.log_date || (log.logged_at ? localDateStr(new Date(log.logged_at)) : null);
+        if (!day) return;
         const pages = log.pages_read || 1;
         if (!map[day]) map[day] = { pages: 0, books: [] };
         map[day].pages += pages;
@@ -3312,10 +3319,9 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         setLoading(false);
       })
       .catch(() => { setLoading(false); });
-    checkStreakOnLoad(user.id).then(() => {
-      supabase.from("user_streaks").select("*").eq("user_id", user.id).maybeSingle()
-        .then(({ data }) => { if (data) setStreak(data); });
-    });
+    checkStreakOnLoad(user.id).then(() => fetchStreakRow(user.id))
+      .then((data) => { if (data) setStreak(data); })
+      .catch((err) => console.error("[streak] perfil: no se pudo leer la racha:", err?.message || err));
 
     // Privacidad — query aparte y tolerante: si la columna aún no existe
     // (migración pendiente) no rompe la carga del resto del perfil.
@@ -5068,7 +5074,8 @@ function FriendProfileModal({ friend, user, onClose }) {
         .from("books")
         .select("title, author, status, rating, genre, review, finished_at")
         .eq("user_id", friend.id);
-      setFriendBooks(booksData || []);
+      // Géneros en español y unificados, igual que los libros propios (dbToBook).
+      setFriendBooks((booksData || []).map((b) => ({ ...b, genre: normalizeGenre(b.genre) })));
       setLoading(false);
 
       // Public quotes
@@ -5093,7 +5100,7 @@ function FriendProfileModal({ friend, user, onClose }) {
       // Streak
       const { data: streakData } = await supabase
         .from("user_streaks").select("current_streak, longest_streak").eq("user_id", friend.id).maybeSingle();
-      setFriendStreak(streakData);
+      setFriendStreak(normalizeStreak(streakData));
 
       // Pet (mascota) del amigo
       const { data: petData } = await supabase
@@ -6300,7 +6307,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
       )}
 
       {/* Subtabs */}
-      <div style={{ display: "flex", gap: "0.25rem", marginBottom: "1.25rem", backgroundColor: palette.bgSoft, borderRadius: "12px", padding: "3px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
+      <div className="scrollbar-hide" style={{ display: "flex", gap: "0.25rem", marginBottom: "1.25rem", backgroundColor: palette.bgSoft, borderRadius: "12px", padding: "3px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {subtabs.map((t) => (
           <button
             key={t.id}
@@ -6549,6 +6556,55 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
 }
 
 // ============ NOTIFICATIONS SHEET ============
+// Texto corto de la publicación o comentario al que apunta una notificación,
+// para que dos likes a cosas distintas no parezcan duplicados.
+function snippet(text, max = 42) {
+  const t = (text || "").replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
+}
+function describePostTarget(post, book) {
+  if (!post) return null;
+  if (book?.title) return `«${book.title}»`;
+  if (post.content) {
+    try {
+      const parsed = JSON.parse(post.content);
+      if (parsed?.__folio_type === "quote" && parsed.text) return `la frase «${snippet(parsed.text)}»`;
+    } catch { /* texto normal */ }
+    return `«${snippet(post.content)}»`;
+  }
+  if (post.type === "reading_session") return "tu sesión de lectura";
+  if (post.type === "achievement") return "tu logro";
+  return null;
+}
+async function attachNotifTargets(notifs) {
+  const postIds = [...new Set(notifs.map((n) => n.post_id).filter(Boolean))];
+  const commentIds = [...new Set(notifs.map((n) => n.comment_id).filter(Boolean))];
+  const [postsRes, commentsRes] = await Promise.all([
+    postIds.length ? supabase.from("posts").select("id, type, content, book_id").in("id", postIds) : { data: [] },
+    commentIds.length ? supabase.from("comments").select("id, content").in("id", commentIds) : { data: [] },
+  ]);
+  if (postsRes.error) console.error("[notif] no se pudieron leer las publicaciones de las notificaciones:", postsRes.error.message);
+  if (commentsRes.error) console.error("[notif] no se pudieron leer los comentarios de las notificaciones:", commentsRes.error.message);
+  const postMap = {};
+  (postsRes.data || []).forEach((p) => { postMap[p.id] = p; });
+  const bookIds = [...new Set((postsRes.data || []).map((p) => p.book_id).filter(Boolean))];
+  const bookMap = {};
+  if (bookIds.length) {
+    const { data: bks, error } = await supabase.from("books").select("id, title").in("id", bookIds);
+    if (error) console.error("[notif] no se pudieron leer los libros de las notificaciones:", error.message);
+    (bks || []).forEach((b) => { bookMap[b.id] = b; });
+  }
+  const commentMap = {};
+  (commentsRes.data || []).forEach((c) => { commentMap[c.id] = c; });
+  return notifs.map((n) => {
+    const post = n.post_id ? postMap[n.post_id] : null;
+    const target = n.comment_id
+      ? (commentMap[n.comment_id]?.content ? `«${snippet(commentMap[n.comment_id].content)}»` : null)
+      : describePostTarget(post, post?.book_id ? bookMap[post.book_id] : null);
+    return { ...n, target };
+  });
+}
+
 function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
   const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
@@ -6586,7 +6642,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
         console.error("Error fetching notifications:", error);
         setNotifications([]);
       } else {
-        setNotifications(data || []);
+        setNotifications(await attachNotifTargets(data || []));
       }
     } catch (err) {
       console.error("Catch error notifications:", err);
@@ -6658,6 +6714,11 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                     <p style={{ margin: 0, fontSize: 14, lineHeight: 1.4, color: palette.ink }}>
                       <strong>{actorName}</strong>{" "}{typeLabel(notif.type)}
                     </p>
+                    {notif.target && (
+                      <p style={{ margin: "2px 0 0", fontSize: 12.5, color: palette.inkSoft, fontStyle: "italic", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {notif.target}
+                      </p>
+                    )}
                     <p style={{ margin: "2px 0 0", fontSize: 11, color: palette.inkFaint }}>
                       {notif.created_at ? new Date(notif.created_at).toLocaleDateString("es-MX", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
                     </p>
@@ -6976,6 +7037,21 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
   );
 }
 
+// Notificación de like: se crea SOLO si el like se guardó de verdad (antes se
+// insertaba en paralelo, también cuando el like ya existía → 23505) y una sola
+// vez por sesión para cada (tipo, objetivo): like → quitar → like ya no apila
+// dos notificaciones con la misma hora. El índice único de
+// supabase/lote_ui_2026-11-01.sql lo garantiza también en la base (23505 = ya existía).
+const _notifiedLikes = new Set();
+function notifyLike({ type, recipientId, actorId, postId = null, commentId = null }) {
+  const key = `${type}:${postId || commentId}:${actorId}`;
+  if (!recipientId || recipientId === actorId || _notifiedLikes.has(key)) return;
+  _notifiedLikes.add(key);
+  const payload = { user_id: recipientId, actor_id: actorId, type, read: false, ...(postId ? { post_id: postId } : { comment_id: commentId }) };
+  supabase.from("notifications").insert(payload)
+    .then(({ error }) => { if (error && error.code !== "23505") console.error("[notif] no se pudo crear la notificación:", error.message); });
+}
+
 function PostComments({ postId, user, onCountChange, postOwnerId }) {
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -7024,15 +7100,12 @@ function PostComments({ postId, user, onCountChange, postOwnerId }) {
     if (alreadyLiked) {
       supabase.from("comment_likes").delete().eq("comment_id", commentId).eq("user_id", user.id).then(revert);
     } else {
-      supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.id }).then(revert);
       const comment = comments.find(c => c.id === commentId);
-      if (!comment) { console.warn("[notif] like_comment: comment not found in state for id", commentId); }
-      else if (comment.user_id !== user.id) {
-        const notifPayload = { user_id: comment.user_id, actor_id: user.id, type: "like_comment", comment_id: commentId, read: false };
-        devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
-        supabase.from("notifications").insert(notifPayload)
-          .then(({ error }) => { if (error) console.error("[notif] no se pudo crear la notificación:", error.message); });
-      }
+      if (!comment) console.warn("[notif] like_comment: comment not found in state for id", commentId);
+      supabase.from("comment_likes").insert({ comment_id: commentId, user_id: user.id }).then((res) => {
+        revert(res);
+        if (!res.error && comment) notifyLike({ type: "like_comment", recipientId: comment.user_id, actorId: user.id, commentId });
+      });
     }
   }
 
@@ -7327,23 +7400,6 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
       <div style={{ position: "absolute", top: -50, right: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.1)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -25, left: -15, width: 90, height: 90, borderRadius: "50%", background: "rgba(0,0,0,0.07)", pointerEvents: "none" }} />
 
-      {/* Freeze button */}
-      {canFreeze && (
-        <button
-          onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
-          style={{
-            position: "absolute", top: "10px", right: "12px", zIndex: 5,
-            background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.4)",
-            borderRadius: "50%", width: "30px", height: "30px",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            cursor: "pointer",
-          }}
-          title="Congelar racha"
-        >
-          <Snowflake size={14} color="rgba(255,255,255,0.9)" strokeWidth={2} />
-        </button>
-      )}
-
       {/* Main content */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "18px 20px 14px" }}>
 
@@ -7396,7 +7452,24 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           </div>
         </div>
 
-        {/* Botón */}
+        {/* Botones: congelar + páginas en la misma fila (antes el copo era
+            position:absolute arriba a la derecha y se encimaba con "+ Páginas") */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        {canFreeze && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
+            aria-label="Congelar racha"
+            style={{
+              background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.4)",
+              borderRadius: "50%", width: "34px", height: "34px", flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+            }}
+            title="Congelar racha"
+          >
+            <Snowflake size={15} color="rgba(255,255,255,0.9)" strokeWidth={2} />
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onLog(); }}
           className="btn-press"
@@ -7407,13 +7480,14 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             color: palette.onAccent,
             border: "1.5px solid rgba(255,255,255,0.7)",
             borderRadius: "22px",
-            padding: "10px 18px",
+            padding: "10px 16px",
             fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "14px",
             flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer",
           }}
         >
           + Páginas
         </button>
+        </div>
       </div>
 
       {/* Barra de progreso diario */}
@@ -8087,7 +8161,7 @@ function SnacksCarousel({ onRead }) {
       <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, fontSize: "1rem", color: palette.ink, marginBottom: "0.75rem" }}>
         Más cuentos
       </p>
-      <div style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.5rem", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+      <div className="scrollbar-hide" style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
         {rest.map(c => (
           <button
             key={c.id}
@@ -8241,7 +8315,8 @@ function ProgressBarBook({ current = 0, total = 0, height = 6 }) {
         {has && <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", borderRadius: 999, backgroundColor: pct >= 100 ? palette.sage : palette.accent, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />}
       </div>
       <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, marginTop: "0.4rem" }}>
-        {has ? `${pct}% · ${current} de ${total} páginas` : `${current} páginas leídas`}
+        {/* Mismo formato siempre; sin total conocido no se inventa porcentaje */}
+        {has ? `${pct}% · ${current} de ${total} páginas` : `${current} ${current === 1 ? "página leída" : "páginas leídas"} · total desconocido`}
       </p>
     </div>
   );
@@ -8331,6 +8406,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const [leerOpen, setLeerOpen] = useState(false);
   const [logBook, setLogBook] = useState(null);
   const [progressNonce, setProgressNonce] = useState(0);
+  const [filledPages, setFilledPages] = useState({});
 
   const firstName = (user.name || "").trim().split(" ")[0] || "lector";
   const h = new Date().getHours();
@@ -8356,6 +8432,18 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
       });
   }, [user.id, isOnline, books.map((b) => b.id).join(","), progressNonce]);
 
+
+  // Respaldo al mostrar: libros "Leyendo" guardados sin total de páginas.
+  useEffect(() => {
+    if (!isOnline) return;
+    let cancelled = false;
+    books.filter((b) => b.status === "reading" && !b.totalPages).slice(0, 3).forEach((b) => {
+      fillMissingPageCount(b, user.id).then((pages) => {
+        if (!cancelled && pages) setFilledPages((prev) => ({ ...prev, [b.id]: pages }));
+      });
+    });
+    return () => { cancelled = true; };
+  }, [user.id, isOnline, books.map((b) => b.id).join(",")]);
 
   function openRead(book) {
     if (!book) return;
@@ -8418,7 +8506,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...ts.h3, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
                   <p style={{ ...ts.caption, marginBottom: sp.xs }}>{b.author}</p>
-                  <ProgressBarBook current={bookProgress[b.id] || 0} total={b.totalPages || 0} />
+                  <ProgressBarBook current={bookProgress[b.id] || 0} total={b.totalPages || filledPages[b.id] || 0} />
                 </div>
               </button>
             ))}
@@ -8750,15 +8838,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     if (alreadyLiked) {
       supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", user.id).then(revert);
     } else {
-      supabase.from("post_likes").insert({ post_id: postId, user_id: user.id }).then(revert);
       const post = posts.find(p => p.id === postId);
-      if (!post) { console.warn("[notif] like_post: post not found in state for id", postId); }
-      else if (post.user_id !== user.id) {
-        const notifPayload = { user_id: post.user_id, actor_id: user.id, type: "like_post", post_id: postId, read: false };
-        devLog("[like-insert-pre] Inserting into notifications:", notifPayload);
-        supabase.from("notifications").insert(notifPayload)
-          .then(({ error }) => { if (error) console.error("[notif] no se pudo crear la notificación:", error.message); });
-      }
+      if (!post) console.warn("[notif] like_post: post not found in state for id", postId);
+      supabase.from("post_likes").insert({ post_id: postId, user_id: user.id }).then((res) => {
+        revert(res);
+        if (!res.error && post) notifyLike({ type: "like_post", recipientId: post.user_id, actorId: user.id, postId });
+      });
     }
   }
 
@@ -8904,10 +8989,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.inkSoft, marginBottom: "8px" }}>
             Leyendo ahora
           </p>
-          <div style={{ display: "flex", gap: 12, overflowX: "auto", padding: "4px 0 10px", WebkitOverflowScrolling: "touch", borderBottom: `1px solid ${palette.borderSoft}` }}>
+          <div className="scrollbar-hide" style={{ display: "flex", gap: 6, overflowX: "auto", padding: "4px 0 10px", WebkitOverflowScrolling: "touch", borderBottom: `1px solid ${palette.borderSoft}` }}>
             {friendsReading.map(({ book, friend }) => {
-              const firstName = (friend.nombre || "").split(" ")[0];
-              const displayName = firstName.length > 6 ? firstName.slice(0, 6) + "…" : firstName;
+              // Nombre de pila completo; el recorte lo hace CSS solo si no cabe
+              // (antes se cortaba a mano en 6 letras: "Marian…", "Claudi…").
+              const displayName = (friend.nombre || "").split(" ")[0];
               const isOpen = openPopover?.id === book.id;
               return (
                 <button
@@ -8918,7 +9004,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     setOpenPopover({ id: book.id, rect, book, friend });
                   }}
                   className="friend-strip-btn"
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 64, flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 74, flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                 >
                   <div style={{ position: "relative" }}>
                     {friend.avatar_url ? (
@@ -8930,7 +9016,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     )}
                     <div className="pulse-dot" style={{ position: "absolute", bottom: 1, right: 1, width: 8, height: 8, borderRadius: "50%", backgroundColor: palette.session, border: `2px solid ${palette.bgCard}` }} />
                   </div>
-                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 10, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
+                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 11, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
                     {displayName}
                   </p>
                 </button>
@@ -11011,7 +11097,7 @@ function BookFinishedCelebration({ book, user, allBooks, onClose, onGoToExplorer
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
     const monthStr = monthStart.toISOString();
     const [{ data: streakData }, { count: monthCount }, achievedKeys, { count: fc }] = await Promise.all([
-      supabase.from("user_streaks").select("current_streak,longest_streak").eq("user_id", user.id).maybeSingle(),
+      fetchStreakRow(user.id).then((data) => ({ data })).catch((err) => { console.error("[streak] celebración: no se pudo leer la racha:", err?.message || err); return { data: null }; }),
       supabase.from("books").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", "read").gte("finished_at", monthStr),
       checkAchievements(user.id, user.name, { silent: true }),
       supabase.from("friendships").select("id", { count: "exact", head: true }).or(`user_id.eq.${user.id},friend_id.eq.${user.id}`).eq("status", "accepted"),
@@ -11683,10 +11769,20 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       }
       // p === undefined → tabla ausente/error: no mostrar mascota ni onboarding
     });
-    supabase.from("user_streaks").select("current_streak, total_pages_read").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => { if (!cancelled && data) setPetStreak(data); });
     return () => { cancelled = true; };
   }, [user.id]);
+
+  // Racha para Home/RachaModal: fila completa y normalizada (antes solo
+  // current_streak → "Tu mejor: 0"). Se relee al volver a Home para reflejar
+  // sesiones registradas en Social.
+  useEffect(() => {
+    if (tab !== "home") return;
+    let cancelled = false;
+    fetchStreakRow(user.id)
+      .then((row) => { if (!cancelled && row) setPetStreak(row); })
+      .catch((err) => console.error("[streak] home: no se pudo leer la racha:", err?.message || err));
+    return () => { cancelled = true; };
+  }, [user.id, tab]);
 
   // Reaccionar a cambios de XP/nivel de la mascota
   useEffect(() => {
@@ -11723,7 +11819,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   async function addBook(rawBook) {
     // BookTinder y BookPreviewModal llaman sin `id`: sin uno propio, el libro
     // se guardaba bien pero la celebración y el post usaban id undefined.
-    const book = rawBook.id ? rawBook : { ...rawBook, id: crypto.randomUUID() };
+    const withId = rawBook.id ? rawBook : { ...rawBook, id: crypto.randomUUID() };
+    // pageCount (Google Books / catálogo) → totalPages, que es lo que lee la UI.
+    const book = !withId.totalPages && withId.pageCount ? { ...withId, totalPages: withId.pageCount } : withId;
     const withFinished =
       book.status === "read" && !book.finishedAt ? { ...book, finishedAt: Date.now() } : book;
     setBooks((prev) => [withFinished, ...prev]);
@@ -11731,6 +11829,14 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       const dbId = await insertBook(withFinished, user.id);
       if (dbId && dbId !== withFinished.id) {
         setBooks((prev) => prev.map((b) => b.id === withFinished.id ? { ...b, id: dbId } : b));
+      }
+      // Sin número de páginas (BookTinder, recomendaciones, vista previa, manual):
+      // se completa desde Google Books en segundo plano para el progreso.
+      if (!withFinished.totalPages && !withFinished.pageCount) {
+        const savedId = dbId || withFinished.id;
+        fillMissingPageCount({ ...withFinished, id: savedId }, user.id).then((pages) => {
+          if (pages) setBooks((prev) => prev.map((b) => (b.id === savedId ? { ...b, totalPages: pages } : b)));
+        });
       }
       if (book.status === "reading") {
         checkAchievements(user.id, user.name);
@@ -12126,7 +12232,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         </div>
       )}
       <AppHeader tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
-      <main className="max-w-4xl mx-auto pb-24 sm:pb-10 fade-in" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
+      <main className="max-w-4xl mx-auto fade-in main-fab-clearance" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
         {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} onOpenNotifs={() => setNotifsSheetOpen(true)} unreadNotifs={unreadNotifs} pendingCount={pendingCount} /></div>}

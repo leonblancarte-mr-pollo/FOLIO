@@ -476,6 +476,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
       summary:  book.description || null,
       coverUrl: book.coverUrl || null,
       isbn:     book.isbn || null,
+      pageCount: book.pages || null,
       moodTags: [],
       rating:   0,
     });

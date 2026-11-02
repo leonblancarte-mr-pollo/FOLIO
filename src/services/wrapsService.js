@@ -26,6 +26,9 @@ function pickWrapPhrase(bookCount, currentStreak, isBestPeriod, isAnnual) {
   return [base, ...extras].join(" ");
 }
 
+// Fecha YYYY-MM-01 para filtrar reading_logs.log_date (columna DATE).
+const ymd = (y, m) => `${y}-${String(m).padStart(2, "0")}-01`;
+
 async function generateMonthWrap(userId, month, year) {
   const startISO = new Date(year, month - 1, 1).toISOString();
   const endISO   = new Date(year, month, 1).toISOString();
@@ -38,8 +41,9 @@ async function generateMonthWrap(userId, month, year) {
     supabase.from("books").select("id,title,author,cover_url,rating,genre,finished_at")
       .eq("user_id", userId).eq("status", "read")
       .gte("finished_at", startISO).lt("finished_at", endISO),
-    supabase.from("reading_logs").select("pages_read,logged_at")
-      .eq("user_id", userId).gte("logged_at", startISO).lt("logged_at", endISO),
+    // log_date (fecha de la racha), no logged_at: este último puede ser NULL.
+    supabase.from("reading_logs").select("pages_read,log_date")
+      .eq("user_id", userId).gte("log_date", ymd(year, month)).lt("log_date", month === 12 ? ymd(year + 1, 1) : ymd(year, month + 1)),
     supabase.from("achievements").select("achievement_key,unlocked_at")
       .eq("user_id", userId).gte("unlocked_at", startISO).lt("unlocked_at", endISO),
     supabase.from("books").select("id", { count: "exact", head: true })
@@ -96,8 +100,9 @@ async function generateAnnualWrap(userId, year) {
     supabase.from("books").select("id,title,author,cover_url,rating,genre,finished_at")
       .eq("user_id", userId).eq("status", "read")
       .gte("finished_at", startISO).lt("finished_at", endISO),
-    supabase.from("reading_logs").select("pages_read,logged_at")
-      .eq("user_id", userId).gte("logged_at", startISO).lt("logged_at", endISO),
+    // log_date (fecha de la racha), no logged_at: este último puede ser NULL.
+    supabase.from("reading_logs").select("pages_read,log_date")
+      .eq("user_id", userId).gte("log_date", ymd(year, 1)).lt("log_date", ymd(year + 1, 1)),
     supabase.from("books").select("id", { count: "exact", head: true })
       .eq("user_id", userId).eq("status", "read")
       .gte("finished_at", prevStart).lt("finished_at", prevEnd),
