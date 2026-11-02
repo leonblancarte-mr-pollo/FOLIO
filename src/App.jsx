@@ -1950,7 +1950,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
       <div className="px-4 sm:px-6 pt-2 scrollbar-hide" style={{ display: "flex", gap: "0.8rem", overflowX: "auto" }}>
         {[0, 1, 2].map((i) => (
           <div key={i} style={{ width: 130, flexShrink: 0 }}>
-            <div style={{ width: 130, height: 180, borderRadius: 10, backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+            <div style={{ width: 130, height: 180, borderRadius: 10, backgroundColor: palette.superficieSuave, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
           </div>
         ))}
         <style>{`@keyframes skeletonPulse { 0%,100% { opacity:1; } 50% { opacity:0.55; } }`}</style>
@@ -1979,20 +1979,22 @@ function CollaborativeRecommendations({ user, onAdd }) {
               <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: "2px 0 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.author}
               </p>
+              {/* Botón silencioso (la única acción rellena de la pestaña es la del quiz): 44 px, sin durazno como texto */}
               <button
                 onClick={() => handleAdd(item)}
                 disabled={added}
                 className="btn-press"
                 style={{
-                  width: "100%", padding: "0.4rem", borderRadius: 8,
-                  border: `1px solid ${added ? palette.borderSoft : palette.accent}`,
-                  backgroundColor: added ? palette.bgSoft : "transparent",
-                  color: added ? palette.inkFaint : palette.accent,
+                  width: "100%", minHeight: 44, padding: "0 0.4rem", borderRadius: 999,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
+                  border: added ? "none" : `1.5px solid ${palette.inkSoft}`,
+                  backgroundColor: "transparent",
+                  color: added ? palette.success : palette.ink,
                   cursor: added ? "default" : "pointer",
-                  ...body, fontSize: "0.78rem", fontWeight: 600,
+                  ...body, fontSize: "14px", fontWeight: 600,
                 }}
               >
-                {added ? "Guardado ✓" : "+ Guardar"}
+                {added ? <><Check size={15} /> Guardado</> : <><Plus size={15} /> Guardar</>}
               </button>
             </div>
           );
@@ -2002,13 +2004,121 @@ function CollaborativeRecommendations({ user, onAdd }) {
   );
 }
 
+// ── «Recomiéndame» como conversación (Explorar → Para ti) ──
+// El gato pregunta en globos (superficieSuave + ink) y las opciones son burbujas
+// tocables del lado del usuario; la respuesta elegida queda en el hilo como globo
+// firma (lila + onFirma). Los VALORES de las opciones (lo que recibe
+// getMoodRecommendations) no cambian: solo el texto que dice el gato.
+const RECO_QUIZ_STEPS = [
+  {
+    key: "mood",
+    ask: "Para empezar: ¿cómo andas ahorita?",
+    options: ["Contemplativo, reflexivo", "Aventurero, con ganas de acción", "Melancólico, introspectivo", "Curioso, con ganas de aprender", "Ligero, divertido", "Intenso, profundo"],
+  },
+  {
+    key: "time",
+    ask: "¿Cuánto tiempo hay para leer? Un ratito cuenta igual.",
+    options: ["Ratitos cortos (5-15 min por sesión)", "Sesiones medianas (15-40 min)", "Sesiones largas (40 min a 1 hora+)"],
+  },
+  {
+    key: "challenge",
+    ask: "¿Qué tan pesado lo quieres? Sin juicio: a veces la cabeza pide tregua.",
+    options: ["Fácil de leer, que fluya solo", "Ni fácil ni difícil, equilibrado", "Retadora, que me haga pensar"],
+  },
+  {
+    key: "openness",
+    ask: "¿Algo parecido a lo que ya te gustó, o te avientas a lo desconocido?",
+    options: ["Algo similar a lo que ya me gustó", "Salir de mi zona de confort", "Sorpréndeme, lo que sea"],
+  },
+];
+const RECO_INTRO = "Elegir qué leer es de las pocas decisiones que sí dependen de uno. Te hago unas preguntas y te paso ideas.";
+const RECO_EXTRA_ASK = "Última, y es opcional: ¿algo más que deba saber? Un autor, un país, un final abierto…";
+
+// Avatar del gato en disco firma (como en Inicio y Descubrir): el gato negro no se pierde en oscuro.
+function RecoCatAvatar({ hidden = false }) {
+  return (
+    <div aria-hidden style={{
+      width: 36, height: 36, borderRadius: "50%", flexShrink: 0, alignSelf: "flex-end",
+      backgroundColor: hidden ? "transparent" : palette.firma,
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {!hidden && <img src="/pets/cat.png" alt="" width={28} height={28} style={{ display: "block", objectFit: "contain" }} />}
+    </div>
+  );
+}
+
+// Globo del gato. `avatar={false}` en globos seguidos del gato: deja el hueco sin repetir la cara.
+function RecoCatBubble({ children, avatar = true }) {
+  return (
+    <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: "88%" }}>
+      <RecoCatAvatar hidden={!avatar} />
+      <div style={{
+        ...body, fontSize: "15px", lineHeight: 1.45, color: palette.ink,
+        backgroundColor: palette.superficieSuave,
+        padding: "0.65rem 0.95rem", borderRadius: "18px 18px 18px 6px",
+      }}>
+        <span className="sr-only">El gato dice: </span>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Globo del usuario (respuesta ya elegida). Tocarlo regresa a esa pregunta.
+function RecoUserBubble({ children, onEdit }) {
+  const style = {
+    ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.4, textAlign: "left",
+    color: palette.onFirma, backgroundColor: palette.firma, border: "none",
+    padding: "0.65rem 0.95rem", minHeight: 44, borderRadius: "18px 18px 6px 18px",
+    alignSelf: "flex-end", maxWidth: "82%",
+  };
+  if (!onEdit) return <p style={{ ...style, margin: 0 }}>{children}</p>;
+  return (
+    <button onClick={onEdit} className="quiz-pill-press" aria-label={`Cambiar respuesta: ${children}`} style={{ ...style, cursor: "pointer" }}>
+      {children}
+    </button>
+  );
+}
+
+// Escribiendo… (tres puntos) mientras la IA responde.
+function RecoTyping() {
+  return (
+    <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }} role="status">
+      <RecoCatAvatar />
+      <div style={{ backgroundColor: palette.superficieSuave, padding: "0.95rem 1.05rem", borderRadius: "18px 18px 18px 6px", display: "flex", gap: 5 }}>
+        <span className="sr-only">El gato está pensando</span>
+        {[0, 1, 2].map((i) => (
+          <span key={i} aria-hidden className="reco-typing-dot" style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: palette.ink, animationDelay: `${i * 160}ms` }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({ mood: "", time: "", challenge: "", openness: "", extra: "" });
+  const [draftExtra, setDraftExtra] = useState("");
+  const [sent, setSent] = useState(false); // ya se mandó el paso 5 (con texto o saltado)
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
   const [addedTitles, setAddedTitles] = useState(new Set());
+  const endRef = useRef(null);
+  const lastThreadKey = useRef(null);
+  const resultsRef = useRef(null);
+
+  // Scroll natural: cada mensaje nuevo baja el hilo hasta el último globo. Se compara con el
+  // estado anterior (no con «ya montó») para que el doble efecto de StrictMode no mueva la
+  // pantalla al abrir la pestaña.
+  useEffect(() => {
+    const key = `${step}|${sent}|${loading}|${error}|${results ? 1 : 0}`;
+    if (lastThreadKey.current === null || lastThreadKey.current === key) { lastThreadKey.current = key; return; }
+    lastThreadKey.current = key;
+    // Con resultados se muestra desde el «Listo» del gato (no desde el final de la lista).
+    const target = results ? resultsRef.current : endRef.current;
+    target?.scrollIntoView({ behavior: "smooth", block: results ? "start" : "nearest" });
+  }, [step, sent, loading, error, results]);
 
   if (books.length === 0) {
     return (
@@ -2021,17 +2131,20 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     );
   }
 
-
   async function fetchRecs(answersOverride) {
     setLoading(true);
     setError("");
+    setResults(null);
     try {
       const ans = answersOverride ?? answers;
       const res = await getMoodRecommendations(books, ans);
       setResults(res);
     } catch (e) {
       console.error(e);
-      setError(e.message || "Algo salió mal. Intenta de nuevo.");
+      // El gato no repite errores técnicos: solo distingue «mucha gente» del resto.
+      setError(/solicitudes/i.test(e?.message || "")
+        ? "Hay mucha gente preguntando ahorita. Dame un minuto y lo volvemos a intentar."
+        : "Se me trabó algo y no pude pensar bien. No es tu culpa; lo intentamos otra vez.");
     } finally {
       setLoading(false);
     }
@@ -2040,9 +2153,37 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   function reset() {
     setStep(0);
     setAnswers({ mood: "", time: "", challenge: "", openness: "", extra: "" });
+    setDraftExtra("");
+    setSent(false);
     setResults(null);
     setError("");
     setAddedTitles(new Set());
+  }
+
+  function choose(key, opt) {
+    setAnswers({ ...answers, [key]: opt });
+    setStep(step + 1);
+  }
+
+  // Regresar a una pregunta ya contestada: se borra de ahí en adelante para que el hilo cuadre.
+  function editStep(i) {
+    if (loading) return;
+    const cleared = { ...answers };
+    RECO_QUIZ_STEPS.slice(i).forEach((q) => { cleared[q.key] = ""; });
+    cleared.extra = "";
+    setAnswers(cleared);
+    setDraftExtra("");
+    setSent(false);
+    setResults(null);
+    setError("");
+    setStep(i);
+  }
+
+  function send(extra) {
+    const next = { ...answers, extra };
+    setAnswers(next);
+    setSent(true);
+    fetchRecs(next);
   }
 
   function handleAddSuggestion(suggestion) {
@@ -2062,383 +2203,229 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     setAddedTitles(new Set([...addedTitles, suggestion.title.toLowerCase().trim()]));
   }
 
-  if (results) {
-    const readTitlesLower = new Set(
-      books.filter((b) => b.status === "read").map((b) => b.title.toLowerCase().trim())
-    );
+  const optionStyle = {
+    ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.3, color: palette.ink,
+    backgroundColor: "transparent", border: `1.5px solid ${palette.inkSoft}`,
+    borderRadius: 999, minHeight: 44, padding: "0.55rem 1.1rem", cursor: "pointer", textAlign: "left",
+  };
+  const quietBtn = {
+    ...body, fontSize: "15px", fontWeight: 500, color: palette.inkSoft,
+    background: "none", border: "none", minHeight: 44, padding: "0 0.5rem",
+    display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer",
+  };
 
+  // ── Hilo de la conversación ──
+  const thread = [];
+  thread.push(<RecoCatBubble key="intro">{RECO_INTRO}</RecoCatBubble>);
+  RECO_QUIZ_STEPS.forEach((q, i) => {
+    if (i > step) return;
+    thread.push(<RecoCatBubble key={`q${i}`} avatar={i !== 0}>{q.ask}</RecoCatBubble>);
+    if (i < step && answers[q.key]) {
+      thread.push(<RecoUserBubble key={`a${i}`} onEdit={loading ? null : () => editStep(i)}>{answers[q.key]}</RecoUserBubble>);
+    }
+  });
+  if (step >= 4) {
+    thread.push(<RecoCatBubble key="qextra">{RECO_EXTRA_ASK}</RecoCatBubble>);
+    if (sent) thread.push(<RecoUserBubble key="aextra">{answers.extra || "Nada más, así está bien."}</RecoUserBubble>);
+  }
+
+  // ── Resultados ──
+  let resultsBlock = null;
+  if (results) {
+    const readTitlesLower = new Set(books.filter((b) => b.status === "read").map((b) => b.title.toLowerCase().trim()));
     const fromLibraryMatched = (results.fromLibrary || [])
       .map((r) => {
-        const book = books.find(
-          (b) =>
-            b.title.toLowerCase().trim() === r.title.toLowerCase().trim() &&
-            b.status !== "read"
-        );
+        const book = books.find((b) => b.title.toLowerCase().trim() === r.title.toLowerCase().trim() && b.status !== "read");
         return book ? { ...r, book } : null;
       })
       .filter(Boolean);
-
     const allTitlesLower = new Set(books.map((b) => b.title.toLowerCase().trim()));
-    const newSuggestions = (results.newSuggestions || []).filter(
-      (s) => !readTitlesLower.has(s.title.toLowerCase().trim())
-    );
+    const newSuggestions = (results.newSuggestions || []).filter((s) => !readTitlesLower.has(s.title.toLowerCase().trim()));
+    const empty = fromLibraryMatched.length === 0 && newSuggestions.length === 0;
 
-    return (
-      <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto">
-        <div className="mb-5">
-          <p
-            style={{
-              ...display,
-              fontSize: "0.78rem",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: palette.amber,
-              fontWeight: 600,
-            }}
-          >
-            ✦ Para tu mood actual
-          </p>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-            <h2 style={{ ...display, fontSize: "1.6rem", color: palette.ink }}>
-              Mis sugerencias
-            </h2>
-            <button
-              onClick={() => fetchRecs(answers)}
-              disabled={loading}
-              className="btn-press"
-              style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "0.35rem", padding: "0.45rem 0.9rem", borderRadius: 999, border: `1.5px solid ${palette.accent}`, backgroundColor: "transparent", color: palette.accent, cursor: loading ? "default" : "pointer", ...display, fontSize: "0.82rem", fontWeight: 600, opacity: loading ? 0.6 : 1 }}
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : "🎲"} Sorpréndeme
-            </button>
-          </div>
+    const sectionTitle = { ...display, fontSize: "18px", fontWeight: 700, color: palette.ink, margin: "1.75rem 0 0.25rem" };
+    const rowTitle = { ...display, fontSize: "17px", fontWeight: 700, color: palette.ink, lineHeight: 1.25, margin: 0 };
+    const rowAuthor = { ...body, fontSize: "14px", color: palette.inkSoft, margin: "0.15rem 0 0" };
+    const rowReason = { ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, margin: "0.5rem 0 0" };
+    const coverBox = { position: "relative", width: 64, height: 92, borderRadius: 6, overflow: "hidden", flexShrink: 0 };
+
+    resultsBlock = (
+      <>
+        <div ref={resultsRef} style={{ scrollMarginTop: 80, marginTop: "0.6rem" }}>
+        <RecoCatBubble>
+          {empty
+            ? "Esta vez no di con nada que te quede. Pasa. ¿Probamos con otro ánimo?"
+            : "Listo. Esto es lo que yo leería en tu lugar hoy."}
+        </RecoCatBubble>
         </div>
 
         {fromLibraryMatched.length > 0 && (
-          <div className="mb-7">
-            <h3
-              style={{
-                ...display,
-                fontSize: "0.85rem",
-                color: palette.inkFaint,
-                fontWeight: 500,
-                marginBottom: "0.75rem",
-              }}
-            >
-              De tu biblioteca
-            </h3>
-            <div className="space-y-3">
+          <section aria-label="De tu biblioteca">
+            <h3 style={sectionTitle}>De tu biblioteca</h3>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {fromLibraryMatched.map((r, i) => (
-                <button
-                  key={i}
-                  onClick={() => onSelectBook(r.book)}
-                  className="w-full text-left p-4 rounded-md transition-all hover:-translate-y-0.5"
-                  style={{
-                    backgroundColor: palette.bgCard,
-                    border: `1px solid ${palette.borderSoft}`,
-                  }}
-                >
-                  <div className="flex gap-3">
-                    {r.book.coverUrl ? (
-                      <img
-                        src={r.book.coverUrl}
-                        alt={r.book.title}
-                        className="rounded-sm flex-shrink-0"
-                        style={{ width: 60, height: 86, objectFit: "cover", boxShadow: "0 2px 8px rgba(42,31,26,0.15)" }}
-                      />
-                    ) : (
-                      <BookCoverPlaceholder title={r.book.title} author={r.book.author} width={60} height={86} />
-                    )}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3
-                          style={{
-                            ...display,
-                            fontWeight: 600,
-                            fontSize: "1.05rem",
-                            color: palette.ink,
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {r.book.title}
-                        </h3>
-                        <StatusBadge status={r.book.status} />
-                      </div>
-                      <p style={{ ...body, fontStyle: "italic", color: palette.inkSoft, fontSize: "0.9rem" }}>
-                        {r.book.author}
-                      </p>
-                      <p
-                        style={{
-                          ...body,
-                          color: palette.ink,
-                          fontSize: "0.92rem",
-                          marginTop: "0.5rem",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {r.reason}
-                      </p>
+                <li key={i} style={{ borderTop: i ? `1px solid ${palette.borderSoft}` : "none" }}>
+                  <button
+                    onClick={() => onSelectBook(r.book)}
+                    className="w-full text-left"
+                    style={{ display: "flex", gap: "0.9rem", padding: "1rem 0", background: "none", border: "none", cursor: "pointer" }}
+                  >
+                    <div style={coverBox}>
+                      <BookCoverImage coverUrl={r.book.coverUrl} title={r.book.title} author={r.book.author} genres={r.book.genre ? [r.book.genre] : []} alt="" compact />
                     </div>
-                  </div>
-                </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={rowTitle}>{r.book.title}</p>
+                      <p style={rowAuthor}>
+                        {r.book.author}
+                        {STATUS_META[r.book.status] && <> · {STATUS_META[r.book.status].label}</>}
+                      </p>
+                      <p style={rowReason}>{r.reason}</p>
+                    </div>
+                  </button>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         )}
 
         {newSuggestions.length > 0 && (
-          <div>
-            <h3
-              style={{
-                ...display,
-                fontSize: "0.85rem",
-                color: palette.mauve,
-                fontWeight: 500,
-                marginBottom: "0.75rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-              }}
-            >
-              <Sparkles size={13} /> Para descubrir
-            </h3>
-            <div className="space-y-3">
+          <section aria-label="Para descubrir">
+            <h3 style={sectionTitle}>Para descubrir</h3>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {newSuggestions.map((s, i) => {
-                const isAdded =
-                  addedTitles.has(s.title.toLowerCase().trim()) ||
-                  allTitlesLower.has(s.title.toLowerCase().trim());
+                const isAdded = addedTitles.has(s.title.toLowerCase().trim()) || allTitlesLower.has(s.title.toLowerCase().trim());
                 return (
-                  <div
-                    key={i}
-                    className="p-4 rounded-md"
-                    style={{
-                      backgroundColor: palette.bgCard,
-                      border: `1px solid ${palette.borderSoft}`,
-                    }}
-                  >
-                    <h3
-                      style={{
-                        ...display,
-                        fontWeight: 600,
-                        fontSize: "1.05rem",
-                        color: palette.ink,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {s.title}
-                    </h3>
-                    <p
-                      style={{ ...body, fontStyle: "italic", color: palette.inkSoft, fontSize: "0.9rem" }}
-                    >
-                      {s.author}
-                      {s.genre && (
-                        <span style={{ color: palette.inkFaint, fontStyle: "normal" }}> · {s.genre}</span>
-                      )}
-                    </p>
-                    {s.summary && (
-                      <p
+                  <li key={i} style={{ display: "flex", gap: "0.9rem", padding: "1rem 0", borderTop: i ? `1px solid ${palette.borderSoft}` : "none" }}>
+                    <div style={coverBox}>
+                      <BookCoverImage coverUrl={null} title={s.title} author={s.author} genres={s.genre ? [s.genre] : []} alt="" compact />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={rowTitle}>{s.title}</p>
+                      <p style={rowAuthor}>{s.author}{s.genre && <> · {s.genre}</>}</p>
+                      {s.summary && <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, lineHeight: 1.45, margin: "0.4rem 0 0" }}>{s.summary}</p>}
+                      <p style={rowReason}>{s.reason}</p>
+                      <button
+                        onClick={() => handleAddSuggestion(s)}
+                        disabled={isAdded}
+                        className="btn-press"
                         style={{
-                          ...body,
-                          color: palette.inkSoft,
-                          fontSize: "0.88rem",
-                          marginTop: "0.4rem",
-                          fontStyle: "italic",
-                          lineHeight: 1.4,
+                          marginTop: "0.6rem", minHeight: 44, padding: isAdded ? "0" : "0 1rem", borderRadius: 999,
+                          display: "inline-flex", alignItems: "center", gap: "0.4rem",
+                          ...body, fontSize: "15px", fontWeight: 600,
+                          backgroundColor: "transparent",
+                          color: isAdded ? palette.success : palette.ink,
+                          border: isAdded ? "none" : `1.5px solid ${palette.inkSoft}`,
+                          cursor: isAdded ? "default" : "pointer",
                         }}
                       >
-                        {s.summary}
-                      </p>
-                    )}
-                    <p
-                      style={{
-                        ...body,
-                        color: palette.ink,
-                        fontSize: "0.92rem",
-                        marginTop: "0.5rem",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {s.reason}
-                    </p>
-                    <button
-                      onClick={() => handleAddSuggestion(s)}
-                      disabled={isAdded}
-                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all"
-                      style={{
-                        ...display,
-                        fontSize: "0.85rem",
-                        fontWeight: 500,
-                        backgroundColor: isAdded ? "transparent" : palette.mauve,
-                        color: isAdded ? palette.mauve : palette.onAccent,
-                        border: `1px solid ${palette.mauve}`,
-                        opacity: isAdded ? 0.7 : 1,
-                        cursor: isAdded ? "default" : "pointer",
-                      }}
-                    >
-                      {isAdded ? (
-                        <>
-                          <Check size={13} /> Agregado a Quiero leer
-                        </>
-                      ) : (
-                        <>
-                          <Heart size={13} /> Agregar a Quiero leer
-                        </>
-                      )}
-                    </button>
-                  </div>
+                        {isAdded ? <><Check size={16} /> En Quiero leer</> : <><Bookmark size={16} /> Agregar a Quiero leer</>}
+                      </button>
+                    </div>
+                  </li>
                 );
               })}
+            </ul>
+          </section>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem", marginTop: "1.25rem" }}>
+          <button onClick={reset} style={quietBtn}>
+            <ChevronLeft size={16} /> Empezar de nuevo
+          </button>
+          <button onClick={() => fetchRecs(answers)} style={{ ...quietBtn, color: palette.ink }}>
+            <Wand2 size={16} /> Otras ideas
+          </button>
+        </div>
+      </>
+    );
+  }
+
+  const questionNumber = Math.min(step + 1, 5);
+  const current = step < 4 ? RECO_QUIZ_STEPS[step] : null;
+
+  return (
+    <div className="px-4 sm:px-6 pt-4 pb-8 max-w-xl mx-auto">
+      {!results && (
+        <p style={{ ...ts.label, margin: "0 0 1rem" }} aria-live="polite">
+          Pregunta {questionNumber} de 5{step >= 4 ? " · opcional" : ""}
+        </p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+        {thread}
+
+        {/* Opciones de la pregunta actual: burbujas tocables del lado del usuario */}
+        {current && (
+          <div role="group" aria-label={current.ask} className="fade-in" style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.4rem" }}>
+            {current.options.map((opt) => (
+              <button key={opt} onClick={() => choose(current.key, opt)} className="quiz-pill-press" style={optionStyle}>
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {current && step > 0 && (
+          <div>
+            <button onClick={() => editStep(step - 1)} style={quietBtn}>
+              <ChevronLeft size={16} /> Volver
+            </button>
+          </div>
+        )}
+
+        {/* Paso 5: caja de texto tipo mensajería */}
+        {step >= 4 && !sent && (
+          <div className="fade-in" style={{ marginTop: "0.4rem" }}>
+            <label htmlFor="reco-extra" className="sr-only">Algo más para el gato (opcional)</label>
+            <textarea
+              id="reco-extra"
+              value={draftExtra}
+              onChange={(e) => setDraftExtra(e.target.value.slice(0, 200))}
+              maxLength={200}
+              rows={3}
+              placeholder="Ej.: nada muy largo, algo mexicano…"
+              style={{ width: "100%", padding: "0.75rem 1rem", backgroundColor: palette.bg, border: `1.5px solid ${palette.inkSoft}`, borderRadius: 18, ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, outline: "none", resize: "none", boxSizing: "border-box" }}
+            />
+            <p style={{ ...ts.caption, textAlign: "right", margin: "0.2rem 0 0.6rem" }}>{draftExtra.length}/200</p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+              <button onClick={() => editStep(3)} style={quietBtn}>
+                <ChevronLeft size={16} /> Volver
+              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                <button onClick={() => send("")} style={quietBtn}>Saltar</button>
+                <button
+                  onClick={() => send(draftExtra.trim())}
+                  className="btn-press"
+                  style={{ minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...body, fontSize: "15px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}
+                >
+                  <Send size={16} /> Ver ideas
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {fromLibraryMatched.length === 0 && newSuggestions.length === 0 && (
-          <p style={{ ...body, color: palette.inkSoft, fontStyle: "italic" }}>
-            No encontré buenas coincidencias esta vez. Intenta con otro mood.
-          </p>
+        {loading && <RecoTyping />}
+
+        {error && !loading && (
+          <>
+            <RecoCatBubble>{error}</RecoCatBubble>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.25rem", marginTop: "0.2rem" }}>
+              <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>
+              <button
+                onClick={() => fetchRecs(answers)}
+                className="btn-press"
+                style={{ minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent, border: "none", ...body, fontSize: "15px", fontWeight: 600, cursor: "pointer" }}
+              >
+                Intentar otra vez
+              </button>
+            </div>
+          </>
         )}
-        <button
-          onClick={reset}
-          className="mt-7 w-full py-3 rounded-full"
-          style={{
-            ...display,
-            backgroundColor: "transparent",
-            color: palette.inkSoft,
-            border: `1px solid ${palette.border}`,
-          }}
-        >
-          Empezar de nuevo
-        </button>
       </div>
-    );
-  }
 
-  if (loading) {
-    return <LoadingEntertainment label="Pensando en lo que te encajaría…" />;
-  }
-
-  const QUIZ_STEPS = [
-    {
-      key: "mood",
-      title: "¿Cómo te sientes ahora?",
-      options: ["Contemplativo, reflexivo", "Aventurero, con ganas de acción", "Melancólico, introspectivo", "Curioso, con ganas de aprender", "Ligero, divertido", "Intenso, profundo"],
-    },
-    {
-      key: "time",
-      title: "¿Cuánto tiempo tienes para leer?",
-      options: ["Ratitos cortos (5-15 min por sesión)", "Sesiones medianas (15-40 min)", "Sesiones largas (40 min a 1 hora+)"],
-    },
-    {
-      key: "challenge",
-      title: "¿Qué tipo de lectura buscas?",
-      options: ["Fácil de leer, que fluya solo", "Ni fácil ni difícil, equilibrado", "Retadora, que me haga pensar"],
-    },
-    {
-      key: "openness",
-      title: "¿Quieres explorar o profundizar?",
-      options: ["Algo similar a lo que ya me gustó", "Salir de mi zona de confort", "Sorpréndeme, lo que sea"],
-    },
-  ];
-
-  const pillStyle = (selected) => ({
-    padding: "12px 24px",
-    borderRadius: "24px",
-    minWidth: "160px",
-    border: selected ? "none" : `1px solid ${palette.border}`,
-    backgroundColor: selected ? BRAND.wineDeep : palette.bgSoft,
-    color: selected ? palette.onColor : palette.ink,
-    fontFamily: "Figtree, system-ui, sans-serif",
-    fontSize: "15px",
-    fontWeight: 500,
-    cursor: "pointer",
-    transition: "all 0.2s",
-    transform: "scale(1)",
-  });
-
-  const ProgressBar = () => (
-    <div style={{ display: "flex", gap: "0.35rem", marginBottom: "1.75rem" }}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <div key={i} style={{ flex: 1, height: 3, borderRadius: 999, backgroundColor: i <= step ? palette.accent : palette.borderSoft, transition: "background-color 0.25s" }} />
-      ))}
-    </div>
-  );
-
-  const NavRow = ({ onBack, nextLabel, onNext, nextDisabled }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.75rem" }}>
-      {onBack ? (
-        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-          <ChevronLeft size={15} /> Volver
-        </button>
-      ) : <div />}
-      {!nextDisabled && (
-        <button onClick={onNext} style={{ padding: "0.7rem 1.5rem", borderRadius: "999px", backgroundColor: palette.ink, color: palette.bg, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "15px", fontWeight: 500, border: "none", cursor: "pointer" }}>
-          {nextLabel || "Siguiente →"}
-        </button>
-      )}
-    </div>
-  );
-
-  // Steps 0–3: single-select pills
-  if (step < 4) {
-    const { key, title, options } = QUIZ_STEPS[step];
-    const selected = answers[key];
-    return (
-      <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto fade-in">
-        <ProgressBar />
-        <p style={{ ...ts.caption, marginBottom: "0.4rem", fontWeight: 500 }}>Paso {step + 1} de 5</p>
-        <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "24px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "1.5rem" }}>
-          {title}
-        </h2>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", justifyContent: "center" }}>
-          {options.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => setAnswers({ ...answers, [key]: opt === selected ? "" : opt })}
-              className="quiz-pill-press"
-              style={pillStyle(opt === selected)}
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-        {error && <p style={{ ...ts.caption, color: palette.accent, fontStyle: "italic", marginTop: "0.75rem" }}>{error}</p>}
-        <NavRow
-          onBack={step > 0 ? () => setStep(step - 1) : null}
-          nextDisabled={!selected}
-          onNext={() => setStep(step + 1)}
-        />
-      </div>
-    );
-  }
-
-  // Step 5: free text
-  return (
-    <div className="px-4 sm:px-6 py-6 sm:py-8 max-w-xl mx-auto fade-in">
-      <ProgressBar />
-      <p style={{ ...ts.caption, marginBottom: "0.4rem", fontWeight: 500 }}>Paso 5 de 5</p>
-      <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "24px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "1.5rem" }}>
-        ¿Algo más que deba saber?
-      </h2>
-      <textarea
-        value={answers.extra}
-        onChange={(e) => setAnswers({ ...answers, extra: e.target.value.slice(0, 200) })}
-        maxLength={200}
-        rows={3}
-        placeholder="Ej: No quiero nada muy largo, me gustan los finales abiertos, quiero algo mexicano..."
-        style={{ width: "100%", padding: "0.85rem", backgroundColor: palette.bgCard, border: `1.5px solid ${palette.border}`, borderRadius: "10px", fontFamily: "Figtree, system-ui, sans-serif", fontSize: "15px", color: palette.ink, lineHeight: 1.5, outline: "none", resize: "none", boxSizing: "border-box" }}
-      />
-      <p style={{ ...ts.caption, textAlign: "right", marginTop: "0.2rem", marginBottom: "1rem" }}>{answers.extra.length}/200</p>
-      {error && <p style={{ ...ts.caption, color: palette.accent, fontStyle: "italic", marginBottom: "0.75rem" }}>{error}</p>}
-      <div style={{ display: "flex", gap: "0.65rem", alignItems: "center" }}>
-        <button onClick={() => setStep(3)} style={{ display: "flex", alignItems: "center", gap: "0.3rem", color: palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
-          <ChevronLeft size={15} /> Volver
-        </button>
-        <button onClick={() => fetchRecs({ ...answers, extra: "" })} style={{ padding: "0.7rem 1.1rem", borderRadius: "999px", backgroundColor: "transparent", color: palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", border: `1px solid ${palette.border}`, cursor: "pointer", flexShrink: 0 }}>
-          Saltar
-        </button>
-        <button onClick={() => fetchRecs()} style={{ flex: 1, padding: "0.7rem 1rem", borderRadius: "999px", backgroundColor: palette.ink, color: palette.bg, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "15px", fontWeight: 500, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
-          <Wand2 size={15} /> Ver recomendaciones
-        </button>
-      </div>
+      {resultsBlock}
+      <div ref={endRef} style={{ scrollMarginBottom: 200 }} />
     </div>
   );
 }

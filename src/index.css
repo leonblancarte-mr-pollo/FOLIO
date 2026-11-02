@@ -147,6 +147,16 @@
   .quiz-pill-press:hover { transform: scale(0.97); }
 }
 
+/* «Escribiendo…» del gato en Recomiéndame (Explorar → Para ti) */
+.reco-typing-dot {
+  display: inline-block;
+  animation: recoTyping 1.1s ease-in-out infinite;
+}
+@keyframes recoTyping {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+
 .timer-book-hover {
   transition: border-color 150ms ease, background-color 150ms ease;
 }
