@@ -8399,9 +8399,10 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
         </button>
         <h2 id="leer-ahora-titulo" style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center", padding: "0 2.5rem" }}>¿Qué leemos?</h2>
         {primary && (
-          <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.accent}`, backgroundColor: `${palette.accent}10`, display: "flex", alignItems: "center", gap: "0.85rem" }}>
-            <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={20} color={palette.inkFaint} />}
+          <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            {/* Sin caja dentro de caja: portada o lomo con el título sobre superficie (como en Inicio) */}
+            <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.25rem 0.2rem" }}>
+              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{primary.title}</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
@@ -8411,9 +8412,10 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
           </button>
         )}
         {cuento && (
-          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.85rem" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Sparkles size={20} color={palette.ink} />
+          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.border}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            {/* Ícono suelto, sin cuadro de color (sema-identidad: nada de íconos genéricos en círculos) */}
+            <div style={{ width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Feather size={24} color={palette.ink} strokeWidth={1.8} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
@@ -8585,12 +8587,12 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           Frase en Bricolage 600 / inkSoft para no competir con los títulos de libro.
           El sprite de 80 px trae ~26 px de aire a la izquierda: se compensa con margen negativo
           para que el gato (en claro) o el disco (en oscuro) alineen con el margen de la pantalla.
-          En oscuro, un disco plano de superficieSuave recorta al gato negro del fondo negro. */}
+          En oscuro, un disco plano lila (firma, igual que el de la barra inferior) recorta al gato negro del fondo. */}
       {pet && (
         <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.sm }}>
           <span style={{ flexShrink: 0, position: "relative", display: "inline-flex", width: 80, height: 80, marginLeft: isDarkMode ? -8 : -24 }}>
             {isDarkMode && (
-              <span aria-hidden style={{ position: "absolute", left: 8, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.superficieSuave }} />
+              <span aria-hidden style={{ position: "absolute", left: 8, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma }} />
             )}
             <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={80} showShadow={false} style={{ position: "relative" }} />
           </span>
@@ -12562,7 +12564,7 @@ function TutorialOverlay({ onDone }) {
     { key: 'snacks-hero', text: 'Un cuento de 5 minutos. Una página ya cuenta',    dir: 'below' },
     { key: 'gems',        text: 'Las gemas se ganan leyendo',                      dir: 'below' },
     // 2026-11-02: nav-perfil es la foto de perfil de la cabecera; el globo va debajo.
-    { key: 'nav-perfil',  text: 'Tu biblioteca, logros y estadísticas',        dir: 'below' },
+    { key: 'nav-perfil',  text: 'Biblioteca, logros y estadísticas',           dir: 'below' },
   ];
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
@@ -12632,11 +12634,11 @@ function TutorialOverlay({ onDone }) {
         </div>
         <p style={{ fontSize: '0.88rem', fontWeight: 500, lineHeight: 1.45, margin: '0 0 0.85rem', color: BRAND.cream }}>{current.text}</p>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <button onClick={done} style={{ fontSize: '0.75rem', color: 'rgba(245,237,224,0.5)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+          <button onClick={done} style={{ fontSize: '0.8rem', color: BRAND.cream, background: 'none', border: 'none', cursor: 'pointer', padding: '0 0.5rem', minHeight: 44, fontFamily: 'inherit' }}>
             Saltar
           </button>
-          <button onClick={advance} style={{ fontSize: '0.8rem', fontWeight: 600, backgroundColor: BRAND.cream, color: BRAND.wine, border: 'none', borderRadius: 999, padding: '0.38rem 1rem', cursor: 'pointer', fontFamily: 'inherit' }}>
-            {isLast ? '¡Entendido!' : 'Siguiente →'}
+          <button onClick={advance} style={{ fontSize: '0.8rem', fontWeight: 600, backgroundColor: BRAND.cream, color: BRAND.wine, border: 'none', borderRadius: 999, padding: '0.38rem 1rem', minHeight: 44, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {isLast ? 'Listo' : 'Siguiente →'}
           </button>
         </div>
       </div>
