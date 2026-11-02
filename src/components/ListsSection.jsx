@@ -22,11 +22,12 @@ function ListsSection({ user, books, onSelectBook }) {
   }
 
   return (
-    <div style={{ padding: "0 1.25rem 1.25rem" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-        <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Mis listas</p>
-        <button onClick={() => setCreateOpen(true)} style={{ display: "flex", alignItems: "center", gap: "0.25rem", background: "none", border: "none", cursor: "pointer", color: palette.accent, ...body, fontSize: "0.82rem", fontWeight: 600, padding: 0 }}>
-          <Plus size={14} /> Nueva
+    <div style={{ padding: "0 0 1.5rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, textTransform: "uppercase", letterSpacing: "0.08em" }}>Mis listas</p>
+        {/* «Nueva» en tinta (el durazno como texto sobre blanco da 2.06:1) y con 44 px de toque */}
+        <button onClick={() => setCreateOpen(true)} style={{ display: "flex", alignItems: "center", gap: "0.3rem", minHeight: 44, background: "none", border: "none", cursor: "pointer", color: palette.ink, ...body, fontSize: "15px", fontWeight: 600, padding: "0 0.25rem" }}>
+          <Plus size={16} aria-hidden /> Nueva
         </button>
       </div>
 
@@ -44,7 +45,7 @@ function ListsSection({ user, books, onSelectBook }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           {lists.map((l) => (
             <button key={l.id} onClick={() => setOpenList(l)} style={{ width: "100%", display: "flex", alignItems: "center", gap: "0.7rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 12, padding: "0.75rem 0.9rem", cursor: "pointer", textAlign: "left" }}>
-              {l.isPublic ? <Bookmark size={16} color={palette.accent} style={{ flexShrink: 0 }} /> : <Lock size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
+              {l.isPublic ? <Bookmark size={16} color={palette.ink} style={{ flexShrink: 0 }} /> : <Lock size={15} color={palette.inkFaint} style={{ flexShrink: 0 }} />}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ ...display, fontSize: "0.95rem", fontWeight: 600, color: palette.ink, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.name}</p>
                 <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: 0 }}>

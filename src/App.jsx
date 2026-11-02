@@ -3105,11 +3105,11 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
       {!friendOnly && (
         <div style={{ marginBottom: "1rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
-            <span style={{ ...body, fontSize: "0.85rem", color: palette.inkSoft }}>{unlockedCount} / {total} logros desbloqueados</span>
-            <span style={{ ...display, fontSize: "0.85rem", fontWeight: 600, color: palette.amber }}>{pct}%</span>
+            <span style={{ ...body, fontSize: "14px", color: palette.inkSoft }}>{unlockedCount} / {total} logros desbloqueados</span>
+            <span style={{ ...display, fontSize: "15px", fontWeight: 700, color: palette.ink }}>{pct}%</span>
           </div>
-          <div style={{ height: 7, backgroundColor: palette.bgSoft, borderRadius: "999px", overflow: "hidden" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${BRAND.wine}, ${BRAND.amber})`, borderRadius: "999px", transition: "width 0.5s ease" }} />
+          <div style={{ height: 10, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", overflow: "hidden", boxSizing: "content-box" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: SEMA_GRADIENTS.acento, borderRadius: "999px", transition: "width 0.5s ease" }} />
           </div>
         </div>
       )}
@@ -3163,13 +3163,33 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false }) {
 // ============ READING HEATMAP ============
 const DAY_HEADERS_ES = ["D", "L", "M", "Mi", "J", "V", "S"];
 
-function getCalColor(pages) {
-  if (!pages || pages === 0) return null;
-  const cols = palette.bg === PALETTE_DARK.bg ? HEATMAP_COLORS.dark : HEATMAP_COLORS.light;
-  if (pages <= 5)  return cols[0];
-  if (pages <= 15) return cols[1];
-  if (pages <= 30) return cols[2];
-  return cols[3];
+// Escala del calendario (rediseño de Perfil 2026-11-02): solo tokens de sema-paleta.
+// Claro: superficie suave -> firma -> frío -> tinta (de claro a oscuro sobre blanco).
+// Oscuro: superficie suave -> frío -> firma -> tinta (de oscuro a claro sobre negro).
+// Los dos primeros niveles no llegan a 3:1 contra el fondo por sí solos: todo día con lectura
+// lleva filo de 1.5 px en tinta (10.39 / 21.00), así la cuadrícula se lee sin depender del relleno.
+function getCalLevel(pages) {
+  if (!pages || pages === 0) return -1;
+  if (pages <= 5)  return 0;
+  if (pages <= 15) return 1;
+  if (pages <= 30) return 2;
+  return 3;
+}
+function getCalScale() {
+  const dark = palette.bg === PALETTE_DARK.bg;
+  return dark
+    ? [
+        { bg: palette.superficieSuave, fg: palette.onColor },
+        { bg: palette.complementoFrio, fg: palette.onColor },
+        { bg: palette.firma,           fg: palette.onFirma },
+        { bg: palette.ink,             fg: palette.onFirma },
+      ]
+    : [
+        { bg: palette.superficieSuave, fg: palette.ink },
+        { bg: palette.firma,           fg: palette.onFirma },
+        { bg: palette.complementoFrio, fg: palette.onColor },
+        { bg: palette.ink,             fg: palette.onColor },
+      ];
 }
 
 function ReadingHeatmap({ userId }) {
@@ -3260,26 +3280,21 @@ function ReadingHeatmap({ userId }) {
   for (let i = 0; i < firstDow; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
+  const scale = getCalScale();
+  const navBtn = (enabled) => ({ width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", background: "none", border: "none", borderRadius: 999, cursor: enabled ? "pointer" : "default", opacity: enabled ? 1 : 0.35, color: palette.ink });
+
   return (
-    <div style={{ padding: "0 1.25rem 1.25rem" }}>
-      {/* Month nav header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-        <button
-          onClick={prevMonth}
-          disabled={!canGoPrev}
-          style={{ background: "none", border: "none", cursor: canGoPrev ? "pointer" : "default", opacity: canGoPrev ? 1 : 0.3, padding: "0.25rem 0.5rem", color: palette.inkSoft, fontSize: "1.1rem", lineHeight: 1 }}
-        >
-          ←
+    <div style={{ marginBottom: "2rem" }}>
+      {/* Mes y flechas (Lucide, 44 px) */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+        <button onClick={prevMonth} disabled={!canGoPrev} aria-label="Mes anterior" style={navBtn(canGoPrev)}>
+          <ChevronLeft size={22} strokeWidth={2} aria-hidden />
         </button>
-        <p style={{ ...display, fontSize: "1.1rem", fontWeight: 700, color: palette.ink, margin: 0 }}>
+        <p style={{ ...display, fontSize: "18px", fontWeight: 700, color: palette.ink, margin: 0 }}>
           {MONTHS_ES[viewMonth]} {viewYear}
         </p>
-        <button
-          onClick={nextMonth}
-          disabled={!canGoNext}
-          style={{ background: "none", border: "none", cursor: canGoNext ? "pointer" : "default", opacity: canGoNext ? 1 : 0.3, padding: "0.25rem 0.5rem", color: palette.inkSoft, fontSize: "1.1rem", lineHeight: 1 }}
-        >
-          →
+        <button onClick={nextMonth} disabled={!canGoNext} aria-label="Mes siguiente" style={navBtn(canGoNext)}>
+          <ChevronRight size={22} strokeWidth={2} aria-hidden />
         </button>
       </div>
 
@@ -3289,16 +3304,14 @@ function ReadingHeatmap({ userId }) {
         </SkeletonGroup>
       ) : (
         <>
-          {/* Day-of-week headers */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
             {DAY_HEADERS_ES.map(h => (
-              <div key={h} style={{ textAlign: "center", ...body, fontSize: "0.68rem", color: palette.inkFaint }}>
+              <div key={h} style={{ textAlign: "center", ...body, fontSize: "13px", fontWeight: 500, color: palette.inkSoft }}>
                 {h}
               </div>
             ))}
           </div>
 
-          {/* Day cells */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
             {cells.map((day, idx) => {
               if (day === null) return <div key={`e-${idx}`} />;
@@ -3307,32 +3320,35 @@ function ReadingHeatmap({ userId }) {
               const dateStr = `${viewYear}-${mm}-${dd}`;
               const data = logMap[dateStr];
               const pages = data?.pages || 0;
-              const bg = getCalColor(pages);
+              const level = getCalLevel(pages);
+              const cell = level >= 0 ? scale[level] : null;
               const isToday = dateStr === todayStr;
               const isFuture = new Date(dateStr + "T12:00:00") > todayNow;
-              const darkBg = pages > 15;
               return (
                 <div
                   key={dateStr}
+                  aria-label={pages > 0 ? `${day}: ${pages} ${pages === 1 ? "página" : "páginas"}` : undefined}
                   style={{
                     aspectRatio: "1",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    borderRadius: 6,
-                    backgroundColor: bg || "transparent",
-                    border: isToday
-                      ? `1.5px dashed ${bg ? "rgba(255,255,255,0.55)" : palette.inkFaint}`
-                      : "1px solid transparent",
+                    borderRadius: 8,
+                    backgroundColor: cell ? cell.bg : "transparent",
+                    // Día con lectura: filo de tinta. Hoy: contorno punteado en tinta.
+                    border: cell
+                      ? `1.5px ${isToday ? "dashed" : "solid"} ${palette.ink}`
+                      : isToday ? `1.5px dashed ${palette.ink}` : "1.5px solid transparent",
+                    // Nivel 4 (relleno = tinta): canto del fondo por dentro para que siga leyéndose como sticker.
+                    boxShadow: cell && level === 3 ? `inset 0 0 0 1.5px ${palette.bg}` : "none",
                   }}
                 >
                   <span style={{
                     ...body,
-                    fontSize: "0.78rem",
-                    fontWeight: isToday ? 700 : 400,
-                    color: bg
-                      ? (darkBg ? palette.onColor : palette.ink)
-                      : (isFuture ? palette.border : palette.inkFaint),
+                    fontSize: "13px",
+                    fontWeight: isToday || cell ? 700 : 400,
+                    color: cell ? cell.fg : palette.inkSoft,
+                    opacity: !cell && isFuture ? 0.45 : 1,
                     lineHeight: 1,
                     userSelect: "none",
                   }}>
@@ -3343,15 +3359,17 @@ function ReadingHeatmap({ userId }) {
             })}
           </div>
 
-          {/* Footer: active days + legend */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.75rem", gap: "0.5rem" }}>
-            <span style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint }}>
-              {activeDaysThisMonth} {activeDaysThisMonth === 1 ? "día activo" : "días activos"} este mes
+          {/* Pie: días con lectura + leyenda Menos -> Más */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "0.75rem", gap: "0.5rem", flexWrap: "wrap" }}>
+            <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>
+              {activeDaysThisMonth} {activeDaysThisMonth === 1 ? "día con lectura" : "días con lectura"} este mes
             </span>
-            <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-              {(palette.bg === PALETTE_DARK.bg ? HEATMAP_COLORS.dark : HEATMAP_COLORS.light).map(c => (
-                <div key={c} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: c, flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }} aria-hidden>
+              <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginRight: 2 }}>Menos</span>
+              {scale.map((c, i) => (
+                <div key={i} style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: c.bg, border: `1.5px solid ${palette.ink}`, boxShadow: i === 3 ? `inset 0 0 0 1px ${palette.bg}` : "none", flexShrink: 0 }} />
               ))}
+              <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginLeft: 2 }}>Más</span>
             </div>
           </div>
         </>
@@ -3624,7 +3642,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
     <div style={{ maxWidth: "56rem", margin: "0 auto", paddingBottom: "2rem" }}>
 
       {/* ── Cover banner ── */}
-      <div style={{ position: "relative", height: 180, background: profile.coverUrl ? "none" : BRAND.gradient }}>
+      {/* Sin foto de portada: superficie suave plana (antes degradado vino → ámbar, fuera de paleta) */}
+      <div style={{ position: "relative", height: 180, backgroundColor: profile.coverUrl ? "transparent" : palette.superficieSuave }}>
         {profile.coverUrl && (
           <img src={profile.coverUrl} alt="portada" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         )}
@@ -3635,7 +3654,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           onClick={() => !uploading && fileInput.current?.click()}
           className="group"
         >
-          <div style={{ padding: 3, borderRadius: "50%", background: BRAND.gradient, boxShadow: "0 4px 18px rgba(122,46,46,0.45)", border: `4px solid ${palette.bg}` }}>
+          {/* Canto de sticker: filo del fondo + línea de tinta (antes anillo con degradado vino y sombra) */}
+          <div style={{ position: "relative", borderRadius: "50%", border: `4px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}` }}>
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt="avatar" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
@@ -3653,9 +3673,12 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         <button
           onClick={() => coverFileInput.current?.click()}
           disabled={uploadingCover}
-          style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: "0.3rem", backgroundColor: "rgba(42,31,26,0.55)", backdropFilter: "blur(6px)", color: palette.onColor, border: "1px solid rgba(255,255,255,0.25)", borderRadius: "999px", padding: "0.35rem 0.75rem", cursor: "pointer", fontSize: "0.78rem", ...display, fontWeight: 500 }}
+          className="btn-press"
+          style={{
+            // Botón silencioso legible sobre cualquier foto: fondo bg + tinta (10.39 / 21.00), 44 px.
+            position: "absolute", bottom: 10, right: 12, minHeight: 44, display: "flex", alignItems: "center", gap: "0.4rem", backgroundColor: palette.bg, color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 0.95rem", cursor: "pointer", fontSize: "14px", ...display, fontWeight: 600 }}
         >
-          {uploadingCover ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+          {uploadingCover ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Camera size={16} aria-hidden />}
           {uploadingCover ? "Subiendo…" : "Cambiar portada"}
         </button>
 
@@ -3666,60 +3689,47 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       {/* Space for avatar overflow + name */}
       <div style={{ paddingTop: 56, paddingLeft: 20, paddingRight: 20, paddingBottom: "0.5rem", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
-          <p style={{ ...display, fontWeight: 700, fontSize: "1.25rem", color: palette.ink, lineHeight: 1.2 }}>{user.name}</p>
-          {profile.username && <p style={{ ...body, fontSize: "0.85rem", color: palette.inkFaint }}>@{profile.username}</p>}
+          {/* Si el nombre llega como correo o handle se recorta igual que en Social (displayAuthorName) */}
+          <p style={{ ...display, fontWeight: 800, fontSize: "26px", letterSpacing: "-0.02em", color: palette.ink, lineHeight: 1.15, overflowWrap: "anywhere" }}>{displayAuthorName(user.name)}</p>
+          {profile.username && <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, marginTop: "0.15rem" }}>@{profile.username}</p>}
         </div>
       </div>
 
-      {/* ── Sección de racha ── */}
-      <div style={{ padding: "0 1.25rem 0.5rem" }}>
-        {streak && streak.current_streak > 0 ? (
-          <div className="streak-banner-active" style={{
-            borderRadius: "14px", padding: "1rem 1.25rem",
-            background: BRAND.gradient,
-            display: "flex", alignItems: "center", gap: "1rem",
-          }}>
-            <Flame
-              size={36}
-              color={BRAND.cream}
-              className={streak.current_streak > 7 ? "fire-pulse" : ""}
-              style={{ flexShrink: 0 }}
-            />
-            <div style={{ flex: 1 }}>
-              <p style={{ ...display, fontWeight: 800, fontSize: "1.6rem", color: BRAND.cream, lineHeight: 1, marginBottom: "0.15rem" }}>
-                {streak.current_streak} {streak.current_streak === 1 ? "día" : "días"} de racha
-              </p>
-              <p style={{ ...body, fontSize: "0.82rem", color: "rgba(244,237,224,0.75)" }}>
-                Mejor racha: {streak.longest_streak} {streak.longest_streak === 1 ? "día" : "días"}
-              </p>
-            </div>
-            {streak.total_pages_read > 0 && (
-              <div style={{ textAlign: "center", flexShrink: 0, backgroundColor: "rgba(244,237,224,0.15)", borderRadius: "10px", padding: "0.5rem 0.8rem" }}>
-                <p style={{ ...display, fontWeight: 800, fontSize: "1.2rem", color: BRAND.cream, lineHeight: 1 }}>
-                  {streak.total_pages_read.toLocaleString("es")}
+      {/* ── Racha: el mismo sticker lila con papel de Inicio (sema-identidad §2/§5, principio 4) ──
+          Antes: degradado vino → ámbar con texto crema (fuera de paleta). Todo el texto en onFirma (5.21:1). */}
+      {(() => {
+        const cur = streak?.current_streak || 0;
+        const best = streak?.longest_streak || 0;
+        const pagesTotal = streak?.total_pages_read || 0;
+        const dayWord = (n) => (n === 1 ? "día" : "días");
+        const sub = cur === 0
+          ? "Con 5 minutos arranca."
+          : cur >= best ? "Esto ya es récord." : `Récord: ${best} ${dayWord(best)}`;
+        return (
+          <div style={{ padding: "0.75rem 1.25rem 0.5rem" }}>
+            <div
+              className="sema-papel sema-sticker"
+              style={{
+                width: "fit-content", maxWidth: "100%",
+                backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
+                // Canto de sticker recortado: filo del color de fondo + línea de tinta (sin desenfoque).
+                border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
+                padding: "0.9rem 1.15rem 1rem", display: "flex", alignItems: "center", gap: sp.md,
+              }}
+            >
+              <Flame size={34} strokeWidth={2} color={palette.onFirma} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} aria-hidden />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
+                  {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
                 </p>
-                <p style={{ ...body, fontSize: "0.65rem", color: "rgba(244,237,224,0.7)", marginTop: "0.1rem" }}>páginas</p>
+                <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.35rem" }}>
+                  {sub}{pagesTotal > 0 ? ` · ${pagesTotal.toLocaleString("es")} ${pagesTotal === 1 ? "página" : "páginas"} en total` : ""}
+                </p>
               </div>
-            )}
-          </div>
-        ) : (
-          <div style={{
-            borderRadius: "14px", padding: "1rem 1.25rem",
-            backgroundColor: palette.bgCard, border: `1px dashed ${palette.border}`,
-            display: "flex", alignItems: "center", gap: "0.75rem",
-          }}>
-            <BookOpen size={28} color={palette.inkFaint} style={{ flexShrink: 0 }} />
-            <div>
-              <p style={{ ...display, fontWeight: 700, fontSize: "0.95rem", color: palette.inkSoft }}>
-                Comienza tu racha hoy
-              </p>
-              <p style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint }}>
-                Registra una sesión en el Feed para empezar
-              </p>
             </div>
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* ── Edit Profile Modal ── */}
       {editModalOpen && (
@@ -3776,7 +3786,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                 <p style={{ ...ts.caption, textAlign: "right", marginTop: "0.2rem" }}>{profile.bio.length}/160</p>
               </div>
             </div>
-            {error && <p style={{ ...ts.body15, color: palette.accent, fontStyle: "italic", marginTop: "0.75rem" }}>{error}</p>}
+            {error && <p style={{ ...ts.body15, color: palette.danger, fontStyle: "italic", marginTop: "0.75rem" }}>{error}</p>}
             {success && <p style={{ ...ts.body15, color: palette.success, fontStyle: "italic", marginTop: "0.75rem" }}>{success}</p>}
             <button
               onClick={async () => { const ok = await handleSave(); if (ok) setTimeout(() => setEditModalOpen(false), 800); }}
@@ -3797,21 +3807,22 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       {profile.bio ? (
         <p style={{ ...ts.body15, color: palette.inkSoft, marginBottom: "1rem", lineHeight: 1.6 }}>{profile.bio}</p>
       ) : (
-        <p style={{ ...ts.body15, color: palette.inkFaint, fontStyle: "italic", marginBottom: "1rem" }}>Sin bio aún.</p>
+        <p style={{ ...ts.body15, color: palette.inkSoft, fontStyle: "italic", marginBottom: "0.75rem" }}>Sin bio aún.</p>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
         <button
           onClick={() => { setError(""); setSuccess(""); setDisplayName(user.name || ""); setEditModalOpen(true); }}
-          style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", padding: "0.5rem 1.1rem", borderRadius: "999px", border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, color: palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 500, cursor: "pointer" }}
+          className="btn-press"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", minHeight: 44, padding: "0 1.1rem", borderRadius: "999px", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", color: palette.ink, ...body, fontSize: "15px", fontWeight: 600, cursor: "pointer" }}
         >
-          <PenLine size={14} strokeWidth={2} />
+          <PenLine size={16} strokeWidth={2} aria-hidden />
           Editar perfil
         </button>
         <button
           onClick={async () => {
             const username = profile.username || user.name || "Alguien";
             const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-            const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común 📚`;
+            const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común.`;
             try {
               if (navigator.share) {
                 await navigator.share({ title: "SEMA — Tu biblioteca personal", text: msg, url: refUrl });
@@ -3822,16 +3833,17 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               if (e.name !== "AbortError") setInviteModalOpen(true);
             }
           }}
-          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", padding: "0.4rem 0", backgroundColor: "transparent", border: "none", color: palette.inkSoft, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", fontWeight: 500, cursor: "pointer" }}
+          className="btn-press"
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", minHeight: 44, padding: "0 0.25rem", backgroundColor: "transparent", border: "none", color: palette.ink, ...body, fontSize: "15px", fontWeight: 500, cursor: "pointer" }}
         >
-          <Share2 size={14} strokeWidth={2} />
+          <Share2 size={16} strokeWidth={2} aria-hidden />
           Invita a un amigo
         </button>
       </div>
       {inviteModalOpen && (() => {
         const username = profile.username || user.name || "Alguien";
         const refUrl = `https://folio-final.vercel.app?ref=${encodeURIComponent(username)}`;
-        const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común 📚`;
+        const msg = `Llevo ${books.length} libros en mi biblioteca de SEMA. Únete y veamos qué tenemos en común.`;
         return <InviteShareModal message={msg} url={refUrl} onClose={() => setInviteModalOpen(false)} />;
       })()}
 
@@ -3839,106 +3851,85 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
 
       {/* Stats — right column on desktop, below on mobile */}
       {books.length > 0 && (
-        <div className="mt-10 pt-8 border-t md:mt-0 md:pt-0 md:border-0 md:flex-1 md:min-w-0" style={{ borderColor: palette.border }}>
-          <h3 style={{ ...ts.h2, color: palette.ink, marginBottom: "1.25rem" }}>
+        <div className="mt-8 pt-7 border-t md:mt-0 md:pt-0 md:border-0 md:flex-1 md:min-w-0" style={{ borderColor: palette.border }}>
+          <h3 style={{ ...ts.h2, color: palette.ink, marginBottom: "1rem" }}>
             Tu biblioteca
           </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+          {/* Cifras grandes en Bricolage separadas con filetes, sin cajitas (principio 2).
+              La rejilla «Racha actual / Mejor racha» se quitó: ya la dice el sticker de arriba. */}
+          <dl style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", margin: "0 0 2rem" }}>
             {[
-              { label: "Leídos",   value: readBooks.length,    numColor: palette.sage, bg: `${palette.sage}0D` },
-              { label: "Leyendo",  value: readingBooks.length, numColor: palette.ink, bg: `${BRAND.amber}0D` },
-              { label: "Por leer", value: wantBooks.length,    numColor: palette.slate, bg: `${palette.slate}0D` },
-              { label: "En total", value: books.length,        numColor: palette.ink, bg: palette.bgCard },
-            ].map(({ label, value, numColor, bg }) => (
+              { label: "Leídos",   value: readBooks.length },
+              { label: "Leyendo",  value: readingBooks.length },
+              { label: "Por leer", value: wantBooks.length },
+              { label: "En total", value: books.length },
+            ].map(({ label, value }, i) => (
               <div
                 key={label}
                 style={{
-                  backgroundColor: bg,
-                  borderRadius: "14px",
-                  padding: "1rem",
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  minHeight: "88px",
+                  display: "flex", flexDirection: "column-reverse", justifyContent: "flex-end", gap: "0.3rem",
+                  padding: i === 0 ? "0 0.5rem 0 0" : "0 0.5rem 0 0.75rem",
+                  borderLeft: i === 0 ? "none" : `1.5px solid ${palette.border}`,
+                  minWidth: 0,
                 }}
               >
-                <div style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "28px", fontWeight: 700, color: numColor, lineHeight: 1, marginBottom: "0.4rem" }}>{value}</div>
-                <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", fontWeight: 500, color: palette.inkFaint }}>{label}</div>
+                <dt style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.inkSoft, whiteSpace: "nowrap" }}>{label}</dt>
+                <dd style={{ ...display, fontSize: "34px", fontWeight: 800, letterSpacing: "-0.03em", color: palette.ink, lineHeight: 1, margin: 0 }}>{value}</dd>
               </div>
             ))}
-          </div>
-          {streak && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.5rem" }}>
-              {[
-                { label: "Racha actual", value: `${streak.current_streak || 0}`, unit: "días", numColor: BRAND.wine, bg: `${BRAND.amber}0D` },
-                { label: "Mejor racha",  value: `${streak.longest_streak  || 0}`, unit: "días", numColor: palette.amberInk, bg: palette.bgCard },
-              ].map(({ label, value, unit, numColor, bg }) => (
-                <div key={label} style={{ backgroundColor: bg, borderRadius: "14px", padding: "1rem", display: "flex", flexDirection: "column", justifyContent: "flex-end", minHeight: "88px" }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "0.25rem", marginBottom: "0.4rem" }}>
-                    <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "28px", fontWeight: 700, color: numColor, lineHeight: 1 }}>{value}</span>
-                    <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "12px", color: numColor, opacity: 0.7 }}>{unit}</span>
-                  </div>
-                  <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "13px", fontWeight: 500, color: palette.inkFaint }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          )}
+          </dl>
 
+          <h3 style={{ ...ts.h2, color: palette.ink, marginBottom: "0.25rem" }}>Días de lectura</h3>
           <ReadingHeatmap userId={user.id} />
 
           {avgRating && (
-            <div
-              style={{
-                backgroundColor: `${BRAND.amber}14`,
-                border: `1px solid ${BRAND.amber}28`,
-                borderRadius: "12px",
-                padding: "0.9rem 1rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.75rem",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <Star size={20} color={palette.amberRich} fill={palette.amberRich} />
-              <div>
-                <span style={{ ...display, fontSize: "1.5rem", fontWeight: 800, color: palette.amberInk }}>{avgRating}</span>
-                <span style={{ ...body, fontSize: "0.84rem", color: palette.inkSoft, marginLeft: "0.4rem" }}>
-                  promedio · {ratedBooks.length} {ratedBooks.length === 1 ? "calificación" : "calificaciones"}
-                </span>
-              </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", marginBottom: "2rem", flexWrap: "wrap" }}>
+              {/* Promedio como texto grande, sin caja ámbar con borde. Estrella en tinta (el durazno no llega a 3:1). */}
+              <Star size={22} color={palette.ink} fill={palette.ink} aria-hidden style={{ alignSelf: "center" }} />
+              <span style={{ ...display, fontSize: "34px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, color: palette.ink }}>{avgRating}</span>
+              <span style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>
+                de promedio · {ratedBooks.length} {ratedBooks.length === 1 ? "calificación" : "calificaciones"}
+              </span>
             </div>
           )}
 
-
           {topGenres.length > 0 && (
-            <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ marginBottom: "2rem" }}>
               <p style={{ ...ts.h2, color: palette.ink, marginBottom: "0.75rem" }}>
                 Géneros favoritos
               </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginBottom: expandedGenre ? "0.75rem" : 0 }}>
+              {/* Chips sin borde: superficie suave + tinta (7.36 / 10.39); el abierto se invierte a tinta. */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: expandedGenre ? "0.75rem" : 0 }}>
                 {topGenres.map(([genre, count]) => {
                   const isOpen = expandedGenre === genre;
                   return (
                     <button
                       key={genre}
                       onClick={() => setExpandedGenre(isOpen ? null : genre)}
-                      style={{ ...body, ...genrePillStyle(genre, isOpen) }}
+                      aria-expanded={isOpen}
+                      className="btn-press"
+                      style={{
+                        ...body, minHeight: 44, padding: "0 1rem", borderRadius: 999, border: "none", cursor: "pointer",
+                        backgroundColor: isOpen ? palette.ink : palette.superficieSuave,
+                        color: isOpen ? palette.bg : palette.ink,
+                        fontSize: "15px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                      }}
                     >
-                      {genre} <span style={{ opacity: 0.7, fontSize: "0.78rem" }}>({count})</span>
+                      {genre} <span style={{ fontWeight: 400 }}>{count}</span>
                     </button>
                   );
                 })}
               </div>
               {expandedGenre && (
-                <div style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", padding: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ display: "flex", flexDirection: "column" }}>
                   {books.filter((b) => b.genre === expandedGenre).map((book) => {
                     const statusLabel = { reading: "Leyendo", want_to_read: "Por leer", wish: "Por leer", read: "Leído" }[book.status];
                     return (
                       <button
                         key={book.id}
                         onClick={() => onSelectBook(book)}
-                        style={{ display: "flex", alignItems: "center", gap: "0.65rem", background: "none", border: "none", cursor: "pointer", textAlign: "left", padding: "0.35rem 0.25rem", borderRadius: 8 }}
+                        style={{ display: "flex", alignItems: "center", gap: "0.75rem", minHeight: 44, background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`, cursor: "pointer", textAlign: "left", padding: "0.6rem 0" }}
                       >
                         {book.coverUrl ? (
                           <img src={book.coverUrl} alt="" style={{ width: 40, height: 58, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
@@ -3946,12 +3937,18 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                           <BookCoverPlaceholder title={book.title} author={book.author} width={40} height={58} />
                         )}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ ...display, fontSize: "0.88rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
-                          <p style={{ ...body, fontSize: "0.76rem", color: palette.inkFaint }}>{book.author}</p>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.2rem" }}>
-                            {statusLabel && <span style={{ ...body, fontSize: "0.68rem", color: palette.inkSoft }}>{statusLabel}</span>}
-                            {book.rating > 0 && <span style={{ fontSize: "0.7rem", color: palette.amber }}>{"★".repeat(book.rating)}</span>}
-                          </div>
+                          <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+                          <p style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{book.author}</p>
+                          {(statusLabel || book.rating > 0) && (
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.2rem" }}>
+                              {statusLabel && <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{statusLabel}</span>}
+                              {book.rating > 0 && (
+                                <span style={{ display: "inline-flex", gap: 2 }} aria-label={`${book.rating} de 5`}>
+                                  {Array.from({ length: book.rating }, (_, k) => <Star key={k} size={13} color={palette.ink} fill={palette.ink} aria-hidden />)}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </button>
                     );
@@ -3963,38 +3960,32 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
 
           {topRated.length > 0 && (
             <div>
-              <p style={{ ...ts.h2, color: palette.ink, marginBottom: "0.75rem" }}>
+              <p style={{ ...ts.h2, color: palette.ink, marginBottom: "0.25rem" }}>
                 Mejor valorados
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              {/* Filas separadas con filete, sin tarjeta con borde por cada libro */}
+              <div style={{ display: "flex", flexDirection: "column" }}>
                 {topRated.map((book) => (
                   <button
                     key={book.id}
                     onClick={() => onSelectBook(book)}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.75rem",
-                      backgroundColor: palette.bgCard,
-                      border: `1px solid ${palette.borderSoft}`,
-                      borderRadius: "8px",
-                      padding: "0.6rem 0.85rem",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      width: "100%",
+                      display: "flex", alignItems: "center", gap: "0.75rem", minHeight: 56,
+                      background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`,
+                      padding: "0.6rem 0", textAlign: "left", cursor: "pointer", width: "100%",
                     }}
                   >
-                    <div style={{ display: "flex", gap: "2px" }}>
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star key={s} size={11} color={palette.amber} fill={s <= book.rating ? palette.amber : "none"} />
-                      ))}
-                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <p style={{ ...display, fontSize: "15px", fontWeight: 700, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {book.title}
                       </p>
-                      <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{book.author}</p>
+                      <p style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{book.author}</p>
                     </div>
+                    <span style={{ display: "inline-flex", gap: 2, flexShrink: 0 }} aria-label={`${book.rating} de 5`}>
+                      {[1, 2, 3, 4, 5].map((k) => (
+                        <Star key={k} size={14} color={palette.ink} fill={k <= book.rating ? palette.ink : "none"} aria-hidden />
+                      ))}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -4005,11 +3996,11 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       </div>{/* end grid */}
 
       {/* ── Mis logros (colapsado por default) ── */}
-      <div style={{ padding: "1.75rem 1.25rem 2rem", backgroundColor: palette.bgCard }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
+      <div style={{ padding: "0.5rem 0 1.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
           <p style={{ ...ts.h2, color: palette.ink }}>Mis logros{unlockedAchievements.length > 0 ? ` (${unlockedAchievements.length})` : ""}</p>
           {unlockedAchievements.length > 0 && (
-            <button onClick={() => setAchievementsExpanded((v) => !v)} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.82rem", color: palette.accent, fontWeight: 600 }}>
+            <button onClick={() => setAchievementsExpanded((v) => !v)} style={{ minHeight: 44, padding: "0 0.25rem", background: "none", border: "none", cursor: "pointer", ...body, fontSize: "15px", color: palette.ink, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>
               {achievementsExpanded ? "Ver menos" : "Ver todos"}
             </button>
           )}
@@ -4017,7 +4008,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         <div style={{ position: "relative", maxHeight: achievementsExpanded ? "none" : 132, overflow: "hidden" }}>
           <AchievementGrid unlockedAchievements={unlockedAchievements} />
           {!achievementsExpanded && unlockedAchievements.length > 0 && (
-            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 50, background: `linear-gradient(to bottom, transparent, ${palette.bgCard})`, pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 50, background: `linear-gradient(to bottom, transparent, ${palette.bg})`, pointerEvents: "none" }} />
           )}
         </div>
       </div>
@@ -4031,28 +4022,30 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         const year = now.getFullYear();
         const annualWrap = wraps.find(w => w.wrap_type === "annual" && w.year === year);
         return (
-          <div style={{ padding: "1.75rem 1.25rem 2.5rem", backgroundColor: palette.bgSoft }}>
-            <p style={{ ...ts.h2, color: palette.ink, marginBottom: "1rem" }}>Tu Wrapped {year}</p>
+          // Tarjeta destacada con degradadoAcento (sema-paleta §5): encima solo texto grande en onAccent
+          // (título 26 px 800: 3.24 sobre cereza, 5.04 sobre durazno). La llamada chica va en una píldora bg + tinta.
+          <div style={{ padding: "0.5rem 0 2rem" }}>
             <button
               onClick={() => annualWrap ? setActiveWrap(annualWrap) : handleGenerateWrap(null, year, "annual")}
               disabled={generatingWrap}
+              className="btn-press sema-focus-onaccent"
+              aria-label={annualWrap ? `Ver Wrapped ${year}` : `Generar Wrapped ${year}`}
               style={{
-                width: "100%", minHeight: "80px", padding: "1.1rem 1.25rem",
-                background: BRAND.gradientWrappedCta,
-                borderRadius: 14, border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                boxShadow: "0 4px 20px rgba(107,30,42,0.35)",
+                width: "100%", minHeight: 96, padding: "1.1rem 1.1rem 1.1rem 1.25rem",
+                background: SEMA_GRADIENTS.acento,
+                borderRadius: 16, border: "none", cursor: generatingWrap ? "default" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-                <span className="sparkle-anim"><Sparkles size={20} color={BRAND.cream} /></span>
-                <div style={{ textAlign: "left" }}>
-                  <div style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", fontWeight: 500, color: "rgba(244,237,224,0.65)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.2rem" }}>{year}</div>
-                  <div style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.1rem", fontWeight: 700, color: BRAND.cream }}>Wrapped</div>
-                </div>
-              </div>
-              <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", fontWeight: 700, color: BRAND.cream }}>
-                {generatingWrap ? "Generando…" : annualWrap ? "Ver mi Wrapped →" : "Generar →"}
+              <span style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
+                <span className="sparkle-anim" style={{ display: "inline-flex" }}><Sparkles size={26} color={palette.onAccent} strokeWidth={2} aria-hidden /></span>
+                <span style={{ ...display, fontSize: "26px", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.05, color: palette.onAccent, textAlign: "left" }}>
+                  Wrapped {year}
+                </span>
+              </span>
+              <span style={{ flexShrink: 0, minHeight: 44, padding: "0 0.9rem", borderRadius: 999, backgroundColor: palette.bg, color: palette.ink, ...body, fontSize: "15px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                {generatingWrap ? "Generando…" : annualWrap ? "Ver" : "Generar"}
+                {!generatingWrap && <ArrowRight size={16} strokeWidth={2.2} aria-hidden />}
               </span>
             </button>
           </div>
@@ -4067,8 +4060,8 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       <ListsSection user={user} books={books} onSelectBook={onSelectBook} />
 
       {/* Privacidad */}
-      <div style={{ padding: "0 1.25rem 1.25rem" }}>
-        <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Privacidad</p>
+      <div style={{ padding: "0 0 1.5rem" }}>
+        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Privacidad</p>
         <div style={{ display: "flex", gap: "0.4rem" }}>
           {[{ v: true, label: "Perfil público" }, { v: false, label: "Perfil privado" }].map(({ v, label }) => (
             <button
@@ -4087,40 +4080,40 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                 setSavingPrivacy(false);
               }}
               style={{
-                flex: 1, padding: "0.55rem 0.25rem", borderRadius: 10,
-                border: `1.5px solid ${isPublicProfile === v ? palette.accent : palette.border}`,
-                backgroundColor: isPublicProfile === v ? `${palette.accent}18` : "transparent",
-                color: isPublicProfile === v ? palette.accent : palette.inkSoft,
-                cursor: "pointer", ...body, fontSize: "0.82rem",
+                flex: 1, minHeight: 44, padding: "0 0.25rem", borderRadius: 999,
+                border: `1.5px solid ${isPublicProfile === v ? palette.ink : palette.border}`,
+                backgroundColor: isPublicProfile === v ? palette.superficieSuave : "transparent",
+                color: isPublicProfile === v ? palette.ink : palette.inkSoft,
+                cursor: "pointer", ...body, fontSize: "15px",
                 fontWeight: isPublicProfile === v ? 600 : 400,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem",
                 transition: "all 150ms ease",
               }}
             >
-              {!v && <Lock size={12} />}
+              {!v && <Lock size={15} aria-hidden />}
               {label}
             </button>
           ))}
         </div>
-        <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, marginTop: "0.4rem", lineHeight: 1.4 }}>
+        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.5rem", lineHeight: 1.45 }}>
           Con el perfil privado, solo tus amigos ven tus libros, stats, racha y mascota. Tu nombre y foto siguen visibles para que puedan enviarte solicitudes.
         </p>
       </div>
 
       {/* Apariencia */}
-      <div style={{ padding: "0 1.25rem 1.25rem" }}>
-        <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Apariencia</p>
+      <div style={{ padding: "0 0 1.5rem" }}>
+        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>Apariencia</p>
         <div style={{ display: "flex", gap: "0.4rem" }}>
           {[{ id: "system", label: "Sistema" }, { id: "light", label: "Claro" }, { id: "dark", label: "Oscuro" }].map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTheme?.(id)}
               style={{
-                flex: 1, padding: "0.55rem 0.25rem", borderRadius: 10,
-                border: `1.5px solid ${theme === id ? palette.accent : palette.border}`,
-                backgroundColor: theme === id ? `${palette.accent}18` : "transparent",
-                color: theme === id ? palette.accent : palette.inkSoft,
-                cursor: "pointer", ...body, fontSize: "0.82rem",
+                flex: 1, minHeight: 44, padding: "0 0.25rem", borderRadius: 999,
+                border: `1.5px solid ${theme === id ? palette.ink : palette.border}`,
+                backgroundColor: theme === id ? palette.superficieSuave : "transparent",
+                color: theme === id ? palette.ink : palette.inkSoft,
+                cursor: "pointer", ...body, fontSize: "15px",
                 fontWeight: theme === id ? 600 : 400,
                 transition: "all 150ms ease",
               }}
@@ -4132,11 +4125,11 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
       </div>
 
       {/* Cerrar sesión / Eliminar cuenta */}
-      <div style={{ padding: "0 1.25rem 2.5rem", textAlign: "center", marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.9rem", alignItems: "center" }}>
-        <button onClick={onLogout} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.82rem", color: palette.inkFaint }}>
+      <div style={{ padding: "0 0 2.5rem", textAlign: "center", marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.25rem", alignItems: "center" }}>
+        <button onClick={onLogout} style={{ minHeight: 44, padding: "0 1rem", background: "none", border: "none", cursor: "pointer", ...body, fontSize: "15px", fontWeight: 500, color: palette.ink }}>
           Cerrar sesión
         </button>
-        <button onClick={() => setDeleteModalOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.78rem", color: palette.danger, opacity: 0.75 }}>
+        <button onClick={() => setDeleteModalOpen(true)} style={{ minHeight: 44, padding: "0 1rem", background: "none", border: "none", cursor: "pointer", ...body, fontSize: "14px", color: palette.danger }}>
           Eliminar cuenta
         </button>
       </div>
@@ -10462,7 +10455,13 @@ function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogo
         )}
       </div>
       {sub === "libros" && <LibraryView books={books} onSelectBook={onSelectBook} setTab={setTab} isOnline={isOnline} />}
-      {sub === "perfil" && <ProfileView user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={onSelectBook} onLogout={onLogout} theme={theme} setTheme={setTheme} />}
+      {/* La portada va pegada a la línea de las pestañas: se anula el margen inferior de SubTabBar (1.25rem)
+          solo en «Mi perfil». Con el aviso sin conexión debajo de las pestañas se deja el aire. */}
+      {sub === "perfil" && (
+        <div style={{ marginTop: isOnline ? "-1.25rem" : 0 }}>
+          <ProfileView user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={onSelectBook} onLogout={onLogout} theme={theme} setTheme={setTheme} />
+        </div>
+      )}
       {sub === "frases" && <QuotesView user={user} books={books} />}
       {sub === "resumen" && <ReadingStatsView books={books} onAddBook={() => setTab("add")} />}
     </div>
