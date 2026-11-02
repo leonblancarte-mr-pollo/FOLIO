@@ -29,7 +29,7 @@ function DeleteAccountModal({ onClose, onDeleted }) {
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 2000, backgroundColor: "rgba(42,31,26,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.25rem" }}
+      style={{ position: "fixed", inset: 0, zIndex: 2000, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.25rem" }}
       onClick={(e) => e.target === e.currentTarget && !deleting && onClose()}
     >
       <div style={{ backgroundColor: palette.bg, borderRadius: 18, padding: "1.5rem 1.25rem", width: "100%", maxWidth: 400, border: `1px solid ${palette.border}` }}>

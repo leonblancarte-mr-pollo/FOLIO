@@ -3033,6 +3033,16 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
 function AchievementDetailModal({ def, unlockedAt, onClose }) {
   const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
+  // Diálogo accesible: foco al botón «Cerrar» al abrir y Escape para cerrar.
+  const closeBtnRef = useRef(null);
+  const handleCloseRef = useRef(handleClose);
+  handleCloseRef.current = handleClose;
+  useEffect(() => {
+    closeBtnRef.current?.focus();
+    const onKey = (e) => { if (e.key === "Escape") handleCloseRef.current(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const IconComp = ACHIEVEMENT_ICON_MAP[def.key] || Award;
   const isUnlocked = !!unlockedAt;
   const dateStr = unlockedAt
@@ -3040,12 +3050,15 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
     : null;
   return (
     <div
-      style={{ position: "fixed", inset: 0, zIndex: 85, backgroundColor: "rgba(42,31,26,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
+      style={{ position: "fixed", inset: 0, zIndex: 85, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
       onClick={handleClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="logro-detalle-titulo"
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bg, borderRadius: "1.25rem 1.25rem 0 0", padding: "1.75rem 1.5rem 2rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.2)", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
+        style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bg, borderRadius: "1.25rem 1.25rem 0 0", padding: "1.75rem 1.5rem 2rem", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0.85rem" }}>
           {/* Desbloqueado: sticker lila con canto (firma + onFirma 5.21). Bloqueado: contorno en inkSoft. */}
@@ -3053,7 +3066,7 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
             <IconComp size={34} color={isUnlocked ? palette.onFirma : palette.inkSoft} strokeWidth={1.75} aria-hidden />
           </div>
           <div>
-            <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2 }}>{def.name}</p>
+            <p id="logro-detalle-titulo" style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2 }}>{def.name}</p>
             <p style={{ ...body, fontSize: "14px", marginTop: "0.3rem", color: palette.inkSoft, fontWeight: isUnlocked ? 600 : 400 }}>
               {isUnlocked ? `Desbloqueado el ${dateStr}` : "Aún no desbloqueado"}
             </p>
@@ -3068,6 +3081,7 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
           </div>
         </div>
         <button
+          ref={closeBtnRef}
           onClick={handleClose}
           style={{ display: "block", width: "100%", minHeight: 44, marginTop: "1.25rem", ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 1rem", cursor: "pointer", backgroundColor: "transparent" }}
         >
@@ -5776,11 +5790,11 @@ function InviteShareModal({ message, url, onClose }) {
   return (
     <div
       onClick={handleClose}
-      style={{ position: "fixed", inset: 0, zIndex: 210, backgroundColor: "rgba(42,31,26,0.65)", display: "flex", alignItems: "flex-end", justifyContent: "center", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
+      style={{ position: "fixed", inset: 0, zIndex: 210, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center", animation: isClosing ? "backdropOut 250ms ease-out forwards" : "backdropIn 200ms ease-out" }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bgCard, borderRadius: "1.5rem 1.5rem 0 0", padding: "1.75rem 1.5rem 2.25rem", boxShadow: "0 -4px 40px rgba(42,31,26,0.2)", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
+        style={{ width: "100%", maxWidth: 480, backgroundColor: palette.bgCard, borderRadius: "1.5rem 1.5rem 0 0", padding: "1.75rem 1.5rem 2.25rem", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)" }}
       >
         <div style={{ width: 36, height: 4, backgroundColor: palette.border, borderRadius: 999, margin: "0 auto 1.25rem" }} />
         <p style={{ ...display, fontSize: "1.1rem", fontWeight: 700, color: palette.ink, marginBottom: "0.35rem" }}>Invita a un amigo</p>
@@ -5796,7 +5810,7 @@ function InviteShareModal({ message, url, onClose }) {
           </span>
           <button
             onClick={copyLink}
-            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.75rem", backgroundColor: copied ? palette.sage : palette.accent, color: copied ? palette.onColor : palette.onAccent, border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
+            style={{ /* «Copiado»: success + onColor en claro (5.79), ink + bg en oscuro (21.00). Antes sage oscuro + blanco ~3.1. */ ...display, fontSize: "14px", fontWeight: 600, minHeight: 44, padding: "0 1rem", backgroundColor: copied ? (palette.bg === PALETTE_DARK.bg ? palette.ink : palette.success) : palette.accent, color: copied ? (palette.bg === PALETTE_DARK.bg ? palette.bg : palette.onColor) : palette.onAccent, border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
           >
             {copied ? "Copiado" : "Copiar"}
           </button>
@@ -5808,7 +5822,7 @@ function InviteShareModal({ message, url, onClose }) {
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.whatsapp, color: palette.onColor, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.whatsapp, color: palette.onAccent, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
           >
             WhatsApp
           </a>
@@ -5816,7 +5830,7 @@ function InviteShareModal({ message, url, onClose }) {
             href={twUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.x, color: palette.onColor, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.x, color: palette.onColor, border: palette.bg === PALETTE_DARK.bg ? `1.5px solid ${palette.inkSoft}` : "1.5px solid transparent", borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
           >
             Twitter / X
           </a>
