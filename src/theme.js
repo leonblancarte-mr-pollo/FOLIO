@@ -110,6 +110,17 @@ function applyPaletteCssVars(isDark = false) {
 // Valores iniciales (modo claro) para las pantallas que se pintan antes de MainApp (login, onboarding).
 applyPaletteCssVars(false);
 
+// Degradados permitidos (sema-paleta §5, 2026-11-02). Solo como acento en tarjetas destacadas y
+// barras de progreso; nunca de fondo de pantalla ni debajo de texto largo.
+//   acento: cereza → durazno. Texto encima solo grande (≥ 19 px negritas) en onAccent #483A58.
+//   frio:   lila → azul acero. Sin texto encima (ningún color pasa en los dos extremos).
+const SEMA_GRADIENTS = {
+  acento: "linear-gradient(135deg, #F45B69 0%, #F79F79 100%)",
+  acentoV: "linear-gradient(180deg, #F45B69 0%, #F79F79 100%)",
+  frio: "linear-gradient(135deg, #BBADFF 0%, #456990 100%)",
+  cereza: "#F45B69",
+};
+
 // Identidad fija (no cambia con el tema).
 const BRAND = {
   wine: "#7A2E2E", wineDeep: "#6B1E2A", amber: "#C8924A", amberLight: "#D4A574", amberGlow: "#F4C77A",
@@ -243,7 +254,7 @@ function genreColor(genre) {
 
 
 export {
-  FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SOCIAL_COLORS, STATUS_COLORS,
+  FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
   display, body, quote, sp, FONT_DISPLAY, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,

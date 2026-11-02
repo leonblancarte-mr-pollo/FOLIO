@@ -17,10 +17,11 @@ Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un co
 | Tinta | `#483A58` | — | Texto principal, íconos, logo |
 | Texto secundario | `#5E5768` | — | Texto secundario y placeholders |
 | Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora de la pestaña activa. Nunca texto sobre blanco |
-| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior |
+| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior, marcos de celebración, publicación «leyó hoy» |
 | Acento cálido | `#F79F79` | `#483A58` | Celebraciones, gemas, segundo sticker. Desde el 2026-11-02 es el mismo valor que la acción principal: en una pantalla, el durazno relleno es la acción y el cálido solo aparece en detalles chicos |
 | Superficie suave | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del blanco |
-| Complemento frío | `#456990` | — (sirve como texto sobre blanco) | Enlaces, estados informativos, íconos secundarios |
+| Complemento frío | `#456990` | `#FFFFFF` (`onColor`) cuando es fondo; sirve como texto sobre blanco | Enlaces, estados informativos, íconos secundarios, reseñas (publicación «reseña» del feed) |
+| Cereza (solo en degradado) | `#F45B69` | ver §5 | **Ya no es acción principal.** Solo existe como extremo del `degradadoAcento`; nunca sola como relleno ni como texto |
 | Éxito («Leído») | `#5C6B3D` | — | Token actual `success` de `theme.js` |
 | Error | `#B03A2E` | — | Errores y acciones destructivas |
 
@@ -81,6 +82,28 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 | `#E7D7C1` | `#FFFFFF` | **1.41** | **Prohibido como texto.** Como línea divisoria es decorativa |
 | `#FFFFFF` | `#BBADFF` / `#F79F79` | 1.99 / 2.06 | **Prohibido**: sobre firma y cálido el texto es siempre `#483A58`, también en modo oscuro |
 
+## 5. Degradados permitidos (2026-11-02)
+
+Solo dos, definidos en `theme.js` como `SEMA_GRADIENTS`, y solo como **acento** en tarjetas destacadas y barras de progreso. Nunca como fondo de pantalla completa ni debajo de texto largo (sema-identidad §2).
+
+| Nombre | Valor | Dónde | Texto encima |
+|---|---|---|---|
+| `degradadoAcento` | `linear-gradient(135deg, #F45B69 0%, #F79F79 100%)` (cereza → durazno) | Tarjeta «libro terminado» del feed, barra de progreso de «Seguir leyendo», tarjetas destacadas | `#483A58` **solo en texto grande** (≥ 19 px en negritas o ≥ 24 px): sobre la cereza da 3.24:1 y sobre el durazno 5.04:1. El texto chico (13–15 px) **no va sobre el degradado**: va sobre `bg` o sobre `superficieSuave` dentro de la misma tarjeta. Blanco está prohibido (3.21 / 2.06) |
+| `degradadoFrio` | `linear-gradient(135deg, #BBADFF 0%, #456990 100%)` (lila → azul acero) | Barras de progreso y marcos; nunca de fondo de texto | **Ninguno.** No hay un color que pase en los dos extremos (`#483A58` falla sobre el azul, blanco falla sobre el lila) |
+
+Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pista actual de `ProgressBarBook`), porque el durazno y el lila no llegan a 3:1 sobre blanco por sí solos.
+
+## 6. Mapa de color por tipo de publicación (feed, 2026-11-02)
+
+| Tipo | Color | Texto |
+|---|---|---|
+| Leyó hoy (`reading_session` con libro) | `firma` lila como fondo de tarjeta o franja | `onFirma` `#483A58` |
+| Libro terminado (`book_update` → leído) | `degradadoAcento` con la portada en primer plano | Título grande en `#483A58`; texto chico sobre `bg` |
+| Reseña (`book_update` con reseña o calificación) | `complementoFrio` azul acero como franja o marco | `onColor` `#FFFFFF` sobre el azul; `ink` sobre `bg` |
+| Frase guardada (`quote`) | Ciruela oscuro `#483A58` (`superficieSuave` oscuro / `ink` claro) de fondo, tipografía Instrument Serif itálica | `onColor` `#FFFFFF` (10.39:1) y `#E7D7C1` para secundario (7.36:1) |
+| Sesión sin libro | Neutro: `bg` con texto `ink` y `inkSoft`, sin color | `ink` |
+| Logro | `firma` (sticker) | `onFirma` |
+
 ## 4. Regla de implementación
 
 - **Dónde viven los colores.** Solo en `src/theme.js`, como tokens semánticos (`PALETTE_LIGHT` / `PALETTE_DARK`).
@@ -126,7 +149,9 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 | **`onFirma`** *(nuevo)* | `#483A58` | `#483A58` | Texto sobre `firma` y sobre `acentoCalido`, en ambos modos |
 | **`acentoCalido`** *(nuevo)* | `#F79F79` | `#F79F79` | Celebraciones, gemas, segundo sticker |
 | **`superficieSuave`** *(nuevo)* | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo. Texto encima: `ink` |
-| **`complementoFrio`** *(nuevo)* | `#456990` | `#456990` | Enlaces, estados informativos, íconos secundarios (en oscuro solo en elementos grandes) |
+| **`complementoFrio`** *(nuevo)* | `#456990` | `#456990` | Enlaces, estados informativos, íconos secundarios, reseñas (en oscuro solo en elementos grandes) |
+| **`SEMA_GRADIENTS.acento`** *(2026-11-02, fuera de `palette`)* | cereza → durazno | igual | Tarjetas destacadas y barras de progreso (§5) |
+| **`SEMA_GRADIENTS.frio`** *(2026-11-02, fuera de `palette`)* | lila → azul acero | igual | Barras y marcos, sin texto encima (§5) |
 
 ### Fuera de `palette` (pendiente pantalla por pantalla)
 
@@ -134,4 +159,4 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 
 - **`/paleta` no los rediseña.** Solo los lista en su reporte.
 - **Cada `/redisena` los cambia** cuando toca la pantalla que los usa, con valores de esta skill.
-- **Los degradados son un rechazo de identidad:** se reemplazan por color plano y no se reinventan como degradados nuevos.
+- **Los degradados viejos (vino → ámbar, etc.) se reemplazan** por color plano o por uno de los dos de §5. No se inventan degradados nuevos.

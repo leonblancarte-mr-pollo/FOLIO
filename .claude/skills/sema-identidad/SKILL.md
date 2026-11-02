@@ -17,7 +17,14 @@ Esta skill es la regla. Si algo no está aquí, en `sema-paleta` o en `sema-voz`
 
 Los colores vivos van **solo como acento**: botones, celebraciones, stickers y racha.
 
-Nunca se usan como fondo grande ni como degradado.
+Nunca se usan como fondo grande.
+
+**Reparto de los acentos (decidido con León, 2026-11-02):**
+- **Acción principal: durazno** `#F79F79` en claro y `#F9B294` en oscuro. El único botón relleno de cada pantalla, la píldora activa y el progreso.
+- **Firma de marca: lila** `#BBADFF`. Racha, stickers, borde rasgado de la barra inferior y marcos de celebración.
+- **Complemento frío: azul acero** `#456990`. Reseñas y estados informativos.
+
+**Degradados.** Permitidos **solo como acento** en tarjetas destacadas y barras de progreso, con dos combinaciones fijas de `sema-paleta`: cereza → durazno (`degradadoAcento`) y lila → azul acero (`degradadoFrio`). Nunca como fondo de pantalla completa ni como fondo de texto largo. Las reglas de texto encima están en `sema-paleta` §5.
 
 ## 3. Principio rector
 
@@ -41,14 +48,17 @@ Nunca se usan como fondo grande ni como degradado.
 - **Stickers y boletos** como complementos.
 - **El gato en Inicio:** pequeño, nunca ocupando la pantalla.
 - **Textura de papel arrugado:**
-  - Dónde se permite: solo en stickers y tarjetas.
-  - Cómo: sutil, hecha con CSS o SVG inline.
+  - Dónde se permite: stickers, tarjetas destacadas y el fondo de la tarjeta de racha.
+  - Cómo: sutil, hecha con CSS o SVG inline (clase `.sema-papel` de `index.css`).
   - Nunca como fondo de pantalla completa ni con imágenes pesadas.
+- **Cabecera «Sema»** con mayúscula inicial en el texto del logo (decisión de León del 2026-11-02; es un cambio de marca pendiente del logo final).
+- **Foto de perfil en la cabecera**, que abre Perfil. Por eso Perfil ya no va en la barra inferior.
 
 ## 6. Rechazado
 
 - Pasteles como fondo.
-- Degradados suaves.
+- Degradados como fondo de pantalla o debajo de texto largo (los de acento de §2 sí).
+- **Emojis en la interfaz.** Los íconos son del set Lucide (`lucide-react`) o SVG propios: también las portadas genéricas, las estrellas de calificación y los chips. Un emoji solo puede aparecer en contenido escrito por el usuario.
 - Estética de app de bienestar.
 - Look «generado por IA».
 - Morado saturado sobre azul tinta.
@@ -70,7 +80,7 @@ Copiados tal cual de `design-system/sema/MASTER.md`:
 
 1. **Una acción principal por pantalla.** Un solo botón relleno en vino; todo lo demás es texto o botón silencioso.
 2. **Cero cajas dentro de cajas.** Se separa con espacio y tamaño de letra. Una tarjeta solo si es el contenedor de una acción (p. ej. portada), nunca borde + fondo + sombra sobre algo que ya está en una tarjeta.
-3. **Emojis con intención.** Íconos de la interfaz: solo `lucide-react`. Emoji solo en contenido del usuario o momentos de celebración.
+3. **Emojis con intención.** Íconos de la interfaz: solo `lucide-react`. Emoji solo en contenido del usuario o momentos de celebración. *(Desde el 2026-11-02 la regla de §6 es más estricta: ningún emoji en la interfaz, ni en celebraciones; los momentos se resuelven con stickers, marcos lila y SVG.)*
 4. **Progreso siempre visible.** Racha y avance del libro a la vista: vino mientras avanza, salvia al completar.
 5. **Pedir en pequeño, celebrar en grande.** Pedir 5 minutos / una página; celebrar con confetti, mascota y tarjeta compartible.
 6. **La mascota guía los avisos y los empty states.** Es quien habla cuando hay algo que decir (`EmptyState`, home).
