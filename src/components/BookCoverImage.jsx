@@ -101,14 +101,15 @@ export function GenericCover({ title, author, compact = false, label = "", foote
             // Compacta (2026-11-02, Para ti ronda 2): monograma con la inicial de la primera palabra con
             // peso del título, en Bricolage, para que no parezca un skeleton de rayas.
             <>
-              <div style={{ width: "30%", height: 3, backgroundColor: s.fieldInk, marginBottom: "8cqw" }} />
+              {/* La raya va DEBAJO de la inicial (encima parecía tilde: «N» se leía «Ñ»). */}
               <p style={{
                 fontFamily: FONT_DISPLAY, fontWeight: 800, color: s.fieldInk,
                 fontSize: "clamp(20px, 52cqw, 64px)", lineHeight: 1, letterSpacing: "-0.03em",
-                margin: "0 0 10cqw",
+                margin: "0 0 8cqw",
               }}>
                 {coverInitial(title)}
               </p>
+              <div style={{ width: "30%", height: 3, backgroundColor: s.fieldInk, marginBottom: "10cqw" }} />
               <Ticket scheme={s} compact />
             </>
           ) : (
