@@ -60,6 +60,8 @@ import {
   CloudSun,
   Gem,
   RefreshCw,
+  ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
@@ -80,7 +82,7 @@ import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { EmptyState } from "./components/EmptyState.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
-import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
+import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
@@ -706,10 +708,10 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
     <nav
       className="sm:hidden fixed bottom-0 left-0 right-0 z-20 flex items-center sema-nav-rasgado"
       style={{
-        backgroundColor: palette.bgCard + "F5",
+        // Barra de papel (2026-11-02): superficie suave opaca + textura de .sema-nav-rasgado,
+        // para que se separe del fondo blanco (antes era blanco translúcido con desenfoque).
+        backgroundColor: palette.superficieSuave,
         paddingBottom: "env(safe-area-inset-bottom)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
       }}
     >
       {NAV_ITEMS.map((t) => {
@@ -6613,22 +6615,20 @@ function AmigosSheet({ user, onClose, onPendingChange, onMessagesRead }) {
 
 // Social — feed de amigos con acceso a amigos y notificaciones
 function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, onNavigationDone, onOpenAmigos, pendingCount = 0 }) {
+  // Sin campana propia: la del encabezado global abre las mismas notificaciones.
+  const amigosButton = (
+    <button onClick={onOpenAmigos} aria-label={pendingCount > 0 ? `Amigos, ${pendingCount} ${pendingCount === 1 ? "solicitud pendiente" : "solicitudes pendientes"}` : "Amigos"} className="btn-press" style={{ position: "relative", minHeight: 44, background: "transparent", border: `1.5px solid ${palette.ink}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem 0.95rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+      <Users size={18} color={palette.ink} />
+      <span style={{ ...body, fontSize: "14px", color: palette.ink, fontWeight: 600 }}>Amigos</span>
+      {pendingCount > 0 && (
+        <span aria-hidden style={{ position: "absolute", top: -6, right: -6, backgroundColor: palette.badge, color: palette.onColor, borderRadius: 999, fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
+      )}
+    </button>
+  );
   return (
     <div>
-      <div style={{ maxWidth: "42rem", margin: "0 auto", padding: "1rem 1rem 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800, fontSize: "1.4rem", color: palette.ink }}>Social</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <button onClick={onOpenAmigos} aria-label="Amigos" className="btn-press" style={{ position: "relative", background: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 999, cursor: "pointer", padding: "0.5rem 0.8rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Users size={18} color={palette.inkSoft} />
-            <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, fontWeight: 600 }}>Amigos</span>
-            {pendingCount > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onColor, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
-            )}
-          </button>
-          {/* Sin campana propia: la del encabezado global abre las mismas notificaciones. */}
-        </div>
-      </div>
-      <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} onOpenAmigos={onOpenAmigos} />
+      {/* Sin título «Social» (la píldora activa de la barra ya dice dónde se está). «Amigos» va en la fila del saludo. */}
+      <FeedView user={user} onAdd={onAdd} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={onNavigationDone} onOpenAmigos={onOpenAmigos} headerAction={amigosButton} />
     </div>
   );
 }
@@ -7092,7 +7092,7 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
     onToggle(postId);
   }
   return (
-    <button onClick={handleClick} style={{ display: "flex", alignItems: "center", gap: "0.28rem", background: "none", border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+    <button onClick={handleClick} aria-label={liked ? "Quitar me gusta" : "Me gusta"} aria-pressed={liked} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.3rem", background: "none", border: "none", cursor: "pointer", padding: "0 0.4rem", minWidth: 44, minHeight: 44, flexShrink: 0 }}>
       <span style={{ position: "relative", display: "inline-flex", width: size, height: size, flexShrink: 0 }}>
         <Heart
           size={size}
@@ -7110,7 +7110,7 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
           style={{ position: "absolute", opacity: liked ? 1 : 0, transition: "opacity 120ms ease" }}
         />
       </span>
-      {count > 0 && <span style={{ fontSize: size <= 14 ? "0.72rem" : "0.82rem", color: palette.inkFaint, fontFamily: "Figtree, system-ui, sans-serif", lineHeight: 1 }}>{count}</span>}
+      {count > 0 && <span style={{ fontSize: size <= 14 ? "13px" : "14px", color: palette.inkSoft, fontFamily: "Figtree, system-ui, sans-serif", lineHeight: 1 }}>{count}</span>}
     </button>
   );
 }
@@ -7422,170 +7422,90 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   const freezesRemaining = streak?.streak_freezes_remaining ?? 1;
   const canFreeze = hasStreak && !hasLoggedToday && freezesRemaining > 0 && streak?.streak_freeze_used_at !== localDateStr();
 
-  // Phase: 0=sin racha, 1=1-3d, 2=4-7d, 3=8+d
-  const phase = days >= 8 ? 3 : days >= 4 ? 2 : days >= 1 ? 1 : 0;
-
-  const cfg = STREAK_PHASES[phase];
-
-  // Danger: racha activa, sin leer hoy, hora nocturna
-  const hour = new Date().getHours();
-  const isDanger = hasStreak && !hasLoggedToday && hour >= 20;
-
-  // Glow
-  const glowOpacity = hasLoggedToday ? "0.65" : "0.38";
-  const glowSize   = hasLoggedToday ? "30px" : "20px";
-  const bannerShadow = `0 0 ${glowSize} rgba(${cfg.rgb},${glowOpacity}), 0 6px 24px rgba(0,0,0,0.18)`;
-
-  // Progress bar — meta diaria: 20 páginas
+  // Progreso del día — meta diaria: 20 páginas
   const DAILY_GOAL = 20;
   const pct = pagesLoggedToday > 0 ? Math.min(100, Math.round((pagesLoggedToday / DAILY_GOAL) * 100)) : 0;
   const goalReached = pagesLoggedToday >= DAILY_GOAL;
 
-  // Confeti al alcanzar meta (solo en la transición, nunca al montar)
+  // Confeti al alcanzar meta (solo en la transición, nunca al montar). Colores de la paleta SEMA.
   const prevGoalRef = useRef(goalReached);
   useEffect(() => {
     if (goalReached && !prevGoalRef.current && typeof confetti === "function") {
-      confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: [BRAND.gold, BRAND.goldDeep, palette.onAccent, cfg.g0] });
-      setTimeout(() => confetti({ particleCount: 35, spread: 55, origin: { y: 0.28 } }), 650);
+      confetti({ particleCount: 70, spread: 80, origin: { y: 0.35 }, colors: [palette.firma, palette.accent, SEMA_GRADIENTS.cereza, palette.superficieSuave] });
+      setTimeout(() => confetti({ particleCount: 35, spread: 55, origin: { y: 0.28 }, colors: [palette.firma, palette.accent, SEMA_GRADIENTS.cereza, palette.superficieSuave] }), 650);
     }
     prevGoalRef.current = goalReached;
   }, [goalReached]);
 
-  // Fire size por fase
-  const FIRE_SIZES = [22, 28, 36, 44];
-  const fireSize = FIRE_SIZES[phase];
+  const dayWord = days === 1 ? "día" : "días";
+  const pagesWord = pagesLoggedToday === 1 ? "página" : "páginas";
 
+  // Rediseño 2026-11-02: la racha es el mismo sticker lila con papel de Inicio (sema-identidad §2/§5).
+  // Antes: degradado ámbar/café con texto blanco (fuera de paleta, 2.2:1) y brillo rojo de «peligro»
+  // de noche (presión: rompe la regla cero culpa). Todo el texto va en onFirma (5.21:1 sobre lila).
   return (
     <>
     <div
       onClick={hasLoggedToday ? undefined : onLog}
-      className={`streak-banner-enter${isDanger ? " streak-danger" : ""}`}
+      className="streak-banner-enter sema-papel"
       style={{
-        position: "relative", overflow: "hidden",
-        borderRadius: "20px",
-        border: `2px solid ${cfg.border}99`,
-        background: `linear-gradient(135deg, ${cfg.g0} 0%, ${cfg.g1} 100%)`,
-        boxShadow: isDanger ? undefined : bannerShadow,
-        marginBottom: "1.25rem",
+        borderRadius: 16,
+        backgroundColor: palette.firma,
+        // Canto de sticker recortado: filo del fondo + línea de tinta (igual que Inicio).
+        border: `3px solid ${palette.bg}`,
+        boxShadow: `0 0 0 1.5px ${palette.ink}`,
+        margin: "0 2px 2rem",
         cursor: hasLoggedToday ? "default" : "pointer",
-        transition: "box-shadow 500ms ease-out",
       }}
     >
-      {/* Glassmorphism sheen */}
-      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(160deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 100%)", pointerEvents: "none", borderRadius: "18px" }} />
-
-      {/* Decorative orbs */}
-      <div style={{ position: "absolute", top: -50, right: -30, width: 150, height: 150, borderRadius: "50%", background: "rgba(255,255,255,0.1)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: -25, left: -15, width: 90, height: 90, borderRadius: "50%", background: "rgba(0,0,0,0.07)", pointerEvents: "none" }} />
-
-      {/* Main content */}
-      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "18px 20px 14px" }}>
-
-        {/* Left: fuego + número + label */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", padding: "16px 16px 12px 18px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0, flex: 1 }}>
-
-          {/* Fuego (evoluciona por fase) */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <Flame
-              size={fireSize}
-              color={palette.onColor}
-              strokeWidth={phase >= 2 ? 1.5 : 2}
-              style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.28))", display: "block" }}
-            />
-            {phase === 3 && (
-              <>
-                <span className="sparkle-orbit" style={{ position: "absolute", top: -10, right: -8, fontSize: 13, color: BRAND.gold, lineHeight: 1 }}>✦</span>
-                <span className="sparkle-orbit" style={{ position: "absolute", bottom: -4, left: -10, fontSize: 10, color: BRAND.gold, lineHeight: 1 }}>✦</span>
-                <span className="sparkle-orbit" style={{ position: "absolute", top: 2, left: -12, fontSize: 9, color: BRAND.goldLight, lineHeight: 1, opacity: 0.8 }}>✦</span>
-              </>
-            )}
-            {phase === 2 && (
-              <span style={{ position: "absolute", top: -6, right: -6, fontSize: 10, color: "rgba(255,255,255,0.8)", lineHeight: 1 }}>✦</span>
-            )}
-          </div>
-
-          {/* Texto */}
+          <Flame size={32} color={palette.onFirma} strokeWidth={2} className={days > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "7px", flexWrap: "wrap" }}>
-              {hasStreak && (
-                <span style={{
-                  fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800,
-                  fontSize: "clamp(32px, 8vw, 44px)",
-                  color: palette.onColor, lineHeight: 0.9,
-                  textShadow: "0 2px 10px rgba(0,0,0,0.22)",
-                  letterSpacing: "-1.5px",
-                }}>
-                  {days}
-                </span>
-              )}
-              <span style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "16px", color: "rgba(255,255,255,0.92)", lineHeight: 1.2, fontStyle: hasStreak ? "normal" : "italic" }}>
-                {hasStreak ? "días de racha" : hasLoggedToday ? "¡Leíste hoy!" : "¿Leíste hoy?"}
-              </span>
-            </div>
-            {pagesLoggedToday > 0 && (
-              <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "13px", color: "rgba(255,255,255,0.72)", margin: "3px 0 0", lineHeight: 1 }}>
-                {pagesLoggedToday} {pagesLoggedToday === 1 ? "página" : "páginas"} hoy
-              </p>
-            )}
+            <p style={{ ...display, fontWeight: 800, fontSize: hasStreak ? "40px" : "20px", lineHeight: 0.95, letterSpacing: hasStreak ? "-0.03em" : "-0.01em", color: palette.onFirma }}>
+              {hasStreak
+                ? <>{days} <span style={{ fontSize: "17px", fontWeight: 700, letterSpacing: 0 }}>{dayWord} de racha</span></>
+                : hasLoggedToday ? "Hoy ya hubo lectura" : "¿Hubo lectura hoy?"}
+            </p>
+            <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.4rem", lineHeight: 1.2 }}>
+              {pagesLoggedToday > 0 ? `${pagesLoggedToday} ${pagesWord} hoy` : "Con una página basta."}
+            </p>
           </div>
         </div>
 
-        {/* Botones: congelar + páginas en la misma fila (antes el copo era
-            position:absolute arriba a la derecha y se encimaba con "+ Páginas") */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-        {canFreeze && (
+        {/* Congelar + páginas en la misma fila. Botones silenciosos: la acción rellena de Social es «Leer ahora». */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+          {canFreeze && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
+              aria-label="Congelar racha"
+              title="Congelar racha"
+              className="btn-press"
+              style={{ width: 44, height: 44, borderRadius: "50%", flexShrink: 0, background: "transparent", border: `1.5px solid ${palette.onFirma}`, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+            >
+              <Snowflake size={18} color={palette.onFirma} strokeWidth={2} />
+            </button>
+          )}
           <button
-            onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
-            aria-label="Congelar racha"
-            style={{
-              background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.4)",
-              borderRadius: "50%", width: "34px", height: "34px", flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer",
-            }}
-            title="Congelar racha"
+            onClick={(e) => { e.stopPropagation(); onLog(); }}
+            className="btn-press"
+            style={{ minHeight: 44, background: "transparent", color: palette.onFirma, border: `1.5px solid ${palette.onFirma}`, borderRadius: 999, padding: "0 14px", ...display, fontWeight: 700, fontSize: "15px", flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
           >
-            <Snowflake size={15} color="rgba(255,255,255,0.9)" strokeWidth={2} />
+            <Plus size={16} strokeWidth={2.4} /> Páginas
           </button>
-        )}
-        <button
-          onClick={(e) => { e.stopPropagation(); onLog(); }}
-          className="btn-press"
-          style={{
-            backgroundColor: "rgba(255,255,255,0.18)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            color: palette.onColor,
-            border: "1.5px solid rgba(255,255,255,0.7)",
-            borderRadius: "22px",
-            padding: "10px 16px",
-            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "14px",
-            flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer",
-          }}
-        >
-          + Páginas
-        </button>
         </div>
       </div>
 
-      {/* Barra de progreso diario */}
-      <div style={{ height: "3px", background: "rgba(0,0,0,0.18)", margin: "0 2px" }}>
-        {pct > 0 && (
-          <div style={{
-            height: "100%",
-            width: `${pct}%`,
-            background: goalReached ? BRAND.gold : "rgba(255,255,255,0.62)",
-            boxShadow: goalReached ? "0 0 8px rgba(255,215,0,0.75)" : "none",
-            transition: "width 600ms ease-out, background 400ms ease, box-shadow 400ms ease",
-          }} />
-        )}
+      {/* Progreso del día siempre visible (principio 4): pista con borde de tinta, relleno de tinta */}
+      <div role="progressbar" aria-label="Páginas de hoy" aria-valuemin={0} aria-valuemax={DAILY_GOAL} aria-valuenow={Math.min(pagesLoggedToday, DAILY_GOAL)} style={{ margin: "0 18px 14px", height: 8, borderRadius: 999, border: `1.5px solid ${palette.onFirma}`, overflow: "hidden" }}>
+        {pct > 0 && <div style={{ height: "100%", width: `${pct}%`, backgroundColor: palette.onFirma, transition: "width 600ms ease-out" }} />}
       </div>
     </div>
 
     {/* Freeze modal */}
     {showFreezeModal && (
       <div
-        style={{ position: "fixed", inset: 0, zIndex: 1000, backgroundColor: "rgba(42,31,26,0.55)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        style={{ position: "fixed", inset: 0, zIndex: 1000, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}
         onClick={() => setShowFreezeModal(false)}
       >
         <div
@@ -7601,13 +7521,13 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button
               onClick={() => setShowFreezeModal(false)}
-              style={{ ...body, flex: 1, fontSize: "0.9rem", backgroundColor: palette.bgSoft, color: palette.inkSoft, border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
+              style={{ ...body, flex: 1, minHeight: 48, fontSize: "15px", fontWeight: 600, backgroundColor: "transparent", color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "12px", padding: "0.75rem", cursor: "pointer" }}
             >
               Cancelar
             </button>
             <button
               onClick={() => { onFreeze?.(); setShowFreezeModal(false); }}
-              style={{ ...body, flex: 1, fontSize: "0.9rem", fontWeight: 700, backgroundColor: palette.freeze, color: palette.onColor, border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
+              style={{ ...body, flex: 1, minHeight: 48, fontSize: "15px", fontWeight: 700, backgroundColor: palette.complementoFrio, color: palette.onColor, border: "none", borderRadius: "12px", padding: "0.75rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
             >
               <Snowflake size={14} style={{ marginRight: "0.35rem" }} /> Congelar
             </button>
@@ -8159,69 +8079,51 @@ function SnacksHero({ onRead }) {
     if (!readIds.has(c.id)) { cuento = c; break; }
   }
   if (!cuento) cuento = CUENTOS[heroBase];
-  const isDark = palette.bg === PALETTE_DARK.bg;
 
   if (!cuento) return null;
 
+  // Rediseño 2026-11-02: sin caja, sin degradado vino/ámbar ni filete durazno (era caja dentro de
+  // caja y el rótulo durazno sobre blanco daba 2.06:1). Se separa con espacio; los rótulos van en
+  // tinta. «Leer ahora» es la única acción rellena de Social (principio 1).
   return (
-    <div data-tutorial="snacks-hero" style={{
-      background: isDark
-        ? `linear-gradient(135deg, ${palette.bgCard} 0%, rgba(200,79,79,0.08) 100%)`
-        : "linear-gradient(135deg, rgba(164,75,63,0.07) 0%, rgba(200,146,74,0.06) 100%)",
-      border: `1px solid ${isDark ? palette.border : "rgba(164,75,63,0.2)"}`,
-      borderRadius: 18,
-      padding: "1.35rem 1.25rem 1.1rem",
-      marginBottom: "1.5rem",
-      position: "relative",
-      overflow: "hidden",
-    }}>
-      {/* Decorative accent line */}
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, backgroundColor: palette.accent, borderRadius: "18px 0 0 18px" }} />
-      <div style={{ paddingLeft: "0.75rem" }}>
-        <p style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.65rem", fontWeight: 600, color: palette.accent, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "0.6rem" }}>
-          cuento del día
-        </p>
-        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.3rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, marginBottom: "0.3rem" }}>
-          {cuento.titulo}
-        </p>
-        <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontStyle: "italic", fontSize: "0.9rem", color: palette.inkSoft, marginBottom: "0.65rem" }}>
-          {cuento.autor}
-        </p>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-          <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.72rem", color: palette.inkFaint, fontWeight: 500 }}>
-            {cuento.duracion || `${cuento.duracion_minutos} min`} de lectura
-          </span>
-          {cuento.generos?.[0] && (
-            <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.68rem", color: palette.amber, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-              {cuento.generos[0]}
-            </span>
-          )}
-        </div>
-        <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.88rem", color: palette.inkSoft, lineHeight: 1.5, marginBottom: "1rem", fontStyle: "italic" }}>
-          {cuento.desc}
-        </p>
-        <button
-          onClick={() => {
-            haptic(HAPTIC.NAV);
-            try {
-              const ids = new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]'));
-              ids.add(cuento.id);
-              localStorage.setItem('folio_read_cuentos', JSON.stringify([...ids]));
-            } catch { /* localStorage no disponible: no marcar como leído no rompe nada */ }
-            onRead(cuento);
-          }}
-          style={{
-            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.92rem", fontWeight: 700,
-            backgroundColor: palette.accent, color: palette.onAccent,
-            border: "none", borderRadius: 12, padding: "0.75rem 1.5rem",
-            cursor: "pointer", width: "100%",
-          }}
-          className="btn-press"
-        >
-          Leer ahora →
-        </button>
-      </div>
-    </div>
+    <section data-tutorial="snacks-hero" aria-labelledby="cuento-dia-titulo" style={{ marginBottom: "2rem" }}>
+      <p style={{ ...body, fontSize: "13px", fontWeight: 700, color: palette.ink, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: 6 }}>
+        <BookOpen size={15} strokeWidth={2} color={palette.ink} aria-hidden /> Cuento del día
+      </p>
+      <h2 id="cuento-dia-titulo" style={{ ...display, fontSize: "24px", fontWeight: 800, color: palette.ink, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: "0.25rem" }}>
+        {cuento.titulo}
+      </h2>
+      <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginBottom: "0.5rem" }}>
+        {cuento.autor}
+        <span aria-hidden> · </span>
+        {cuento.duracion || `${cuento.duracion_minutos} min`} de lectura
+        {cuento.generos?.[0] && <><span aria-hidden> · </span><span style={{ textTransform: "lowercase" }}>{cuento.generos[0]}</span></>}
+      </p>
+      <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", color: palette.ink, lineHeight: 1.4, marginBottom: "1rem" }}>
+        {cuento.desc}
+      </p>
+      <button
+        onClick={() => {
+          haptic(HAPTIC.NAV);
+          try {
+            const ids = new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]'));
+            ids.add(cuento.id);
+            localStorage.setItem('folio_read_cuentos', JSON.stringify([...ids]));
+          } catch { /* localStorage no disponible: no marcar como leído no rompe nada */ }
+          onRead(cuento);
+        }}
+        style={{
+          ...display, fontSize: "16px", fontWeight: 700,
+          backgroundColor: palette.accent, color: palette.onAccent,
+          border: "none", borderRadius: 14, minHeight: 52, padding: "0 1.5rem",
+          cursor: "pointer", width: "100%",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        }}
+        className="btn-press"
+      >
+        Leer ahora <ArrowRight size={18} strokeWidth={2.2} aria-hidden />
+      </button>
+    </section>
   );
 }
 
@@ -8234,9 +8136,10 @@ function SnacksCarousel({ onRead }) {
 
   if (rest.length === 0) return null;
 
+  // Boletos en superficie suave, sin borde (una sola capa: sema-paleta «boletos»).
   return (
     <div style={{ marginTop: "1.75rem", marginBottom: "0.5rem" }}>
-      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, fontSize: "1rem", color: palette.ink, marginBottom: "0.75rem" }}>
+      <p style={{ ...display, fontWeight: 700, fontSize: "18px", color: palette.ink, marginBottom: "0.75rem" }}>
         Más cuentos
       </p>
       <div className="scrollbar-hide" style={{ display: "flex", gap: "0.75rem", overflowX: "auto", paddingBottom: "0.5rem" }}>
@@ -8245,24 +8148,24 @@ function SnacksCarousel({ onRead }) {
             key={c.id}
             onClick={() => onRead(c)}
             style={{
-              flexShrink: 0, width: 160,
-              backgroundColor: palette.bgCard,
-              border: `1px solid ${palette.border}`,
+              flexShrink: 0, width: 168, minHeight: 112,
+              backgroundColor: palette.superficieSuave,
+              border: "none",
               borderRadius: 12,
-              padding: "0.9rem 0.85rem",
+              padding: "0.9rem 0.9rem",
               textAlign: "left",
               cursor: "pointer",
               display: "flex", flexDirection: "column", gap: "0.25rem",
             }}
-            className="sema-card"
+            className="btn-press"
           >
-            <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.88rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
+            <p style={{ ...display, fontSize: "16px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
               {c.titulo}
             </p>
-            <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontStyle: "italic", fontSize: "0.75rem", color: palette.inkSoft, margin: 0 }}>
+            <p style={{ ...body, fontSize: "13px", color: palette.ink, margin: 0 }}>
               {c.autor}
             </p>
-            <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.65rem", color: palette.inkFaint, marginTop: "0.25rem" }}>
+            <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "auto" }}>
               {c.duracion || `${c.duracion_minutos} min`}
             </span>
           </button>
@@ -8273,90 +8176,74 @@ function SnacksCarousel({ onRead }) {
 }
 
 // ============ QUOTE POST CARD (feed) ============
-function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsOpen, doubleTapId, onLike, onToggleComments, onAuthorClick, children }) {
+// Frase guardada (sema-paleta §6): fondo ciruela #483A58 (ink en claro / superficieSuave en oscuro),
+// Instrument Serif itálica en onColor (10.39:1) y secundario en onDarkSoft #E7D7C1 (7.36:1).
+// Reemplaza QUOTE_POSTER_GRADIENTS (vino/café) y los rgba de crema y ámbar viejos.
+function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsOpen, doubleTapId, onLike, onToggleComments, onAuthorClick, highlighted, children }) {
   const quote = post.quote;
   const [expanded, setExpanded] = useState(false);
   const text = quote?.text || "";
   const isLong = text.length > 280;
   const displayText = !expanded && isLong ? text.slice(0, 280) + "…" : text;
-  const moodLabel = MOOD_OPTIONS.find(m => m.key === quote?.mood)?.label;
+  // Sin el emoji de la etiqueta: es texto de la interfaz, no del usuario (sema-identidad §6).
+  const moodLabel = MOOD_OPTIONS.find(m => m.key === quote?.mood)?.label?.replace(/^[^\p{L}]+/u, "");
   const isDark = palette.bg === PALETTE_DARK.bg;
-
-  const cardBg = isDark ? QUOTE_POSTER_GRADIENTS.dark : QUOTE_POSTER_GRADIENTS.light;
+  const plum = isDark ? palette.superficieSuave : palette.ink;
+  const canOpenAuthor = post.user_id !== userId && onAuthorClick;
 
   return (
     <div
       id={`post-${post.id}`}
       className="feed-post-item"
       onClick={() => onLike && onLike(post.id, true)}
-      style={{ position: "relative", overflow: "hidden", borderRadius: "16px", boxShadow: "0 6px 24px rgba(42,31,26,0.22), 0 2px 6px rgba(42,31,26,0.1)", cursor: "default" }}
+      style={{ position: "relative", overflow: "hidden", borderRadius: 16, backgroundColor: plum, boxShadow: highlighted ? `0 0 0 2px ${palette.bg}, 0 0 0 4px ${palette.accent}` : "none", transition: "box-shadow 200ms ease", cursor: "default" }}
     >
-      {/* Poster background */}
-      <div style={{ background: cardBg, padding: "1.4rem 1.3rem 1.1rem" }}>
-        {/* Header: user + timestamp */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.25rem" }}>
-          {post.user_id !== userId && onAuthorClick ? (
-            <button onClick={() => onAuthorClick(post.author)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-              <Avatar author={post.author} size={30} />
+      <div style={{ padding: "1.1rem 1.2rem 1rem" }}>
+        {/* Cabecera: autor + hora */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1.1rem" }}>
+          {canOpenAuthor ? (
+            <button onClick={(e) => { e.stopPropagation(); onAuthorClick(post.author); }} aria-label={`Ver perfil de ${post.author?.nombre || "Usuario"}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0, minWidth: 44, minHeight: 44, display: "flex", alignItems: "center" }}>
+              <Avatar author={post.author} size={36} />
             </button>
-          ) : <Avatar author={post.author} size={30} />}
+          ) : <Avatar author={post.author} size={36} />}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "0.35rem", flexWrap: "wrap" }}>
-              {post.user_id !== userId && onAuthorClick ? (
-                <button onClick={() => onAuthorClick(post.author)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                  <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
-                    {post.author?.nombre || "Usuario"}
-                  </span>
-                </button>
-              ) : (
-              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "13px", color: "rgba(244,237,224,0.95)" }}>
-                {post.author?.nombre || "Usuario"}
-              </span>
-              )}
-              <span style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.8rem", color: "rgba(244,237,224,0.55)", fontStyle: "italic" }}>
-                guardó una frase
-              </span>
-            </div>
-            <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: "rgba(244,237,224,0.4)" }}>
-              {timeAgo(post.created_at)}
-            </span>
+            <p style={{ ...body, fontSize: "15px", color: palette.onDarkSoft, lineHeight: 1.3 }}>
+              <span style={{ ...display, fontWeight: 700, color: palette.onColor }}>{post.author?.nombre || "Usuario"}</span> guardó una frase
+            </p>
+            <span style={{ ...body, fontSize: "13px", color: palette.onDarkSoft }}>{timeAgo(post.created_at)}</span>
           </div>
         </div>
 
-        {/* Decorative opening quote */}
-
-        {/* Quote text */}
-        <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: "clamp(1.35rem, 5.5vw, 1.65rem)", lineHeight: 1.4, color: "rgba(244,237,224,0.95)", marginBottom: isLong && !expanded ? "0.5rem" : "1.4rem", letterSpacing: "0.01em" }}>
+        {/* La frase */}
+        <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "clamp(1.4rem, 5.6vw, 1.7rem)", lineHeight: 1.35, color: palette.onColor, marginBottom: isLong && !expanded ? "0.25rem" : "1.1rem" }}>
           {displayText}
         </p>
         {isLong && (
           <button
             onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
-            style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(200,146,74,0.8)", padding: "0 0 1.2rem", display: "block" }}
+            style={{ ...body, background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: palette.onColor, textDecoration: "underline", textUnderlineOffset: 3, minHeight: 44, padding: 0, marginBottom: "0.5rem", display: "block" }}
           >
-            {expanded ? "Leer menos ↑" : "Leer más ↓"}
+            {expanded ? "Leer menos" : "Leer más"}
           </button>
         )}
 
-        {/* Book info */}
-        {quote?.bookTitle && (
-          <div style={{ borderTop: "1px solid rgba(244,237,224,0.12)", paddingTop: "0.75rem", marginBottom: moodLabel ? "0.65rem" : 0 }}>
-            <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(244,237,224,0.6)", fontStyle: "italic" }}>
-              — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
-            </p>
+        {/* Libro y ánimo: el ánimo es un sticker lila (texto onFirma 5.21:1) */}
+        {(quote?.bookTitle || moodLabel) && (
+          <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem 0.75rem" }}>
+            {quote?.bookTitle && (
+              <p style={{ ...body, fontSize: "14px", color: palette.onDarkSoft, flex: "1 1 auto", minWidth: 0 }}>
+                — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
+              </p>
+            )}
+            {moodLabel && (
+              <span className="sema-sticker" style={{ ...body, fontSize: "13px", fontWeight: 700, color: palette.onFirma, backgroundColor: palette.firma, borderRadius: 8, padding: "0.2rem 0.6rem" }}>
+                {moodLabel}
+              </span>
+            )}
           </div>
         )}
 
-        {/* Mood pill */}
-        {moodLabel && (
-          <div style={{ marginTop: quote?.bookTitle ? 0 : "0.65rem" }}>
-            <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.72rem", color: "rgba(200,146,74,0.9)", backgroundColor: "rgba(200,146,74,0.15)", borderRadius: "999px", padding: "0.2rem 0.6rem", border: "1px solid rgba(200,146,74,0.25)" }}>
-              {moodLabel}
-            </span>
-          </div>
-        )}
-
-        {/* Double-tap heart overlay */}
+        {/* Corazón del doble toque */}
         {doubleTapId === post.id && (
           <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
             <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
@@ -8364,21 +8251,29 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
         )}
       </div>
 
-      {/* Footer: likes + comments */}
-      <div style={{ backgroundColor: palette.bgCard, borderTop: "1px solid rgba(122,46,46,0.2)", padding: "0.6rem 1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-        <LikeButton postId={post.id} count={likeCount || 0} liked={liked} onToggle={(id) => onLike && onLike(id)} size={15} />
-        <button
-          onClick={e => { e.stopPropagation(); onToggleComments(post.id); }}
-          style={{ ...body, fontSize: "0.8rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}
-        >
-          <MessageCircle size={14} strokeWidth={2} />
-          {commentsOpen ? "Ocultar" : commentCount ? `Comentarios (${commentCount})` : "Comentarios"}
-        </button>
+      {/* Pie: likes + comentarios, sobre el fondo de la app (el texto chico no va sobre la ciruela en oscuro) */}
+      <div style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, borderTop: "none", borderRadius: "0 0 16px 16px", padding: "0 0.75rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <LikeButton postId={post.id} count={likeCount || 0} liked={liked} onToggle={(id) => onLike && onLike(id)} size={18} />
+        <CommentsToggle open={commentsOpen} count={commentCount} onClick={(e) => { e.stopPropagation(); onToggleComments(post.id); }} />
       </div>
 
-      {/* Comments section (injected from parent) */}
-      {commentsOpen && children}
+      {/* Comentarios (vienen del padre) */}
+      {commentsOpen && <div style={{ backgroundColor: palette.bg, padding: "0 0.75rem" }}>{children}</div>}
     </div>
+  );
+}
+
+// Botón «Comentarios» del pie de cada publicación (44 px de alto, texto 14 px en inkSoft).
+function CommentsToggle({ open, count, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={open}
+      style={{ ...body, fontSize: "14px", fontWeight: 500, color: palette.inkSoft, background: "none", border: "none", cursor: "pointer", minHeight: 44, padding: "0 0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" }}
+    >
+      <MessageCircle size={17} strokeWidth={1.9} />
+      {open ? "Ocultar comentarios" : count ? `Comentarios (${count})` : "Comentar"}
+    </button>
   );
 }
 
@@ -8747,7 +8642,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   );
 }
 
-function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone, onOpenAmigos }) {
+function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNavigation, onNavigationDone, onOpenAmigos, headerAction = null }) {
   const [posts, setPosts] = useState([]);
   const [feedError, setFeedError] = useState("");
   const [showNewPost, setShowNewPost] = useState(false);
@@ -9060,7 +8955,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
 
   if (feedState === 'loading') return <FeedSkeleton />;
 
-  // ── Motivational phrase ──
+  // Saludo: mismo recorte que Inicio (HomeView). Si el nombre llega como correo o handle
+  // («leon.blancarte+prueba») se corta en @ . + y se capitaliza. No se tocan datos.
+  const rawName = (user.name || "").trim().split(/\s+/)[0] || "";
+  const cutName = rawName.split(/[@+.]/)[0];
+  const firstName = cutName && cutName !== rawName ? cutName[0].toUpperCase() + cutName.slice(1) : cutName;
+
+  // ── Frase del saludo (sema-voz: corta, sin culpa, sin segunda persona de marketing) ──
   const readingBooks = books.filter(b => b.status === "reading");
   const recentlyFinished = books
     .filter(b => b.status === "read" && b.finishedAt && Date.now() - b.finishedAt < 5 * 24 * 3600 * 1000)
@@ -9069,74 +8970,163 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   let motivationalPhrase = "";
   const s = streak?.current_streak || 0;
   if (s >= 7) {
-    motivationalPhrase = `Llevas ${s} días seguidos. Eso ya es un hábito.`;
+    motivationalPhrase = `${s} días seguidos. Eso ya es costumbre.`;
   } else if (s >= 3) {
-    motivationalPhrase = `Llevas ${s} días seguidos. No pares ahora.`;
+    motivationalPhrase = `${s} días seguidos. Buen ritmo.`;
   } else if (!loggedYesterday) {
-    motivationalPhrase = "Ayer te tomaste el día. Hoy es buen día para volver.";
+    motivationalPhrase = "Ayer fue día de descanso. Hoy es buen día para volver.";
   } else if (recentlyFinished) {
     const daysAgo = Math.round((Date.now() - recentlyFinished.finishedAt) / (24 * 3600 * 1000));
     const daysStr = daysAgo <= 0 ? "hoy" : daysAgo === 1 ? "ayer" : `hace ${daysAgo} días`;
-    motivationalPhrase = `Terminaste "${recentlyFinished.title}" ${daysStr}. ¿Ya sabes cuál sigue?`;
+    motivationalPhrase = `«${recentlyFinished.title}» quedó terminado ${daysStr}. ¿Cuál sigue?`;
   } else if (readingBooks.length > 0) {
-    motivationalPhrase = `Hoy es buen día para avanzar en "${readingBooks[0].title}".`;
+    motivationalPhrase = `Hoy es buen día para avanzar en «${readingBooks[0].title}».`;
   } else if (wantToReadCount > 20) {
-    motivationalPhrase = `Tienes ${wantToReadCount} libros esperándote. Uno a la vez.`;
+    motivationalPhrase = `${wantToReadCount} libros en espera. Uno a la vez.`;
   } else {
-    motivationalPhrase = "Un buen libro te está esperando hoy.";
+    motivationalPhrase = "Un buen libro espera. Con una página basta.";
   }
 
+  // ── Piezas comunes de las publicaciones (rediseño 2026-11-02) ──
+  // Tarjeta base neutra: fondo de la app, borde suave, sin sombras de color. El color de cada
+  // tipo vive solo en su franja o zona (sema-identidad §2; mapa en sema-paleta §6).
+  const cardStyle = (post) => ({
+    position: "relative", overflow: "hidden",
+    backgroundColor: palette.bg,
+    border: `1px solid ${palette.border}`,
+    borderRadius: 16,
+    boxShadow: highlightedPost === post.id ? `0 0 0 2px ${palette.ink}` : "none",
+    transition: "box-shadow 200ms ease",
+    cursor: "default",
+  });
+  const openAuthor = (post) => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' });
+  const heartOverlay = (post) => doubleTapPost === post.id && (
+    <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
+      <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
+    </div>
+  );
+  // Franja superior del tipo de publicación (texto 14 px en negritas; contraste en la tabla de §6).
+  const band = (bg, color, Icon, label, extra) => (
+    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 16px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3 }}>
+      <Icon size={17} strokeWidth={2.1} color={color} aria-hidden />
+      <span>{label}</span>
+      {extra}
+    </div>
+  );
+  const postHeader = (post, verb) => {
+    const other = post.user_id !== user.id;
+    const name = post.author?.nombre || 'Usuario';
+    return (
+      <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", padding: "12px 8px 0 12px" }}>
+        {other ? (
+          <button onClick={(e) => { e.stopPropagation(); openAuthor(post); }} aria-label={`Ver perfil de ${name}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0, minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Avatar author={post.author} size={40} />
+          </button>
+        ) : <span style={{ minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Avatar author={post.author} size={40} /></span>}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.3 }}>
+            {other ? (
+              <button onClick={(e) => { e.stopPropagation(); openAuthor(post); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</button>
+            ) : <span style={{ ...display, fontWeight: 700, color: palette.ink }}>{name}</span>}
+            {verb ? <> {verb}</> : null}
+          </p>
+          <span style={{ ...ts.caption, color: palette.inkSoft }}>{timeAgo(post.created_at)}</span>
+        </div>
+        {post.user_id === user.id && (
+          <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} aria-label="Eliminar publicación" title="Eliminar" style={{ width: 44, height: 44, flexShrink: 0, color: palette.inkSoft, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Trash2 size={16} strokeWidth={2} />
+          </button>
+        )}
+      </div>
+    );
+  };
+  const postFooter = (post) => (
+    <>
+      <div style={{ borderTop: `1px solid ${palette.borderSoft}`, marginTop: 12, padding: "0 8px", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+        <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={18} />
+        <CommentsToggle open={openComments.has(post.id)} count={commentCounts[post.id]} onClick={(e) => { e.stopPropagation(); toggleComments(post.id); }} />
+      </div>
+      {openComments.has(post.id) && <div className="comments-enter" style={{ padding: "0 16px 12px" }}><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
+    </>
+  );
+  // Libro en línea (sin caja: portada + título; toda la fila abre la ficha).
+  const bookRow = (post) => post.book && (
+    <button
+      onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }}
+      className="book-card-hover"
+      aria-label={`Ver detalles de ${post.book.title}`}
+      style={{ display: "flex", gap: "0.85rem", alignItems: "center", background: "none", border: "none", padding: 0, width: "100%", textAlign: "left", cursor: "pointer", minHeight: 44 }}
+    >
+      {post.book.cover_url ? (
+        <img src={post.book.cover_url} alt="" style={{ width: 48, height: 72, objectFit: "cover", borderRadius: 4, flexShrink: 0, border: `1px solid ${palette.border}` }} />
+      ) : (
+        <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={48} height={72} />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ ...display, fontWeight: 700, fontSize: "17px", color: palette.ink, lineHeight: 1.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{post.book.title}</p>
+        {post.book.author && <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, marginTop: "0.15rem" }}>{post.book.author}</p>}
+      </div>
+      <ChevronRight size={18} color={palette.inkSoft} aria-hidden style={{ flexShrink: 0 }} />
+    </button>
+  );
+  // Estrellas Lucide (no ★): blancas sobre el azul acero de la reseña.
+  const starsOn = (rating, color) => (
+    <span role="img" aria-label={`${rating} de 5 estrellas`} style={{ display: "inline-flex", gap: 2 }}>
+      {[1, 2, 3, 4, 5].map(n => <Star key={n} size={14} strokeWidth={1.8} color={color} fill={n <= rating ? color : "transparent"} aria-hidden />)}
+    </span>
+  );
+  const pagesText = (p) => `${p} ${p === 1 ? "página" : "páginas"}`;
+
   return (
-    <div className="px-4 sm:px-6 py-6 max-w-xl mx-auto">
-      {/* Notification opt-in prompt */}
+    <div className="px-4 sm:px-6 pt-4 pb-6 max-w-xl mx-auto">
+      {/* Aviso para activar recordatorios */}
       {showNotifPrompt && (
         <div style={{
-          backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`,
-          borderRadius: "14px", padding: "1rem 1.1rem", marginBottom: "1.25rem",
+          borderTop: `1px solid ${palette.border}`, borderBottom: `1px solid ${palette.border}`,
+          padding: "0.75rem 0", marginBottom: "1.5rem",
           animation: "feedFadeIn 300ms ease-out",
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
-            <div style={{ flex: 1 }}>
-              <p style={{ ...display, fontSize: "0.95rem", fontWeight: 700, color: palette.ink, marginBottom: "0.2rem" }}>
-                ¿Quieres recordatorios de lectura?
+            <div style={{ flex: 1, paddingTop: "0.5rem" }}>
+              <p style={{ ...display, fontSize: "16px", fontWeight: 700, color: palette.ink, marginBottom: "0.2rem" }}>
+                ¿Recordatorios de lectura?
               </p>
-              <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, marginBottom: "0.85rem" }}>
-                Una notificación motivacional cada día a las 8pm. Sin spam.
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, marginBottom: "0.75rem" }}>
+                Un aviso al día, a las 8 de la noche. Sin spam.
               </p>
             </div>
-            <button onClick={dismissNotifPrompt} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.1rem", color: palette.inkFaint, flexShrink: 0 }}>
-              <X size={16} />
+            <button onClick={dismissNotifPrompt} aria-label="Cerrar" style={{ width: 44, height: 44, background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <X size={18} />
             </button>
           </div>
-          <div style={{ display: "flex", gap: "0.6rem" }}>
-            <button
-              onClick={dismissNotifPrompt}
-              style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, background: "none", border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.45rem 0.9rem", cursor: "pointer" }}
-            >
-              Ahora no
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <button onClick={requestNotifPermission} style={{ ...body, minHeight: 44, fontSize: "14px", fontWeight: 700, backgroundColor: "transparent", color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: 999, padding: "0 1.1rem", cursor: "pointer" }}>
+              Activar
             </button>
-            <button
-              onClick={requestNotifPermission}
-              style={{ ...body, fontSize: "0.82rem", fontWeight: 700, backgroundColor: palette.ink, color: palette.onColor, border: "none", borderRadius: "8px", padding: "0.45rem 1rem", cursor: "pointer" }}
-            >
-              Activar notificaciones
+            <button onClick={dismissNotifPrompt} style={{ ...body, minHeight: 44, fontSize: "14px", fontWeight: 600, color: palette.inkSoft, background: "none", border: "none", padding: "0 0.75rem", cursor: "pointer" }}>
+              Ahora no
             </button>
           </div>
         </div>
       )}
 
-      {/* Greeting banner */}
-      <div style={{ marginBottom: "1.75rem" }}>
-        <p style={{ ...ts.caption, marginBottom: "0.15rem" }}>{greeting},</p>
-        <p style={{ ...ts.h1, color: palette.ink }}>
-          {user.name?.split(" ")[0] || "lector"}
-        </p>
-        <p style={{ ...body, fontStyle: "italic", fontSize: "0.94rem", color: palette.inkSoft, marginTop: "0.35rem", lineHeight: 1.45 }}>
+      {/* Saludo */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>{firstName ? `${greeting},` : `${greeting}.`}</p>
+          {headerAction}
+        </div>
+        {firstName && (
+          <p style={{ ...ts.h1, color: palette.ink, overflowWrap: "anywhere" }}>
+            {firstName}
+          </p>
+        )}
+        <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginTop: "0.35rem", lineHeight: 1.45 }}>
           {motivationalPhrase}
         </p>
       </div>
 
-      {/* Banner de racha diaria */}
+      {/* Racha diaria: sticker lila */}
       <DailyReadingBanner
         streak={streak}
         hasLoggedToday={hasLoggedToday}
@@ -9145,19 +9135,18 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         onFreeze={applyFreeze}
       />
 
-      {/* Snacks Hero — cuento del día */}
+      {/* Cuento del día */}
       <SnacksHero onRead={setActiveReader} />
 
-      {/* Strip: Leyendo ahora */}
+      {/* Tira: Leyendo ahora */}
       {friendsReading.length > 0 && (
         <div style={{ marginBottom: "1.5rem" }}>
-          <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.inkSoft, marginBottom: "8px" }}>
+          <p style={{ ...display, fontSize: "18px", fontWeight: 700, color: palette.ink, marginBottom: "0.5rem" }}>
             Leyendo ahora
           </p>
-          <div className="scrollbar-hide" style={{ display: "flex", gap: 6, overflowX: "auto", padding: "4px 0 10px", WebkitOverflowScrolling: "touch", borderBottom: `1px solid ${palette.borderSoft}` }}>
+          <div className="scrollbar-hide" style={{ display: "flex", gap: 6, overflowX: "auto", padding: "4px 0 6px", WebkitOverflowScrolling: "touch" }}>
             {friendsReading.map(({ book, friend }) => {
-              // Nombre de pila completo; el recorte lo hace CSS solo si no cabe
-              // (antes se cortaba a mano en 6 letras: "Marian…", "Claudi…").
+              // Nombre de pila completo; el recorte lo hace CSS solo si no cabe.
               const displayName = (friend.nombre || "").split(" ")[0];
               const isOpen = openPopover?.id === book.id;
               return (
@@ -9168,20 +9157,23 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     const rect = e.currentTarget.getBoundingClientRect();
                     setOpenPopover({ id: book.id, rect, book, friend });
                   }}
+                  aria-label={`${displayName || "Amistad"} está leyendo ${book.title}`}
+                  aria-expanded={isOpen}
                   className="friend-strip-btn"
-                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 74, flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: 74, minHeight: 44, flexShrink: 0, background: "none", border: "none", cursor: "pointer", padding: 0 }}
                 >
                   <div style={{ position: "relative" }}>
                     {friend.avatar_url ? (
-                      <img src={friend.avatar_url} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
+                      <img src={friend.avatar_url} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
                     ) : (
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 16, fontWeight: 600 }}>
+                      <div style={{ width: 48, height: 48, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: 17, fontWeight: 700 }}>
                         {(friend.nombre || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                     )}
-                    <div className="pulse-dot" style={{ position: "absolute", bottom: 1, right: 1, width: 8, height: 8, borderRadius: "50%", backgroundColor: palette.session, border: `2px solid ${palette.bgCard}` }} />
+                    {/* Indicador «leyendo ahora»: punto lila (firma) con canto del fondo y filo de tinta, como los stickers */}
+                    <div className="pulse-dot" aria-hidden style={{ position: "absolute", bottom: -1, right: -1, width: 15, height: 15, borderRadius: "50%", backgroundColor: palette.firma, border: `2.5px solid ${palette.bg}`, boxShadow: `0 0 0 1px ${palette.ink}`, boxSizing: "border-box" }} />
                   </div>
-                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 11, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
+                  <p style={{ ...body, fontSize: 13, fontWeight: 600, color: palette.ink, textAlign: "center", width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: 1.2, margin: 0 }}>
                     {displayName}
                   </p>
                 </button>
@@ -9191,10 +9183,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         </div>
       )}
 
-      {/* Popover para strip de amigos */}
+      {/* Popover de la tira de amistades */}
       {openPopover && (() => {
         const { rect, book } = openPopover;
-        const popW = 200;
+        const popW = 220;
         const left = Math.max(8, Math.min(rect.left + rect.width / 2 - popW / 2, window.innerWidth - popW - 8));
         const bottom = window.innerHeight - rect.top + 12;
         return (
@@ -9202,31 +9194,28 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             <div onClick={() => setOpenPopover(null)} style={{ position: "fixed", inset: 0, zIndex: 900 }} />
             <div
               className="popover-anim"
+              role="dialog"
+              aria-label={`Está leyendo ${book.title}`}
               style={{
                 position: "fixed", bottom, left, width: popW, zIndex: 901,
-                backgroundColor: palette.bgCard,
-                border: `1px solid ${palette.borderSoft}`,
+                backgroundColor: palette.bg,
+                border: `1.5px solid ${palette.ink}`,
                 borderRadius: 12,
                 padding: "10px",
-                boxShadow: "0 4px 20px rgba(42,31,26,0.18)",
               }}
             >
               <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
                 {book.cover_url ? (
-                  <img src={book.cover_url} style={{ width: 40, height: 60, borderRadius: 4, objectFit: "cover", flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.15)" }} alt="" />
+                  <img src={book.cover_url} style={{ width: 40, height: 60, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} alt="" />
                 ) : (
-                  <div style={{ width: 40, height: 60, borderRadius: 4, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: "4px", border: `1px solid ${palette.borderSoft}` }}>
-                    <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 8, color: palette.inkSoft, textAlign: "center", lineHeight: 1.3, margin: 0, display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                      {book.title}
-                    </p>
-                  </div>
+                  <BookCoverPlaceholder title={book.title} author={book.author} width={40} height={60} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 11, fontStyle: "italic", color: palette.inkSoft, marginBottom: "0.2rem", margin: "0 0 3px" }}>está leyendo</p>
-                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: palette.ink, lineHeight: 1.3, marginBottom: "0.2rem", margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  <p style={{ ...body, fontSize: 13, color: palette.inkSoft, margin: "0 0 3px" }}>está leyendo</p>
+                  <p style={{ ...display, fontSize: 15, fontWeight: 700, color: palette.ink, lineHeight: 1.25, margin: "0 0 3px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {book.title}
                   </p>
-                  <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: 11, color: palette.inkSoft, margin: 0 }}>
+                  <p style={{ ...body, fontSize: 13, color: palette.inkSoft, margin: 0 }}>
                     {book.author}
                   </p>
                 </div>
@@ -9236,59 +9225,60 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         );
       })()}
 
-      {/* Botón Tengo 5 minutos */}
+      {/* Tengo 5 minutos: botón silencioso (la acción rellena es «Leer ahora») */}
       {readingBooks.length > 0 && (
         <button
           onClick={() => setShowTimerModal(true)}
           className="btn-press"
-          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 14, padding: "14px 16px", cursor: "pointer", marginBottom: "1.5rem" }}
+          style={{ width: "100%", minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "transparent", border: `1px solid ${palette.border}`, borderRadius: 14, padding: "0 16px", cursor: "pointer", marginBottom: "0.75rem" }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-            <Timer size={18} color={palette.amber} strokeWidth={1.8} />
-            <span style={{ ...body, fontSize: "0.94rem", fontWeight: 600, color: palette.ink }}>Tengo 5 minutos</span>
-          </div>
-          <ChevronRight size={16} color={palette.inkFaint} />
+          <span style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <Timer size={19} color={palette.ink} strokeWidth={2} aria-hidden />
+            <span style={{ ...body, fontSize: "16px", fontWeight: 600, color: palette.ink }}>Tengo 5 minutos</span>
+          </span>
+          <ChevronRight size={18} color={palette.inkSoft} aria-hidden />
         </button>
       )}
 
-      {/* Crear post */}
+      {/* Crear publicación. En móvil deja libre la columna del «+» flotante (sema-composer-fab). */}
       <div style={{ marginBottom: "2rem" }}>
         {!showNewPost ? (
           <button
             onClick={() => setShowNewPost(true)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl transition-all hover:opacity-80"
-            style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, textAlign: "left" }}
+            className="sema-composer-fab btn-press"
+            style={{ minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", borderRadius: 14, backgroundColor: "transparent", border: `1px solid ${palette.inkSoft}`, textAlign: "left", cursor: "pointer" }}
           >
-            <PenLine size={15} color={palette.inkFaint} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-            <span style={{ ...ts.body15, color: palette.inkFaint }}>¿Qué estás leyendo?</span>
+            <PenLine size={17} color={palette.inkSoft} strokeWidth={1.9} style={{ flexShrink: 0 }} aria-hidden />
+            <span style={{ ...ts.body15, color: palette.inkSoft }}>¿Qué estás leyendo?</span>
           </button>
         ) : (
-          <div className="post-compose-enter" style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: "12px", padding: "1rem" }}>
+          <div className="post-compose-enter" style={{ border: `1px solid ${palette.inkSoft}`, borderRadius: 14, padding: "0.75rem 1rem 0.5rem" }}>
             <textarea
               autoFocus
               value={newPostText}
               onChange={(e) => setNewPostText(e.target.value)}
               placeholder="¿Qué estás leyendo o pensando sobre libros?"
+              aria-label="Texto de la publicación"
               rows={3}
-              style={{ ...body, width: "100%", padding: "0.5rem 0", border: "none", backgroundColor: "transparent", color: palette.ink, fontSize: "1rem", resize: "none", outline: "none", boxSizing: "border-box" }}
+              style={{ ...body, width: "100%", padding: "0.25rem 0", border: "none", backgroundColor: "transparent", color: palette.ink, fontSize: "16px", resize: "none", outline: "none", boxSizing: "border-box" }}
             />
-            {/* Image preview */}
+            {/* Vista previa de la imagen */}
             {postImagePreview && (
               <div style={{ position: "relative", display: "inline-block", marginBottom: "0.75rem" }}>
                 <img src={postImagePreview} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, display: "block" }} />
                 <button
                   onClick={() => { setPostImageFile(null); setPostImagePreview(null); }}
-                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", backgroundColor: palette.ink, color: palette.onColor, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}
+                  aria-label="Quitar imagen"
+                  style={{ position: "absolute", top: -12, right: -12, width: 32, height: 32, borderRadius: "50%", backgroundColor: palette.bg, color: palette.ink, border: `1.5px solid ${palette.ink}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  ✕
+                  <X size={16} strokeWidth={2.4} />
                 </button>
               </div>
             )}
             {postError && (
-              <p style={{ ...body, fontSize: "0.82rem", color: palette.danger, marginBottom: "0.5rem" }}>⚠️ {postError}</p>
+              <p role="alert" style={{ ...body, fontSize: "14px", color: palette.danger, marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: 6 }}><AlertCircle size={16} aria-hidden /> {postError}</p>
             )}
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.75rem" }}>
-              {/* Image picker */}
+            <div style={{ display: "flex", gap: "0.25rem", alignItems: "center", borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.5rem" }}>
               <input
                 ref={imageInputRef}
                 type="file"
@@ -9304,16 +9294,17 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               />
               <button
                 onClick={() => imageInputRef.current?.click()}
+                aria-label="Agregar imagen"
                 title="Agregar imagen"
-                style={{ background: "none", border: "none", cursor: "pointer", padding: "0.2rem", display: "flex", alignItems: "center", color: palette.inkFaint }}
+                style={{ width: 44, height: 44, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: palette.ink }}
               >
                 <ImagePlus size={20} />
               </button>
               <div style={{ flex: 1 }} />
-              <button onClick={() => { setShowNewPost(false); setNewPostText(""); setPostError(""); setPostImageFile(null); setPostImagePreview(null); }} style={{ ...display, fontSize: "0.85rem", color: palette.inkSoft, backgroundColor: "transparent", border: `1px solid ${palette.border}`, padding: "0.4rem 0.9rem", borderRadius: "999px", cursor: "pointer" }}>
+              <button onClick={() => { setShowNewPost(false); setNewPostText(""); setPostError(""); setPostImageFile(null); setPostImagePreview(null); }} style={{ ...body, minHeight: 44, fontSize: "15px", fontWeight: 600, color: palette.inkSoft, backgroundColor: "transparent", border: "none", padding: "0 0.75rem", cursor: "pointer" }}>
                 Cancelar
               </button>
-              <button onClick={handleCreateTextPost} disabled={posting || (!newPostText.trim() && !postImageFile)} style={{ ...display, fontSize: "0.85rem", fontWeight: 600, color: palette.bg, backgroundColor: palette.accent, border: "none", padding: "0.4rem 1rem", borderRadius: "999px", cursor: "pointer", opacity: (posting || (!newPostText.trim() && !postImageFile)) ? 0.6 : 1 }}>
+              <button onClick={handleCreateTextPost} disabled={posting || (!newPostText.trim() && !postImageFile)} style={{ ...display, minHeight: 44, fontSize: "15px", fontWeight: 700, color: palette.ink, backgroundColor: "transparent", border: `1.5px solid ${palette.ink}`, padding: "0 1.1rem", borderRadius: 999, cursor: "pointer", opacity: (posting || (!newPostText.trim() && !postImageFile)) ? 0.5 : 1 }}>
                 {posting ? "Publicando…" : "Publicar"}
               </button>
             </div>
@@ -9321,22 +9312,22 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         )}
       </div>
 
-      {/* Lista de posts */}
+      {/* Lista de publicaciones */}
       {feedState === 'error' ? (
-        <div style={{ backgroundColor: palette.dangerSoft, border: `1px solid ${palette.dangerBorder}`, borderRadius: "12px", padding: "1rem 1.25rem", marginBottom: "1rem", color: palette.dangerInk, ...body, fontSize: "0.88rem" }}>
-          <p style={{ marginBottom: "0.75rem" }}>⚠️ {feedError || "No se pudo cargar el feed."}</p>
+        <div role="alert" style={{ backgroundColor: palette.dangerSoft, border: `1px solid ${palette.dangerBorder}`, borderRadius: 12, padding: "1rem 1.25rem", marginBottom: "1rem", color: palette.dangerInk, ...body, fontSize: "15px" }}>
+          <p style={{ marginBottom: "0.75rem", display: "flex", alignItems: "flex-start", gap: 8 }}><AlertCircle size={18} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden /> {feedError || "No se pudo cargar el feed."}</p>
           <button
             onClick={() => { setFeedState('loading'); loadFeed(); }}
-            style={{ backgroundColor: palette.dangerInk, color: palette.onColor, border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", ...body, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
+            style={{ minHeight: 44, backgroundColor: "transparent", color: palette.dangerInk, border: `1.5px solid ${palette.dangerInk}`, borderRadius: 999, padding: "0 1.25rem", ...body, fontSize: "15px", fontWeight: 700, cursor: "pointer" }}
           >
             Reintentar
           </button>
         </div>
       ) : feedState === 'offline' ? (
         <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-          <WifiOff size={28} color={palette.border} style={{ margin: "0 auto 0.75rem", display: "block" }} />
-          <p style={{ ...display, fontSize: "1.15rem", color: palette.inkSoft, marginBottom: "0.4rem" }}>Sin conexión</p>
-          <p style={{ ...body, color: palette.inkFaint, fontSize: "0.9rem" }}>Necesitas conexión para ver el feed de tus amigos.</p>
+          <WifiOff size={28} color={palette.inkSoft} style={{ margin: "0 auto 0.75rem", display: "block" }} aria-hidden />
+          <p style={{ ...display, fontSize: "18px", fontWeight: 700, color: palette.ink, marginBottom: "0.4rem" }}>Sin conexión</p>
+          <p style={{ ...body, color: palette.inkSoft, fontSize: "15px" }}>El feed de las amistades vuelve solo al regresar el internet.</p>
         </div>
       ) : feedState === 'empty' ? (
         <EmptyState
@@ -9347,91 +9338,40 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           style={{ paddingTop: "1.5rem" }}
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.4rem", animation: "feedFadeIn 200ms ease-out" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", animation: "feedFadeIn 200ms ease-out" }}>
           {posts.map((post) => {
-            const commentsOpen = openComments.has(post.id);
             const isFinished = post.type === "book_update" && post.action === "finished";
             const isStarted = post.type === "book_update" && post.action === "started";
-            // Detect achievement posts: new type OR legacy text with emoji pattern (exclude quote posts)
+            // Logros: tipo nuevo o texto viejo con el patrón (sin contar frases)
             const isAchievement = post.type === "achievement" || (post.type === "text" && !post.quote && post.content?.includes("¡Logro desbloqueado!"));
             const achDef = isAchievement ? ACHIEVEMENT_DEFS.find(a => post.content?.includes(`"${a.name}"`)) : null;
             const AchIcon = achDef ? (ACHIEVEMENT_ICON_MAP[achDef.key] || Award) : Award;
 
+            // ── Logro: sticker lila (firma) ──
             if (isAchievement) {
               return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" style={{
-                  position: "relative", overflow: "hidden",
-                  backgroundColor: palette.bgCard,
-                  border: `1px solid ${palette.amber}40`,
-                  borderRadius: "14px",
-                  padding: "18px 16px 14px",
-                  boxShadow: highlightedPost === post.id ? `0 2px 10px rgba(200,146,74,0.13), 0 0 0 2px ${BRAND.wine}` : "0 2px 10px rgba(200,146,74,0.13)",
-                  transition: "box-shadow 200ms ease",
-                }}>
-                  {/* Sparkles decorativos */}
-                  <span style={{ position: "absolute", top: 10, right: 18, fontSize: 11, opacity: 0.3, color: BRAND.amber, pointerEvents: "none" }}>✦</span>
-                  <span style={{ position: "absolute", top: 22, right: 36, fontSize: 8, opacity: 0.25, color: BRAND.amber, pointerEvents: "none" }}>✦</span>
-                  <span style={{ position: "absolute", bottom: 14, right: 22, fontSize: 9, opacity: 0.2, color: BRAND.amber, pointerEvents: "none" }}>✦</span>
-
-                  {/* Header: autor + "desbloqueó un logro" */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "1rem" }}>
-                    {post.user_id !== user.id ? (
-                      <button onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                        <Avatar author={post.author} size={36} />
-                      </button>
-                    ) : <Avatar author={post.author} size={36} />}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "0.3rem", flexWrap: "wrap" }}>
-                        <span style={{ ...display, fontWeight: 700, fontSize: "14px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
-                        <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, fontStyle: "italic" }}>desbloqueó un logro</span>
-                      </div>
-                      <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
-                    </div>
-                    {post.user_id === user.id && (
-                      <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} style={{ color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Ícono central grande */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0.25rem 0 0.75rem" }}>
-                    <div className="achieve-icon-enter" style={{ position: "relative", marginBottom: "0.75rem" }}>
-                      <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: BRAND.amber, opacity: 0.15, position: "absolute", inset: 0 }} />
-                      <div style={{ width: 72, height: 72, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", position: "relative" }}>
-                        <AchIcon size={34} color={BRAND.amber} strokeWidth={1.8} />
-                      </div>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postHeader(post, "desbloqueó un logro")}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0.75rem 16px 0" }}>
+                    <div className="achieve-icon-enter sema-papel sema-sticker" style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.75rem" }}>
+                      <AchIcon size={32} color={palette.onFirma} strokeWidth={2} aria-hidden />
                     </div>
                     {achDef ? (
                       <>
-                        <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, marginBottom: "0.2rem" }}>{achDef.name}</p>
-                        <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft }}>{achDef.desc}</p>
+                        <p style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.ink, marginBottom: "0.2rem" }}>{achDef.name}</p>
+                        <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>{achDef.desc}</p>
                       </>
                     ) : (
-                      <p style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft, fontStyle: "italic" }}>{post.content}</p>
+                      <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>{post.content}</p>
                     )}
                   </div>
-
-                  {/* Doble tap overlay */}
-                  {doubleTapPost === post.id && (
-                    <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-                      <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
-                    </div>
-                  )}
-
-                  {/* Footer: likes + comentarios */}
-                  <div style={{ borderTop: `1px solid ${palette.amber}40`, paddingTop: "0.65rem", marginTop: "0.1rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={16} />
-                    <button onClick={() => toggleComments(post.id)} style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <MessageCircle size={14} strokeWidth={2} />
-                      {commentsOpen ? "Ocultar comentarios" : commentCounts[post.id] ? `Comentarios (${commentCounts[post.id]})` : "Comentarios"}
-                    </button>
-                  </div>
-                  {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
+                  {postFooter(post)}
                 </div>
               );
             }
 
+            // ── Frase: ciruela + Instrument Serif ──
             if (post.type === "quote") {
               return (
                 <QuotePostCard
@@ -9443,6 +9383,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   commentCount={commentCounts[post.id] || 0}
                   commentsOpen={openComments.has(post.id)}
                   doubleTapId={doubleTapPost}
+                  highlighted={highlightedPost === post.id}
                   onLike={(id, isDoubleTap) => { if (isDoubleTap) { handleDoubleTap(id); } else { toggleLike(id); } }}
                   onToggleComments={toggleComments}
                   onAuthorClick={(author) => setProfileModalAuthor({ ...(author || {}), name: author?.nombre || 'Usuario' })}
@@ -9452,242 +9393,126 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               );
             }
 
-            const isReadingSession = post.type === "reading_session";
-            if (isReadingSession) {
+            // ── Sesión de lectura: lila si hay libro (leyó hoy), neutra si no ──
+            if (post.type === "reading_session") {
               const sesPages = post.pages_read || post.pagesRead || 0;
               const sesMinutes = post.minutes_read || post.minutesRead || null;
               devLog('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
+              const stats = [sesPages > 0 ? pagesText(sesPages) : null, sesMinutes > 0 ? `${sesMinutes} min` : null].filter(Boolean).join(" · ");
               return (
-                <div key={post.id} id={`post-${post.id}`}
-                  className="feed-post-item"
-                  onClick={() => handleDoubleTap(post.id)}
-                  style={{ position: "relative", overflow: "hidden", backgroundColor: palette.bgCard, border: `1px solid ${palette.session}30`, borderLeft: `4px solid ${palette.session}`, borderRadius: "14px", padding: "18px", boxShadow: highlightedPost === post.id ? `0 2px 8px rgba(76,175,80,0.10), 0 0 0 2px ${BRAND.wine}` : "0 2px 8px rgba(76,175,80,0.10)", cursor: "default", transition: "box-shadow 200ms ease" }}
-                >
-                  {doubleTapPost === post.id && (
-                    <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-                      <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
-                    </div>
-                  )}
-                  {/* Header */}
-                  <div style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                    {post.user_id !== user.id ? (
-                      <button onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}>
-                        <Avatar author={post.author} size={42} />
-                      </button>
-                    ) : <Avatar author={post.author} size={42} />}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "0.3rem", flexWrap: "wrap" }}>
-                        {post.user_id !== user.id ? (
-                          <button onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                            <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
-                          </button>
-                        ) : <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>}
-                        <span style={{ ...body, fontSize: "0.85rem", color: palette.inkSoft, fontStyle: "italic" }}>leyó hoy</span>
-                      </div>
-                      <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
-                    </div>
-                    {post.user_id === user.id && (
-                      <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} style={{ color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
-                        <Trash2 size={14} />
-                      </button>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {post.book && band(palette.firma, palette.onFirma, BookOpen, "Leyó hoy", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
+                  {postHeader(post, post.book ? null : "leyó hoy")}
+                  <div style={{ padding: "10px 16px 0" }}>
+                    {post.book ? bookRow(post) : stats && (
+                      <p style={{ ...display, fontSize: "24px", fontWeight: 800, color: palette.ink, letterSpacing: "-0.02em" }}>{stats}</p>
                     )}
+                    {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{post.content}</p>}
                   </div>
-                  {/* Book info */}
-                  {post.book && (
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", backgroundColor: palette.bg, border: `1px solid ${palette.borderSoft}`, borderRadius: 10, padding: "10px 12px", marginBottom: "0.75rem" }}>
-                      {post.book.cover_url ? (
-                        <img src={post.book.cover_url} alt="" style={{ width: 36, height: 52, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                      ) : (
-                        <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={36} height={52} />
-                      )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ ...display, fontSize: "0.9rem", fontWeight: 700, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{post.book.title}</p>
-                        <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, fontStyle: "italic" }}>{post.book.author}</p>
-                      </div>
-                    </div>
-                  )}
-                  {/* Sin libro: la sesión se muestra solo con sus páginas/minutos */}
-                  {/* Stats pills */}
-                  {(sesPages > 0 || sesMinutes > 0) && (
-                    <div style={{ display: "flex", gap: "8px", marginTop: "10px", marginBottom: "12px", flexWrap: "wrap" }}>
-                      {sesPages > 0 && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: palette.bgSoft, color: palette.sessionInk, borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
-                          📖 {sesPages} {sesPages === 1 ? "página" : "páginas"}
-                        </span>
-                      )}
-                      {sesMinutes > 0 && (
-                        <span style={{ display: "flex", alignItems: "center", gap: "5px", backgroundColor: palette.warnBg, color: palette.warnInk, borderRadius: "12px", padding: "6px 12px", fontSize: "13px", fontWeight: 500 }}>
-                          ⏱ {sesMinutes} min
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {post.content && (
-                    <p style={{ ...body, fontSize: "0.92rem", color: palette.ink, lineHeight: 1.55, marginBottom: "0.9rem" }}>{post.content}</p>
-                  )}
-                  {/* Footer */}
-                  <div style={{ borderTop: `1px solid ${palette.borderSoft}`, marginTop: "8px", paddingTop: "0.65rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                    <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={16} />
-                    <button onClick={() => toggleComments(post.id)} style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <MessageCircle size={14} strokeWidth={2} />
-                      {commentsOpen ? "Ocultar comentarios" : commentCounts[post.id] ? `Comentarios (${commentCounts[post.id]})` : "Comentarios"}
-                    </button>
-                  </div>
-                  {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
+                  {postFooter(post)}
                 </div>
               );
             }
 
-            const accentBorder = isFinished ? BRAND.wine : isStarted ? BRAND.amber : palette.slate;
-            const shadowColor = isFinished ? "rgba(122,46,46,0.13)" : isStarted ? "rgba(200,146,74,0.15)" : "rgba(27,58,75,0.12)";
-            return (
-              <div key={post.id} id={`post-${post.id}`}
-                className="feed-post-item"
-                onClick={() => handleDoubleTap(post.id)}
-                style={{
-                  position: "relative", overflow: "hidden",
-                  backgroundColor: palette.bgCard,
-                  border: `1px solid ${palette.border}`,
-                  borderLeft: `4px solid ${accentBorder}`,
-                  borderRadius: "14px",
-                  padding: "18px",
-                  boxShadow: highlightedPost === post.id ? `0 2px 8px ${shadowColor}, 0 0 0 2px ${BRAND.wine}` : `0 2px 8px ${shadowColor}`,
-                  cursor: "default",
-                  transition: "box-shadow 200ms ease",
-                }}>
-                {/* Doble tap overlay */}
-                {doubleTapPost === post.id && (
-                  <div className="heart-pop-anim" style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 10, pointerEvents: "none" }}>
-                    <Heart size={60} color={palette.like} fill={palette.like} strokeWidth={0} />
-                  </div>
-                )}
-                {/* Celebración para libros terminados */}
-                {isFinished && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginBottom: "0.6rem" }}>
-                    <BookmarkCheck size={12} color={palette.accent} strokeWidth={2} />
-                    <span style={{ ...display, fontSize: "0.7rem", fontWeight: 700, color: palette.accent, letterSpacing: "0.08em", textTransform: "uppercase" }}>libro terminado</span>
-                  </div>
-                )}
-
-                {/* Cabecera del post */}
-                <div style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                  {post.user_id !== user.id ? (
-                    <button
-                      onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })}
-                      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0 }}
-                    >
-                      <Avatar author={post.author} size={42} />
-                    </button>
-                  ) : (
-                    <Avatar author={post.author} size={42} />
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", flexWrap: "wrap" }}>
-                      {post.user_id !== user.id ? (
-                        <button
-                          onClick={() => setProfileModalAuthor({ ...(post.author || {}), name: post.author?.nombre || 'Usuario' })}
-                          style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}
-                        >
-                          <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
-                        </button>
-                      ) : (
-                        <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{post.author?.nombre || 'Usuario'}</span>
-                      )}
-                      {post.type === "book_update" && (
-                        <span style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, fontStyle: "italic" }}>
-                          {isStarted ? "empezó a leer" : "terminó de leer"}
-                        </span>
-                      )}
-                    </div>
-                    <span style={{ ...ts.caption, color: palette.inkFaint }}>{timeAgo(post.created_at)}</span>
-                  </div>
-                  {post.user_id === user.id && (
-                    <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} title="Eliminar" style={{ color: palette.inkFaint, backgroundColor: "transparent", border: "none", cursor: "pointer", padding: "0 0.2rem", display: "flex", alignItems: "center" }}>
-                      <Trash2 size={14} strokeWidth={2} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Info del libro — clicable para abrir modal */}
-                {post.type === "book_update" && post.book && (
-                  <button
-                    onClick={() => setPreviewPost(post)}
-                    className="book-card-hover"
-                    style={{ display: "flex", gap: "0.8rem", alignItems: "flex-start", backgroundColor: palette.bg, borderRadius: "10px", padding: "0.7rem 0.85rem", marginBottom: "0.75rem", border: `1px solid ${palette.borderSoft}`, width: "100%", textAlign: "left", cursor: "pointer" }}
-                  >
-                    {post.book.cover_url ? (
-                      <img src={post.book.cover_url} alt={post.book.title} style={{ width: 44, height: 64, objectFit: "cover", borderRadius: "4px", flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.2)" }} />
-                    ) : (
-                      <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={44} height={64} />
+            // ── Libro terminado: degradado cereza → durazno con la portada al frente ──
+            if (isFinished) {
+              const reviewText = post.book?.review || post.content || "";
+              const extraText = post.content && post.content !== reviewText ? post.content : "";
+              const rating = post.book?.rating || 0;
+              return (
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postHeader(post, "terminó de leer")}
+                  <div style={{ background: SEMA_GRADIENTS.acento, margin: "12px 0 0", padding: "16px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
+                    {/* Sticker: texto chico sobre el fondo de la app, no sobre el degradado (sema-paleta §5) */}
+                    <span className="sema-sticker" style={{ alignSelf: "flex-start", ...body, fontSize: "13px", fontWeight: 700, color: palette.ink, backgroundColor: palette.bg, border: `1.5px solid ${palette.onAccent}`, borderRadius: 8, padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: "0.75rem" }}>
+                      <BookmarkCheck size={15} strokeWidth={2.2} aria-hidden /> Libro terminado
+                    </span>
+                    {post.book ? (
+                      <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                        {post.book.cover_url ? (
+                          <img src={post.book.cover_url} alt="" style={{ width: 116, height: 174, objectFit: "cover", borderRadius: 6, display: "block", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }} />
+                        ) : (
+                          <span style={{ display: "block", border: `2px solid ${palette.onAccent}`, borderRadius: 6, boxShadow: `5px 5px 0 ${palette.onAccent}`, overflow: "hidden" }}>
+                            <BookCoverPlaceholder title={post.book.title} author={post.book.author} width={116} height={174} />
+                          </span>
+                        )}
+                      </button>
+                    ) : null}
+                    {/* Título grande en onAccent #483A58: 3.24:1 sobre la cereza y 5.04:1 sobre el durazno (≥ 22 px negritas) */}
+                    {post.book?.title && (
+                      <p style={{ ...display, fontSize: "22px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: palette.onAccent, marginTop: "1rem", maxWidth: "18rem" }}>
+                        {post.book.title}
+                      </p>
                     )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ ...display, fontWeight: 700, fontSize: "1.05rem", color: palette.ink, marginBottom: "0.15rem", lineHeight: 1.25 }}>{post.book.title}</p>
-                      <p style={{ ...body, fontStyle: "italic", fontSize: "0.84rem", color: palette.inkSoft, marginBottom: "0.3rem" }}>{post.book.author}</p>
-                      {isFinished && post.book.rating > 0 && (
-                        <p style={{ fontSize: "0.85rem", color: palette.amberRich, letterSpacing: "0.05em" }}>
-                          {"★".repeat(post.book.rating)}{"☆".repeat(5 - post.book.rating)}
-                        </p>
-                      )}
-                      <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, marginTop: "0.3rem" }}>Toca para ver detalles →</p>
-                    </div>
-                  </button>
-                )}
-
-                {/* Sin libro (post antiguo sin book_id o libro borrado): solo acción + comentario */}
-                {/* Reseña si terminó */}
-                {isFinished && post.book?.review && (
-                  <p style={{ ...body, fontStyle: "italic", color: palette.inkSoft, fontSize: "0.9rem", borderLeft: `3px solid ${palette.accent}55`, paddingLeft: "0.8rem", marginBottom: "0.75rem", lineHeight: 1.6 }}>
-                    "{post.book.review}"
-                  </p>
-                )}
-
-                {/* Texto del post */}
-                {post.content && (
-                  <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.65, marginBottom: "0.75rem" }}>{post.content}</p>
-                )}
-
-                {/* Imagen del post */}
-                {post.image_url && (
-                  <button
-                    onClick={() => setLightboxImage(post.image_url)}
-                    style={{ display: "block", width: "100%", border: "none", padding: 0, cursor: "pointer", marginBottom: "0.75rem", borderRadius: 12, overflow: "hidden" }}
-                  >
-                    <img src={post.image_url} alt="" style={{ width: "100%", display: "block", borderRadius: 12 }} />
-                  </button>
-                )}
-
-                {/* Footer: likes + comentarios */}
-                <div style={{ borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.75rem", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "1rem" }}>
-                  <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleComments(post.id); }}
-                    style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint, backgroundColor: "transparent", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: "0.35rem" }}
-                  >
-                    <MessageCircle size={14} strokeWidth={2} />
-                    {commentsOpen
-                      ? "Ocultar comentarios"
-                      : commentCounts[post.id]
-                        ? `Comentarios (${commentCounts[post.id]})`
-                        : "Comentarios"}
-                  </button>
+                  </div>
+                  <div style={{ padding: "12px 16px 0" }}>
+                    {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
+                    {/* Reseña: azul acero (complementoFrio). Rótulo con texto blanco sobre el azul (5.71:1) en los dos modos */}
+                    {(reviewText || rating > 0) && (
+                      <div style={{ marginTop: "0.9rem" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8, backgroundColor: palette.complementoFrio, color: palette.onColor, borderRadius: 8, padding: "0.3rem 0.65rem", ...body, fontSize: "13px", fontWeight: 700 }}>
+                          Reseña {rating > 0 && starsOn(rating, palette.onColor)}
+                        </span>
+                        {reviewText && (
+                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
+                            «{reviewText}»
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {extraText && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{extraText}</p>}
+                  </div>
+                  {postFooter(post)}
                 </div>
-                {commentsOpen && <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
+              );
+            }
+
+            // ── Empezó a leer (superficie suave, sobria) · Reseña suelta (azul acero) · Texto (neutro) ──
+            const hasReview = post.type === "book_update" && !isStarted && (post.book?.review || post.book?.rating > 0);
+            return (
+              <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                {heartOverlay(post)}
+                {isStarted && band(palette.superficieSuave, palette.ink, BookOpen, "Empezó a leer")}
+                {hasReview && band(palette.complementoFrio, palette.onColor, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, palette.onColor) : null)}
+                {postHeader(post, null)}
+                <div style={{ padding: "10px 16px 0" }}>
+                  {post.type === "book_update" && bookRow(post)}
+                  {hasReview && post.book?.review && (
+                    <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.75rem" }}>
+                      «{post.book.review}»
+                    </p>
+                  )}
+                  {post.content && (
+                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
+                  )}
+                  {post.image_url && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setLightboxImage(post.image_url); }}
+                      aria-label="Ver imagen completa"
+                      style={{ display: "block", width: "100%", border: "none", padding: 0, cursor: "pointer", marginTop: "0.75rem", borderRadius: 12, overflow: "hidden" }}
+                    >
+                      <img src={post.image_url} alt="" style={{ width: "100%", display: "block", borderRadius: 12 }} />
+                    </button>
+                  )}
+                </div>
+                {postFooter(post)}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Snacks carousel + invitar amigo — al final del feed */}
+      {/* Más cuentos + invitar: al final del feed, separados con espacio (sin caja) */}
       {(feedState === 'ready' || feedState === 'empty') && (
-        <div style={{ paddingTop: "1rem", borderTop: `1px solid ${palette.borderSoft}` }}>
+        <div style={{ marginTop: "2rem", paddingTop: "0.5rem", borderTop: `1px solid ${palette.borderSoft}` }}>
           <SnacksCarousel onRead={setActiveReader} />
-          {/* Invitar amigo */}
-          <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, borderRadius: 14, padding: "1.1rem 1.25rem" }}>
-            <p style={{ ...display, fontSize: "1rem", color: palette.ink, margin: "0 0 0.2rem" }}>Invita a un amigo y lean juntos</p>
-            <p style={{ ...body, fontSize: "0.83rem", color: palette.inkFaint, margin: "0 0 0.85rem" }}>Comparte tu link personal de SEMA</p>
-            <button onClick={handleInvite} style={{ ...body, fontSize: "0.85rem", fontWeight: 700, backgroundColor: palette.bg, color: palette.ink, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.55rem 1.25rem", cursor: "pointer" }}>
-              Invitar amigo
+          <div style={{ marginTop: "2rem" }}>
+            <p style={{ ...display, fontSize: "18px", fontWeight: 700, color: palette.ink, margin: "0 0 0.2rem" }}>Leer con amistades sabe mejor</p>
+            <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, margin: "0 0 0.75rem" }}>Un link personal de Sema para invitar.</p>
+            <button onClick={handleInvite} className="btn-press" style={{ ...body, minHeight: 44, fontSize: "15px", fontWeight: 700, backgroundColor: "transparent", color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: 999, padding: "0 1.25rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+              <UserPlus size={17} aria-hidden /> Invitar
             </button>
           </div>
         </div>

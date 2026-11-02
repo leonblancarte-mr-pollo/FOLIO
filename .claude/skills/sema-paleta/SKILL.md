@@ -104,6 +104,19 @@ Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pi
 | Sesión sin libro | Neutro: `bg` con texto `ink` y `inkSoft`, sin color | `ink` |
 | Logro | `firma` (sticker) | `onFirma` |
 
+**Implementación en Social (2026-11-02, ronda 1, pendiente de León).** La tarjeta base es neutra (`bg` + borde `border`, sin sombras de color); el color de cada tipo vive solo en su franja o zona:
+
+| Tipo | Zona de color | Fondo | Texto encima | Contraste (claro / oscuro) |
+|---|---|---|---|---|
+| Leyó hoy (`reading_session` con libro) | Franja superior «Leyó hoy · N páginas · M min» | `firma` `#BBADFF` | `onFirma` `#483A58`, 14 px negritas | 5.21 / 5.21 |
+| Sesión sin libro | Ninguna; el número de páginas en grande | `bg` | `ink` (24 px) y `inkSoft` | 10.39 / 21.00 |
+| Empezó a leer (`book_update` started) | Franja superior «Empezó a leer» | `superficieSuave` (`#E7D7C1` / `#483A58`) | `ink` (`#483A58` / `#FFFFFF`) | 7.36 / 10.39 |
+| Libro terminado (`book_update` finished) | Zona central con la portada grande al frente | `SEMA_GRADIENTS.acento` | Título en `onAccent` `#483A58` 22 px 800 (grande); rótulo «Libro terminado» como sticker sobre `bg`; autor y reseña debajo, sobre `bg` | Título 3.24 (cereza) – 5.04 (durazno); rótulo 10.39 / 21.00 |
+| Reseña (dentro de «terminado», o suelta si hay reseña o calificación) | Rótulo «Reseña» + estrellas Lucide, y filete izquierdo del texto | `complementoFrio` `#456990` | `onColor` `#FFFFFF`, 13 px negritas; la reseña en `ink` sobre `bg` | 5.71 / 5.71 (el rótulo es relleno, así que pasa también en oscuro) |
+| Frase (`quote`) | Toda la tarjeta salvo el pie | `#483A58` (`ink` en claro / `superficieSuave` en oscuro) | `onColor` en Instrument Serif; secundario `onDarkSoft` `#E7D7C1`; ánimo como sticker `firma` + `onFirma` | 10.39 · 7.36 · 5.21 |
+| Texto | Ninguna | `bg` | `ink` | 10.39 / 21.00 |
+| Logro | Sticker circular con papel | `firma` | Ícono `onFirma` | 5.21 |
+
 ## 4. Regla de implementación
 
 - **Dónde viven los colores.** Solo en `src/theme.js`, como tokens semánticos (`PALETTE_LIGHT` / `PALETTE_DARK`).
