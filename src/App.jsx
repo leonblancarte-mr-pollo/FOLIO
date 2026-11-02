@@ -3129,7 +3129,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false, onlyUnlocke
       {/* Vista corta: solo los desbloqueados, como stickers en fila (sin difuminado que los corte) */}
       {onlyUnlocked ? (
         toShow.length === 0 ? (
-          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>Todavía ninguno. El primero llega solo, leyendo.</p>
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>Todavía ninguno. El primero sale leyendo.</p>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", padding: "2px" }}>
             {toShow.map((def, i) => {
@@ -3138,7 +3138,7 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false, onlyUnlocke
                 <button
                   key={def.key}
                   onClick={() => openDetail(def)}
-                  className="btn-press sema-papel sema-focus-onfirma"
+                  className="btn-press sema-papel"
                   style={{ ...sticker, minHeight: 44, borderRadius: 12, padding: "0.4rem 0.85rem 0.4rem 0.65rem", display: "inline-flex", alignItems: "center", gap: "0.45rem", cursor: "pointer", transform: `rotate(${i % 2 ? 1.2 : -1.5}deg)` }}
                 >
                   <IconComp size={18} color={palette.onFirma} strokeWidth={2} aria-hidden />
@@ -3163,9 +3163,9 @@ function AchievementGrid({ unlockedAchievements, friendOnly = false, onlyUnlocke
                     key={def.key}
                     onClick={() => openDetail(def)}
                     aria-label={`${def.name}${isUnlocked ? (date ? `, desbloqueado el ${date}` : ", desbloqueado") : ", bloqueado"}`}
-                    className={isUnlocked ? "btn-press sema-papel sema-focus-onfirma" : "btn-press"}
+                    className={isUnlocked ? "btn-press sema-papel" : "btn-press"}
                     style={{
-                      ...(isUnlocked ? sticker : { backgroundColor: "transparent", border: `1.5px dashed ${palette.inkSoft}` }),
+                      ...(isUnlocked ? sticker : { backgroundColor: "transparent", border: "3px solid transparent" }),
                       borderRadius: 12, padding: "0.65rem 0.4rem 0.6rem", minHeight: 96, textAlign: "center",
                       cursor: "pointer", position: "relative",
                       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: "0.3rem",
@@ -3197,8 +3197,9 @@ const DAY_HEADERS_ES = ["D", "L", "M", "Mi", "J", "V", "S"];
 
 // Escala del calendario (rediseño de Perfil 2026-11-02): solo tokens de sema-paleta.
 // Claro: superficie suave -> firma -> frío -> tinta (de claro a oscuro sobre blanco).
-// Oscuro: fondo con filo -> frío -> firma -> tinta (de oscuro a claro sobre negro). Ronda 2: el nivel 1
-// oscuro era superficieSuave #483A58, que casi desaparecía sobre negro (2.02); ahora es bg con el filo ink.
+// Oscuro: superficie suave -> frío -> firma -> tinta (de oscuro a claro sobre negro). El nivel 1 oscuro
+// (#483A58, 2.02 sobre negro) se lee por el filo ink blanco (21.00), igual en el día y en la leyenda;
+// así no se confunde con un día vacío (sin filo). Texto onColor encima: 10.39.
 // El nivel 4 se distingue del 3 también por el canto interior en bg (no solo por color).
 // Los dos primeros niveles no llegan a 3:1 contra el fondo por sí solos: todo día con lectura
 // lleva filo de 1.5 px en tinta (10.39 / 21.00), así la cuadrícula se lee sin depender del relleno.
@@ -3213,7 +3214,7 @@ function getCalScale() {
   const dark = palette.bg === PALETTE_DARK.bg;
   return dark
     ? [
-        { bg: palette.bg,              fg: palette.ink },
+        { bg: palette.superficieSuave, fg: palette.onColor },
         { bg: palette.complementoFrio, fg: palette.onColor },
         { bg: palette.firma,           fg: palette.onFirma },
         { bg: palette.ink,             fg: palette.onFirma },
@@ -3403,7 +3404,7 @@ function ReadingHeatmap({ userId }) {
             <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>Páginas al día:</span>
             {["1–5", "6–15", "16–30", "31+"].map((label, i) => (
               <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                <span aria-hidden style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: scale[i].bg, border: `1.5px solid ${palette.ink}`, boxShadow: i === 3 ? `inset 0 0 0 1px ${palette.bg}` : "none", flexShrink: 0 }} />
+                <span aria-hidden style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: scale[i].bg, border: `1.5px solid ${palette.ink}`, boxShadow: i === 3 ? `inset 0 0 0 1px ${palette.bg}` : "none", flexShrink: 0 }} />
                 <span style={{ ...body, fontSize: "13px", color: palette.ink }}>{label}</span>
               </span>
             ))}
@@ -3682,57 +3683,62 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
   return (
     <div style={{ maxWidth: "56rem", margin: "0 auto", paddingBottom: "2rem" }}>
 
-      {/* ── Cover banner ── */}
-      {/* Portada. Con foto: 180 px. Sin foto (ronda 2): franja baja de 104 px en bg con filete de tinta abajo;
-          el detalle es el avatar con canto, no un bloque de color vacío de un tercio de pantalla. */}
-      <div style={{ position: "relative", height: profile.coverUrl ? 180 : 104, backgroundColor: palette.bg, borderBottom: profile.coverUrl ? "none" : `1.5px solid ${palette.ink}` }}>
-        {profile.coverUrl && (
-          <img src={profile.coverUrl} alt="Foto de portada" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        )}
-
-        {/* Avatar overlapping bottom-left */}
-        <button
-          type="button"
-          aria-label="Cambiar foto de perfil"
-          disabled={uploading}
-          style={{ position: "absolute", bottom: -46, left: 20, padding: 0, background: "none", border: "none", borderRadius: "50%", cursor: uploading ? "default" : "pointer" }}
-          onClick={() => !uploading && fileInput.current?.click()}
-          className="group"
-        >
-          {/* Canto de sticker: filo del fondo + línea de tinta (antes anillo con degradado vino y sombra) */}
-          <div style={{ position: "relative", borderRadius: "50%", border: `4px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}` }}>
-            {profile.avatarUrl ? (
-              <img src={profile.avatarUrl} alt="Foto de perfil" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
-            ) : (
-              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                {initials}
+      {/* ── Portada y avatar ──
+          Con foto: portada de 180 px con el avatar encima del borde y «Cambiar portada» sobre la foto.
+          Sin foto (corrección tras revisión 2): no se dibuja franja ni filete; el avatar va justo debajo
+          de las pestañas y «Cambiar portada» es un botón silencioso junto a «Editar perfil». */}
+      {(() => {
+        const avatarBtn = (pos) => (
+          <button
+            type="button"
+            aria-label="Cambiar foto de perfil"
+            disabled={uploading}
+            style={{ ...pos, padding: 0, background: "none", border: "none", borderRadius: "50%", cursor: uploading ? "default" : "pointer" }}
+            onClick={() => !uploading && fileInput.current?.click()}
+            className="group"
+          >
+            {/* Canto de sticker: filo del fondo + línea de tinta */}
+            <div style={{ position: "relative", borderRadius: "50%", border: `4px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}` }}>
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt="Foto de perfil" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+              ) : (
+                <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {initials}
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "rgba(42,31,26,0.45)" }}>
+                {uploading ? <Loader2 size={20} color={palette.onColor} className="animate-spin" /> : <Camera size={18} color={palette.onColor} />}
               </div>
-            )}
-            <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "rgba(42,31,26,0.45)" }}>
-              {uploading ? <Loader2 size={20} color={palette.onColor} className="animate-spin" /> : <Camera size={18} color={palette.onColor} />}
             </div>
+          </button>
+        );
+        return profile.coverUrl ? (
+          <div style={{ position: "relative", height: 180 }}>
+            <img src={profile.coverUrl} alt="Foto de portada" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            {avatarBtn({ position: "absolute", bottom: -46, left: 20 })}
+            <button
+              onClick={() => coverFileInput.current?.click()}
+              disabled={uploadingCover}
+              className="btn-press"
+              style={{
+                // Botón silencioso legible sobre cualquier foto: fondo bg + tinta (10.39 / 21.00), 44 px.
+                position: "absolute", bottom: 10, right: 12, minHeight: 44, display: "flex", alignItems: "center", gap: "0.4rem", backgroundColor: palette.bg, color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 0.95rem", cursor: "pointer", fontSize: "14px", ...display, fontWeight: 600 }}
+            >
+              {uploadingCover ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Camera size={16} aria-hidden />}
+              {uploadingCover ? "Subiendo…" : "Cambiar portada"}
+            </button>
           </div>
-        </button>
+        ) : (
+          <div style={{ padding: "1.25rem 20px 0" }}>
+            {avatarBtn({ position: "relative", display: "block" })}
+          </div>
+        );
+      })()}
+      <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => handleAvatarUpload(e.target.files?.[0])} />
+      <input ref={coverFileInput} type="file" accept="image/*" hidden onChange={(e) => handleCoverUpload(e.target.files?.[0])} />
 
-        {/* Change cover button */}
-        <button
-          onClick={() => coverFileInput.current?.click()}
-          disabled={uploadingCover}
-          className="btn-press"
-          style={{
-            // Botón silencioso legible sobre cualquier foto: fondo bg + tinta (10.39 / 21.00), 44 px.
-            position: "absolute", bottom: 10, right: 12, minHeight: 44, display: "flex", alignItems: "center", gap: "0.4rem", backgroundColor: palette.bg, color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 0.95rem", cursor: "pointer", fontSize: "14px", ...display, fontWeight: 600 }}
-        >
-          {uploadingCover ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Camera size={16} aria-hidden />}
-          {uploadingCover ? "Subiendo…" : "Cambiar portada"}
-        </button>
-
-        <input ref={fileInput} type="file" accept="image/*" hidden onChange={(e) => handleAvatarUpload(e.target.files?.[0])} />
-        <input ref={coverFileInput} type="file" accept="image/*" hidden onChange={(e) => handleCoverUpload(e.target.files?.[0])} />
-      </div>
-
-      {/* Space for avatar overflow + name */}
-      <div style={{ paddingTop: 56, paddingLeft: 20, paddingRight: 20, paddingBottom: "0.5rem", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+      {/* Nombre (con foto de portada deja sitio al avatar que sobresale) */}
+      <div style={{ paddingTop: profile.coverUrl ? 56 : 14, paddingLeft: 20, paddingRight: 20, paddingBottom: "0.5rem", display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
         <div>
           {/* Si el nombre llega como correo o handle se recorta igual que en Social (displayAuthorName) */}
           <p style={{ ...display, fontWeight: 800, fontSize: "26px", letterSpacing: "-0.02em", color: palette.ink, lineHeight: 1.15, overflowWrap: "anywhere" }}>{displayAuthorName(user.name)}</p>
@@ -3887,6 +3893,17 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           <Share2 size={16} strokeWidth={2} aria-hidden />
           Invita a un amigo
         </button>
+        {!profile.coverUrl && (
+          <button
+            onClick={() => coverFileInput.current?.click()}
+            disabled={uploadingCover}
+            className="btn-press"
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", minHeight: 44, padding: "0 0.25rem", backgroundColor: "transparent", border: "none", color: palette.ink, ...body, fontSize: "15px", fontWeight: 500, cursor: "pointer" }}
+          >
+            {uploadingCover ? <Loader2 size={16} className="animate-spin" aria-hidden /> : <Camera size={16} strokeWidth={2} aria-hidden />}
+            {uploadingCover ? "Subiendo…" : "Poner portada"}
+          </button>
+        )}
       </div>
       {inviteModalOpen && (() => {
         const username = profile.username || user.name || "Alguien";
@@ -3979,11 +3996,10 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
                         onClick={() => onSelectBook(book)}
                         style={{ display: "flex", alignItems: "center", gap: "0.75rem", minHeight: 44, background: "none", border: "none", borderBottom: `1px solid ${palette.borderSoft}`, cursor: "pointer", textAlign: "left", padding: "0.6rem 0" }}
                       >
-                        {book.coverUrl ? (
-                          <img src={book.coverUrl} alt="" style={{ width: 40, height: 58, objectFit: "cover", borderRadius: 4, flexShrink: 0 }} />
-                        ) : (
-                          <BookCoverPlaceholder title={book.title} author={book.author} width={40} height={58} />
-                        )}
+                        {/* Portada compacta (monograma) como en Social; alt vacío porque el título va al lado */}
+                        <div style={{ position: "relative", width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
+                          <BookCoverImage coverUrl={book.coverUrl} title={book.title} author={book.author} genres={book.genre ? [book.genre] : []} alt="" compact />
+                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
                           <p style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{book.author}</p>
