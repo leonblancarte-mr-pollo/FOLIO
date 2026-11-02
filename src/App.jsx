@@ -2051,7 +2051,7 @@ const RECO_QUIZ_STEPS = [
     ],
   },
 ];
-const RECO_INTRO = "Elegir qué leer sí depende de uno. Unas preguntas rápidas y te paso ideas.";
+const RECO_INTRO = "Elegir qué leer, eso sí depende de uno. Unas preguntas rápidas y te paso ideas.";
 const RECO_EXTRA_ASK = "Última, y es opcional: ¿algo más que deba saber? Un autor, un país, un final abierto…";
 // Texto visible de una respuesta guardada (el valor sigue siendo el de la IA).
 function recoLabel(key, value) {
@@ -2074,12 +2074,12 @@ function RecoCatAvatar({ hidden = false }) {
 
 // Globo del gato. El avatar va en el ÚLTIMO globo de una racha seguida (como en mensajería);
 // los anteriores dejan el hueco. Colita recta (esquina inferior izquierda en 0).
-function RecoCatBubble({ children, avatar = true }) {
+function RecoCatBubble({ children, avatar = true, focusRef }) {
   return (
     <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: "88%" }}>
       <RecoCatAvatar hidden={!avatar} />
-      <div style={{
-        ...body, fontSize: "15px", lineHeight: 1.45, color: palette.ink,
+      <div ref={focusRef} tabIndex={focusRef ? -1 : undefined} style={{
+        ...body, fontSize: "15px", lineHeight: 1.45, color: palette.ink, outline: "none",
         backgroundColor: palette.superficieSuave,
         padding: "0.65rem 0.95rem", borderRadius: "16px 16px 16px 0",
       }}>
@@ -2091,7 +2091,7 @@ function RecoCatBubble({ children, avatar = true }) {
 }
 
 // Globo del usuario (respuesta ya elegida). Tocarlo regresa a esa pregunta; el lápiz lo avisa.
-function RecoUserBubble({ children, onEdit }) {
+function RecoUserBubble({ children, onEdit, pencil = false }) {
   const style = {
     ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.4, textAlign: "left",
     color: palette.onFirma, backgroundColor: palette.firma, border: "none",
@@ -2103,7 +2103,7 @@ function RecoUserBubble({ children, onEdit }) {
   return (
     <button onClick={onEdit} className="quiz-pill-press" aria-label={`Tú: ${children}. Cambiar respuesta`} style={{ ...style, cursor: "pointer" }}>
       {children}
-      <Pencil size={14} aria-hidden style={{ flexShrink: 0 }} />
+      {pencil && <Pencil size={14} aria-hidden style={{ flexShrink: 0 }} />}
     </button>
   );
 }
@@ -2138,6 +2138,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const rootRef = useRef(null);
   const optionsRef = useRef(null);
   const extraRef = useRef(null);
+  const extraAskRef = useRef(null); // globo de la pregunta 5: recibe el foco sin abrir el teclado
   const retryRef = useRef(null);
   const lastThreadKey = useRef(null);
 
@@ -2157,7 +2158,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     }
     if (error && !loading) retryRef.current?.focus({ preventScroll: true });
     else if (step < 4 && !loading) optionsRef.current?.querySelector("button")?.focus({ preventScroll: true });
-    else if (step >= 4 && !sent) extraRef.current?.focus({ preventScroll: true });
+    else if (step >= 4 && !sent) extraAskRef.current?.focus({ preventScroll: true }); // no la caja: en Android abriría el teclado
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [step, sent, loading, error, results]);
 
@@ -2271,7 +2272,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   // Progreso (principio 4): va pegado a la pregunta actual, así nunca se va con el scroll.
   const counter = (n) => (
     <p key="counter" style={{ ...ts.label, margin: "-0.2rem 0 0 calc(36px + 0.5rem)" }}>
-      Pregunta {n} de 5{n === 5 ? " · opcional" : ""}
+      Pregunta {n} de 5
     </p>
   );
 
@@ -2283,11 +2284,11 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     thread.push(<RecoCatBubble key={`q${i}`}>{q.ask}</RecoCatBubble>);
     if (i === step && !results) thread.push(counter(i + 1));
     if (i < step && answers[q.key]) {
-      thread.push(<RecoUserBubble key={`a${i}`} onEdit={loading ? null : () => editStep(i)}>{recoLabel(q.key, answers[q.key])}</RecoUserBubble>);
+      thread.push(<RecoUserBubble key={`a${i}`} onEdit={loading ? null : () => editStep(i)} pencil={i === step - 1 && !sent}>{recoLabel(q.key, answers[q.key])}</RecoUserBubble>);
     }
   });
   if (step >= 4) {
-    thread.push(<RecoCatBubble key="qextra">{RECO_EXTRA_ASK}</RecoCatBubble>);
+    thread.push(<RecoCatBubble key="qextra" focusRef={extraAskRef}>{RECO_EXTRA_ASK}</RecoCatBubble>);
     if (!sent) thread.push(counter(5));
     if (sent) thread.push(<RecoUserBubble key="aextra">{answers.extra || "Nada más, así está bien."}</RecoUserBubble>);
   }
@@ -2320,7 +2321,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
 
     resultsBlock = (
       <>
-        <div ref={resultsRef} tabIndex={-1} aria-label="Recomendaciones del gato" style={{ scrollMarginTop: 80, marginTop: "0.6rem", outline: "none" }}>
+        <div ref={resultsRef} tabIndex={-1} role="region" aria-label="Recomendaciones del gato" style={{ scrollMarginTop: 80, marginTop: "0.6rem", outline: "none" }}>
           <RecoCatBubble>
             {empty
               ? "Esta vez no di con nada que te quede. Pasa a veces. ¿Probamos con otro ánimo?"
@@ -2409,29 +2410,23 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     // Padding inferior: deja libre el espacio del FAB y de la barra inferior.
     <div ref={rootRef} className="px-4 sm:px-6 pt-5 max-w-xl mx-auto" style={{ paddingBottom: "6.5rem", scrollMarginTop: 64 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        {results && !threadOpen ? (
+        {/* Un solo botón (no se desmonta al alternar): el foco se queda en él. */}
+        {results && (
           <button
-            onClick={() => setThreadOpen(true)}
-            aria-expanded={false}
+            onClick={() => setThreadOpen((v) => !v)}
+            aria-expanded={threadOpen}
+            aria-controls="reco-thread"
             style={{ ...quietBtn, padding: 0, justifyContent: "space-between", width: "100%", textAlign: "left", color: palette.inkSoft }}
           >
             <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              <span className="sr-only">Ver la plática: </span>{summary}
+              {threadOpen ? "Ocultar la plática" : <><span className="sr-only">Ver la plática: </span>{summary}</>}
             </span>
-            <ChevronDown size={18} aria-hidden style={{ flexShrink: 0 }} />
+            <ChevronDown size={18} aria-hidden style={{ flexShrink: 0, transform: threadOpen ? "rotate(180deg)" : "none" }} />
           </button>
-        ) : (
-          <>
-            {results && (
-              <button onClick={() => setThreadOpen(false)} aria-expanded style={{ ...quietBtn, padding: 0, color: palette.inkSoft }}>
-                Ocultar la plática <ChevronDown size={18} aria-hidden style={{ transform: "rotate(180deg)" }} />
-              </button>
-            )}
-            <div role="log" aria-live="polite" aria-label="Plática con el gato" style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              {thread}
-            </div>
-          </>
         )}
+        <div id="reco-thread" role="log" aria-live="polite" aria-label="Plática con el gato" hidden={!!results && !threadOpen} style={{ display: results && !threadOpen ? "none" : "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {thread}
+        </div>
 
         {/* Opciones de la pregunta actual: burbujas tocables del lado del usuario */}
         {current && (
