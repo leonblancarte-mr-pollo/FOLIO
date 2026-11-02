@@ -85,7 +85,7 @@ let palette = { ...PALETTE_LIGHT };
 // Variables CSS del tema (2026-10-10): copia `palette` a :root como --sema-<token> (camelCase →
 // kebab-case: bgSoft → --sema-bg-soft) para que index.css (hover, skeleton, focus) use los mismos
 // colores sin hex propios. Además define tres variables derivadas que dependen del modo:
-//   --sema-skel-base / --sema-skel-shine  (fondo y brillo del skeleton, de border/borderSoft)
+//   --sema-skel-base / --sema-skel-shine  (fondo y brillo del skeleton: border como base, bg como brillo)
 //   --sema-hover-brightness / --sema-press-brightness (oscurece en claro, aclara en oscuro)
 // MainApp la llama en cada render; solo escribe en el DOM cuando cambia el tema.
 let appliedCssTheme = null;
@@ -99,8 +99,8 @@ function applyPaletteCssVars(isDark = false) {
   Object.entries(src).forEach(([k, v]) => {
     root.setProperty(`--sema-${k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`, v);
   });
-  root.setProperty("--sema-skel-base", isDark ? src.borderSoft : src.border);
-  root.setProperty("--sema-skel-shine", isDark ? src.border : src.borderSoft);
+  root.setProperty("--sema-skel-base", src.border);
+  root.setProperty("--sema-skel-shine", src.bg);
   root.setProperty("--sema-hover-brightness", isDark ? "1.12" : "0.96");
   root.setProperty("--sema-press-brightness", isDark ? "1.22" : "0.9");
 }
