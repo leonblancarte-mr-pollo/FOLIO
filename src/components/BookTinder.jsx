@@ -161,7 +161,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
 
         <h2 style={{
           ...serif, fontSize: "clamp(1.45rem, 5.5vw, 1.75rem)", fontWeight: 700,
-          color: palette.onAccent, lineHeight: 1.15, margin: "0 0 0.28rem",
+          color: palette.onColor, lineHeight: 1.15, margin: "0 0 0.28rem",
           textShadow: "0 2px 10px rgba(0,0,0,0.5)",
         }}>
           {book.title}
@@ -189,7 +189,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
           backgroundColor: "rgba(0,0,0,0.52)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
           borderRadius: 10, padding: "5px 11px",
           fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "0.82rem", fontWeight: 600, color: palette.onAccent,
+          fontSize: "0.82rem", fontWeight: 600, color: palette.onColor,
           letterSpacing: "0.01em",
           pointerEvents: "none",
         }}>
@@ -211,7 +211,7 @@ function CardFace({ book, showInfo, onToggleInfo }) {
             cursor: "pointer",
           }}
         >
-          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onAccent, margin: "0 0 0.3rem" }}>
+          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onColor, margin: "0 0 0.3rem" }}>
             {book.title}
           </h3>
           <p style={{ ...body, fontSize: "0.97rem", color: "rgba(255,255,255,0.72)", margin: "0 0 1rem" }}>

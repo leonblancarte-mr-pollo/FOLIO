@@ -8,8 +8,9 @@
 //    una constante de módulo).
 //    · Superficies ........ bg (fondo de app) · bgSoft (secciones, inputs apagados) · bgCard (tarjetas, sheets)
 //    · Texto .............. ink (principal) · inkSoft (secundario) · inkFaint (captions, labels, placeholders)
-//    · Marca / acento ..... accent (acción principal: botón, progreso, marca; NO es color de links ni de
-//                           texto normal en claro, 3.21:1) · accentSoft (hover, "Leyendo")
+//    · Marca / acento ..... accent (acción principal: botón «Leer ahora», progreso, píldora activa; durazno #F79F79,
+//                           oscuro #F9B294. NO es texto sobre blanco (2.06:1); texto encima = onAccent #483A58)
+//                           · accentSoft (#FBD4C3: hover, "Leyendo"; tampoco es texto sobre blanco)
 //    · Cálidos ............ amber (gemas, estrellas, celebración) · amberRich (estrellas llenas) · amberInk (texto que antes iba en ámbar)
 //    · Secundarios ........ mauve (sugerencias IA; no es texto sobre blanco) · slate (amigo en comparativas, "Por leer") · sage (Leídos, éxito suave)
 //    · SEMA 2026-11 ....... firma (#BBADFF: racha, stickers, resaltados, borde rasgado de la barra inferior)
@@ -19,7 +20,9 @@
 //                           complementoFrio (enlaces, estados informativos, íconos secundarios; en oscuro solo grande)
 //      Valores y reglas de contraste: .claude/skills/sema-paleta/SKILL.md (fuente de verdad).
 //    · Bordes ............. border (inputs, tarjetas) · borderSoft (divisores)
-//    · Sobre color ........ onAccent (texto/icono sobre accent o degradados) · onDark / onDarkSoft / onDarkFaint /
+//    · Sobre color ........ onAccent (#483A58: texto/icono sobre accent, en ambos modos)
+//                           onColor (#FFFFFF: texto/icono sobre colores oscuros o saturados: degradados de BRAND,
+//                           badge rojo, salvia, avatares, redes; antes eso usaba onAccent) · onDark / onDarkSoft / onDarkFaint /
 //                           onDarkMuted (texto sobre overlays casi negros: celebración, Wrapped, compartir)
 //    · Estados ............ danger / dangerSoft / dangerBorder / dangerInk (errores y acciones destructivas)
 //                           success (confirmaciones) · warnBg / warnBorder / warnInk (banner offline, avisos)
@@ -49,11 +52,11 @@ const FONT_LINK = `
 const PALETTE_LIGHT = {
   bg: "#FFFFFF", bgSoft: "#FFFFFF", bgCard: "#FFFFFF",
   ink: "#483A58", inkSoft: "#5E5768", inkFaint: "#5E5768",
-  accent: "#F45B69", accentSoft: "#F45B69",
+  accent: "#F79F79", accentSoft: "#FBD4C3",
   amber: "#F79F79", amberRich: "#F79F79", amberInk: "#483A58",
   mauve: "#BBADFF", slate: "#5E5768", sage: "#5C6B3D",
   border: "#E7D7C1", borderSoft: "#E7D7C1",
-  onAccent: "#FFFFFF",
+  onAccent: "#483A58", onColor: "#FFFFFF",
   onDark: "#FFFFFF", onDarkSoft: "#E7D7C1", onDarkFaint: "#E7D7C1", onDarkMuted: "#E7D7C1",
   danger: "#B03A2E", dangerSoft: "#FBEEEA", dangerBorder: "#E3A79F", dangerInk: "#8E2A20",
   success: "#5C6B3D",
@@ -66,16 +69,16 @@ const PALETTE_LIGHT = {
 const PALETTE_DARK = {
   bg: "#000000", bgSoft: "#000000", bgCard: "#000000",
   ink: "#FFFFFF", inkSoft: "#E7D7C1", inkFaint: "#E7D7C1",
-  accent: "#F45B69", accentSoft: "#F45B69",
+  accent: "#F9B294", accentSoft: "#FBD4C3",
   amber: "#F79F79", amberRich: "#F79F79", amberInk: "#F79F79",
   mauve: "#BBADFF", slate: "#E7D7C1", sage: "#7A9B5C",
   border: "#483A58", borderSoft: "#483A58",
-  onAccent: "#FFFFFF",
+  onAccent: "#483A58", onColor: "#FFFFFF",
   onDark: "#FFFFFF", onDarkSoft: "#E7D7C1", onDarkFaint: "#E7D7C1", onDarkMuted: "#E7D7C1",
   danger: "#E5675B", dangerSoft: "#3A1F1C", dangerBorder: "#7A3A34", dangerInk: "#F2A39B",
   success: "#7A9B5C",
   warnBg: "#3A301A", warnBorder: "#6B5A2A", warnInk: "#E8C97A",
-  like: "#E5675B", badge: "#E5675B", unreadBg: "#483A58",
+  like: "#E5675B", badge: "#B03A2E", unreadBg: "#483A58",
   session: "#7A9B5C", sessionInk: "#7A9B5C", freeze: "#E7D7C1",
   firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
   superficieSuave: "#483A58", complementoFrio: "#456990",

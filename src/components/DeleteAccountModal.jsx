@@ -66,7 +66,7 @@ function DeleteAccountModal({ onClose, onDeleted }) {
               <button
                 onClick={handleDelete}
                 disabled={!canDelete || deleting}
-                style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: canDelete ? palette.danger : palette.border, color: canDelete ? palette.onAccent : palette.inkFaint, cursor: canDelete && !deleting ? "pointer" : "default", ...display, fontSize: "0.98rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
+                style={{ width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", backgroundColor: canDelete ? palette.danger : palette.border, color: canDelete ? palette.onColor : palette.inkFaint, cursor: canDelete && !deleting ? "pointer" : "default", ...display, fontSize: "0.98rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}
               >
                 {deleting && <Loader2 size={16} className="animate-spin" />}
                 {deleting ? "Eliminando…" : "Eliminar mi cuenta"}

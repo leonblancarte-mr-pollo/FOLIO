@@ -348,7 +348,7 @@ button:not(:disabled), [role="button"], [role="radio"], [role="tab"], a[href], s
   cursor: pointer;
 }
 :where(button, a[href], select, summary, [role="button"], [role="radio"], [role="tab"], [tabindex]:not([tabindex="-1"])):focus-visible {
-  outline: 2px solid var(--sema-accent);
+  outline: 2px solid var(--sema-ink);
   outline-offset: 2px;
 }
 
@@ -399,9 +399,11 @@ button:not(:disabled):not(.sema-no-hover):active,
    inferior (≈54 px + safe area) ni del botón flotante "+" (58 px a 80 px del borde
    → ocupa hasta ~138 px). Antes era pb-24 (96 px) y el "+" tapaba el sábado del
    calendario, "Mis listas" y bordes de tarjetas. En escritorio no hay barra
-   inferior, pero el "+" sigue fijo, así que se deja el mismo margen. */
+   inferior, pero el "+" sigue fijo, así que se deja el mismo margen.
+   2026-11-02: +10 px por el borde rasgado lila (.sema-nav-rasgado::before sube 10 px
+   sobre la barra y tapaba la última fila de Descubrir y de Perfil). */
 .main-fab-clearance {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 156px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 166px);
 }
 
 /* Carruseles horizontales sin barra gris del navegador. `scrollbar-hide` se usaba
@@ -415,4 +417,51 @@ button:not(:disabled):not(.sema-no-hover):active,
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;                  /* Chrome, Safari, Android */
+}
+
+/* ═══ Inicio — rediseño SEMA 2026-11-02 ═══════════════════════════════════════
+   Borde superior rasgado tipo revista de la barra inferior, en lila (firma).
+   Una tira de 12 px con el canto de arriba irregular (clip-path), sin imágenes.
+   El color sale del token (--sema-firma), no hay hex aquí. */
+.sema-nav-rasgado::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -10px;
+  height: 13px;
+  background-color: var(--sema-firma);
+  clip-path: polygon(0% 100%, 0% 55%, 1.9% 5%, 4.9% 3%, 6.2% 15%, 8.6% 2%, 11.2% 33%, 12.5% 8%, 14.3% 35%, 16.8% 24%, 18.8% 19%, 21.4% 54%, 23.6% 32%, 26.5% 41%, 28.9% 63%, 31.4% 3%, 34.3% 5%, 37.6% 55%, 39.6% 52%, 40.9% 3%, 42.2% 59%, 44.1% 14%, 47.3% 57%, 48.7% 27%, 50.7% 32%, 52.9% 70%, 56.0% 49%, 58.7% 13%, 60.3% 41%, 63.4% 6%, 65.5% 13%, 68.2% 18%, 70.4% 73%, 72.5% 52%, 73.8% 2%, 75.3% 21%, 77.6% 33%, 80.8% 37%, 84.1% 21%, 87.1% 51%, 89.0% 64%, 91.3% 24%, 94.6% 18%, 97.4% 10%, 100.0% 9%, 100% 100%);
+  pointer-events: none;
+}
+
+/* Textura de papel arrugado: solo en stickers y tarjetas, nunca en el fondo.
+   SVG inline con feTurbulence + luz difusa (relieve gris, sin colores propios),
+   en multiply. La luz satura a blanco en lo plano (diffuseConstant > 1): solo los
+   pliegues oscurecen, así el lila conserva su valor. */
+.sema-papel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.sema-papel > * {
+  position: relative;
+  z-index: 1;
+}
+.sema-papel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='4' seed='11'/%3E%3CfeDiffuseLighting surfaceScale='4' diffuseConstant='1.18'%3E%3CfeDistantLight azimuth='225' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+
+/* Sticker: leve giro, como pegado a mano. */
+.sema-sticker {
+  transform: rotate(-1.5deg);
 }

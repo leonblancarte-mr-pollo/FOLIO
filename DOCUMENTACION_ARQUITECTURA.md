@@ -1,6 +1,6 @@
 # SEMA — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-11-02 (paleta SEMA 2026-11 en `theme.js`: claro con fondo `#FFFFFF`, oscuro con negro puro, 5 tokens nuevos; ver §III «Sistema visual (2026-11-02)». Antes, ese mismo día: sistema de agentes de diseño en `.claude/`: skills `sema-*`, 6 agentes y comandos `/paleta`, `/revisa`, `/redisena`; ver §III «Sistema de agentes de diseño». Antes, 2026-10-11: design system: paleta de 5 colores, Bricolage Grotesque / Figtree / Instrument Serif, ver §III «Sistema visual (2026-10-11)» y `design-system/sema/MASTER.md`; antes, 2026-10-10: textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-11-02 (primario durazno `#F79F79` y token `onColor`; `/redisena home` en dos rondas más corrección de QA: sticker de racha lila, barra con borde rasgado, FAB silencioso; ver §III «Inicio (2026-11-02)» y §XII #23. Antes, ese mismo día: paleta SEMA 2026-11 en `theme.js`: claro con fondo `#FFFFFF`, oscuro con negro puro, 5 tokens nuevos; ver §III «Sistema visual (2026-11-02)». Antes, ese mismo día: sistema de agentes de diseño en `.claude/`: skills `sema-*`, 6 agentes y comandos `/paleta`, `/revisa`, `/redisena`; ver §III «Sistema de agentes de diseño». Antes, 2026-10-11: design system: paleta de 5 colores, Bricolage Grotesque / Figtree / Instrument Serif, ver §III «Sistema visual (2026-10-11)» y `design-system/sema/MASTER.md`; antes, 2026-10-10: textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce SEMA y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -38,6 +38,8 @@
 - 2026-11-02 — `.gitignore`: se quita la regla que ignoraba `.claude/` (ahora entra a git); quedan ignorados `.claude/settings.local.json` y una regla por cada una de las 60 carpetas de skills de terceros de `.claude/skills/` (las que no empiezan con `sema-`, que sí entran); se agrega `capturas/`. `.env.local` sigue ignorado (`.env.local` y `.env.*.local`). Sin cambios de código de la app. Ver §XII #21
 - 2026-11-02 — Sistema de agentes de diseño (sin tocar código de la app): 5 skills (`.claude/skills/sema-identidad`, `sema-paleta`, `sema-voz`, `sema-capturas` con la plantilla `captura.js`, `sema-prompts`), 6 agentes (`.claude/agents/`: `disenador`, `critico`, `lectora`, `accesibilidad`, `copy`, `qa`) y 3 comandos (`.claude/commands/`: `/paleta`, `/revisa`, `/redisena`) para rediseñar SEMA una pantalla a la vez con la paleta nueva (blanco/negro puro, tinta `#483A58`, acción `#F45B69`, firma lila `#BBADFF`). Ver §III «Sistema de agentes de diseño». ⚠️ `.claude/` está en `.gitignore`: estos archivos viven solo en el disco local
 - 2026-11-02 — Paleta SEMA 2026-11 (rama `paleta-2026-11-02`, solo `theme.js`, sin tocar componentes): commit `ffdf223` cambia `PALETTE_LIGHT`/`PALETTE_DARK` según `sema-paleta` (claro primario con fondo `#FFFFFF`, tinta `#483A58`, acción `#F45B69`; oscuro con negro puro `#000000` y tinta `#FFFFFF`), conserva todos los nombres de token y agrega `firma`, `onFirma`, `acentoCalido`, `superficieSuave` y `complementoFrio` (`applyPaletteCssVars` los expone solos como `--sema-firma`, etc.); commit `d4172e8` corrige el brillo del skeleton (`--sema-skel-shine` pasa a `bg`, porque `border` y `borderSoft` ahora valen lo mismo). `BRAND` y los datos de arte siguen con la paleta anterior; pendientes en §XII #22
+- 2026-11-02 — Primario durazno (rama `paleta-2026-11-02`, sin commit). León comparó 4 candidatos en Inicio (lila, cereza, durazno y azul acero; `capturas/home/comparacion-primario-2026-11-02.png`) y eligió durazno. `accent` `#F79F79` en claro y `#F9B294` en oscuro (11.82:1 sobre negro; se descartó `#F0B9A0`, 12.15:1, porque se ve deslavado y beige). `accentSoft` `#FBD4C3`. `onAccent` pasa a `#483A58` en los dos modos (5.04 / 5.85 sobre durazno). Token nuevo `onColor` `#FFFFFF` para texto e íconos sobre colores oscuros o saturados; unas 50 líneas pasan de `onAccent` a `onColor` (App.jsx, `BookTinder`, `DeleteAccountModal`, `PetHub`, `PetLevelUpToast`, `PetOnboarding`; se dejan en `onAccent` las que sí van sobre durazno). `badge` oscuro pasa a `#B03A2E` (blanco encima 6.02; `#E5675B` daba 3.27). `SubTabBar` y las pestañas inactivas van en `ink`. Se actualizaron `.claude/skills/sema-paleta/SKILL.md` y `design-system/sema/MASTER.md`.
+- 2026-11-02 — `/redisena home` (rama `paleta-2026-11-02`, sin commit), dos rondas con crítico, lectora, accesibilidad y copy, más una corrección de QA. Inicio: header con logo «sema» en tinta, avatar con inicial (44 px, abre Perfil) y campana de 44 px con badge `onColor` de 12 px; saludo en Bricolage 32 px que corta en `@ . +` el nombre que llega como correo; racha como sticker lila (`firma`/`onFirma`) con textura de papel, canto (filo `bg` + anillo `ink`) y estado «en pausa» derivado del mismo criterio que `checkStreakOnLoad`; la mascota habla pegada al sticker con la voz del gato (Instrument Serif), sin nivel ni chevron, con halo `firma` en oscuro; «Leer ahora» única acción en durazno con `onAccent`; libro actual con `BookCoverImage` o, sin portada, el título como lomo sobre `superficieSuave`; `ProgressBarBook` sin total muestra el número grande («99 págs. leídas · no sabemos de cuántas») y con total una barra de 10 px con borde `ink`; barra inferior con borde superior rasgado lila, etiquetas de 12 px, píldora activa con `onAccent`, círculo central plano `firma` con `aria-label="Mascota"` y «Home» → «Inicio»; FAB silencioso (fondo `bg`, borde e ícono `ink`, sin sombra); foco global (`:focus-visible`) en `ink`; `RachaModal` y `LeerAhoraModal` planos (sin `BRAND.gradient`), copy nuevo de racha («Récord», «Listo», pausa coherente con el sticker). CSS nuevo en `index.css`: `.sema-nav-rasgado`, `.sema-papel`, `.sema-sticker`; `.main-fab-clearance` sube a 166 px. QA: la tarjeta del cuento en Social usa `onAccent` sobre `accent` y «Leyendo» en «Tu biblioteca» va en `ink`. Capturas en `capturas/home/2026-11-02-despues-{claro,oscuro}.png`.
 
 ---
 
@@ -148,10 +150,11 @@ FOLIO FINAL/
 - **Sin state manager**: `useState`/`useEffect` + prop drilling desde `MainApp`, más **event buses** caseros (patrón pub/sub con arrays de listeners): `gemsEventBus`, `gemToastBus`, `petBus`, `achievementBus`. Sirven para que servicios sin acceso a React notifiquen a la UI (toasts de gemas, level-up de mascota, logros desbloqueados).
 - **Tema**: `theme.js` exporta un objeto **mutable** `palette`; `MainApp` hace `Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT)` en cada render. Los componentes leen `palette.xxx` en estilos inline (siempre en el render, nunca copiado a una constante de módulo). Preferencia en `localStorage('folio_theme')`: light/dark/system.
 - **Sistema visual (2026-11-02)** — `.claude/skills/sema-paleta/SKILL.md` es la fuente de verdad de los colores; `theme.js` la implementa (commits `ffdf223` y `d4172e8`). Reemplaza la paleta de 5 colores del 2026-10-11 (crema, vino, ámbar, salvia), que se conserva abajo como historia. La tipografía, el espacio y los 8 principios no cambian.
-  - **Modo claro (primario):** fondo blanco `#FFFFFF`, tinta `#483A58`, secundario `#5E5768`, acción `#F45B69`, firma lila `#BBADFF`, acento cálido `#F79F79`, superficie suave `#E7D7C1`, complemento frío `#456990`, éxito `#5C6B3D` y error `#B03A2E`.
-  - **Modo oscuro:** negro puro `#000000` (nunca café ni azul tinta), tinta `#FFFFFF`, secundario `#E7D7C1`, superficie suave `#483A58`, éxito `#7A9B5C` y error `#E5675B`. Acción, firma, cálido y frío no cambian.
+  - **Modo claro (primario):** fondo blanco `#FFFFFF`, tinta `#483A58`, secundario `#5E5768`, acción durazno `#F79F79` (desde el 2026-11-02; antes cereza `#F45B69`), firma lila `#BBADFF`, acento cálido `#F79F79`, superficie suave `#E7D7C1`, complemento frío `#456990`, éxito `#5C6B3D` y error `#B03A2E`.
+  - **Modo oscuro:** negro puro `#000000` (nunca café ni azul tinta), tinta `#FFFFFF`, secundario `#E7D7C1`, superficie suave `#483A58`, éxito `#7A9B5C` y error `#E5675B`. Acción durazno aclarada `#F9B294`; firma, cálido y frío no cambian.
   - **Contraste (obligatorio):**
-    - `accent` (`#F45B69`) **no va como texto normal sobre blanco** (3.21:1). Sirve como relleno de botón, barra de progreso, ícono grande o texto grande. Los links usan `complementoFrio`. El texto blanco sobre `accent` va en negritas de **19 px o más**.
+    - `accent` (durazno `#F79F79`) **no va como texto sobre blanco** (2.06:1), ni siquiera grande. Sirve como relleno de botón o píldora; como barra de progreso necesita borde o un elemento al lado. Los links usan `complementoFrio` y los títulos y el logo, `ink`. **El texto sobre `accent` y `accentSoft` es siempre `#483A58` (`onAccent`)**: 5.04:1 en claro y 5.85:1 en oscuro. Blanco sobre durazno está prohibido (2.06 / 1.78). En oscuro `#F9B294` sí sirve como texto sobre negro (11.82:1).
+    - Sobre colores oscuros o saturados (`BRAND`, `badge`, `sage`, `danger`, avatares, redes, velos negros) el texto es `onColor` `#FFFFFF`; `#483A58` ahí da 1.12 (vino) o 1.73 (`#B03A2E`).
     - **Firma `#BBADFF`, cálido `#F79F79` y superficie `#E7D7C1` nunca son texto sobre blanco** (1.99, 2.06 y 1.41:1). Encima de firma y cálido el texto es siempre `onFirma` (`#483A58`), también en oscuro.
     - `#483A58` nunca es texto sobre negro (2.02:1). En oscuro, `complementoFrio` solo va en elementos grandes (3.68:1).
   - **Tabla de tokens (`palette`):**
@@ -164,8 +167,8 @@ FOLIO FINAL/
     | `ink` | `#483A58` | `#FFFFFF` | Texto principal, íconos, logo |
     | `inkSoft` | `#5E5768` | `#E7D7C1` | Texto secundario |
     | `inkFaint` | `#5E5768` | `#E7D7C1` | Captions, labels, placeholders |
-    | `accent` | `#F45B69` | `#F45B69` | Acción principal: botón, progreso, marca. No es color de links |
-    | `accentSoft` | `#F45B69` | `#F45B69` | Estado «Leyendo», hover de acción |
+    | `accent` | `#F79F79` | `#F9B294` | Acción principal (durazno): botón «Leer ahora», progreso, píldora activa. No es texto sobre blanco (2.06:1) |
+    | `accentSoft` | `#FBD4C3` | `#FBD4C3` | Estado «Leyendo», hover de acción. Solo fondo, con `onAccent` encima |
     | `amber` | `#F79F79` | `#F79F79` | Gemas, estrellas, celebración (= acento cálido) |
     | `amberRich` | `#F79F79` | `#F79F79` | Estrellas llenas |
     | `amberInk` | `#483A58` | `#F79F79` | Texto que antes iba en ámbar |
@@ -174,7 +177,8 @@ FOLIO FINAL/
     | `sage` | `#5C6B3D` | `#7A9B5C` | «Leídos», éxito suave |
     | `border` | `#E7D7C1` | `#483A58` | Bordes de inputs y tarjetas |
     | `borderSoft` | `#E7D7C1` | `#483A58` | Divisores |
-    | `onAccent` | `#FFFFFF` | `#FFFFFF` | Texto sobre `accent` (negritas, ≥ 19 px) |
+    | `onAccent` | `#483A58` | `#483A58` | Texto e íconos sobre `accent` y `accentSoft`, en ambos modos |
+    | **`onColor`** (nuevo 2026-11-02) | `#FFFFFF` | `#FFFFFF` | Texto e íconos sobre colores oscuros o saturados (`BRAND`, `badge`, `sage`, `danger`, avatares, redes, velos) |
     | `onDark` | `#FFFFFF` | `#FFFFFF` | Texto sobre overlays negros |
     | `onDarkSoft` / `onDarkFaint` / `onDarkMuted` | `#E7D7C1` | `#E7D7C1` | Texto secundario sobre overlays negros |
     | `danger` | `#B03A2E` | `#E5675B` | Error, acción destructiva |
@@ -182,7 +186,7 @@ FOLIO FINAL/
     | `success` | `#5C6B3D` | `#7A9B5C` | Éxito, «Leído» |
     | `warnBg` / `warnBorder` / `warnInk` | `#F6EAD0` / `#E0C48F` / `#8A5A1A` | `#3A301A` / `#6B5A2A` / `#E8C97A` | Banner offline y avisos (sin cambio) |
     | `like` | `#B03A2E` | `#E5675B` | Corazón (= danger) |
-    | `badge` | `#B03A2E` | `#E5675B` | Contador de no leídos (= danger) |
+    | `badge` | `#B03A2E` | `#B03A2E` | Contador de no leídos. En oscuro era `#E5675B` y con blanco daba 3.27; desde el 2026-11-02 es `#B03A2E` (6.02) |
     | `unreadBg` | `#E7D7C1` | `#483A58` | Notificación no leída (= superficie suave) |
     | `session` | `#5C6B3D` | `#7A9B5C` | Post de sesión de lectura |
     | `sessionInk` | `#5C6B3D` | `#7A9B5C` | Texto del post de sesión |
@@ -195,6 +199,21 @@ FOLIO FINAL/
 
   - **Variables CSS:** `applyPaletteCssVars` expone los tokens nuevos sin cambios en la función (`--sema-firma`, `--sema-on-firma`, `--sema-acento-calido`, `--sema-superficie-suave`, `--sema-complemento-frio`). El skeleton usa `--sema-skel-base` = `border` y `--sema-skel-shine` = `bg` en los dos modos (claro `#E7D7C1` → `#FFFFFF`; oscuro `#483A58` → `#000000`).
   - **Fuera de `palette`:** `BRAND` y los datos de arte siguen con la paleta anterior hasta que cada `/redisena` toque su pantalla (lista en §XII #22).
+  - **Inicio (2026-11-02, `/redisena home`):** primera pantalla rediseñada con la paleta 2026-11.
+    - **Header (`AppHeader`, compartido):** logo «sema» en `ink` en los dos modos; gemas; campana de 44×44 con badge `onColor` de 12 px; avatar de 36 px (inicial sobre `superficieSuave`, botón de 44 px que abre Perfil). Recibe `userName` desde `MainApp`.
+    - **Saludo:** Bricolage 32 px/800, nombre en su propia línea. Si `user.name` llega como correo o handle se corta en `@ . +`; sin nombre queda solo «Buenas tardes.».
+    - **Racha:** sticker `firma` con texto `onFirma`, número de 48 px, giro de -1.5°, canto (borde 3 px `bg` + anillo 1.5 px `ink`) y textura de papel. «Récord: N días» o, en pausa, «En pausa, no rota. Cualquier día sirve para volver.». La pausa se calcula en la vista con `daysBetweenLocalDates` sobre la fila de racha que ya llega (mismo criterio que `checkStreakOnLoad`); `RachaModal` recibe `paused`.
+    - **Mascota:** 48 px, pegada al sticker, habla en Instrument Serif cursiva con la voz del gato; halo `firma` de 1 px solo en oscuro.
+    - **Acción principal:** «Leer ahora» en `accent` con `onAccent`, alto mínimo 56 px.
+    - **Libro actual:** portada de 60×90 (`BookCoverImage` si hay URL; si no, el título como lomo en Bricolage 12 px sobre `superficieSuave`, cortado por palabras). `ProgressBarBook`: sin total, número grande; con total, barra de 10 px con borde `ink` y porcentaje en `ink` de 13 px.
+    - **Barra inferior (`BottomNav`, compartida):** borde superior rasgado lila, etiquetas de 12 px, píldora activa `accent` + `onAccent`, círculo central plano `firma` (sin degradado ni sombra) con `aria-label="Mascota"`, pestaña «Inicio».
+    - **FAB «+» (compartido):** fondo `bg`, borde 2 px `ink`, ícono `ink`, sin sombra.
+    - **Clases CSS nuevas (`src/index.css`):**
+      - `.sema-nav-rasgado::before`: tira de 13 px en `var(--sema-firma)` con canto irregular por `clip-path`, 10 px por encima de la barra.
+      - `.sema-papel`: textura de papel arrugado con SVG inline (`feTurbulence` + `feDiffuseLighting`, sin colores propios) en `::after`, `multiply` al 0.55. Solo en stickers y tarjetas, nunca de fondo.
+      - `.sema-sticker`: `rotate(-1.5deg)`.
+      - `.main-fab-clearance` sube de 156 a 166 px por el borde rasgado.
+      - `:focus-visible` usa `var(--sema-ink)` (antes `accent`, 2.06 sobre blanco).
 - **Sistema visual (2026-10-11, paleta reemplazada el 2026-11-02)** — `design-system/sema/MASTER.md` es la guía; `theme.js` la implementa.
   - **Paleta de 5 colores:** Crema `#F4EDE0` (fondo; oscuro `#1A1614`), Tinta `#2A1F1A` (texto; oscuro `#F5EDE0`), Vino `#7A2E2E` (acción y marca; oscuro `#C84F4F`), Ámbar `#C8924A` (celebración, gemas; oscuro `#D4A574`; texto `amberInk` `#8A5A1A`) y Salvia `#5C6B3D` (éxito, «Leído», progreso completo; oscuro `#7A9B5C`). Superficies y bordes (`bgSoft`, `bgCard`, `border*`) son tintes de la crema; `inkSoft` `#5C4A3F` e `inkFaint` `#6E6054` son tintes de la tinta. Fuera de los 5 queda solo `danger` `#B03A2E` (errores/destructivo/corazón) más sus fondos suaves y los `warn*`.
   - **Alias compatibles:** `accentSoft` (vino claro `#96403B`), `mauve` = `accentSoft`, `slate` y `freeze` = `inkSoft`, `amberRich` = `amber`, `session`/`success` = salvia, `like`/`badge` = `danger`. Los nombres de token no cambian, así que ningún componente (ni el Trueque) tuvo que tocarse.
@@ -937,7 +956,7 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 
 22. **Paleta SEMA 2026-11 — pendientes (2026-11-02, commits `ffdf223` y `d4172e8`):**
     - **Siguen con la paleta anterior** (vino, ámbar, salvia, crema): `BRAND` (degradados `gradient*` y `confetti`), `SOCIAL_COLORS`, `STATUS_COLORS`, `AVATAR_COLORS`, `COVER_PALETTES`, `HEATMAP_COLORS`, `STREAK_PHASES`, `FRIEND_STREAK_GRADIENT`, `WRAPPED_SLIDE_GRADIENTS`, `QUOTE_POSTER_GRADIENTS`, `genrePillStyle` y `genreColor`. También hay rgba vino/café escritos a mano fuera de `theme.js`, que vio QA: el borde y el degradado de la tarjeta del cuento en Social, y el backdrop del modal en `App.jsx:2847` (`rgba(42,31,26,0.72)`). Cada `/redisena` los cambia al tocar su pantalla; los degradados pasan a color plano.
-    - **`accent`/`amber`/`mauve` como texto chico sobre blanco** (no pasan contraste: accent 3.21, amber 2.06, mauve 1.99). Son 69 líneas con `color: palette.(accent|accentSoft|mauve|amber|amberRich)`; se corrigen en cada `/redisena` (links → `complementoFrio`; texto ámbar → `amberInk`):
+    - **`accent`/`amber`/`mauve` como texto chico sobre blanco** (no pasan contraste: desde el 2026-11-02 `accent` es durazno y da **2.06:1**, igual que amber; mauve 1.99). Las líneas de abajo se midieron con la cereza; con durazno fallan todas, incluidas las que antes pasaban como texto grande. Entre ellas «Perfil público», «Claro», «+ Nueva» y «CUENTO DEL DÍA» en Perfil. Son 69 líneas con `color: palette.(accent|accentSoft|mauve|amber|amberRich)`; se corrigen en cada `/redisena` (links → `complementoFrio`; texto ámbar → `amberInk`):
       - `src/App.jsx` (55):
         - accent que falla: 1060, 1129, 1245, 1346, 1362, 1403, 1618, 1829, 2087, 2381, 2408, 2698, 2760, 2770, 3695, 3928, 4991, 5266, 5375, 5484, 5596, 6253, 6675, 6787, 6872, 7895, 8102, 8364, 8532, 9402, 9953, 10166 y 13113 (logo «SEMA» a 1.05rem).
         - accent que pasa como texto grande: 4941 y 7854.
@@ -953,8 +972,30 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **Skeletons inline con `palette.bgSoft`** (`App.jsx:1931`, `BookTinder.jsx:244-265`): ahora `bgSoft` es igual al fondo y no se ven. Las clases `.sema-skeleton` sí tienen brillo desde `d4172e8`.
     - **Tarjetas de «Tu biblioteca»** (`App.jsx:3765-3768`): con `bgCard` igual al fondo se funden con él. Deben separarse con espacio o con `superficieSuave`.
     - **Texto blanco sobre la fase ámbar de `STREAK_PHASES`:** se lee mal. Sobre cálido el texto debe ser `onFirma`.
-    - **Gato negro sobre negro puro** en Inicio, modo oscuro: la mascota casi desaparece.
+    - ~~**Gato negro sobre negro puro** en Inicio, modo oscuro~~: resuelto en `/redisena home` con un halo `firma` solo en oscuro.
     - **ESLint no está configurado:** no hay `eslint.config.*`, `.eslintrc*` ni script `lint` en `package.json`. La única verificación automática es `npm run build`.
+23. **Rediseño de Inicio — pendientes (2026-11-02, rama `paleta-2026-11-02`, sin commit):**
+    - **`LeerAhoraModal`:** cajas dentro de cajas (App.jsx 8377, 8389); `Sparkles` en un cuadro; tarjeta «Continuar» con tinte `${accent}10` y borde durazno; respaldo `BookOpen` cuando no hay portada; velo café `rgba(42,31,26,0.6)` (8353, 8373; también en `RachaModal`).
+    - **Copy:** «Descubre tu siguiente» → «Lo que sigue» lo decide León (texto ya revisado, MASTER P8).
+    - **Nombre y avatar:** «Leon» sale sin acento porque el nombre se obtiene cortando `user.name` (que hoy es el correo). Falta un nombre visible en el perfil. El avatar con foto requiere agregar `avatar_url` al `select` de `MainApp` (~11548) y pasarlo a `AppHeader`; hoy muestra la inicial.
+    - **Lomo sin portada:** si una palabra es más ancha que el lomo (~7 caracteres a 12 px) se corta en el borde.
+    - **Compartir la racha:** falta el botón y la tarjeta 9:16 (principio 7).
+    - **Dos accesos a perfil:** el avatar del header y la pestaña «Perfil». El avatar fue dirección de León; queda para que él decida.
+    - **El «+» no tiene etiqueta visible** (solo `aria-label="Agregar"`).
+    - **`BookCoverImage`:** si una URL de portada falla, su respaldo es un degradado oscuro con emoji (componente compartido, fuera de `palette`).
+    - **Sticker de racha:** el texto pasa justo con la textura (mínimo 4.68:1). No subir la opacidad ni el `surfaceScale` de `.sema-papel`.
+    - **Voz de la mascota:** las líneas solo existen para el gato; cuervo, zorro y mapache necesitan las suyas si llegan.
+    - **Borde rasgado en Descubrir:** sigue tapando «1 de 20 libros», porque `BookTinder` no usa `.main-fab-clearance`.
+    - **`onAccent` que todavía no van sobre `accent`:** 2729 (cargando sobre `inkSoft`), 9965 (deshabilitado sobre `border`, invisible en oscuro) y 7380 (confetti oscuro).
+    - **Texto blanco sobre `palette.ink` en oscuro** (5859, 9002, 9163): `ink` es blanco en oscuro y el texto `onColor` también. Ya pasaba antes de la paleta 2026-11; el arreglo es `palette.bg`.
+    - **Perilla del toggle** (9958): blanca sobre durazno da 2.06 en claro y 1.78 en oscuro.
+    - **Contador sobre `slate`** (6498): mide 10.4 px; con `onColor` pasa en claro (6.91) y no en oscuro (1.41).
+    - **Durazno como texto sobre blanco en Perfil:** «Perfil público», «Claro», «+ Nueva» y «CUENTO DEL DÍA» (ver #22).
+    - **Texto blanco sobre el ámbar de `STREAK_PHASES`** (ver #22).
+    - **Trueque no tocado** (`onAccent` sin revisar): `MyPlaces.jsx` 120, 246 y 307; `TruequeMain.jsx` 289, 300 y 347.
+24. **Ideas para después (solo documentadas, no implementadas):** chocan con el rechazo de degradados de `sema-identidad` y requieren la decisión de León antes de diseñarse.
+    - Publicaciones con degradado tipo Fable, de rosa a naranja.
+    - Reseñas con color propio según la calificación o el tono.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 

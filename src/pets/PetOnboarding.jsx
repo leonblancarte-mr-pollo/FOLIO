@@ -67,7 +67,7 @@ function PetOnboarding({ user, onComplete }) {
             className="btn-press"
             style={{
               marginTop: "1.75rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: "pointer",
-              background: BRAND.gradient, color: palette.onAccent,
+              background: BRAND.gradient, color: palette.onColor,
               fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
             }}
           >
@@ -97,7 +97,7 @@ function PetOnboarding({ user, onComplete }) {
               className="btn-press"
               style={{
                 marginTop: "1rem", width: "100%", padding: "1rem", borderRadius: 14, border: "none", cursor: saving ? "default" : "pointer",
-                background: BRAND.gradient, color: palette.onAccent,
+                background: BRAND.gradient, color: palette.onColor,
                 fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.05rem", boxShadow: "0 6px 20px rgba(122,46,46,0.3)",
                 opacity: saving ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
               }}

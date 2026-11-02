@@ -7,6 +7,8 @@ description: Paleta exacta de SEMA (modo claro y oscuro), reglas de contraste y 
 
 Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un color que no está aquí, se detiene el trabajo y se pregunta a León en el reporte.
 
+> **2026-11-02:** León eligió el **durazno** como primario (`accent` `#F79F79` en claro, `#F9B294` en oscuro, texto encima `#483A58`) después de comparar lila, cereza, durazno y azul acero en Inicio (`capturas/home/comparacion-primario-2026-11-02.png`). La cereza `#F45B69` deja de ser la acción principal.
+
 ## 1. Modo claro (principal)
 
 | Rol | Valor | Texto encima | Uso |
@@ -14,9 +16,9 @@ Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un co
 | Fondo | `#FFFFFF` | Tinta | Fondo de toda la app |
 | Tinta | `#483A58` | — | Texto principal, íconos, logo |
 | Texto secundario | `#5E5768` | — | Texto secundario y placeholders |
-| Acción principal | `#F45B69` | `#FFFFFF` en negritas, **mínimo 19 px** (ver §3) | Botón «Leer ahora», progreso, marca |
+| Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora de la pestaña activa. Nunca texto sobre blanco |
 | Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior |
-| Acento cálido | `#F79F79` | `#483A58` | Celebraciones, gemas, segundo sticker |
+| Acento cálido | `#F79F79` | `#483A58` | Celebraciones, gemas, segundo sticker. Desde el 2026-11-02 es el mismo valor que la acción principal: en una pantalla, el durazno relleno es la acción y el cálido solo aparece en detalles chicos |
 | Superficie suave | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del blanco |
 | Complemento frío | `#456990` | — (sirve como texto sobre blanco) | Enlaces, estados informativos, íconos secundarios |
 | Éxito («Leído») | `#5C6B3D` | — | Token actual `success` de `theme.js` |
@@ -29,7 +31,7 @@ Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un co
 | Fondo | `#000000` | Negro puro. Nunca café ni azul tinta |
 | Tinta | `#FFFFFF` | Texto principal |
 | Texto secundario | `#E7D7C1` | Texto secundario y placeholders |
-| Acción principal | `#F45B69` | Con texto `#FFFFFF` |
+| Acción principal | `#F9B294` | Durazno aclarado para negro. Texto encima `#483A58` (5.85:1). Sobre negro también sirve como texto (11.82:1). Se descartó `#F0B9A0` (12.15:1) porque se ve deslavado y beige |
 | Firma | `#BBADFF` | Sobre negro **sí** puede ser texto |
 | Acento cálido | `#F79F79` | |
 | Superficie suave | `#483A58` | Con texto `#FFFFFF` |
@@ -49,8 +51,12 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 |---|---|---|---|
 | `#483A58` tinta | `#FFFFFF` | 10.39 | Pasa todo |
 | `#5E5768` secundario | `#FFFFFF` | 6.91 | Pasa todo |
-| `#FFFFFF` | `#F45B69` acción | **3.21** | **Solo texto grande.** León pidió 18 px en negritas, pero WCAG cuenta texto grande en negritas desde 18.66 px, así que el mínimo es **19 px en negritas** (o 24 px normal). Nunca texto chico blanco sobre coral |
-| `#F45B69` acción como texto | `#FFFFFF` | **3.21** | **No se usa como texto normal sobre blanco.** Sí como relleno de botón, barra de progreso o ícono grande (3:1 de componente) |
+| `#483A58` | `#F79F79` acción (claro) | 5.04 | Pasa todo: es el texto del botón principal |
+| `#483A58` | `#F9B294` acción (oscuro) | 5.85 | Pasa todo |
+| `#F79F79` acción como texto | `#FFFFFF` | **2.06** | **Prohibido como texto.** Como relleno de botón o píldora va con texto `#483A58`; como barra de progreso o ícono no llega a 3:1 sobre blanco, así que necesita borde o un elemento grande al lado |
+| `#FBD4C3` acción suave | `#FFFFFF` | **1.37** | **Prohibido como texto.** Solo fondo (hover, «Leyendo») con texto `#483A58` encima (7.57:1) |
+| `#FFFFFF` | `#F79F79` / `#F9B294` | 2.06 / 1.78 | **Prohibido**: sobre durazno el texto es siempre `#483A58` |
+| `#483A58` | `#7A2E2E` vino de BRAND / `#B03A2E` badge | **1.12 / 1.73** | **Prohibido**: sobre colores oscuros o saturados el texto es `onColor` `#FFFFFF` |
 | `#483A58` | `#BBADFF` firma | 5.21 | Pasa todo |
 | `#483A58` | `#F79F79` cálido | 5.04 | Pasa todo |
 | `#483A58` | `#E7D7C1` superficie | 7.36 | Pasa todo |
@@ -64,7 +70,7 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 | `#E7D7C1` secundario oscuro | `#000000` | 14.89 | Pasa todo |
 | `#BBADFF` firma | `#000000` | 10.53 | Pasa todo |
 | `#F79F79` cálido | `#000000` | 10.19 | Pasa todo |
-| `#F45B69` acción | `#000000` | 6.55 | Pasa todo (en oscuro sí sirve como texto) |
+| `#F9B294` acción oscura | `#000000` | 11.82 | Pasa todo (en oscuro sí sirve como texto) |
 | `#FFFFFF` | `#483A58` superficie oscura | 10.39 | Pasa todo |
 | `#456990` frío | `#000000` | **3.68** | **Solo elementos grandes** (como pide la regla) |
 | `#7A9B5C` éxito oscuro | `#000000` | 6.67 | Pasa todo |
@@ -92,8 +98,8 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 | `ink` | `#483A58` | `#FFFFFF` | Texto principal, íconos, logo |
 | `inkSoft` | `#5E5768` | `#E7D7C1` | Texto secundario |
 | `inkFaint` | `#5E5768` | `#E7D7C1` | Captions, labels, placeholders |
-| `accent` | `#F45B69` | `#F45B69` | Acción principal: botón, progreso, marca. **No es color de links** (en claro no alcanza como texto: usar `complementoFrio`) |
-| `accentSoft` | `#F45B69` | `#F45B69` | Estado «Leyendo», hover de acción |
+| `accent` | `#F79F79` | `#F9B294` | Acción principal (durazno): botón, progreso, píldora activa. **No es texto sobre blanco** (2.06:1; links → `complementoFrio`, títulos y logo → `ink`) |
+| `accentSoft` | `#FBD4C3` | `#FBD4C3` | Estado «Leyendo», hover de acción. Solo fondo, con `onAccent` encima |
 | `amber` | `#F79F79` | `#F79F79` | Gemas, estrellas, celebración (= acento cálido) |
 | `amberRich` | `#F79F79` | `#F79F79` | Estrellas llenas |
 | `amberInk` | `#483A58` | `#F79F79` | Texto que antes iba en ámbar: tinta en claro, cálido en oscuro |
@@ -102,7 +108,8 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 | `sage` | `#5C6B3D` | `#7A9B5C` | «Leídos», éxito suave (= éxito) |
 | `border` | `#E7D7C1` | `#483A58` | Bordes de inputs y tarjetas. Si un input necesita 3:1 para identificarse, usar `inkSoft` |
 | `borderSoft` | `#E7D7C1` | `#483A58` | Divisores |
-| `onAccent` | `#FFFFFF` | `#FFFFFF` | Texto sobre `accent` (negritas, ≥ 19 px) |
+| `onAccent` | `#483A58` | `#483A58` | Texto e íconos sobre `accent` y `accentSoft`, en ambos modos |
+| **`onColor`** *(nuevo 2026-11-02)* | `#FFFFFF` | `#FFFFFF` | Texto e íconos blancos sobre colores oscuros o saturados (degradados de `BRAND`, `badge`, `sage`, avatares, botones de redes). Antes esos usos leían `onAccent`; se migran pantalla por pantalla |
 | `onDark` | `#FFFFFF` | `#FFFFFF` | Texto sobre overlays negros |
 | `onDarkSoft` / `onDarkFaint` / `onDarkMuted` | `#E7D7C1` | `#E7D7C1` | Texto secundario sobre overlays negros |
 | `danger` | `#B03A2E` | `#E5675B` | Error, acción destructiva |

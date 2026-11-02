@@ -16,7 +16,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
 
   if (!pet) return null;
   const isDark = palette.bg === PALETTE_DARK.bg;
-  const onSceneText = palette.onAccent;
+  const onSceneText = palette.onColor;
   const textShadow = "0 2px 8px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3)";
 
   const max = petXpForLevel(pet.level);
@@ -35,7 +35,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
 
   const topBtn = {
     width: 42, height: 42, borderRadius: "50%", border: "none", cursor: "pointer",
-    backgroundColor: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)", color: palette.onAccent,
+    backgroundColor: "rgba(0,0,0,0.28)", backdropFilter: "blur(6px)", color: palette.onColor,
     display: "flex", alignItems: "center", justifyContent: "center",
   };
 
@@ -68,7 +68,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
                 onKeyDown={(e) => { if (e.key === "Enter") saveName(); }}
                 style={{ flex: 1, padding: "0.65rem 0.85rem", borderRadius: 12, border: "none", backgroundColor: "rgba(255,255,255,0.94)", color: BRAND.ink, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", textAlign: "center", outline: "none", minWidth: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}
               />
-              <button onClick={saveName} disabled={savingName} className="btn-press" style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 12, border: "none", background: BRAND.wine, color: palette.onAccent, cursor: "pointer", ...display, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}>
+              <button onClick={saveName} disabled={savingName} className="btn-press" style={{ flexShrink: 0, padding: "0.65rem 0.95rem", borderRadius: 12, border: "none", background: BRAND.wine, color: palette.onColor, cursor: "pointer", ...display, fontWeight: 700, boxShadow: "0 4px 14px rgba(0,0,0,0.2)" }}>
                 {savingName ? "…" : "OK"}
               </button>
             </div>
@@ -108,7 +108,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
 
         {/* Acciones ("Mi perfil" vive solo en la pastilla de arriba; antes estaba duplicado aquí) */}
         <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.5rem", width: "100%", maxWidth: 360, paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
-          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
+          <button onClick={() => showFlash("🖼️ Galería: ¡muy pronto!")} className="btn-press" style={{ flex: 1, padding: "0.85rem", borderRadius: 13, border: "1.5px solid rgba(255,255,255,0.6)", cursor: "pointer", background: "rgba(255,255,255,0.12)", color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem", textShadow }}>
             Ver galería
           </button>
         </div>

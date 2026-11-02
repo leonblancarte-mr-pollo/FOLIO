@@ -84,7 +84,7 @@ import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile,
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
 import { normalizeGenre } from "./services/genreService.js";
-import { localDateStr, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
+import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
 import { fetchQuotes, fetchQuotesForBook, insertQuote, updateQuoteInDB, deleteQuoteFromDB, toggleQuoteFavorite, setQuotePublic } from "./services/quotesService.js";
 import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
 import { logReadingSession, syncPendingLogs } from "./services/readingService.js";
@@ -545,7 +545,7 @@ function QuickRatingModal({ currentRating, onSave, onSkip }) {
 }
 
 const NAV_ITEMS = [
-  { id: "home", label: "Home", icon: Home },
+  { id: "home", label: "Inicio", icon: Home },
   { id: "explorar", label: "Explorar", icon: Compass },
   { id: "mascota", label: "Mascota", icon: PawPrint },
   { id: "social", label: "Social", icon: MessageCircle },
@@ -583,7 +583,7 @@ function SubTabBar({ tabs, active, onChange }) {
             padding: "0.6rem 1.1rem",
             fontSize: "0.88rem",
             fontWeight: active === t.id ? 600 : 400,
-            color: active === t.id ? palette.accent : palette.inkSoft,
+            color: palette.ink,
             backgroundColor: "transparent",
             border: "none",
             borderBottom: `2px solid ${active === t.id ? palette.accent : "transparent"}`,
@@ -601,7 +601,9 @@ function SubTabBar({ tabs, active, onChange }) {
   );
 }
 
-function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, onOpenPet }) {
+function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, onOpenNotifs, gemBalance, onOpenPet, userName = "" }) {
+  // Foto de perfil: el usuario de la app no trae avatar_url, así que va la inicial (decisión pendiente de León).
+  const initial = ((userName || "").trim()[0] || "?").toUpperCase();
   return (
     <header className="sticky top-0 z-10 backdrop-blur-sm" style={{ backgroundColor: palette.bg + "F0", borderBottom: `1px solid ${palette.border}`, paddingTop: "env(safe-area-inset-top)" }}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6" style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -613,26 +615,36 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
             fontSize: "1.6rem",
             lineHeight: 1,
             letterSpacing: "-0.04em",
-            color: palette.bg === PALETTE_DARK.bg ? palette.ink : palette.accent,
+            color: palette.ink,
             userSelect: "none",
           }}
         >sema</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: "4px", ...body, fontSize: "0.9rem", fontWeight: 600, color: palette.amberInk }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+          <span aria-label={(gemBalance ?? 0) === 1 ? "1 gema" : `${gemBalance ?? 0} gemas`} style={{ display: "flex", alignItems: "center", gap: "4px", ...body, fontSize: "0.9rem", fontWeight: 600, color: palette.amberInk, marginRight: "0.25rem" }}>
             <Gem size={16} strokeWidth={1.8} /> {gemBalance ?? 0}
           </span>
           <button
             onClick={onOpenNotifs}
             aria-label="Notificaciones"
             className="bell-btn"
-            style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: "6px", display: "flex", alignItems: "center", justifyContent: "center" }}
+            style={{ position: "relative", background: "none", border: "none", cursor: "pointer", width: 44, height: 44, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
-            <Bell size={22} color={palette.inkSoft} strokeWidth={1.8} />
+            <Bell size={22} color={palette.ink} strokeWidth={1.8} />
             {unreadNotifs > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: "999px", fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", fontFamily: "system-ui, sans-serif" }}>
+              <span style={{ position: "absolute", top: 4, right: 2, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", ...body }}>
                 {unreadNotifs > 9 ? "9+" : unreadNotifs}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setTab("perfil")}
+            aria-label="Mi perfil"
+            className="sema-no-hover btn-press"
+            style={{ background: "none", border: "none", cursor: "pointer", width: 44, height: 44, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <span aria-hidden style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: palette.superficieSuave, color: palette.ink, ...display, fontWeight: 800, fontSize: "1rem", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {initial}
+            </span>
           </button>
         </div>
       </div>
@@ -651,7 +663,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
                 className={active ? undefined : "sema-pill"}
                 style={{
                   display: "flex", alignItems: "center", gap: "0.35rem",
-                  padding: "0.4rem 1rem", borderRadius: "999px",
+                  minHeight: 44, padding: "0.4rem 1rem", borderRadius: "999px",
                   border: `1px solid ${active ? (isAdd ? palette.accent + "55" : palette.accent + "55") : "transparent"}`,
                   backgroundColor: active ? (isAdd ? palette.accent : palette.accent) : "transparent",
                   color: active ? palette.onAccent : palette.inkSoft,
@@ -662,7 +674,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <Icon size={13} strokeWidth={active ? 2.5 : 2} />
                   {badge > 0 && (
-                    <span style={{ position: "absolute", top: -5, right: -7, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: "999px", fontSize: "0.5rem", fontWeight: 700, minWidth: 12, height: 12, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", fontFamily: "system-ui, sans-serif" }}>
+                    <span style={{ position: "absolute", top: -8, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif" }}>
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
@@ -680,10 +692,9 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
 function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }) {
   return (
     <nav
-      className="sm:hidden fixed bottom-0 left-0 right-0 z-20 flex items-center"
+      className="sm:hidden fixed bottom-0 left-0 right-0 z-20 flex items-center sema-nav-rasgado"
       style={{
         backgroundColor: palette.bgCard + "F5",
-        borderTop: `1px solid ${palette.border}`,
         paddingBottom: "env(safe-area-inset-bottom)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
@@ -698,6 +709,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
           <button
             key={t.id}
             data-tutorial={`nav-${t.id}`}
+            aria-label={isCenter ? "Mascota" : undefined}
             onClick={() => { haptic(HAPTIC.NAV); if (isCenter && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
             className={`flex-1 flex flex-col items-center justify-center py-1.5 sema-nav-item${isCenter ? " nav-add-btn" : ""}`}
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
@@ -705,34 +717,33 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
             {isCenter ? (
               <div style={{
                 width: 52, height: 52, borderRadius: "50%",
-                background: BRAND.gradient,
+                backgroundColor: palette.firma,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "0 4px 14px rgba(122, 46, 46, 0.4)",
                 marginBottom: 1, overflow: "hidden",
               }}>
                 {pet ? (
                   <img src={petImageSrc(pet.pet_type)} alt="" className="pet-sprite-img" style={{ width: 42, height: 42, objectFit: "contain", display: "block" }} />
                 ) : (
-                  <PawPrint size={24} color={palette.onAccent} strokeWidth={2.5} />
+                  <PawPrint size={24} color={palette.onFirma} strokeWidth={2.5} />
                 )}
               </div>
             ) : (
               <div className={active ? undefined : "sema-nav-pill"} style={{
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                padding: "5px 8px",
+                padding: "6px 12px",
                 borderRadius: "999px",
-                backgroundColor: active ? `${palette.accent}18` : "transparent",
+                backgroundColor: active ? palette.accent : "transparent",
                 transition: "background-color 200ms ease",
               }}>
                 <span style={{ position: "relative", display: "inline-flex" }}>
-                  <Icon size={21} strokeWidth={active ? 2.2 : 1.8} color={active ? palette.accent : palette.inkFaint} style={{ transition: "color 200ms ease" }} />
+                  <Icon size={21} strokeWidth={active ? 2.2 : 1.8} color={active ? palette.onAccent : palette.ink} style={{ transition: "color 200ms ease" }} />
                   {badge > 0 && (
-                    <span style={{ position: "absolute", top: -4, right: -6, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: "999px", fontSize: "0.5rem", fontWeight: 700, minWidth: 13, height: 13, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 2px", fontFamily: "system-ui, sans-serif" }}>
+                    <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif" }}>
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
                 </span>
-                <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "11px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.accent : palette.inkFaint, transition: "color 200ms ease" }}>{t.label}</span>
+                <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "12px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.onAccent : palette.ink, transition: "color 200ms ease" }}>{t.label}</span>
               </div>
             )}
           </button>
@@ -1381,7 +1392,7 @@ function BookForm({ form, setForm, onReadSelected }) {
                   fontSize: "0.88rem",
                   fontWeight: active ? 600 : 400,
                   backgroundColor: active ? meta.color : "transparent",
-                  color: active ? palette.onAccent : palette.inkSoft,
+                  color: active ? palette.onColor : palette.inkSoft,
                   border: `1px solid ${active ? meta.color : palette.border}`,
                 }}
               >
@@ -2323,7 +2334,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     minWidth: "160px",
     border: selected ? "none" : `1px solid ${palette.border}`,
     backgroundColor: selected ? BRAND.wineDeep : palette.bgSoft,
-    color: selected ? palette.onAccent : palette.ink,
+    color: selected ? palette.onColor : palette.ink,
     fontFamily: "Figtree, system-ui, sans-serif",
     fontSize: "15px",
     fontWeight: 500,
@@ -2872,7 +2883,7 @@ function AchievementCelebration({ achievementKey, onClose, userName, userUsernam
           style={{
             ...display, fontWeight: 600, fontSize: "0.95rem",
             background: BRAND.gradient,
-            color: palette.onAccent, border: "none", borderRadius: "999px",
+            color: palette.onColor, border: "none", borderRadius: "999px",
             padding: "0.75rem 2rem", cursor: "pointer", width: "100%",
             boxShadow: "0 4px 16px rgba(122,46,46,0.35)",
             marginBottom: "0.65rem",
@@ -2964,7 +2975,7 @@ function AchievementDetailModal({ def, unlockedAt, onClose }) {
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0.85rem" }}>
           <div style={{ width: 76, height: 76, borderRadius: "50%", background: isUnlocked ? BRAND.gradient : palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: isUnlocked ? "0 6px 24px rgba(122,46,46,0.3)" : "none" }}>
-            <IconComp size={34} color={isUnlocked ? palette.onAccent : palette.inkFaint} strokeWidth={1.5} />
+            <IconComp size={34} color={isUnlocked ? palette.onColor : palette.inkFaint} strokeWidth={1.5} />
           </div>
           <div>
             <p style={{ ...display, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, lineHeight: 1.2 }}>{def.name}</p>
@@ -3247,7 +3258,7 @@ function ReadingHeatmap({ userId }) {
                     fontSize: "0.78rem",
                     fontWeight: isToday ? 700 : 400,
                     color: bg
-                      ? (darkBg ? palette.onAccent : palette.ink)
+                      ? (darkBg ? palette.onColor : palette.ink)
                       : (isFuture ? palette.border : palette.inkFaint),
                     lineHeight: 1,
                     userSelect: "none",
@@ -3555,12 +3566,12 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
             {profile.avatarUrl ? (
               <img src={profile.avatarUrl} alt="avatar" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
             <div className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: "rgba(42,31,26,0.45)" }}>
-              {uploading ? <Loader2 size={20} color={palette.onAccent} className="animate-spin" /> : <Camera size={18} color={palette.onAccent} />}
+              {uploading ? <Loader2 size={20} color={palette.onColor} className="animate-spin" /> : <Camera size={18} color={palette.onColor} />}
             </div>
           </div>
         </div>
@@ -3569,7 +3580,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         <button
           onClick={() => coverFileInput.current?.click()}
           disabled={uploadingCover}
-          style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: "0.3rem", backgroundColor: "rgba(42,31,26,0.55)", backdropFilter: "blur(6px)", color: palette.onAccent, border: "1px solid rgba(255,255,255,0.25)", borderRadius: "999px", padding: "0.35rem 0.75rem", cursor: "pointer", fontSize: "0.78rem", ...display, fontWeight: 500 }}
+          style={{ position: "absolute", bottom: 10, right: 12, display: "flex", alignItems: "center", gap: "0.3rem", backgroundColor: "rgba(42,31,26,0.55)", backdropFilter: "blur(6px)", color: palette.onColor, border: "1px solid rgba(255,255,255,0.25)", borderRadius: "999px", padding: "0.35rem 0.75rem", cursor: "pointer", fontSize: "0.78rem", ...display, fontWeight: 500 }}
         >
           {uploadingCover ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
           {uploadingCover ? "Subiendo…" : "Cambiar portada"}
@@ -3763,7 +3774,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
             {[
               { label: "Leídos",   value: readBooks.length,    numColor: palette.sage, bg: `${palette.sage}0D` },
-              { label: "Leyendo",  value: readingBooks.length, numColor: palette.accentSoft, bg: `${BRAND.amber}0D` },
+              { label: "Leyendo",  value: readingBooks.length, numColor: palette.ink, bg: `${BRAND.amber}0D` },
               { label: "Por leer", value: wantBooks.length,    numColor: palette.slate, bg: `${palette.slate}0D` },
               { label: "En total", value: books.length,        numColor: palette.ink, bg: palette.bgCard },
             ].map(({ label, value, numColor, bg }) => (
@@ -4533,7 +4544,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
         {avatarUrl ? (
           <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: `3px solid ${color}` }} />
         ) : (
-          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
         )}
         <span style={{ ...display, fontSize: "0.82rem", fontWeight: 600, color: palette.ink }}>{name}</span>
       </div>
@@ -5243,13 +5254,13 @@ function FriendProfileModal({ friend, user, onClose }) {
             {friend.avatar_url ? (
               <img src={friend.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
           </div>
           <button onClick={onClose} style={{ position: "absolute", top: 10, right: 12, backgroundColor: "rgba(42,31,26,0.5)", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" }}>
-            <X size={16} color={palette.onAccent} />
+            <X size={16} color={palette.onColor} />
           </button>
         </div>
 
@@ -5349,7 +5360,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                         <div style={{ position: "absolute", top: -20, right: -20, width: 70, height: 70, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
                         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                           <div>
-                            <div style={{ ...display, fontSize: "2rem", fontWeight: 800, color: palette.onAccent, lineHeight: 1 }}>{value}</div>
+                            <div style={{ ...display, fontSize: "2rem", fontWeight: 800, color: palette.onColor, lineHeight: 1 }}>{value}</div>
                             <div style={{ ...body, fontSize: "0.68rem", color: "rgba(255,255,255,0.75)", marginTop: "0.1rem" }}>días</div>
                           </div>
                           <Flame size={20} color="rgba(255,255,255,0.7)" />
@@ -5656,7 +5667,7 @@ function InviteShareModal({ message, url, onClose }) {
           </span>
           <button
             onClick={copyLink}
-            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.75rem", backgroundColor: copied ? palette.sage : palette.accent, color: palette.onAccent, border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
+            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.3rem 0.75rem", backgroundColor: copied ? palette.sage : palette.accent, color: copied ? palette.onColor : palette.onAccent, border: "none", borderRadius: "999px", cursor: "pointer", flexShrink: 0, transition: "background 0.2s" }}
           >
             {copied ? "¡Copiado! ✓" : "Copiar"}
           </button>
@@ -5668,7 +5679,7 @@ function InviteShareModal({ message, url, onClose }) {
             href={waUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.whatsapp, color: palette.onAccent, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.whatsapp, color: palette.onColor, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
           >
             WhatsApp
           </a>
@@ -5676,7 +5687,7 @@ function InviteShareModal({ message, url, onClose }) {
             href={twUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.x, color: palette.onAccent, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
+            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem", padding: "0.7rem", backgroundColor: SOCIAL_COLORS.x, color: palette.onColor, borderRadius: "12px", textDecoration: "none", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.85rem", fontWeight: 600 }}
           >
             Twitter / X
           </a>
@@ -5845,7 +5856,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
               style={{
                 width: "100%", padding: "0.82rem", borderRadius: "10px",
                 backgroundColor: addedToLibrary ? "transparent" : palette.ink,
-                color: addedToLibrary ? palette.inkFaint : palette.onAccent,
+                color: addedToLibrary ? palette.inkFaint : palette.onColor,
                 border: addedToLibrary ? `1px solid ${palette.border}` : "none",
                 ...body, fontSize: "0.92rem", fontWeight: 600, cursor: addedToLibrary ? "default" : "pointer",
                 marginBottom: "0.5rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem",
@@ -6185,7 +6196,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
           width: size,
           height: size,
           backgroundColor: getAvatarColor(profile.id || profile.nombre),
-          color: palette.onAccent,
+          color: palette.onColor,
           fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
           fontSize: size * 0.35,
           fontWeight: 600,
@@ -6293,7 +6304,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
                       <span style={{ ...body, fontSize: "0.76rem", color: palette.inkFaint, flexShrink: 0 }}>Enviada ✓</span>
                     ) : hasIncoming ? (
                       <button onClick={() => { const row = pending.find((r) => r.user_id === u.id); if (row) acceptRequest(row); }}
-                        style={{ ...display, fontSize: "0.76rem", padding: "0.3rem 0.7rem", backgroundColor: palette.sage, color: palette.onAccent, borderRadius: "20px", fontWeight: 500, flexShrink: 0, border: "none", cursor: "pointer" }}>
+                        style={{ ...display, fontSize: "0.76rem", padding: "0.3rem 0.7rem", backgroundColor: palette.sage, color: palette.onColor, borderRadius: "20px", fontWeight: 500, flexShrink: 0, border: "none", cursor: "pointer" }}>
                         Aceptar
                       </button>
                     ) : (
@@ -6412,7 +6423,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
                         </div>
                         <div style={{ display: "flex", gap: "0.4rem" }}>
                           <button onClick={() => acceptRequest(row)} disabled={!!actionLoading[row.id]}
-                            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.35rem 0.75rem", backgroundColor: palette.sage, color: palette.onAccent, borderRadius: "20px", border: "none", cursor: "pointer", opacity: actionLoading[row.id] ? 0.6 : 1 }}>
+                            style={{ ...display, fontSize: "0.78rem", fontWeight: 600, padding: "0.35rem 0.75rem", backgroundColor: palette.sage, color: palette.onColor, borderRadius: "20px", border: "none", cursor: "pointer", opacity: actionLoading[row.id] ? 0.6 : 1 }}>
                             Aceptar
                           </button>
                           <button onClick={() => rejectRequest(row)} disabled={!!actionLoading[row.id]}
@@ -6484,7 +6495,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.3rem", flexShrink: 0 }}>
                     {tsLabel && <span style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint }}>{tsLabel}</span>}
                     {unread > 0 && (
-                      <span style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: palette.slate, color: palette.onAccent, fontSize: "0.65rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>
+                      <span style={{ width: 18, height: 18, borderRadius: "50%", backgroundColor: palette.slate, color: palette.onColor, fontSize: "0.65rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread}</span>
                     )}
                   </div>
                 </button>
@@ -6543,7 +6554,7 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
             <Users size={18} color={palette.inkSoft} />
             <span style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, fontWeight: 600 }}>Amigos</span>
             {pendingCount > 0 && (
-              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onAccent, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
+              <span style={{ position: "absolute", top: -4, right: -4, backgroundColor: palette.badge, color: palette.onColor, borderRadius: 999, fontSize: "0.55rem", fontWeight: 700, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{pendingCount > 9 ? "9+" : pendingCount}</span>
             )}
           </button>
           {/* Sin campana propia: la del encabezado global abre las mismas notificaciones. */}
@@ -6704,7 +6715,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                   className="sema-row hover-bg-soft"
                   style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 8px", backgroundColor: notif.read ? "transparent" : palette.unreadBg, borderRadius: 10, marginBottom: 4, cursor: "pointer" }}
                 >
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: getAvatarColor(actor.id || actorName), display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: getAvatarColor(actor.id || actorName), display: "flex", alignItems: "center", justifyContent: "center", color: palette.onColor, fontSize: 13, fontWeight: 600, flexShrink: 0, overflow: "hidden" }}>
                     {actor.avatar_url ? (
                       <img src={actor.avatar_url} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} alt="" />
                     ) : initials}
@@ -6926,7 +6937,7 @@ function Avatar({ author, size = 36 }) {
         backgroundColor: getAvatarColor(author?.id || author?.nombre || author?.name || ""),
         display: "flex", alignItems: "center", justifyContent: "center",
         flexShrink: 0, overflow: "hidden",
-        fontSize: size * 0.38, fontWeight: 700, color: palette.onAccent,
+        fontSize: size * 0.38, fontWeight: 700, color: palette.onColor,
         ...display,
       }}
     >
@@ -7409,7 +7420,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           <div style={{ position: "relative", flexShrink: 0 }}>
             <Flame
               size={fireSize}
-              color={palette.onAccent}
+              color={palette.onColor}
               strokeWidth={phase >= 2 ? 1.5 : 2}
               style={{ filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.28))", display: "block" }}
             />
@@ -7432,7 +7443,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
                 <span style={{
                   fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800,
                   fontSize: "clamp(32px, 8vw, 44px)",
-                  color: palette.onAccent, lineHeight: 0.9,
+                  color: palette.onColor, lineHeight: 0.9,
                   textShadow: "0 2px 10px rgba(0,0,0,0.22)",
                   letterSpacing: "-1.5px",
                 }}>
@@ -7476,7 +7487,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             backgroundColor: "rgba(255,255,255,0.18)",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
-            color: palette.onAccent,
+            color: palette.onColor,
             border: "1.5px solid rgba(255,255,255,0.7)",
             borderRadius: "22px",
             padding: "10px 16px",
@@ -7528,7 +7539,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
             </button>
             <button
               onClick={() => { onFreeze?.(); setShowFreezeModal(false); }}
-              style={{ ...body, flex: 1, fontSize: "0.9rem", fontWeight: 700, backgroundColor: palette.freeze, color: palette.onAccent, border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
+              style={{ ...body, flex: 1, fontSize: "0.9rem", fontWeight: 700, backgroundColor: palette.freeze, color: palette.onColor, border: "none", borderRadius: "10px", padding: "0.75rem", cursor: "pointer" }}
             >
               <Snowflake size={14} style={{ marginRight: "0.35rem" }} /> Congelar
             </button>
@@ -8010,7 +8021,7 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
         <button
           onClick={handleShare}
           disabled={sharing || shared}
-          style={{ ...display, width: "100%", padding: "0.9rem", borderRadius: 14, fontSize: "1rem", fontWeight: 700, backgroundColor: shared ? palette.sessionInk : palette.session, color: palette.onAccent, border: "none", cursor: (sharing || shared) ? "default" : "pointer", opacity: sharing ? 0.7 : 1, marginBottom: "0.6rem", transition: "background 0.2s" }}
+          style={{ ...display, width: "100%", padding: "0.9rem", borderRadius: 14, fontSize: "1rem", fontWeight: 700, backgroundColor: shared ? palette.sessionInk : palette.session, color: palette.onColor, border: "none", cursor: (sharing || shared) ? "default" : "pointer", opacity: sharing ? 0.7 : 1, marginBottom: "0.6rem", transition: "background 0.2s" }}
         >
           {shared ? "¡Publicado! ✓" : sharing ? "Compartiendo…" : "Compartir en mi feed"}
         </button>
@@ -8133,7 +8144,7 @@ function SnacksHero({ onRead }) {
           }}
           style={{
             fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.92rem", fontWeight: 700,
-            backgroundColor: palette.accent, color: BRAND.cream,
+            backgroundColor: palette.accent, color: palette.onAccent,
             border: "none", borderRadius: 12, padding: "0.75rem 1.5rem",
             cursor: "pointer", width: "100%",
           }}
@@ -8305,42 +8316,49 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
 
 // ============ HOME (dashboard personalizado) ============
 // Barra de progreso reutilizable por libro (% leído; vino mientras avanza, salvia al terminar)
-function ProgressBarBook({ current = 0, total = 0, height = 6 }) {
+function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
   const has = total > 0;
   const pct = has ? Math.min(100, Math.round((current / total) * 100)) : 0;
+  // Sin total no hay barra vacía: el avance se dice con el número grande (principio 4).
+  if (!has) {
+    return (
+      <p style={{ ...display, fontSize: "24px", fontWeight: 800, lineHeight: 1.1, color: palette.ink }}>
+        {current} <span style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.inkSoft }}>{current === 1 ? "pág. leída" : "págs. leídas"} · no sabemos de cuántas</span>
+      </p>
+    );
+  }
+  // Pista con borde de tinta: el relleno durazno no llega a 3:1 sobre blanco; el contorno sí.
   return (
     <div style={{ width: "100%" }}>
-      <div style={{ height, borderRadius: 999, backgroundColor: palette.border, overflow: "hidden" }}>
-        {has && <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", borderRadius: 999, backgroundColor: pct >= 100 ? palette.sage : palette.accent, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />}
+      <div style={{ height, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, overflow: "hidden" }}>
+        <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", backgroundColor: pct >= 100 ? palette.sage : palette.accent, transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
       </div>
-      <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, marginTop: "0.4rem" }}>
-        {/* Mismo formato siempre; sin total conocido no se inventa porcentaje */}
-        {has ? `${pct}% · ${current} de ${total} páginas` : `${current} ${current === 1 ? "página leída" : "páginas leídas"} · total desconocido`}
-      </p>
+      <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {current} de {total} páginas</p>
     </div>
   );
 }
 
 // Modal motivacional de racha
-function RachaModal({ streak, onClose }) {
+function RachaModal({ streak, paused = false, onClose }) {
   const cur = streak?.current_streak || 0;
   const best = streak?.longest_streak || 0;
   const msg = cur === 0
-    ? "Lee aunque sea 5 minutos hoy y empieza tu racha. El primer día es el más importante."
-    : cur < 3 ? "¡Vas empezando! Los primeros días construyen el hábito."
+    ? "Con 5 minutos arranca. Cualquier día sirve para volver."
+    : paused ? "En pausa, no rota. Cualquier día sirve para volver."
+    : cur < 3 ? "Ya arrancó. Lo pequeño también cuenta."
     : cur < 7 ? "Buen ritmo. Una semana está a la vuelta de la esquina."
-    : cur < 30 ? "Eres constante. Esto ya es parte de quién eres."
-    : "Lector de élite. Tu disciplina es tu superpoder.";
+    : cur < 30 ? "Una semana o más leyendo. Ya es costumbre."
+    : "Más de un mes leyendo. Eso ya se presume.";
   return (
     <div className="fixed inset-0 z-[57] flex items-end sm:items-center justify-center sm:p-4" style={{ backgroundColor: "rgba(42,31,26,0.6)", animation: "backdropIn 180ms ease-out" }} onClick={onClose}>
-      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ background: BRAND.gradient, padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
-        <Flame size={48} color={BRAND.cream} style={{ margin: "0 auto" }} className={cur > 7 ? "fire-pulse" : ""} />
-        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 800, fontSize: "3rem", color: palette.onAccent, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
-        <p style={{ ...display, fontSize: "1rem", color: "rgba(255,255,255,0.9)", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</p>
-        <p style={{ ...body, fontSize: "0.8rem", color: "rgba(255,255,255,0.7)", marginTop: "0.3rem" }}>Mejor racha: {best} {best === 1 ? "día" : "días"}</p>
-        <p style={{ ...body, fontSize: "0.92rem", color: palette.onAccent, lineHeight: 1.4, marginTop: "1.25rem" }}>{msg}</p>
-        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", padding: "0.85rem", borderRadius: 12, border: "none", cursor: "pointer", background: "rgba(255,255,255,0.95)", color: BRAND.wine, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "0.95rem" }}>
-          ¡A leer!
+      <div className="w-full max-w-sm rounded-t-2xl sm:rounded-2xl" style={{ backgroundColor: palette.bg, border: `1px solid ${palette.border}`, padding: "2rem 1.5rem", textAlign: "center", animation: "slideUp 300ms cubic-bezier(0.32,0.72,0,1)" }} onClick={(e) => e.stopPropagation()}>
+        <Flame size={44} color={palette.ink} strokeWidth={1.8} style={{ margin: "0 auto" }} className={cur > 7 && !paused ? "fire-pulse" : ""} />
+        <p style={{ ...display, fontWeight: 800, fontSize: "3rem", color: palette.ink, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
+        <p style={{ ...display, fontSize: "1rem", color: palette.ink, fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}{paused ? " · en pausa" : ""}</p>
+        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>Récord: {best} {best === 1 ? "día" : "días"}</p>
+        <p style={{ ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.45, marginTop: "1.25rem" }}>{msg}</p>
+        <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", minHeight: 48, padding: "0.85rem", borderRadius: 12, border: `1.5px solid ${palette.ink}`, cursor: "pointer", backgroundColor: "transparent", color: palette.ink, ...display, fontWeight: 700, fontSize: "0.95rem" }}>
+          Listo
         </button>
       </div>
     </div>
@@ -8361,7 +8379,7 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
               {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={20} color={palette.inkFaint} />}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "0.72rem", color: palette.accent, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
+              <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
               <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{primary.author}</p>
             </div>
@@ -8369,11 +8387,11 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
         )}
         {cuento && (
           <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.border}`, backgroundColor: palette.bgCard, display: "flex", alignItems: "center", gap: "0.85rem" }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, background: BRAND.gradient, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Sparkles size={20} color={palette.onAccent} />
+            <div style={{ width: 44, height: 44, borderRadius: 12, flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Sparkles size={20} color={palette.ink} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "0.72rem", color: palette.amber, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
+              <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
               <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{cuento.autor}</p>
             </div>
@@ -8407,7 +8425,11 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const [progressNonce, setProgressNonce] = useState(0);
   const [filledPages, setFilledPages] = useState({});
 
-  const firstName = (user.name || "").trim().split(" ")[0] || "lector";
+  // Saludo: si el nombre llega como correo o handle («leon.blancarte+prueba») se corta en @ . +
+  // y se capitaliza. Sin nombre, solo el saludo. No se tocan datos: es el mismo user.name.
+  const rawName = (user.name || "").trim().split(/\s+/)[0] || "";
+  const cutName = rawName.split(/[@+.]/)[0];
+  const firstName = cutName && cutName !== rawName ? cutName[0].toUpperCase() + cutName.slice(1) : cutName;
   const h = new Date().getHours();
   const timeOfDay = (h >= 6 && h < 12) ? { text: "Buenos días", Icon: Sun }
     : (h >= 12 && h < 18) ? { text: "Buenas tardes", Icon: CloudSun }
@@ -8417,6 +8439,18 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const cuento = getCuentoDelDia();
   const cur = streak?.current_streak || 0;
   const best = streak?.longest_streak || 0;
+  const isDarkMode = palette.bg === PALETTE_DARK.bg;
+  // Voz del gato (existencialista, sema-voz). Hoy todas las mascotas nuevas son gato.
+  const petLine = cur > 0 ? "Sin prisa. Los libros, a diferencia de todo, se quedan." : "Nada tiene mucho sentido. Una página, quizá sí.";
+  // Racha en pausa: mismo criterio que checkStreakOnLoad (streakService) sobre la fila que
+  // ya trae Home — más de un día sin leer y sin protector usado ayer. Solo se lee, no se escribe.
+  const streakPaused = (() => {
+    if (cur === 0 || !streak?.last_log_date) return false;
+    const diff = daysBetweenLocalDates(localDateStr(), streak.last_log_date);
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    const freezeProtected = diff === 2 && streak.streak_freeze_used_at === localDateStr(y);
+    return diff > 1 && !freezeProtected;
+  })();
 
   useEffect(() => {
     if (!isOnline) return;
@@ -8464,46 +8498,72 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
 
   // Principio 8: los primeros días solo lo mínimo; "Descubre" aparece con 3+ libros.
   const showDiscover = books.length >= 3;
-  const primaryBtn = { width: "100%", padding: "1.1rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: palette.onAccent, ...display, fontWeight: 700, fontSize: "1.15rem" };
-  const quietRow = { width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: sp.sm };
+  const primaryBtn = { width: "100%", minHeight: 56, padding: "1.1rem", borderRadius: 16, border: "none", cursor: "pointer", background: palette.accent, color: palette.onAccent, ...display, fontWeight: 700, fontSize: "1.15rem" };
+  const quietRow = { width: "100%", minHeight: 44, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: sp.sm };
+  const dayWord = (n) => (n === 1 ? "día" : "días");
 
   return (
     <div style={{ padding: `${sp.lg} 1.25rem ${sp.xxl}`, maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: sp.xl }}>
-      <h1 style={{ ...ts.h1, color: palette.ink, display: "flex", alignItems: "center", gap: sp.xs }}>
-        <timeOfDay.Icon size={24} color={palette.amber} strokeWidth={1.8} />
-        {timeOfDay.text}, {firstName}
+      {/* Saludo grande en Bricolage; el nombre en su propia línea para que no se parta raro */}
+      <h1 style={{ ...display, fontSize: "32px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", color: palette.ink, overflowWrap: "anywhere" }}>
+        {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
       </h1>
 
-      {/* Progreso siempre visible: racha como texto, sin caja */}
-      <button onClick={() => setRachaOpen(true)} className="sema-no-hover" style={{ ...quietRow, gap: sp.md }}>
-        <Flame size={40} strokeWidth={1.6} color={cur > 0 ? palette.accent : palette.inkFaint} className={cur > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
-        {cur > 0 ? (
-          <div>
-            <p style={{ ...display, fontWeight: 800, fontSize: "2.4rem", color: palette.ink, lineHeight: 1 }}>{cur} <span style={{ fontSize: "1rem", fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}</span></p>
-            <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Tu mejor: {best} {best === 1 ? "día" : "días"}</p>
-          </div>
-        ) : (
-          <div>
-            <p style={{ ...display, fontWeight: 700, fontSize: "1.3rem", color: palette.ink, lineHeight: 1.15 }}>Empieza tu racha hoy</p>
-            <p style={{ ...ts.caption, marginTop: "0.25rem" }}>Con 5 minutos cuenta. Slow motion {">"} no motion.</p>
-          </div>
-        )}
+      {/* Progreso siempre visible: la racha es un sticker lila con textura de papel */}
+      <button
+        onClick={() => setRachaOpen(true)}
+        className="btn-press sema-no-hover sema-papel sema-sticker"
+        aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
+        style={{
+          alignSelf: "flex-start", maxWidth: "100%", minHeight: 44, textAlign: "left", cursor: "pointer",
+          backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
+          // Canto de sticker recortado: filo del color de fondo + línea de tinta (sin desenfoque).
+          border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
+          padding: "0.9rem 1.15rem 1rem", display: "flex", alignItems: "center", gap: sp.md,
+        }}
+      >
+        <Flame size={34} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
+        <div style={{ minWidth: 0 }}>
+          <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
+            {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}</span>
+          </p>
+          <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.35rem" }}>
+            {cur === 0
+              ? "Con 5 minutos arranca."
+              : streakPaused
+                ? "En pausa, no rota. Cualquier día sirve para volver."
+                : `Récord: ${best} ${dayWord(best)}`}
+          </p>
+        </div>
       </button>
+
+      {/* La mascota habla pegada al sticker: pequeña, nunca ocupa la pantalla (principio 6) */}
+      {pet && (
+        <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.sm }}>
+          <span style={{ flexShrink: 0, display: "inline-flex", filter: isDarkMode ? `drop-shadow(0 0 1px ${palette.firma}) drop-shadow(0 0 1px ${palette.firma})` : "none" }}>
+            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={48} showShadow={false} />
+          </span>
+          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.3, color: palette.ink, minWidth: 0 }}>«{petLine}»</p>
+        </button>
+      )}
 
       {/* Única acción principal */}
       <button onClick={() => setLeerOpen(true)} className="btn-press" style={primaryBtn}>Leer ahora</button>
 
       {readingBooks.length > 0 && (
         <section>
-          <h2 style={{ ...ts.h2, marginBottom: sp.md }}>Seguir leyendo</h2>
+          <h2 style={{ ...ts.h2, color: palette.ink, marginBottom: sp.md }}>Seguir leyendo</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: sp.lg }}>
             {readingBooks.slice(0, 3).map((b) => (
-              <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-no-hover" style={{ ...quietRow, alignItems: "flex-start", gap: sp.md }}>
-                <div style={{ width: 52, height: 76, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.bgSoft, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {b.coverUrl ? <img src={b.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BookOpen size={22} color={palette.inkFaint} />}
+              <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-no-hover" style={{ ...quietRow, alignItems: "center", gap: sp.md }}>
+                {/* Portada a la izquierda: BookCoverImage si hay URL; sin URL, el título como lomo sobre superficie */}
+                <div style={{ position: "relative", width: 60, height: 90, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.4rem 0.3rem" }}>
+                  {b.coverUrl
+                    ? <BookCoverImage coverUrl={b.coverUrl} title={b.title} author={b.author} compact />
+                    : <span aria-hidden lang="es" style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.02em", color: palette.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "normal", wordBreak: "normal", hyphens: "none" }}>{b.title}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ ...ts.h3, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.title}</p>
+                  <p style={{ ...display, fontSize: "18px", fontWeight: 700, lineHeight: 1.2, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{b.title}</p>
                   <p style={{ ...ts.caption, marginBottom: sp.xs }}>{b.author}</p>
                   <ProgressBarBook current={bookProgress[b.id] || 0} total={b.totalPages || filledPages[b.id] || 0} />
                 </div>
@@ -8513,23 +8573,11 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         </section>
       )}
 
-      {/* La mascota guía los avisos */}
-      {pet && (
-        <button onClick={onOpenPet} className="btn-press sema-no-hover" style={quietRow}>
-          <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={56} showShadow={false} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ ...ts.h3, color: palette.ink }}>{pet.pet_name} · nivel {pet.level}</p>
-            <p style={ts.caption}>{cur > 0 ? "Te espera tu libro, sin prisa." : "Hoy toca una página, aunque sea una."}</p>
-          </div>
-          <ChevronRight size={20} color={palette.inkFaint} style={{ flexShrink: 0 }} />
-        </button>
-      )}
-
       {showDiscover && (
         <section>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: sp.md }}>
             <h2 style={ts.h2}>Descubre tu siguiente</h2>
-            <button onClick={() => setTab("explorar")} className="sema-no-hover" style={{ background: "none", border: "none", cursor: "pointer", ...body, fontSize: "0.88rem", color: palette.accent, fontWeight: 600 }}>Ver más</button>
+            <button onClick={() => setTab("explorar")} className="sema-no-hover" style={{ background: "none", border: "none", cursor: "pointer", minHeight: 44, padding: "0 0.25rem", ...body, fontSize: "0.88rem", color: palette.ink, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3 }}>Ver más</button>
           </div>
           {wantBooks.length > 0 ? (
             <div className="scrollbar-hide" style={{ display: "flex", gap: sp.md, overflowX: "auto", paddingBottom: "0.25rem" }}>
@@ -8543,14 +8591,14 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
             </div>
           ) : (
             <button onClick={() => setTab("explorar")} className="sema-no-hover" style={quietRow}>
-              <Compass size={24} color={palette.accent} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+              <Compass size={24} color={palette.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
               <p style={ts.caption}>Recomendaciones hechas con tus libros.</p>
             </button>
           )}
         </section>
       )}
 
-      {rachaOpen && <RachaModal streak={streak} onClose={() => setRachaOpen(false)} />}
+      {rachaOpen && <RachaModal streak={streak} paused={streakPaused} onClose={() => setRachaOpen(false)} />}
       {leerOpen && (
         <LeerAhoraModal
           booksReading={readingBooks}
@@ -8951,7 +8999,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             </button>
             <button
               onClick={requestNotifPermission}
-              style={{ ...body, fontSize: "0.82rem", fontWeight: 700, backgroundColor: palette.ink, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.45rem 1rem", cursor: "pointer" }}
+              style={{ ...body, fontSize: "0.82rem", fontWeight: 700, backgroundColor: palette.ink, color: palette.onColor, border: "none", borderRadius: "8px", padding: "0.45rem 1rem", cursor: "pointer" }}
             >
               Activar notificaciones
             </button>
@@ -9009,7 +9057,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", display: "block" }} alt="" />
                     ) : (
-                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onAccent, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 16, fontWeight: 600 }}>
+                      <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id), color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 16, fontWeight: 600 }}>
                         {(friend.nombre || "?").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                     )}
@@ -9112,7 +9160,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 <img src={postImagePreview} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, display: "block" }} />
                 <button
                   onClick={() => { setPostImageFile(null); setPostImagePreview(null); }}
-                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", backgroundColor: palette.ink, color: palette.onAccent, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}
+                  style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", backgroundColor: palette.ink, color: palette.onColor, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, lineHeight: 1 }}
                 >
                   ✕
                 </button>
@@ -9161,7 +9209,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           <p style={{ marginBottom: "0.75rem" }}>⚠️ {feedError || "No se pudo cargar el feed."}</p>
           <button
             onClick={() => { setFeedState('loading'); loadFeed(); }}
-            style={{ backgroundColor: palette.dangerInk, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", ...body, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
+            style={{ backgroundColor: palette.dangerInk, color: palette.onColor, border: "none", borderRadius: "8px", padding: "0.5rem 1.25rem", ...body, fontSize: "0.85rem", fontWeight: 600, cursor: "pointer" }}
           >
             Reintentar
           </button>
@@ -9577,7 +9625,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         >
           <button
             onClick={() => setLightboxImage(null)}
-            style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.onAccent }}
+            style={{ position: "absolute", top: 16, right: 16, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: "50%", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: palette.onColor }}
           >
             <X size={18} />
           </button>
@@ -9632,7 +9680,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                 disabled={deleting}
                 style={{
                   width: "100%", padding: "0.85rem", borderRadius: 12,
-                  backgroundColor: palette.danger, color: palette.onAccent,
+                  backgroundColor: palette.danger, color: palette.onColor,
                   border: "none", cursor: deleting ? "default" : "pointer",
                   ...display, fontSize: "0.97rem", fontWeight: 600,
                   opacity: deleting ? 0.7 : 1,
@@ -9907,7 +9955,7 @@ function SaveQuoteModal({ books, userId, onClose, onSaved, defaultBookId }) {
               </div>
             </div>
             <div style={{ width: 38, height: 22, borderRadius: "999px", backgroundColor: shareToFeed ? palette.accent : palette.border, position: "relative", transition: "background-color 200ms ease", flexShrink: 0 }}>
-              <div style={{ position: "absolute", top: 3, left: shareToFeed ? 19 : 3, width: 16, height: 16, borderRadius: "50%", backgroundColor: palette.onAccent, boxShadow: "0 1px 4px rgba(0,0,0,0.25)", transition: "left 200ms ease" }} />
+              <div style={{ position: "absolute", top: 3, left: shareToFeed ? 19 : 3, width: 16, height: 16, borderRadius: "50%", backgroundColor: palette.onColor, boxShadow: "0 1px 4px rgba(0,0,0,0.25)", transition: "left 200ms ease" }} />
             </div>
           </button>
 
@@ -10044,7 +10092,7 @@ function QuoteShareModal({ quote, onClose }) {
             {generating ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={16} />}
             {shared ? "¡Listo!" : generating ? "Generando..." : "Compartir imagen"}
           </button>
-          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onAccent, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" }}>
+          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onColor, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" }}>
             Cerrar
           </button>
         </div>
@@ -10188,7 +10236,7 @@ function QuoteDetailModal({ quote: initialQuote, books, userId, onClose, onUpdat
                 <button onClick={() => setShowDeleteConfirm(false)} style={{ flex: 1, ...body, fontSize: "0.88rem", backgroundColor: palette.bgCard, color: palette.inkSoft, border: `1px solid ${palette.border}`, borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
                   Cancelar
                 </button>
-                <button onClick={onDelete} style={{ flex: 1, ...body, fontSize: "0.88rem", fontWeight: 600, backgroundColor: palette.danger, color: palette.onAccent, border: "none", borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
+                <button onClick={onDelete} style={{ flex: 1, ...body, fontSize: "0.88rem", fontWeight: 600, backgroundColor: palette.danger, color: palette.onColor, border: "none", borderRadius: "8px", padding: "0.5rem", cursor: "pointer" }}>
                   Eliminar
                 </button>
               </div>
@@ -12230,7 +12278,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           </span>
         </div>
       )}
-      <AppHeader tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
+      <AppHeader userName={user.name} tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
       <main className="max-w-4xl mx-auto fade-in main-fab-clearance" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
         {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
@@ -12250,13 +12298,13 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           style={{
             position: "fixed", right: 18, zIndex: 35,
             bottom: "calc(env(safe-area-inset-bottom) + 80px)",
-            width: 58, height: 58, borderRadius: "50%", border: "none", cursor: "pointer",
-            background: BRAND.gradientFab,
-            boxShadow: "0 6px 20px rgba(122,46,46,0.45)",
+            width: 58, height: 58, borderRadius: "50%", cursor: "pointer",
+            backgroundColor: palette.bg,
+            border: `2px solid ${palette.ink}`,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          <Plus size={26} color={palette.onAccent} strokeWidth={2.6} />
+          <Plus size={26} color={palette.ink} strokeWidth={2.4} />
         </button>
       )}
       {notifsSheetOpen && (
@@ -13014,7 +13062,7 @@ function OnboardingStep4({ user, addedFriend, setAddedFriend, onBack, onComplete
               <div key={u.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", backgroundColor: palette.bgCard, borderRadius: 12, border: `1px solid ${palette.borderSoft}` }}>
                 {u.avatar_url
                   ? <img src={u.avatar_url} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                  : <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: getAvatarColor(u.id || u.nombre), display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: "1rem", color: palette.onAccent, flexShrink: 0 }}>{initials}</div>
+                  : <div style={{ width: 42, height: 42, borderRadius: "50%", backgroundColor: getAvatarColor(u.id || u.nombre), display: "flex", alignItems: "center", justifyContent: "center", ...display, fontSize: "1rem", color: palette.onColor, flexShrink: 0 }}>{initials}</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.nombre}</p>
@@ -13226,7 +13274,7 @@ class ErrorBoundary extends Component {
           ) : (
             <p style={{ marginBottom: 16, fontSize: 14, color: palette.inkSoft }}>Intenta recargar la página. Si el problema continúa, vuelve a intentarlo en unos minutos.</p>
           )}
-          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: BRAND.wine, color: palette.onAccent, cursor: 'pointer', fontSize: 15 }}>
+          <button onClick={() => window.location.reload()} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', backgroundColor: BRAND.wine, color: palette.onColor, cursor: 'pointer', fontSize: 15 }}>
             Recargar
           </button>
         </div>
