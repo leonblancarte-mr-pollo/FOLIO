@@ -1,155 +1,122 @@
 import { useState, useEffect, useRef } from "react";
+import { palette, SEMA_COVER_COMBOS, FONT_DISPLAY, FONT_UI } from "../theme.js";
 
 /**
  * Portada de libro con tres estados:
  *  - cargando: skeleton con shimmer
  *  - cargada: la imagen real (fade-in)
- *  - fallback: composición editorial por género (gradiente + emoji + título serif)
+ *  - fallback: portada genérica SEMA (GenericCover)
  *
  * Llena el contenedor padre (position:absolute inset:0), pensado para usarse
  * dentro de un wrapper con position:relative y overflow:hidden.
+ *
+ * Portada genérica (2026-11-02): composición de editorial independiente / flyer, sin emojis
+ * ni degradados. Bloque de color plano arriba con el título (Bricolage) y el autor (Figtree),
+ * franja plana abajo y un motivo geométrico SVG en la parte baja del bloque. Combinación y
+ * motivo salen de un hash del título + autor: el mismo libro siempre se ve igual y dos
+ * libros distintos casi nunca coinciden. Colores: SEMA_COVER_COMBOS (theme.js).
  */
 
-const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
-const body = { fontFamily: "Figtree, system-ui, sans-serif" };
+// Alto de la franja inferior, en % de la portada. BookTinder pone su texto encima.
+export const GENERIC_BAND_PCT = 38;
 
-// Gradiente + emoji por género principal. Tonos oscuros y cinemáticos
-// para que el texto blanco de la card siempre contraste.
-const GENRE_STYLES = [
-  { match: /ciencia ficción|sci.?fi|cyberpunk|space/i, gradient: "linear-gradient(155deg, #06121F 0%, #0E3350 48%, #2E7EA6 100%)", emoji: "🚀", accent: "#7FD4F5" },
-  { match: /fantas/i,                                  gradient: "linear-gradient(155deg, #170B2B 0%, #3A1D62 48%, #8A4BBF 100%)", emoji: "🐉", accent: "#D9B8F5" },
-  { match: /horror|terror/i,                           gradient: "linear-gradient(155deg, #0A0505 0%, #300B0B 52%, #6B1414 100%)", emoji: "🕯️", accent: "#E8A9A9" },
-  { match: /misterio/i,                                gradient: "linear-gradient(155deg, #10131A 0%, #2A3140 52%, #4E5A70 100%)", emoji: "🔍", accent: "#B9C4D6" },
-  { match: /thriller/i,                                gradient: "linear-gradient(155deg, #14100A 0%, #33260F 50%, #705617 100%)", emoji: "🗝️", accent: "#E3C77C" },
-  { match: /roman/i,                                   gradient: "linear-gradient(155deg, #26090F 0%, #571B2E 50%, #A6485F 100%)", emoji: "🌹", accent: "#F2B8C6" },
-  { match: /filosof/i,                                 gradient: "linear-gradient(155deg, #0D1408 0%, #29391A 52%, #5C7A3D 100%)", emoji: "🧠", accent: "#CBDCA8" },
-  { match: /historia/i,                                gradient: "linear-gradient(155deg, #140C05 0%, #3D2712 50%, #8A5A2B 100%)", emoji: "📜", accent: "#E5C79A" },
-  { match: /biograf/i,                                 gradient: "linear-gradient(155deg, #0E0D0B 0%, #33302A 52%, #6E6753 100%)", emoji: "🖋️", accent: "#D8D0BC" },
-  { match: /clásic/i,                                  gradient: "linear-gradient(155deg, #120E05 0%, #3B2F10 50%, #806822 100%)", emoji: "🏛️", accent: "#E8D9A0" },
-  { match: /contemporánea|drama|ficción/i,             gradient: "linear-gradient(155deg, #0A1210 0%, #1F3833 52%, #47736A 100%)", emoji: "🌆", accent: "#AFD6CC" },
-  { match: /aventura/i,                                gradient: "linear-gradient(155deg, #071408 0%, #1B3D1E 50%, #4F7D35 100%)", emoji: "🧭", accent: "#BFE0A3" },
-  { match: /educaci|ciencia$|psicolog/i,               gradient: "linear-gradient(155deg, #081018 0%, #16324A 52%, #3A6E8F 100%)", emoji: "💡", accent: "#A9D4EC" },
-  { match: /poesía/i,                                  gradient: "linear-gradient(155deg, #150F1F 0%, #3C2B52 50%, #7E6099 100%)", emoji: "🕊️", accent: "#D6C6E8" },
-  { match: /realismo mágico/i,                         gradient: "linear-gradient(155deg, #1A0D06 0%, #4A2410 46%, #96541F 78%, #C98A3B 100%)", emoji: "🦋", accent: "#F2CC94" },
-  { match: /distop/i,                                  gradient: "linear-gradient(155deg, #140B05 0%, #402612 50%, #8C4A17 100%)", emoji: "👁️", accent: "#E8B37E" },
-];
-const DEFAULT_STYLE = { gradient: "linear-gradient(155deg, #180A08 0%, #3D1510 50%, #7A2E2E 100%)", emoji: "📚", accent: "#E5B8B8" };
+function hashString(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
 
-export function getGenreStyle(genres = []) {
-  for (const g of genres) {
-    const hit = GENRE_STYLES.find((s) => s.match.test(g || ""));
-    if (hit) return hit;
+/** Combinación de color de la portada genérica de un libro (determinista). */
+export function genericCoverScheme(title = "", author = "") {
+  const h = hashString(`${title}::${author}`);
+  return { ...SEMA_COVER_COMBOS[h % SEMA_COVER_COMBOS.length], motif: Math.floor(h / 7) % 7 };
+}
+
+// Motivos en un lienzo de 100 × 140 (proporción de libro). El bloque superior termina en y≈87;
+// los motivos viven entre y=54 y y=87 para no quedar debajo del título.
+function Motif({ kind, color }) {
+  switch (kind) {
+    case 0: // sol que asoma sobre la franja
+      return <circle cx="72" cy="87" r="24" fill={color} />;
+    case 1: // franjas de flyer
+      return <g fill={color}>{[0, 1, 2, 3].map((i) => <rect key={i} x="38" y={60 + i * 7} width="62" height="3.5" />)}</g>;
+    case 2: // cuarto de círculo en la esquina
+      return <path d="M100 87 V47 A40 40 0 0 0 60 87 Z" fill={color} />;
+    case 3: // triángulo
+      return <polygon points="46,87 70,57 94,87" fill={color} />;
+    case 4: // retícula de puntos
+      return (
+        <g fill={color}>
+          {[0, 1, 2].map((r) => [0, 1, 2, 3, 4].map((c) => (
+            <circle key={`${r}-${c}`} cx={56 + c * 9} cy={64 + r * 9} r="2.4" />
+          )))}
+        </g>
+      );
+    case 5: // aro
+      return <circle cx="76" cy="70" r="12" fill="none" stroke={color} strokeWidth="5" />;
+    default: // dos bloques desplazados
+      return (
+        <g fill={color}>
+          <rect x="58" y="60" width="30" height="27" />
+          <rect x="50" y="54" width="14" height="14" />
+        </g>
+      );
   }
-  return DEFAULT_STYLE;
 }
 
-function Shimmer() {
+export function GenericCover({ title, author, compact = false, label = "" }) {
+  const s = genericCoverScheme(title || "", author || "");
   return (
-    <div
-      aria-hidden
-      style={{
-        position: "absolute", inset: 0,
-        background: "linear-gradient(155deg, #E8DFD0 0%, #DDD2BE 100%)",
-        overflow: "hidden",
-      }}
-    >
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.55) 50%, transparent 70%)",
-        animation: "coverShimmer 1.4s ease-in-out infinite",
-      }} />
-      <span style={{
-        position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
-        fontSize: "2.2rem", opacity: 0.22,
-      }}>📖</span>
-      <style>{`@keyframes coverShimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }`}</style>
-    </div>
-  );
-}
+    // containerType: el texto se mide contra el ancho de LA PORTADA (cqw), no de la pantalla.
+    <div {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })} style={{ position: "absolute", inset: 0, backgroundColor: s.field, overflow: "hidden", containerType: "inline-size" }}>
+      <svg viewBox="0 0 100 140" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}>
+        <Motif kind={s.motif} color={s.mark} />
+      </svg>
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${GENERIC_BAND_PCT}%`, backgroundColor: s.band }} />
 
-function Fallback({ title, author, genres, compact }) {
-  const { gradient, emoji, accent } = getGenreStyle(genres);
-  return (
-    // containerType: el texto se mide contra el ancho de LA PORTADA (cqw), no de la
-    // pantalla (vw). Antes, en tarjetas de 130 px (Explorar › Recomendado para ti)
-    // el título partía palabras ("Fundaci/ón") y el autor quedaba cortado abajo.
-    <div style={{ position: "absolute", inset: 0, background: gradient, overflow: "hidden", containerType: "inline-size" }}>
-      {/* Detalle geométrico: doble marco editorial */}
       {!compact && (
-        <>
-          <div style={{
-            position: "absolute", inset: 14,
-            border: "1px solid rgba(255,255,255,0.22)",
-            borderRadius: 6, pointerEvents: "none",
-          }} />
-          <div style={{
-            position: "absolute", inset: 20,
-            border: "1px solid rgba(255,255,255,0.10)",
-            borderRadius: 3, pointerEvents: "none",
-          }} />
-        </>
-      )}
-
-      {/* Emoji grande semi-transparente */}
-      <span style={{
-        position: "absolute",
-        top: compact ? "50%" : "26%",
-        left: "50%",
-        transform: "translate(-50%,-50%)",
-        fontSize: compact ? "1.6rem" : "clamp(4rem, 14vw, 6.5rem)",
-        opacity: 0.85,
-        filter: "drop-shadow(0 6px 18px rgba(0,0,0,0.45))",
-        lineHeight: 1,
-      }}>
-        {emoji}
-      </span>
-
-      {/* Inicial gigante de fondo */}
-      {!compact && (
-        <span aria-hidden style={{
-          ...serif, position: "absolute", bottom: "8%", right: "6%",
-          fontSize: "7rem", fontWeight: 700, fontStyle: "italic",
-          color: "rgba(255,255,255,0.07)", lineHeight: 1, userSelect: "none",
-        }}>
-          {(title || "?").trim()[0]?.toUpperCase()}
-        </span>
-      )}
-
-      {/* Título + autor */}
-      {!compact && (
-        <div style={{
-          position: "absolute", left: 0, right: 0, top: "44%",
-          padding: "0 9cqw", textAlign: "center",
-        }}>
-          <div style={{ width: 36, height: 1, backgroundColor: accent, opacity: 0.7, margin: "0 auto 0.9rem" }} />
-          <h3 style={{
-            ...serif, fontSize: "clamp(0.8rem, 4.6cqw, 1.45rem)", fontWeight: 700,
-            color: "#FDFAF3", lineHeight: 1.22, margin: 0,
-            textShadow: "0 2px 12px rgba(0,0,0,0.45)",
-            overflowWrap: "normal", wordBreak: "normal",
-            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+        <div style={{ position: "absolute", top: "9cqw", left: "8cqw", right: "8cqw" }}>
+          <div style={{ width: "10cqw", height: 3, backgroundColor: s.fieldInk, marginBottom: "4cqw" }} />
+          <p style={{
+            fontFamily: FONT_DISPLAY, fontWeight: 800, color: s.fieldInk,
+            fontSize: "clamp(12px, 9cqw, 34px)", lineHeight: 1.05, letterSpacing: "-0.02em",
+            margin: 0, overflowWrap: "normal", wordBreak: "normal",
+            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
           }}>
             {title}
-          </h3>
-          <p style={{
-            ...body, fontSize: "clamp(0.68rem, 4.4cqw, 0.95rem)", color: "rgba(255,255,255,0.72)",
-            margin: "0.55rem 0 0", letterSpacing: "0.04em",
-            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          }}>
-            {author}
           </p>
-          <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: "0.9rem" }}>
-            {[0, 1, 2].map((i) => (
-              <span key={i} style={{ width: 4, height: 4, borderRadius: "50%", backgroundColor: accent, opacity: 0.55 }} />
-            ))}
-          </div>
+          {author && (
+            <p style={{
+              fontFamily: FONT_UI, fontWeight: 600, color: s.fieldInk,
+              fontSize: "clamp(12px, 4.6cqw, 16px)", lineHeight: 1.3,
+              margin: "3cqw 0 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            }}>
+              {author}
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
+function Shimmer() {
+  return (
+    <div aria-hidden style={{ position: "absolute", inset: 0, backgroundColor: palette.border, overflow: "hidden" }}>
+      <div style={{
+        position: "absolute", inset: 0,
+        background: `linear-gradient(100deg, transparent 30%, ${palette.bg} 50%, transparent 70%)`,
+        opacity: 0.55,
+        animation: "coverShimmer 1.4s ease-in-out infinite",
+      }} />
+      <style>{`@keyframes coverShimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }`}</style>
+    </div>
+  );
+}
+
 // `alt` opcional: por defecto el título; se pasa "" cuando el título ya está escrito al lado.
+// `genres` se conserva en la API (antes elegía el emoji por género); la portada genérica ya no lo usa.
+// eslint-disable-next-line no-unused-vars
 export default function BookCoverImage({ coverUrl, title, author, genres = [], compact = false, timeoutMs = 3000, alt = title ?? "" }) {
   // idle → loading → loaded | failed
   const [status, setStatus] = useState(coverUrl ? "loading" : "failed");
@@ -167,7 +134,7 @@ export default function BookCoverImage({ coverUrl, title, author, genres = [], c
   return (
     <div style={{ position: "absolute", inset: 0 }}>
       {status === "loading" && <Shimmer />}
-      {status === "failed" && <Fallback title={title} author={author} genres={genres} compact={compact} />}
+      {status === "failed" && <GenericCover title={title} author={author} compact={compact} label={alt} />}
       {coverUrl && status !== "failed" && (
         <img
           src={coverUrl}

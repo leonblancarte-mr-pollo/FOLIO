@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Bookmark, BookOpen, Eye, CheckCircle } from "lucide-react";
 import BookCoverImage from "./BookCoverImage.jsx";
-import { palette, BRAND, STATUS_COLORS } from "../theme.js";
+import { palette, STATUS_COLORS } from "../theme.js";
 const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
 const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
 
@@ -150,10 +150,11 @@ export default function ReadingStatusModal({ book, onConfirm, onClose }) {
           style={{
             width: "100%", padding: "1rem",
             borderRadius: 14, border: "none",
-            background: BRAND.gradientFab,
+            // 2026-11-02: durazno plano (acción principal). Antes BRAND.gradientFab (vino) con
+            // texto #483A58 encima daba 1.12:1.
+            backgroundColor: palette.accent,
             color: palette.onAccent, cursor: "pointer",
             ...serif, fontSize: "1.05rem", fontWeight: 600,
-            boxShadow: "0 4px 18px rgba(122,46,46,0.35)",
           }}
         >
           Guardar

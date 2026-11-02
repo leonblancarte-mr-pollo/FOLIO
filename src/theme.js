@@ -36,7 +36,7 @@
 //    (portadas generativas), HEATMAP_COLORS, STREAK_PHASES, WRAPPED_SLIDE_GRADIENTS,
 //    STATUS_COLORS, AVATAR_COLORS, SOCIAL_COLORS y genrePillStyle/genreColor.
 //
-// Fuera de este archivo quedan a propósito: BookCoverImage.jsx y pets/PetScene.jsx
+// Fuera de este archivo quedan a propósito: pets/PetScene.jsx
 // (ilustraciones con sus propias paletas de arte), main.jsx (pantallas de error que
 // deben renderizar aunque falle el tema) y src/components/trueque/ (zona intocable).
 //
@@ -177,6 +177,20 @@ const COVER_PALETTES = [
   { bg: "#0D3350", fg: "#E4EFF8", accent: "#E8A84A" },
 ];
 
+// Portadas genéricas SEMA (2026-11-02, BookCoverImage › GenericCover). Arte fijo, igual en claro y
+// oscuro; solo valores de sema-paleta. field = bloque superior (título y autor en fieldInk),
+// band = franja inferior (texto encima en bandInk), mark = motivo geométrico (decorativo, nunca
+// debajo de texto). Contrastes: #483A58 sobre lila 5.21 / durazno 5.04 / superficie 7.36;
+// #FFFFFF sobre #483A58 10.39 / sobre #456990 5.71.
+const SEMA_COVER_COMBOS = [
+  { field: "#BBADFF", fieldInk: "#483A58", band: "#483A58", bandInk: "#FFFFFF", mark: "#F79F79" },
+  { field: "#F79F79", fieldInk: "#483A58", band: "#483A58", bandInk: "#FFFFFF", mark: "#BBADFF" },
+  { field: "#E7D7C1", fieldInk: "#483A58", band: "#456990", bandInk: "#FFFFFF", mark: "#F79F79" },
+  { field: "#483A58", fieldInk: "#FFFFFF", band: "#BBADFF", bandInk: "#483A58", mark: "#F79F79" },
+  { field: "#456990", fieldInk: "#FFFFFF", band: "#E7D7C1", bandInk: "#483A58", mark: "#BBADFF" },
+  { field: "#E7D7C1", fieldInk: "#483A58", band: "#483A58", bandInk: "#FFFFFF", mark: "#BBADFF" },
+];
+
 // Heatmap de lectura: 4 intensidades (1-5, 6-15, 16-30, 31+ páginas).
 const HEATMAP_COLORS = {
   light: ["#DDE3C9", "#B3BF8E", "#7E8F57", "#5C6B3D"],
@@ -255,7 +269,7 @@ function genreColor(genre) {
 
 export {
   FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS,
-  AVATAR_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
+  AVATAR_COLORS, getAvatarColor, COVER_PALETTES, SEMA_COVER_COMBOS, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
   display, body, quote, sp, FONT_DISPLAY, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,
 };

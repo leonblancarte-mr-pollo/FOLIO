@@ -10,9 +10,9 @@ import {
   DAILY_LIMIT,
 } from "../services/recommendationService.js";
 import ReadingStatusModal from "./ReadingStatusModal.jsx";
-import BookCoverImage from "./BookCoverImage.jsx";
+import BookCoverImage, { genericCoverScheme, GENERIC_BAND_PCT } from "./BookCoverImage.jsx";
 import { haptic } from "../haptics.js";
-import { palette } from "../theme.js";
+import { palette, ts } from "../theme.js";
 
 const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
 const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
@@ -20,21 +20,36 @@ const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
 const SWIPE_THRESHOLD = 100;   // px para confirmar el swipe
 const MAX_ROTATION = 16;       // grados
 
-// Genre pill — variante clara para overlay oscuro
-function GenrePill({ label }) {
+// Estrella de calificación (SVG propio, sema-identidad §6: nada de emoji). Relleno cálido y
+// contorno del color del texto que la acompaña, para que se lea sobre foto, franja o fondo.
+function Star({ size = 15, stroke }) {
   return (
-    <span style={{
-      backgroundColor: "rgba(255,255,255,0.16)",
-      color: "rgba(255,255,255,0.92)",
-      border: "1px solid rgba(255,255,255,0.28)",
-      borderRadius: 20, padding: "3px 10px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      fontSize: "0.75rem", fontWeight: 500,
-      backdropFilter: "blur(6px)",
-      WebkitBackdropFilter: "blur(6px)",
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0, display: "block" }}>
+      <path
+        d="M12 2.8l2.75 5.75 6.3.8-4.6 4.4 1.18 6.25L12 16.9 6.37 20l1.18-6.25-4.6-4.4 6.3-.8z"
+        fill={palette.amberRich} stroke={stroke} strokeWidth="1.6" strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// Línea de géneros + calificación, en texto plano (sin píldoras: principio 2).
+function MetaLine({ genres, rating, color }) {
+  if (genres.length === 0 && !rating) return null;
+  return (
+    <p style={{
+      ...body, fontSize: "14px", fontWeight: 600, color, lineHeight: 1.3,
+      display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, margin: "0 0 0.45rem",
     }}>
-      {label}
-    </span>
+      {genres.length > 0 && <span>{genres.join(" · ")}</span>}
+      {rating && (
+        <span aria-label={`Calificación ${rating} de 5`} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          {genres.length > 0 && <span aria-hidden>·</span>}
+          <Star stroke={color} />
+          <span aria-hidden>{rating}</span>
+        </span>
+      )}
+    </p>
   );
 }
 
@@ -48,9 +63,9 @@ function Toast({ msg, onDismiss }) {
       position: "fixed", bottom: 100, left: "50%", transform: "translateX(-50%)",
       backgroundColor: palette.ink, color: palette.bg,
       borderRadius: 12, padding: "10px 20px",
-      fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "0.9rem", fontWeight: 500,
+      ...body, fontSize: "15px", fontWeight: 500,
       zIndex: 300, whiteSpace: "nowrap",
-      boxShadow: "0 4px 20px rgba(42,31,26,0.28)",
+      boxShadow: "0 4px 20px rgba(0,0,0,0.22)",
       animation: "tinderToastIn 220ms ease-out",
     }}>
       {msg}
@@ -63,7 +78,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
     <div
       style={{
         position: "fixed", inset: 0, zIndex: 150,
-        backgroundColor: "rgba(42,31,26,0.65)",
+        backgroundColor: "rgba(0,0,0,0.6)",
         backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         animation: "backdropIn 180ms ease-out",
@@ -74,28 +89,27 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
         style={{
           width: "100%", maxWidth: 480, backgroundColor: palette.bg,
           borderRadius: "20px 20px 0 0", padding: "1.5rem 1.5rem 2.5rem",
-          boxShadow: "0 -8px 32px rgba(42,31,26,0.15)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.15)",
           animation: "sheetUp 300ms cubic-bezier(0.32, 0.72, 0, 1)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ textAlign: "center", marginBottom: "1.25rem" }}>
-          <span style={{ fontSize: "2.25rem", lineHeight: 1 }}>📚</span>
-          <h2 style={{ ...serif, fontSize: "1.2rem", fontWeight: 700, color: palette.ink, marginTop: "0.6rem" }}>
-            Límite diario alcanzado
+          <h2 style={{ ...serif, fontSize: "1.2rem", fontWeight: 700, color: palette.ink }}>
+            Límite de hoy alcanzado
           </h2>
           <p style={{ ...body, fontSize: "0.97rem", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5 }}>
             Has guardado {savesUsed} libros hoy. Vuelve mañana o<br />
             gasta 5 gemas para desbloquear 5 más.
           </p>
         </div>
+        {/* Saldo como fila de texto, sin caja dentro de la hoja (principio 2) */}
         <div style={{
-          backgroundColor: palette.bgCard, borderRadius: 12, padding: "0.9rem 1.1rem",
-          border: `1px solid ${palette.borderSoft}`, marginBottom: "1rem",
+          padding: "0.25rem 0", marginBottom: "1rem",
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
-          <span style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft }}>Tu balance</span>
-          <span style={{ display: "flex", alignItems: "center", gap: 5, ...serif, fontWeight: 700, fontSize: "1.05rem", color: palette.amber }}>
+          <span style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft }}>Tu saldo</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 5, ...serif, fontWeight: 700, fontSize: "1.05rem", color: palette.ink }}>
             <Gem size={16} /> {gemBalance} gemas
           </span>
         </div>
@@ -105,9 +119,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
           style={{
             width: "100%", padding: "0.95rem", borderRadius: 12, border: "none",
             cursor: gemBalance < 5 ? "not-allowed" : "pointer",
-            background: gemBalance < 5
-              ? palette.border
-              : `linear-gradient(135deg, ${palette.accent} 0%, ${palette.amber} 100%)`,
+            backgroundColor: gemBalance < 5 ? palette.border : palette.accent,
             color: gemBalance < 5 ? palette.inkFaint : palette.onAccent,
             ...serif, fontSize: "1rem", fontWeight: 600,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -120,7 +132,7 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
         <button
           onClick={onClose}
           style={{
-            width: "100%", padding: "0.75rem",
+            width: "100%", padding: "0.75rem", minHeight: 44,
             backgroundColor: "transparent", border: "none", cursor: "pointer",
             ...body, fontSize: "0.95rem", color: palette.inkFaint, marginTop: "0.5rem",
           }}
@@ -133,8 +145,13 @@ function LimitModal({ onClose, onUseGems, gemBalance, buying, savesUsed }) {
 }
 
 // ─── Contenido visual de una card (portada + info) ──────────────────────────
+// Con portada: foto + velo negro abajo, texto en onDark / onDarkSoft.
+// Sin portada: la portada genérica ya lleva título y autor; el resto de la info va sobre su
+// franja plana inferior, en el color de texto de esa franja (sin velo, sin repetir el título).
 function CardFace({ book, showInfo, onToggleInfo }) {
-  const ratingStr = book.rating ? `${Number(book.rating).toFixed(1)} ⭐` : "";
+  const rating = book.rating ? Number(book.rating).toFixed(1) : null;
+  const genres = (book.genres || []).slice(0, 3);
+  const scheme = book.coverUrl ? null : genericCoverScheme(book.title || "", book.author || "");
   return (
     <>
       <BookCoverImage
@@ -144,56 +161,52 @@ function CardFace({ book, showInfo, onToggleInfo }) {
         genres={book.genres}
       />
 
-      {/* Gradiente inferior + info */}
-      <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0,
-        height: "62%",
-        background: "linear-gradient(to top, rgba(0,0,0,0.93) 0%, rgba(0,0,0,0.72) 35%, rgba(0,0,0,0.28) 65%, transparent 100%)",
-        display: "flex", flexDirection: "column", justifyContent: "flex-end",
-        padding: "1.4rem 1.25rem 1.35rem",
-        pointerEvents: "none",
-      }}>
-        {book.genres?.length > 0 && (
-          <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap", marginBottom: "0.65rem" }}>
-            {book.genres.slice(0, 3).map((g) => <GenrePill key={g} label={g} />)}
-          </div>
-        )}
-
-        <h2 style={{
-          ...serif, fontSize: "clamp(1.45rem, 5.5vw, 1.75rem)", fontWeight: 700,
-          color: palette.onColor, lineHeight: 1.15, margin: "0 0 0.28rem",
-          textShadow: "0 2px 10px rgba(0,0,0,0.5)",
-        }}>
-          {book.title}
-        </h2>
-
-        <p style={{ ...body, fontSize: "1rem", color: "rgba(255,255,255,0.78)", margin: "0 0 0.5rem" }}>
-          {book.author}
-        </p>
-
-        {book.description && (
-          <p style={{
-            ...body, fontSize: "0.92rem", color: "rgba(255,255,255,0.62)",
-            lineHeight: 1.5, margin: 0,
-            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
-          }}>
-            {book.description}
-          </p>
-        )}
-      </div>
-
-      {/* Rating */}
-      {ratingStr && (
+      {scheme ? (
         <div style={{
-          position: "absolute", top: 14, right: 14,
-          backgroundColor: "rgba(0,0,0,0.52)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-          borderRadius: 10, padding: "5px 11px",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "0.82rem", fontWeight: 600, color: palette.onColor,
-          letterSpacing: "0.01em",
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          height: `${GENERIC_BAND_PCT}%`,
+          padding: "1rem 1.25rem",
+          display: "flex", flexDirection: "column", justifyContent: "flex-start",
+          overflow: "hidden", pointerEvents: "none",
+        }}>
+          <MetaLine genres={genres} rating={rating} color={scheme.bandInk} />
+          {book.description && (
+            <p style={{
+              ...body, fontSize: "15px", color: scheme.bandInk, lineHeight: 1.45, margin: 0,
+              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+            }}>
+              {book.description}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0,
+          height: "66%",
+          background: "linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.8) 40%, rgba(0,0,0,0.55) 72%, transparent 100%)",
+          display: "flex", flexDirection: "column", justifyContent: "flex-end",
+          padding: "1.4rem 1.25rem 1.25rem",
           pointerEvents: "none",
         }}>
-          {ratingStr}
+          <MetaLine genres={genres} rating={rating} color={palette.onDarkSoft} />
+          <h2 style={{
+            ...serif, fontSize: "clamp(1.45rem, 5.5vw, 1.75rem)", fontWeight: 700,
+            color: palette.onDark, lineHeight: 1.15, margin: "0 0 0.28rem",
+          }}>
+            {book.title}
+          </h2>
+          <p style={{ ...body, fontSize: "16px", color: palette.onDarkSoft, margin: "0 0 0.5rem" }}>
+            {book.author}
+          </p>
+          {book.description && (
+            <p style={{
+              ...body, fontSize: "15px", color: palette.onDarkSoft,
+              lineHeight: 1.45, margin: 0,
+              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+            }}>
+              {book.description}
+            </p>
+          )}
         </div>
       )}
 
@@ -203,32 +216,31 @@ function CardFace({ book, showInfo, onToggleInfo }) {
           onClick={onToggleInfo}
           style={{
             position: "absolute", inset: 0,
-            backgroundColor: "rgba(12,8,6,0.88)",
-            backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+            backgroundColor: "rgba(0,0,0,1)",
             padding: "1.75rem 1.5rem",
             display: "flex", flexDirection: "column", justifyContent: "center",
             animation: "backdropIn 200ms ease-out",
             cursor: "pointer",
           }}
         >
-          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onColor, margin: "0 0 0.3rem" }}>
+          <h3 style={{ ...serif, fontSize: "1.4rem", fontWeight: 700, color: palette.onDark, margin: "0 0 0.3rem" }}>
             {book.title}
           </h3>
-          <p style={{ ...body, fontSize: "0.97rem", color: "rgba(255,255,255,0.72)", margin: "0 0 1rem" }}>
+          <p style={{ ...body, fontSize: "16px", color: palette.onDarkSoft, margin: "0 0 1rem" }}>
             {book.author}
           </p>
           {book.description && (
-            <p style={{ ...body, fontSize: "1rem", color: "rgba(255,255,255,0.88)", lineHeight: 1.6, margin: "0 0 1.25rem" }}>
+            <p style={{ ...body, fontSize: "16px", color: palette.onDark, lineHeight: 1.6, margin: "0 0 1.25rem" }}>
               {book.description}
             </p>
           )}
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem", fontFamily: "system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(255,255,255,0.65)" }}>
-            {book.pages   && <span>📄 {book.pages} páginas</span>}
-            {book.rating  && <span>⭐ {Number(book.rating).toFixed(1)} de calificación</span>}
-            {book.isbn    && <span>🔖 ISBN {book.isbn}</span>}
-            {book.subgenres?.length > 0 && <span>🏷️ {book.subgenres.join(" · ")}</span>}
+          <div style={{ ...body, display: "flex", flexDirection: "column", gap: "0.45rem", fontSize: "14px", color: palette.onDarkSoft }}>
+            {book.pages   && <span>{book.pages} páginas</span>}
+            {rating       && <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><Star stroke={palette.onDarkSoft} /> {rating} de calificación</span>}
+            {book.isbn    && <span>ISBN {book.isbn}</span>}
+            {book.subgenres?.length > 0 && <span>{book.subgenres.join(" · ")}</span>}
           </div>
-          <p style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.75rem", color: "rgba(255,255,255,0.4)", marginTop: "1.5rem", textAlign: "center" }}>
+          <p style={{ ...body, fontSize: "13px", color: palette.onDarkSoft, marginTop: "1.5rem", textAlign: "center" }}>
             Toca para cerrar
           </p>
         </div>
@@ -239,30 +251,19 @@ function CardFace({ book, showInfo, onToggleInfo }) {
 
 // ─── Skeleton de carga con la estructura de la card ─────────────────────────
 function LoadingSkeleton() {
+  const pulse = { backgroundColor: palette.border, animation: "skeletonPulse 1.3s ease-in-out infinite" };
   return (
-    <div style={{ padding: "0.5rem 1rem 1.5rem", maxWidth: 480, margin: "0 auto" }}>
-      <div style={{ height: 26, width: 180, margin: "0 auto 0.6rem", borderRadius: 8, backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-      <div style={{ height: 5, borderRadius: 5, backgroundColor: palette.bgSoft, marginBottom: "1.1rem", animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-      <div style={{
-        position: "relative", borderRadius: 22, overflow: "hidden",
-        height: CARD_HEIGHT,
-        backgroundColor: palette.bgSoft,
-      }}>
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)",
-          animation: "coverShimmer 1.4s ease-in-out infinite",
-        }} />
-        <div style={{ position: "absolute", bottom: "1.4rem", left: "1.25rem", right: "1.25rem" }}>
-          <div style={{ height: 22, width: "35%", borderRadius: 11, backgroundColor: "rgba(255,255,255,0.35)", marginBottom: 12 }} />
-          <div style={{ height: 28, width: "75%", borderRadius: 8, backgroundColor: "rgba(255,255,255,0.45)", marginBottom: 10 }} />
-          <div style={{ height: 16, width: "45%", borderRadius: 8, backgroundColor: "rgba(255,255,255,0.3)" }} />
-        </div>
+    <div style={{ padding: "0.75rem 1rem 1rem", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+        <div style={{ ...pulse, height: 20, width: 140, borderRadius: 8 }} />
+        <div style={{ ...pulse, height: 16, width: 56, borderRadius: 8 }} />
       </div>
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.5rem", marginTop: "1.2rem" }}>
-        <div style={{ width: 62, height: 62, borderRadius: "50%", backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-        <div style={{ width: 46, height: 46, borderRadius: "50%", backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
-        <div style={{ width: 62, height: 62, borderRadius: "50%", backgroundColor: palette.bgSoft, animation: "skeletonPulse 1.3s ease-in-out infinite" }} />
+      <div style={{ ...pulse, height: 8, borderRadius: 999, marginBottom: "1rem" }} />
+      <div style={{ ...pulse, borderRadius: 22, height: CARD_HEIGHT }} />
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.25rem", marginTop: "1rem" }}>
+        <div style={{ ...pulse, width: 56, height: 56, borderRadius: "50%" }} />
+        <div style={{ ...pulse, width: 44, height: 44, borderRadius: "50%" }} />
+        <div style={{ ...pulse, width: 64, height: 64, borderRadius: "50%" }} />
       </div>
     </div>
   );
@@ -270,11 +271,11 @@ function LoadingSkeleton() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 // demoBooks: catálogo inyectado para pruebas/demos sin auth ni Supabase
-// Alto de la tarjeta: la pantalla menos lo que ocupa todo lo demás (encabezado,
-// pestañas, contador, botones, "N de M" y barra inferior ≈ 390 px). Antes era
-// 64vh y en un celular de 844 px los botones X / corazón quedaban detrás de la
-// barra inferior.
-const CARD_HEIGHT = "clamp(340px, calc(100dvh - 390px), 620px)";
+// Alto de la tarjeta: la pantalla menos lo que ocupa todo lo demás (cabecera, pestañas,
+// fila «N restantes · N de M», barra, botones y la barra inferior con su borde rasgado).
+// 2026-11-02: «N de M» sube a la fila del contador y el alto se recalcula para que los
+// botones queden por encima del borde rasgado (antes «1 de 20 libros» quedaba debajo).
+const CARD_HEIGHT = "clamp(320px, calc(100dvh - 372px), 620px)";
 
 export default function BookTinder({ user, onAdd, demoBooks = null }) {
   const [books, setBooks]               = useState([]);
@@ -488,7 +489,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     });
 
     incrementSaveCounter(user.id).catch(console.error);
-    showToast(`✅ Guardado como "${statusLabel}"`);
+    showToast(`Guardado en «${statusLabel}»`);
     haptic([15, 30, 15]);
     advance();
     setSaving(false);
@@ -509,7 +510,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
     setBuyingGems(false);
 
     if (!result.success) {
-      if (result.error === "GEMS_INSUFFICIENT") showToast("💎 No tienes gemas suficientes");
+      if (result.error === "GEMS_INSUFFICIENT") showToast("No alcanzan las gemas");
       else if (result.error === "GEMS_NO_BALANCE") showToast("Error al leer saldo");
       else if (result.error === "GEMS_RPC_MISSING") showToast("La tienda de gemas no está disponible. Intenta más tarde.");
       else showToast(`Error al gastar gemas: ${result.error}`);
@@ -525,7 +526,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
       savesLeft:      result.extraSaves,
     }));
     setShowLimitModal(false);
-    showToast(`¡5 gemas gastadas! Ahora tienes ${result.newBalance} gemas · +${result.extraSaves} guardados 🎉`);
+    showToast(`+${result.extraSaves} guardados. Quedan ${result.newBalance} gemas`);
   }
 
   // ── Estados especiales ────────────────────────────────────────
@@ -537,7 +538,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         <p style={{ ...body, fontSize: "0.97rem", color: palette.inkSoft, marginBottom: "1rem" }}>{error}</p>
         <button
           onClick={() => window.location.reload()}
-          style={{ ...serif, fontSize: "0.9rem", color: palette.accent, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 0.75rem", textDecoration: "underline", textUnderlineOffset: 3 }}
         >
           <RefreshCw size={15} /> Reintentar
         </button>
@@ -548,7 +549,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (noGenres) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ marginBottom: "1rem" }} />
+        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ margin: "0 auto 1rem" }} />
         <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>
           Configura tus géneros primero
         </h3>
@@ -562,7 +563,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (books.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ marginBottom: "1rem" }} />
+        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ margin: "0 auto 1rem" }} />
         <h3 style={{ ...serif, fontSize: "1.1rem", fontWeight: 600, color: palette.ink, marginBottom: "0.5rem" }}>
           No hay libros disponibles
         </h3>
@@ -571,7 +572,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         </p>
         <button
           onClick={() => window.location.reload()}
-          style={{ ...serif, fontSize: "0.9rem", color: palette.accent, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, background: "none", border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, minHeight: 44, padding: "0 0.75rem", textDecoration: "underline", textUnderlineOffset: 3 }}
         >
           <RefreshCw size={15} /> Reintentar
         </button>
@@ -582,12 +583,12 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
   if (isLast) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
-        <span style={{ fontSize: "2.5rem" }}>📚</span>
-        <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 600, color: palette.ink, margin: "0.75rem 0 0.5rem" }}>
-          ¡Guau, viste todos los libros disponibles!
+        <BookOpen size={40} color={palette.inkFaint} strokeWidth={1.2} style={{ margin: "0 auto 1rem" }} />
+        <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 600, color: palette.ink, margin: "0 0 0.5rem" }}>
+          Ya pasaron todos los de hoy.
         </h3>
         <p style={{ ...body, fontSize: "0.95rem", color: palette.inkSoft, lineHeight: 1.55 }}>
-          Vuelve mañana para más recomendaciones.
+          Mañana llegan más.
         </p>
       </div>
     );
@@ -618,26 +619,26 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
         .tinder-fab:disabled { cursor: default; opacity: 0.45; }
       `}</style>
 
-      <div style={{ padding: "0.5rem 1rem 1.5rem", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ padding: "0.75rem 1rem 1rem", maxWidth: 480, margin: "0 auto" }}>
 
-        {/* ── Header: contador + progreso ── */}
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "center", gap: 8, marginBottom: "0.55rem" }}>
-          <span aria-hidden style={{ fontSize: "1.05rem" }}>📖</span>
-          <span style={{
-            ...serif, fontSize: "1.45rem", fontWeight: 700,
-            color: savesLeft > 0 ? palette.ink : palette.accent,
-          }}>
-            {savesLeft > 0 ? `${savesLeft} restantes hoy` : "Límite alcanzado"}
+        {/* ── Contador + posición en una fila, y barra de avance (principio 4) ── */}
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: "0.5rem" }}>
+          <span style={{ ...ts.h3, color: palette.ink }}>
+            {savesLeft > 0 ? `${savesLeft} restantes hoy` : "Límite de hoy alcanzado"}
+          </span>
+          <span style={{ ...ts.caption, color: palette.inkSoft }}>
+            {index + 1} de {books.length}
           </span>
         </div>
 
-        <div style={{ height: 5, backgroundColor: palette.border, borderRadius: 5, overflow: "hidden", marginBottom: "1.1rem" }}>
+        {/* Pista con borde de tinta: el durazno no llega a 3:1 sobre blanco (sema-paleta §5) */}
+        <div style={{ height: 8, borderRadius: 999, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, overflow: "hidden", marginBottom: "1rem" }}>
           <div style={{
-            height: "100%", borderRadius: 5,
+            height: "100%",
             width: `${progress}%`,
-            background: savesLeft > 5
-              ? `linear-gradient(90deg, ${palette.amber}, ${palette.accent})`
-              : `linear-gradient(90deg, ${palette.accent}, ${palette.danger})`,
+            backgroundColor: palette.accent,
+            borderRight: progress > 0 && progress < 100 ? `1.5px solid ${palette.ink}` : "none",
+            boxSizing: "border-box",
             transition: "width 450ms ease",
           }} />
         </div>
@@ -655,7 +656,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
                 position: "absolute", inset: 0,
                 borderRadius: 22, overflow: "hidden",
                 transform: "scale(0.95) translateY(8px)",
-                boxShadow: "0 12px 36px rgba(0,0,0,0.16)",
+                boxShadow: "0 8px 22px rgba(0,0,0,0.12)",
                 pointerEvents: "none",
               }}
             >
@@ -675,7 +676,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
               style={{
                 position: "absolute", inset: 0,
                 borderRadius: 22, overflow: "hidden",
-                boxShadow: "0 24px 64px rgba(0,0,0,0.28), 0 8px 24px rgba(0,0,0,0.14)",
+                boxShadow: "0 14px 34px rgba(0,0,0,0.2)",
                 userSelect: "none", WebkitUserSelect: "none",
                 touchAction: "none",
                 cursor: "grab",
@@ -695,7 +696,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
                   border: `3.5px solid ${palette.session}`,
                   color: palette.session,
                   borderRadius: 10, padding: "4px 14px",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  ...serif,
                   fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.08em",
                   backgroundColor: "rgba(0,0,0,0.18)",
                   textShadow: "0 1px 6px rgba(0,0,0,0.3)",
@@ -715,7 +716,7 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
                   border: `3.5px solid ${palette.danger}`,
                   color: palette.danger,
                   borderRadius: 10, padding: "4px 14px",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
+                  ...serif,
                   fontSize: "1.6rem", fontWeight: 800, letterSpacing: "0.08em",
                   backgroundColor: "rgba(0,0,0,0.18)",
                   textShadow: "0 1px 6px rgba(0,0,0,0.3)",
@@ -728,22 +729,21 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
           )}
         </div>
 
-        {/* ── Botones de acción ── */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.5rem", marginTop: "1.2rem" }}>
+        {/* ── Botones: un solo relleno (corazón durazno, principio 1); X e info silenciosos ── */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "1.25rem", marginTop: "1rem" }}>
           <button
             onClick={commitSkip}
             disabled={disabled}
             className="tinder-fab"
             aria-label="No me interesa"
             style={{
-              width: 62, height: 62,
-              border: `2px solid ${palette.danger}`,
-              backgroundColor: palette.bgCard,
-              color: palette.danger,
-              boxShadow: "0 4px 14px rgba(199,74,74,0.22)",
+              width: 56, height: 56,
+              border: `1.5px solid ${palette.inkSoft}`,
+              backgroundColor: palette.bg,
+              color: palette.ink,
             }}
           >
-            <X size={27} strokeWidth={2.4} />
+            <X size={24} strokeWidth={2.2} />
           </button>
 
           <button
@@ -751,15 +751,15 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             disabled={disabled}
             className="tinder-fab"
             aria-label="Más información"
+            aria-pressed={showInfo}
             style={{
-              width: 46, height: 46,
-              border: `1.5px solid ${palette.border}`,
-              backgroundColor: palette.bgCard,
+              width: 44, height: 44,
+              border: "none",
+              backgroundColor: "transparent",
               color: palette.inkSoft,
-              boxShadow: "0 3px 10px rgba(42,31,26,0.12)",
             }}
           >
-            <Info size={19} strokeWidth={2} />
+            <Info size={22} strokeWidth={2} />
           </button>
 
           <button
@@ -768,27 +768,15 @@ export default function BookTinder({ user, onAdd, demoBooks = null }) {
             className="tinder-fab"
             aria-label="Guardar libro"
             style={{
-              width: 62, height: 62,
+              width: 64, height: 64,
               border: "none",
-              background: limitStatus.canSave
-                ? `linear-gradient(135deg, ${palette.accent} 0%, ${palette.accentSoft} 100%)`
-                : palette.border,
+              backgroundColor: limitStatus.canSave ? palette.accent : palette.border,
               color: limitStatus.canSave ? palette.onAccent : palette.inkFaint,
-              boxShadow: limitStatus.canSave ? "0 6px 20px rgba(122,46,46,0.42)" : "none",
             }}
           >
             <Heart size={26} strokeWidth={2.2} fill="currentColor" />
           </button>
         </div>
-
-        {/* ── Posición en el catálogo ── */}
-        <p style={{
-          textAlign: "center", marginTop: "0.85rem",
-          fontFamily: "system-ui, -apple-system, sans-serif",
-          fontSize: "0.77rem", color: palette.inkFaint, letterSpacing: "0.02em",
-        }}>
-          {index + 1} de {books.length} libros
-        </p>
       </div>
 
       {/* ── Toast ── */}
