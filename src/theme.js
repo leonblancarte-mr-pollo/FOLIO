@@ -8,9 +8,16 @@
 //    una constante de módulo).
 //    · Superficies ........ bg (fondo de app) · bgSoft (secciones, inputs apagados) · bgCard (tarjetas, sheets)
 //    · Texto .............. ink (principal) · inkSoft (secundario) · inkFaint (captions, labels, placeholders)
-//    · Marca / acento ..... accent (botón primario, links, estado activo) · accentSoft (hover, "Leyendo")
-//    · Cálidos ............ amber (gemas, estrellas, highlights) · amberRich (estrellas llenas) · amberInk (números/texto ámbar sobre fondo claro)
-//    · Secundarios ........ mauve (sugerencias IA) · slate (amigo en comparativas, "Por leer") · sage (Leídos, éxito suave)
+//    · Marca / acento ..... accent (acción principal: botón, progreso, marca; NO es color de links ni de
+//                           texto normal en claro, 3.21:1) · accentSoft (hover, "Leyendo")
+//    · Cálidos ............ amber (gemas, estrellas, celebración) · amberRich (estrellas llenas) · amberInk (texto que antes iba en ámbar)
+//    · Secundarios ........ mauve (sugerencias IA; no es texto sobre blanco) · slate (amigo en comparativas, "Por leer") · sage (Leídos, éxito suave)
+//    · SEMA 2026-11 ....... firma (#BBADFF: racha, stickers, resaltados, borde rasgado de la barra inferior)
+//                           onFirma (texto sobre firma y sobre acentoCalido, en ambos modos)
+//                           acentoCalido (celebraciones, gemas, segundo sticker)
+//                           superficieSuave (boletos, tarjetas que deban separarse del fondo; texto encima: ink)
+//                           complementoFrio (enlaces, estados informativos, íconos secundarios; en oscuro solo grande)
+//      Valores y reglas de contraste: .claude/skills/sema-paleta/SKILL.md (fuente de verdad).
 //    · Bordes ............. border (inputs, tarjetas) · borderSoft (divisores)
 //    · Sobre color ........ onAccent (texto/icono sobre accent o degradados) · onDark / onDarkSoft / onDarkFaint /
 //                           onDarkMuted (texto sobre overlays casi negros: celebración, Wrapped, compartir)
@@ -40,34 +47,38 @@ const FONT_LINK = `
 `;
 
 const PALETTE_LIGHT = {
-  bg: "#F4EDE0", bgSoft: "#EBE3D2", bgCard: "#FBF6EB",
-  ink: "#2A1F1A", inkSoft: "#5C4A3F", inkFaint: "#6E6054",
-  accent: "#7A2E2E", accentSoft: "#96403B",
-  amber: "#C8924A", amberRich: "#C8924A", amberInk: "#8A5A1A",
-  mauve: "#96403B", slate: "#5C4A3F", sage: "#5C6B3D",
-  border: "#D4C9B5", borderSoft: "#DDD5C5",
+  bg: "#FFFFFF", bgSoft: "#FFFFFF", bgCard: "#FFFFFF",
+  ink: "#483A58", inkSoft: "#5E5768", inkFaint: "#5E5768",
+  accent: "#F45B69", accentSoft: "#F45B69",
+  amber: "#F79F79", amberRich: "#F79F79", amberInk: "#483A58",
+  mauve: "#BBADFF", slate: "#5E5768", sage: "#5C6B3D",
+  border: "#E7D7C1", borderSoft: "#E7D7C1",
   onAccent: "#FFFFFF",
-  onDark: "#F4EDE0", onDarkSoft: "#D8CCBC", onDarkFaint: "#9A8A7A", onDarkMuted: "#7A6A5A",
+  onDark: "#FFFFFF", onDarkSoft: "#E7D7C1", onDarkFaint: "#E7D7C1", onDarkMuted: "#E7D7C1",
   danger: "#B03A2E", dangerSoft: "#FBEEEA", dangerBorder: "#E3A79F", dangerInk: "#8E2A20",
   success: "#5C6B3D",
   warnBg: "#F6EAD0", warnBorder: "#E0C48F", warnInk: "#8A5A1A",
-  like: "#B03A2E", badge: "#B03A2E", unreadBg: "#FDF8F3",
-  session: "#5C6B3D", sessionInk: "#46552C", freeze: "#5C4A3F",
+  like: "#B03A2E", badge: "#B03A2E", unreadBg: "#E7D7C1",
+  session: "#5C6B3D", sessionInk: "#5C6B3D", freeze: "#456990",
+  firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
+  superficieSuave: "#E7D7C1", complementoFrio: "#456990",
 };
 const PALETTE_DARK = {
-  bg: "#1a1614", bgSoft: "#211d1a", bgCard: "#2a2420",
-  ink: "#F5EDE0", inkSoft: "#B8A99A", inkFaint: "#9A8B7F",
-  accent: "#C84F4F", accentSoft: "#D06060",
-  amber: "#D4A574", amberRich: "#D4A574", amberInk: "#E0B06A",
-  mauve: "#D06060", slate: "#8C7565", sage: "#7A9B5C",
-  border: "#3D3530", borderSoft: "#332E2A",
+  bg: "#000000", bgSoft: "#000000", bgCard: "#000000",
+  ink: "#FFFFFF", inkSoft: "#E7D7C1", inkFaint: "#E7D7C1",
+  accent: "#F45B69", accentSoft: "#F45B69",
+  amber: "#F79F79", amberRich: "#F79F79", amberInk: "#F79F79",
+  mauve: "#BBADFF", slate: "#E7D7C1", sage: "#7A9B5C",
+  border: "#483A58", borderSoft: "#483A58",
   onAccent: "#FFFFFF",
-  onDark: "#F4EDE0", onDarkSoft: "#D8CCBC", onDarkFaint: "#9A8A7A", onDarkMuted: "#7A6A5A",
+  onDark: "#FFFFFF", onDarkSoft: "#E7D7C1", onDarkFaint: "#E7D7C1", onDarkMuted: "#E7D7C1",
   danger: "#E5675B", dangerSoft: "#3A1F1C", dangerBorder: "#7A3A34", dangerInk: "#F2A39B",
   success: "#7A9B5C",
   warnBg: "#3A301A", warnBorder: "#6B5A2A", warnInk: "#E8C97A",
-  like: "#E5675B", badge: "#C84F4F", unreadBg: "#2F2823",
-  session: "#7A9B5C", sessionInk: "#9CBB7E", freeze: "#8C7565",
+  like: "#E5675B", badge: "#E5675B", unreadBg: "#483A58",
+  session: "#7A9B5C", sessionInk: "#7A9B5C", freeze: "#E7D7C1",
+  firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
+  superficieSuave: "#483A58", complementoFrio: "#456990",
 };
 let palette = { ...PALETTE_LIGHT };
 
