@@ -1,6 +1,6 @@
 # SEMA — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-11-02 (sistema de agentes de diseño en `.claude/`: skills `sema-*`, 6 agentes y comandos `/paleta`, `/revisa`, `/redisena`; ver §III «Sistema de agentes de diseño». Antes, 2026-10-11: design system: paleta de 5 colores, Bricolage Grotesque / Figtree / Instrument Serif, ver §III «Sistema visual (2026-10-11)» y `design-system/sema/MASTER.md`; antes, 2026-10-10: textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
+> Última actualización: 2026-11-02 (paleta SEMA 2026-11 en `theme.js`: claro con fondo `#FFFFFF`, oscuro con negro puro, 5 tokens nuevos; ver §III «Sistema visual (2026-11-02)». Antes, ese mismo día: sistema de agentes de diseño en `.claude/`: skills `sema-*`, 6 agentes y comandos `/paleta`, `/revisa`, `/redisena`; ver §III «Sistema de agentes de diseño». Antes, 2026-10-11: design system: paleta de 5 colores, Bricolage Grotesque / Figtree / Instrument Serif, ver §III «Sistema visual (2026-10-11)» y `design-system/sema/MASTER.md`; antes, 2026-10-10: textos de estados vacíos aprobados por León; logo fuente renombrado a `Sema Logo.png`; estados de interfaz: componentes `EmptyState` y `Skeleton`, hover/press/focus con variables CSS del tema; ver §VII «Estados de interfaz»; antes, 2026-10-07: email de soporte a sema.mx, DOCUMENTACION_PARA_DUMMIES.docx regenerado; rebrand FOLIO → SEMA; antes, 2026-10-03: Trueque v3: se retiran las zonas fijas de CDMX del matching y de la UI, buscador de lugares con Nominatim; antes ese mismo día, Trueque v2: estado obligatorio, pines aproximados, matches por cercanía, reglas +18 y reportes — `supabase/trueque_geo.sql`; antes, 2026-09-23 RPC `spend_gems` y sprint de auditoría 2026-09-22, reporte en `AUDIT_SPRINT_REPORT.md`) · Incluye el fix de signup (`fix_signup_permissions.sql`) y la auto-reparación de perfiles huérfanos en login/sesión (`repair_all_orphan_profiles.sql`). Versión Word extendida: `DOCUMENTACION_ARQUITECTURA_COMPLETA.docx` (`python scripts/generate_docs.py`).
 > Audiencia: developer que NO conoce SEMA y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -37,6 +37,7 @@
 
 - 2026-11-02 — `.gitignore`: se quita la regla que ignoraba `.claude/` (ahora entra a git); quedan ignorados `.claude/settings.local.json` y una regla por cada una de las 60 carpetas de skills de terceros de `.claude/skills/` (las que no empiezan con `sema-`, que sí entran); se agrega `capturas/`. `.env.local` sigue ignorado (`.env.local` y `.env.*.local`). Sin cambios de código de la app. Ver §XII #21
 - 2026-11-02 — Sistema de agentes de diseño (sin tocar código de la app): 5 skills (`.claude/skills/sema-identidad`, `sema-paleta`, `sema-voz`, `sema-capturas` con la plantilla `captura.js`, `sema-prompts`), 6 agentes (`.claude/agents/`: `disenador`, `critico`, `lectora`, `accesibilidad`, `copy`, `qa`) y 3 comandos (`.claude/commands/`: `/paleta`, `/revisa`, `/redisena`) para rediseñar SEMA una pantalla a la vez con la paleta nueva (blanco/negro puro, tinta `#483A58`, acción `#F45B69`, firma lila `#BBADFF`). Ver §III «Sistema de agentes de diseño». ⚠️ `.claude/` está en `.gitignore`: estos archivos viven solo en el disco local
+- 2026-11-02 — Paleta SEMA 2026-11 (rama `paleta-2026-11-02`, solo `theme.js`, sin tocar componentes): commit `ffdf223` cambia `PALETTE_LIGHT`/`PALETTE_DARK` según `sema-paleta` (claro primario con fondo `#FFFFFF`, tinta `#483A58`, acción `#F45B69`; oscuro con negro puro `#000000` y tinta `#FFFFFF`), conserva todos los nombres de token y agrega `firma`, `onFirma`, `acentoCalido`, `superficieSuave` y `complementoFrio` (`applyPaletteCssVars` los expone solos como `--sema-firma`, etc.); commit `d4172e8` corrige el brillo del skeleton (`--sema-skel-shine` pasa a `bg`, porque `border` y `borderSoft` ahora valen lo mismo). `BRAND` y los datos de arte siguen con la paleta anterior; pendientes en §XII #22
 
 ---
 
@@ -146,7 +147,55 @@ FOLIO FINAL/
 - **Sin router**: la navegación es un estado `tab` en `MainApp` (`home | social | library | add | profile`...) + sub-tabs con `SubTabBar`. Deep-links se resuelven leyendo `window.location.search` (ej. `?action=log` abre el modal de registro, `?ref=usuario` abre perfil referido).
 - **Sin state manager**: `useState`/`useEffect` + prop drilling desde `MainApp`, más **event buses** caseros (patrón pub/sub con arrays de listeners): `gemsEventBus`, `gemToastBus`, `petBus`, `achievementBus`. Sirven para que servicios sin acceso a React notifiquen a la UI (toasts de gemas, level-up de mascota, logros desbloqueados).
 - **Tema**: `theme.js` exporta un objeto **mutable** `palette`; `MainApp` hace `Object.assign(palette, isDark ? PALETTE_DARK : PALETTE_LIGHT)` en cada render. Los componentes leen `palette.xxx` en estilos inline (siempre en el render, nunca copiado a una constante de módulo). Preferencia en `localStorage('folio_theme')`: light/dark/system.
-- **Sistema visual (2026-10-11)** — `design-system/sema/MASTER.md` es la guía; `theme.js` la implementa.
+- **Sistema visual (2026-11-02)** — `.claude/skills/sema-paleta/SKILL.md` es la fuente de verdad de los colores; `theme.js` la implementa (commits `ffdf223` y `d4172e8`). Reemplaza la paleta de 5 colores del 2026-10-11 (crema, vino, ámbar, salvia), que se conserva abajo como historia. La tipografía, el espacio y los 8 principios no cambian.
+  - **Modo claro (primario):** fondo blanco `#FFFFFF`, tinta `#483A58`, secundario `#5E5768`, acción `#F45B69`, firma lila `#BBADFF`, acento cálido `#F79F79`, superficie suave `#E7D7C1`, complemento frío `#456990`, éxito `#5C6B3D` y error `#B03A2E`.
+  - **Modo oscuro:** negro puro `#000000` (nunca café ni azul tinta), tinta `#FFFFFF`, secundario `#E7D7C1`, superficie suave `#483A58`, éxito `#7A9B5C` y error `#E5675B`. Acción, firma, cálido y frío no cambian.
+  - **Contraste (obligatorio):**
+    - `accent` (`#F45B69`) **no va como texto normal sobre blanco** (3.21:1). Sirve como relleno de botón, barra de progreso, ícono grande o texto grande. Los links usan `complementoFrio`. El texto blanco sobre `accent` va en negritas de **19 px o más**.
+    - **Firma `#BBADFF`, cálido `#F79F79` y superficie `#E7D7C1` nunca son texto sobre blanco** (1.99, 2.06 y 1.41:1). Encima de firma y cálido el texto es siempre `onFirma` (`#483A58`), también en oscuro.
+    - `#483A58` nunca es texto sobre negro (2.02:1). En oscuro, `complementoFrio` solo va en elementos grandes (3.68:1).
+  - **Tabla de tokens (`palette`):**
+
+    | Token | Claro | Oscuro | Uso |
+    |---|---|---|---|
+    | `bg` | `#FFFFFF` | `#000000` | Fondo de la app |
+    | `bgSoft` | `#FFFFFF` | `#000000` | Secciones e inputs apagados: se separan con espacio, no con fondo |
+    | `bgCard` | `#FFFFFF` | `#000000` | Tarjetas y sheets; si deben separarse, `superficieSuave` |
+    | `ink` | `#483A58` | `#FFFFFF` | Texto principal, íconos, logo |
+    | `inkSoft` | `#5E5768` | `#E7D7C1` | Texto secundario |
+    | `inkFaint` | `#5E5768` | `#E7D7C1` | Captions, labels, placeholders |
+    | `accent` | `#F45B69` | `#F45B69` | Acción principal: botón, progreso, marca. No es color de links |
+    | `accentSoft` | `#F45B69` | `#F45B69` | Estado «Leyendo», hover de acción |
+    | `amber` | `#F79F79` | `#F79F79` | Gemas, estrellas, celebración (= acento cálido) |
+    | `amberRich` | `#F79F79` | `#F79F79` | Estrellas llenas |
+    | `amberInk` | `#483A58` | `#F79F79` | Texto que antes iba en ámbar |
+    | `mauve` | `#BBADFF` | `#BBADFF` | Sugerencias IA (= firma); no es texto sobre blanco |
+    | `slate` | `#5E5768` | `#E7D7C1` | Amigo en comparativas, «Por leer» |
+    | `sage` | `#5C6B3D` | `#7A9B5C` | «Leídos», éxito suave |
+    | `border` | `#E7D7C1` | `#483A58` | Bordes de inputs y tarjetas |
+    | `borderSoft` | `#E7D7C1` | `#483A58` | Divisores |
+    | `onAccent` | `#FFFFFF` | `#FFFFFF` | Texto sobre `accent` (negritas, ≥ 19 px) |
+    | `onDark` | `#FFFFFF` | `#FFFFFF` | Texto sobre overlays negros |
+    | `onDarkSoft` / `onDarkFaint` / `onDarkMuted` | `#E7D7C1` | `#E7D7C1` | Texto secundario sobre overlays negros |
+    | `danger` | `#B03A2E` | `#E5675B` | Error, acción destructiva |
+    | `dangerSoft` / `dangerBorder` / `dangerInk` | `#FBEEEA` / `#E3A79F` / `#8E2A20` | `#3A1F1C` / `#7A3A34` / `#F2A39B` | Estados del sistema (sin cambio) |
+    | `success` | `#5C6B3D` | `#7A9B5C` | Éxito, «Leído» |
+    | `warnBg` / `warnBorder` / `warnInk` | `#F6EAD0` / `#E0C48F` / `#8A5A1A` | `#3A301A` / `#6B5A2A` / `#E8C97A` | Banner offline y avisos (sin cambio) |
+    | `like` | `#B03A2E` | `#E5675B` | Corazón (= danger) |
+    | `badge` | `#B03A2E` | `#E5675B` | Contador de no leídos (= danger) |
+    | `unreadBg` | `#E7D7C1` | `#483A58` | Notificación no leída (= superficie suave) |
+    | `session` | `#5C6B3D` | `#7A9B5C` | Post de sesión de lectura |
+    | `sessionInk` | `#5C6B3D` | `#7A9B5C` | Texto del post de sesión |
+    | `freeze` | `#456990` | `#E7D7C1` | Protector de racha |
+    | **`firma`** (nuevo) | `#BBADFF` | `#BBADFF` | Racha, stickers, resaltados, borde rasgado de la barra inferior |
+    | **`onFirma`** (nuevo) | `#483A58` | `#483A58` | Texto sobre `firma` y `acentoCalido`, en ambos modos |
+    | **`acentoCalido`** (nuevo) | `#F79F79` | `#F79F79` | Celebraciones, gemas, segundo sticker |
+    | **`superficieSuave`** (nuevo) | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo; texto encima: `ink` |
+    | **`complementoFrio`** (nuevo) | `#456990` | `#456990` | Enlaces, estados informativos, íconos secundarios (en oscuro solo grande) |
+
+  - **Variables CSS:** `applyPaletteCssVars` expone los tokens nuevos sin cambios en la función (`--sema-firma`, `--sema-on-firma`, `--sema-acento-calido`, `--sema-superficie-suave`, `--sema-complemento-frio`). El skeleton usa `--sema-skel-base` = `border` y `--sema-skel-shine` = `bg` en los dos modos (claro `#E7D7C1` → `#FFFFFF`; oscuro `#483A58` → `#000000`).
+  - **Fuera de `palette`:** `BRAND` y los datos de arte siguen con la paleta anterior hasta que cada `/redisena` toque su pantalla (lista en §XII #22).
+- **Sistema visual (2026-10-11, paleta reemplazada el 2026-11-02)** — `design-system/sema/MASTER.md` es la guía; `theme.js` la implementa.
   - **Paleta de 5 colores:** Crema `#F4EDE0` (fondo; oscuro `#1A1614`), Tinta `#2A1F1A` (texto; oscuro `#F5EDE0`), Vino `#7A2E2E` (acción y marca; oscuro `#C84F4F`), Ámbar `#C8924A` (celebración, gemas; oscuro `#D4A574`; texto `amberInk` `#8A5A1A`) y Salvia `#5C6B3D` (éxito, «Leído», progreso completo; oscuro `#7A9B5C`). Superficies y bordes (`bgSoft`, `bgCard`, `border*`) son tintes de la crema; `inkSoft` `#5C4A3F` e `inkFaint` `#6E6054` son tintes de la tinta. Fuera de los 5 queda solo `danger` `#B03A2E` (errores/destructivo/corazón) más sus fondos suaves y los `warn*`.
   - **Alias compatibles:** `accentSoft` (vino claro `#96403B`), `mauve` = `accentSoft`, `slate` y `freeze` = `inkSoft`, `amberRich` = `amber`, `session`/`success` = salvia, `like`/`badge` = `danger`. Los nombres de token no cambian, así que ningún componente (ni el Trueque) tuvo que tocarse.
   - **Tipografía:** Bricolage Grotesque (títulos; `display`, `ts.h1/h2`; no tiene cursiva), Figtree (interfaz; `body`, `ts.h3/body15/caption/label`) e Instrument Serif (citas; `quote`, `ts.quote`, citas del feed, tarjetas compartibles y lector de cuentos). En App.jsx `quote` se importa como `quoteFont` porque `quote` es nombre de variable local. `FONT_LINK` carga las tres fuentes desde Google Fonts.
@@ -158,7 +207,7 @@ FOLIO FINAL/
   - Datos de arte con nombre: `COVER_PALETTES`, `HEATMAP_COLORS`, `STREAK_PHASES`, `FRIEND_STREAK_GRADIENT`, `WRAPPED_SLIDE_GRADIENTS`, `QUOTE_POSTER_GRADIENTS`, `STATUS_COLORS`, `AVATAR_COLORS`, `SOCIAL_COLORS`, `genrePillStyle`, `genreColor`.
   - `ts.caption`/`ts.label` leen `palette.inkFaint` con un getter (antes tenían el hex claro fijo y no seguían al modo oscuro).
   - Quedan hex fuera de `theme.js` solo en `BookCoverImage.jsx` y `pets/PetScene.jsx` (ilustraciones), `main.jsx` (pantallas de error independientes del tema) y en algunos componentes del MVP del Trueque (`ui.jsx`, `MatchCard`, `ExchangeChat`, `ZonesEditor`). Los componentes del Trueque v2 (2026-10-03: `MyPlaces`, `TruequeRulesModal`, `LocationStep`, `ReportModal`) y las líneas tocadas de `TruequeMain` usan solo tokens (`BRAND.gradientFab`, `palette.onAccent`…); el mapa pinta pines y círculos con `palette.accent`/`palette.amber`.
-  - **Variables CSS (2026-10-10)**: `applyPaletteCssVars(isDark)` (en `theme.js`, la llama `MainApp` justo después del `Object.assign` del tema y una vez al cargar el módulo en modo claro) copia cada token de `palette` a `:root` como `--sema-<token-en-kebab>` (`bgSoft` → `--sema-bg-soft`) y añade `--sema-skel-base`/`--sema-skel-shine` (de `border`/`borderSoft`, invertidos en oscuro) y `--sema-hover-brightness`/`--sema-press-brightness`. Solo escribe en el DOM cuando cambia el tema. Así `index.css` usa colores del tema sin hex propios.
+  - **Variables CSS (2026-10-10)**: `applyPaletteCssVars(isDark)` (en `theme.js`, la llama `MainApp` justo después del `Object.assign` del tema y una vez al cargar el módulo en modo claro) copia cada token de `palette` a `:root` como `--sema-<token-en-kebab>` (`bgSoft` → `--sema-bg-soft`) y añade `--sema-skel-base`/`--sema-skel-shine` (desde 2026-11-02: `border` y `bg`; antes `border`/`borderSoft`, invertidos en oscuro) y `--sema-hover-brightness`/`--sema-press-brightness`. Solo escribe en el DOM cuando cambia el tema. Así `index.css` usa colores del tema sin hex propios.
   - **z-index**: todavía no hay escala; el mapa real (de 10 a 99999) y los conflictos conocidos están en `AUDIT_SPRINT_REPORT.md` §C.
 - **Estados de interfaz (2026-10-10)**: vacíos con `EmptyState`, cargas con `Skeleton*` y hover/press/focus con clases CSS; detalle, textos y reglas en §VII «Estados de interfaz» y §X.20.
 - **Errores**: `main.jsx` tiene `RootErrorBoundary` + listeners globales `error`/`unhandledrejection`. El **overlay rojo de debug** (div en `document.body`) ahora solo se pinta con `import.meta.env.DEV`; en producción solo hace `console.error`. `RootErrorBoundary` también condiciona su fallback: en DEV muestra el stack trace rojo; en producción una pantalla amigable "Algo salió mal" con botón Recargar.
@@ -885,6 +934,27 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **Faltan requisitos para correr los comandos:** `playwright` ya está en `devDependencies` y en `node_modules` (lo agregó León fuera de esta tarea; aparece en `package.json` y `package-lock.json` sin commit). Falta `SEMA_TEST_EMAIL`/`SEMA_TEST_PASSWORD` en `.env.local`, y no se verificó que el navegador Chromium esté descargado (`npx playwright install chromium`). (`capturas/` ya está en `.gitignore` desde el 2026-11-02.)
     - **Contraste de la acción principal:** blanco sobre `#F45B69` da 3.21:1, solo apto para texto grande. `sema-paleta` fija el mínimo en **19 px en negritas** (León pidió 18; WCAG cuenta negritas como texto grande desde 18.66 px). `#F45B69` no sirve como color de texto normal sobre blanco, así que los links pasan a `complementoFrio`.
     - **`MASTER.md` sigue describiendo la paleta anterior** (crema, vino, ámbar, salvia). `sema-paleta` manda; `MASTER.md` se actualiza cuando `/paleta` se apruebe.
+
+22. **Paleta SEMA 2026-11 — pendientes (2026-11-02, commits `ffdf223` y `d4172e8`):**
+    - **Siguen con la paleta anterior** (vino, ámbar, salvia, crema): `BRAND` (degradados `gradient*` y `confetti`), `SOCIAL_COLORS`, `STATUS_COLORS`, `AVATAR_COLORS`, `COVER_PALETTES`, `HEATMAP_COLORS`, `STREAK_PHASES`, `FRIEND_STREAK_GRADIENT`, `WRAPPED_SLIDE_GRADIENTS`, `QUOTE_POSTER_GRADIENTS`, `genrePillStyle` y `genreColor`. También hay rgba vino/café escritos a mano fuera de `theme.js`, que vio QA: el borde y el degradado de la tarjeta del cuento en Social, y el backdrop del modal en `App.jsx:2847` (`rgba(42,31,26,0.72)`). Cada `/redisena` los cambia al tocar su pantalla; los degradados pasan a color plano.
+    - **`accent`/`amber`/`mauve` como texto chico sobre blanco** (no pasan contraste: accent 3.21, amber 2.06, mauve 1.99). Son 69 líneas con `color: palette.(accent|accentSoft|mauve|amber|amberRich)`; se corrigen en cada `/redisena` (links → `complementoFrio`; texto ámbar → `amberInk`):
+      - `src/App.jsx` (55):
+        - accent que falla: 1060, 1129, 1245, 1346, 1362, 1403, 1618, 1829, 2087, 2381, 2408, 2698, 2760, 2770, 3695, 3928, 4991, 5266, 5375, 5484, 5596, 6253, 6675, 6787, 6872, 7895, 8102, 8364, 8532, 9402, 9953, 10166 y 13113 (logo «SEMA» a 1.05rem).
+        - accent que pasa como texto grande: 4941 y 7854.
+        - amber/amberRich: 293, 493, 2073, 2540, 2864, 3025, 3869, 4726, 4730, 4764, 5040, 5423, 6981, 7673, 8116, 8376, 9461, 9678 y 10423 (varias son estrellas ★).
+        - mauve: 2172.
+      - `src/components/AddToListSheet.jsx` (1): 116.
+      - `src/components/BookTinder.jsx` (3): 98 (amber), 540 y 574.
+      - `src/components/ListDetailModal.jsx` (1): 51.
+      - `src/components/ListsSection.jsx` (1): 28.
+      - `src/components/trueque/MatchCard.jsx` (4, zona intocable): 36, 67, 72 (mauve) y 82.
+      - `src/components/trueque/TruequeMain.jsx` (4, zona intocable): 48, 263 (amber), 281 y 396.
+      - Esta lista no cubre las props `color={palette.accent}` de los íconos de lucide.
+    - **Skeletons inline con `palette.bgSoft`** (`App.jsx:1931`, `BookTinder.jsx:244-265`): ahora `bgSoft` es igual al fondo y no se ven. Las clases `.sema-skeleton` sí tienen brillo desde `d4172e8`.
+    - **Tarjetas de «Tu biblioteca»** (`App.jsx:3765-3768`): con `bgCard` igual al fondo se funden con él. Deben separarse con espacio o con `superficieSuave`.
+    - **Texto blanco sobre la fase ámbar de `STREAK_PHASES`:** se lee mal. Sobre cálido el texto debe ser `onFirma`.
+    - **Gato negro sobre negro puro** en Inicio, modo oscuro: la mascota casi desaparece.
+    - **ESLint no está configurado:** no hay `eslint.config.*`, `.eslintrc*` ni script `lint` en `package.json`. La única verificación automática es `npm run build`.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 
