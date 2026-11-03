@@ -32,50 +32,44 @@ JOIN public.posts b
 WHERE a.type = 'reading_session' AND b.type = 'reading_session'
 ORDER BY a.created_at DESC;
 
--- 2) Cuál se borraría: en cada grupo se conserva la de más «peso»
---    (texto > comentarios > likes > la más vieja).
-WITH pares AS (
-  SELECT p.*,
-         (SELECT count(*) FROM public.comments c WHERE c.post_id = p.id)   AS n_comentarios,
-         (SELECT count(*) FROM public.post_likes l WHERE l.post_id = p.id) AS n_likes,
-         min(p.created_at) OVER (PARTITION BY p.user_id, p.book_id, coalesce(p.pages_read, 0),
-                                 date_trunc('hour', p.created_at)) AS grupo_hora
-  FROM public.posts p
-  WHERE p.type = 'reading_session'
-),
-rank AS (
-  SELECT *, row_number() OVER (
-           PARTITION BY user_id, book_id, coalesce(pages_read, 0), grupo_hora
-           ORDER BY (coalesce(content, '') <> '') DESC, n_comentarios DESC, n_likes DESC, created_at ASC
-         ) AS orden,
-         count(*) OVER (PARTITION BY user_id, book_id, coalesce(pages_read, 0), grupo_hora) AS en_grupo
-  FROM pares
-)
-SELECT id, user_id, book_id, pages_read, created_at, content, n_comentarios, n_likes,
-       CASE WHEN orden = 1 THEN 'se queda' ELSE 'se borra' END AS decision
-FROM rank
-WHERE en_grupo > 1
-ORDER BY user_id, created_at;
+-- 2) Cuál se borraría. Se compara PAR CONTRA PAR (misma ventana de 10 min que
+--    el paso 1, no por hora del reloj): un post se borra solo si tiene un
+--    gemelo (mismo autor, libro y páginas, < 10 min) con más «peso»:
+--    texto > comentarios > likes > más viejo > id menor (desempate).
+CREATE TEMP VIEW sesiones_peso AS
+SELECT p.id, p.user_id, p.book_id, coalesce(p.pages_read, 0) AS pages, p.created_at, p.content,
+       (coalesce(p.content, '') <> '')::int                                  AS con_texto,
+       (SELECT count(*) FROM public.comments c WHERE c.post_id = p.id)       AS n_comentarios,
+       (SELECT count(*) FROM public.post_likes l WHERE l.post_id = p.id)     AS n_likes
+FROM public.posts p
+WHERE p.type = 'reading_session';
 
--- 3) Borrado (descomentar SOLO después de revisar el paso 2).
+SELECT x.id, x.user_id, x.book_id, x.pages, x.created_at, x.content, x.n_comentarios, x.n_likes,
+       'se borra' AS decision, y.id AS se_queda
+FROM sesiones_peso x
+JOIN sesiones_peso y
+  ON x.user_id = y.user_id AND x.book_id = y.book_id AND x.pages = y.pages AND x.id <> y.id
+ AND abs(extract(epoch FROM (x.created_at - y.created_at))) < 600
+ AND (y.con_texto, y.n_comentarios, y.n_likes, -extract(epoch FROM y.created_at), y.id::text)
+   > (x.con_texto, x.n_comentarios, x.n_likes, -extract(epoch FROM x.created_at), x.id::text)
+ORDER BY x.user_id, x.created_at;
+
+-- 3) Borrado. Descomentar SOLO después de revisar el paso 2, en la misma
+--    sesión del SQL Editor (usa la vista temporal del paso 2). Correr el
+--    DELETE, comparar el número de filas con el paso 2 y entonces COMMIT;
+--    si no cuadra, ROLLBACK.
 -- BEGIN;
--- WITH pares AS (
---   SELECT p.*,
---          (SELECT count(*) FROM public.comments c WHERE c.post_id = p.id)   AS n_comentarios,
---          (SELECT count(*) FROM public.post_likes l WHERE l.post_id = p.id) AS n_likes,
---          min(p.created_at) OVER (PARTITION BY p.user_id, p.book_id, coalesce(p.pages_read, 0),
---                                  date_trunc('hour', p.created_at)) AS grupo_hora
---   FROM public.posts p WHERE p.type = 'reading_session'
--- ), rank AS (
---   SELECT id, row_number() OVER (
---            PARTITION BY user_id, book_id, coalesce(pages_read, 0), grupo_hora
---            ORDER BY (coalesce(content, '') <> '') DESC, n_comentarios DESC, n_likes DESC, created_at ASC
---          ) AS orden
---   FROM pares
--- )
--- DELETE FROM public.posts WHERE id IN (SELECT id FROM rank WHERE orden > 1);
--- -- Revisar el número de filas; si cuadra con el paso 2: COMMIT; si no: ROLLBACK;
--- COMMIT;
+-- DELETE FROM public.posts
+-- WHERE id IN (
+--   SELECT x.id
+--   FROM sesiones_peso x
+--   JOIN sesiones_peso y
+--     ON x.user_id = y.user_id AND x.book_id = y.book_id AND x.pages = y.pages AND x.id <> y.id
+--    AND abs(extract(epoch FROM (x.created_at - y.created_at))) < 600
+--    AND (y.con_texto, y.n_comentarios, y.n_likes, -extract(epoch FROM y.created_at), y.id::text)
+--      > (x.con_texto, x.n_comentarios, x.n_likes, -extract(epoch FROM x.created_at), x.id::text)
+-- );
+-- -- ¿Cuadra con el paso 2? Entonces: COMMIT;   Si no: ROLLBACK;
 
 -- 4) Notificaciones de like duplicadas: ya cubiertas por
 --    supabase/lote_ui_2026-11-01.sql (pasos 3 y 4, índice notifications_like_once),

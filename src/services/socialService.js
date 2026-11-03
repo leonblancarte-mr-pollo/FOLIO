@@ -260,7 +260,8 @@ function collapseDuplicateSessions(posts) {
     if (twinIdx === -1) { kept.push(p); continue; }
     const twin = kept[twinIdx];
     // posts viene de más nuevo a más viejo: p es el más viejo del par.
-    const pick = (p.content || "").trim() && !(twin.content || "").trim() ? p : twin;
+    // Con comentario gana; si ninguna o las dos lo tienen, la más vieja (p).
+    const pick = (twin.content || "").trim() && !(p.content || "").trim() ? twin : p;
     kept[twinIdx] = { ...pick, minutes_read: pick.minutes_read || p.minutes_read || twin.minutes_read, duplicateIds: [...(twin.duplicateIds || []), pick === p ? twin.id : p.id] };
   }
   return kept;

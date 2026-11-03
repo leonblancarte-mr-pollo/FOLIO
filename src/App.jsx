@@ -6833,13 +6833,13 @@ async function attachNotifTargets(notifs) {
 
 // Los likes «en pares» venían de publicaciones de sesión duplicadas (mismo
 // libro y hora, ids distintos): la misma persona daba like a las dos. Se
-// muestra una sola notificación por (tipo, quien, a qué) en 10 minutos.
+// muestra una sola notificación por (tipo, quien, a qué) en 2 minutos.
 function collapseTwinNotifs(notifs) {
   const out = [];
   for (const n of notifs) {
     const t = new Date(n.created_at).getTime();
     const twin = out.find((o) => o.type === n.type && o.actor?.id === n.actor?.id && (o.target || o.post_id || o.comment_id) === (n.target || n.post_id || n.comment_id)
-      && Math.abs(new Date(o.created_at).getTime() - t) < 10 * 60 * 1000);
+      && Math.abs(new Date(o.created_at).getTime() - t) < 2 * 60 * 1000);
     if (twin) { if (!n.read) twin.read = false; twin.twinIds = [...(twin.twinIds || []), n.id]; continue; }
     out.push({ ...n });
   }
@@ -9207,7 +9207,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   async function handleDeletePost(postId) {
     setDeleting(true);
     try {
-      await deleteFeedPost(postId, user.id);
+      // Si la tarjeta junta gemelos de una sesión duplicada, se borran todos
+      // (si no, el gemelo oculto reaparece en la siguiente carga).
+      const twins = posts.find((p) => p.id === postId)?.duplicateIds || [];
+      for (const id of [postId, ...twins]) await deleteFeedPost(id, user.id);
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       setPostToDelete(null);
     } catch (err) {
