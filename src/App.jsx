@@ -2266,6 +2266,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       // una línea en su voz según el tipo de error (RECO_ERROR_LINES).
       console.error("[Para ti] no llegaron recomendaciones:", e?.kind || "desconocido", e?.status || "", e?.detail || e?.message || e);
       setError(recoErrorLine(e));
+      setErrorKind(e?.kind || "");
       setErrorDetail(import.meta.env.DEV ? [e?.kind || "error", e?.status, e?.detail || e?.message].filter(Boolean).join(" · ") : "");
     } finally {
       setLoading(false);
@@ -2555,6 +2556,9 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
             <div role="alert" id="reco-error-globo">
               <RecoCatBubble>{error}</RecoCatBubble>
             </div>
+            {errorDetail && (
+              <p style={{ ...ts.label, margin: "0.35rem 0 0 2.75rem" }}>Solo en desarrollo: {errorDetail}</p>
+            )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.25rem", marginTop: "0.2rem" }}>
               {errorKind === "session"
                 ? <button ref={retryRef} onClick={() => editStep(0)} className="btn-press" style={filledBtn} aria-describedby="reco-error-globo">Empezar de nuevo</button>
@@ -3838,6 +3842,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         const dayWord = (n) => (n === 1 ? "día" : "días");
         const sub = cur === 0
           ? "Con 5 minutos arranca"
+          : cur === 1 ? "Día uno. Cuenta igual" // mismo copy que Inicio (ronda 3, 2026-11-02)
           : cur >= best ? "Esto ya es récord" : `Récord: ${best} ${dayWord(best)}`;
         return (
           <div style={{ padding: "0.75rem 1.25rem 0.5rem" }}>
@@ -8644,7 +8649,7 @@ function RachaModal({ streak, paused = false, onClose }) {
         <Flame size={44} color={palette.ink} strokeWidth={1.8} style={{ margin: "0 auto" }} className={cur > 7 && !paused ? "fire-pulse" : ""} />
         <p style={{ ...display, fontWeight: 800, fontSize: "3rem", color: palette.ink, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
         <p style={{ ...display, fontSize: "1rem", color: palette.ink, fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}{paused ? " · en pausa" : ""}</p>
-        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>{cur > 0 && cur >= best ? "Esto ya es récord." : `Récord: ${best} ${best === 1 ? "día" : "días"}`}</p>
+        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>{cur === 1 ? "Día uno. Cuenta igual." : cur > 0 && cur >= best ? "Esto ya es récord." : `Récord: ${best} ${best === 1 ? "día" : "días"}`}</p>
         <p style={{ ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.45, marginTop: "1.25rem" }}>{msg}</p>
         <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", minHeight: 48, padding: "0.85rem", borderRadius: 12, border: `1.5px solid ${palette.ink}`, cursor: "pointer", backgroundColor: "transparent", color: palette.ink, ...display, fontWeight: 700, fontSize: "0.95rem" }}>
           Listo
@@ -8743,8 +8748,9 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const best = streak?.longest_streak || 0;
   const isDarkMode = palette.bg === PALETTE_DARK.bg;
   // Voz del gato (existencialista, sema-voz). Hoy todas las mascotas nuevas son gato.
-  // Prioridad: noche > racha en cero > con racha.
-  const petLine = h >= 21 ? "Ya es tarde. Una página y a dormir."
+  // Prioridad: noche > racha en cero > con racha. Noche desde las 20, igual que el saludo
+  // «Buenas noches» (correcciones ronda 3, 2026-11-02; antes 21).
+  const petLine = h >= 20 ? "Ya es tarde. Una página y a dormir."
     : cur === 0 ? "Nada tiene mucho sentido. Una página, quizá sí."
     : "Sin prisa. Los libros, a diferencia de todo, se quedan.";
   // Racha en pausa: mismo criterio que checkStreakOnLoad (streakService) sobre la fila que
@@ -8810,26 +8816,41 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
 
   return (
     <div style={{ padding: `${sp.lg} 1.25rem ${sp.xxl}`, maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: sp.xl }}>
-      {/* Saludo grande en Bricolage; el nombre en su propia línea para que no se parta raro */}
-      <h1 style={{ ...display, fontSize: "32px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", color: palette.ink, overflowWrap: "anywhere" }}>
-        {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
-      </h1>
+      {/* Ronda 3 (2026-11-02, pedido de León): cabecera en DOS columnas. Izquierda: saludo + racha;
+          derecha: el gato grande y suelto (sin sticker detrás). Sustituye a la ronda 2 (h1 a ancho
+          completo y gato de 132 px sobre papel lila). Medidas: el gato mide 300 px de alto en un
+          wrapper de 200 px de ancho (PNG 408 × 612; el cuerpo ocupa ~229 × 149 px con ~26 px
+          transparentes a cada lado y ~36 arriba y abajo). Los márgenes negativos del botón del
+          gato solo se comen esos flancos transparentes: −12 a la izquierda (sobre el hueco de la
+          columna), −2.25rem (36 px) a la derecha = padding lateral (20) + 16 px del flanco, con lo
+          que el cuerpo queda ~9 px dentro del borde y solo asoman los bigotes; <main> ya recorta
+          en X, así que no hay scroll horizontal. −30 arriba y −22 abajo para que las orejas no
+          separen el saludo de la cabecera y las patas apoyen al nivel de la racha. Columna
+          izquierda: 350−152=198 px a 390, 183 a 375 y 168 a 360; la racha baja su mínimo a 150
+          y ocupa toda la columna. */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
+        <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: sp.md }}>
+          {/* Saludo grande en Bricolage; el nombre en su propia línea para que no se parta raro.
+              En la columna angosta «Buenas noches,» se parte por palabra (Buenas / noches, / León). */}
+          <h1 style={{ ...display, fontSize: "32px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", color: palette.ink, overflowWrap: "anywhere" }}>
+            {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
+          </h1>
 
-      {/* Ronda 2 (2026-11-02): racha y gato en la misma fila (pedido de León). La racha se ajusta
-          a su contenido (mín. 176 px) y el gato (132 px, antes 80) se centra en el resto de la fila.
-          Para que quepa en 375 px, el número va con la llama arriba y «días de racha» debajo. */}
-      <div style={{ display: "flex", alignItems: "center", gap: sp.xs }}>
-        {/* Progreso siempre visible: la racha es un sticker lila con textura de papel */}
+        {/* Progreso siempre visible: la racha es un sticker lila con textura de papel.
+            El número va con la llama arriba y «días de racha» debajo para caber en la columna. */}
         <button
           onClick={() => setRachaOpen(true)}
           className="btn-press sema-no-hover sema-papel sema-sticker"
           aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
           style={{
-            flex: "0 1 auto", minWidth: 176, minHeight: 44, textAlign: "left", cursor: "pointer",
+            width: "100%", minWidth: 150, minHeight: 44, textAlign: "left", cursor: "pointer",
+            // zIndex (correcciones ronda 3): el botón del gato, con sus márgenes negativos, pisaba
+            // los 13 px del borde derecho de la racha. .sema-papel ya la hace position: relative.
+            zIndex: 1,
             backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
             // Canto de sticker recortado: filo del color de fondo + línea de tinta (sin desenfoque).
             border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
-            padding: "0.85rem 1rem 0.95rem", display: "block",
+            padding: "0.85rem 0.95rem 0.95rem", display: "block",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
@@ -8844,29 +8865,66 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
               ? "Con 5 minutos arranca."
               : streakPaused
                 ? "No rota. Cualquier día sirve para volver."
-                : cur >= best
-                  ? "Esto ya es récord."
-                  : `Récord: ${best} ${dayWord(best)}`}
+                : cur === 1
+                  ? "Día uno. Cuenta igual." // correcciones ronda 3: «récord» con 1 día sonaba hueco
+                  : cur >= best
+                    ? "Esto ya es récord."
+                    : `Récord: ${best} ${dayWord(best)}`}
           </p>
         </button>
+        </div>
 
-        {/* El gato junto a la racha (principio 6). Solo cambia su tamaño y posición; la animación
-            es la de PetDisplay. Detrás, igual en claro y oscuro, un sticker de papel lila
-            rectangular girado +4° con canto bg y filo ink (como la racha); el gato va encima y
-            sin girar, con las orejas asomando por arriba (collage). Reemplaza al disco lila que
-            solo iba en oscuro (leía como «ícono en círculo»). */}
+        {/* El gato grande y suelto, columna derecha (principio 6; León, ronda 3: supera el «gato
+            pequeño» de sema-identidad §5). Sin caja detrás: es un recorte. En oscuro usa
+            /pets/cat-recorte.png (correcciones ronda 3): el mismo cat.png con 24 px de margen y un
+            canto blanco horneado de ~8 px que sigue la silueta, como sticker troquelado, para que
+            el gato negro no se funda con el negro; sustituye a la pila de drop-shadow (halo difuso
+            en los bigotes y 8 filtros por fotograma). En claro sigue cat.png sin contorno.
+            Para que el CUERPO mida y caiga igual en los dos modos, el PNG oscuro se escala con el
+            mismo factor (300/612 = 0.4902 → 323.5 × 223.5) y cada margen negativo crece 24 × 0.49
+            ≈ 12 px (caja alfa medida: cat.png cuerpo en x 53–357 / y 73–540; cat-recorte.png en
+            x 77–381 / y 97–564). La animación (bob y respiración) sigue siendo la de PetDisplay;
+            en prefers-reduced-motion se detiene solo aquí (index.css, bloque «Inicio · gato»). */}
         {pet && (
-          <button onClick={onOpenPet} aria-label={`Ver a ${pet.pet_name}`} className="btn-press sema-no-hover" style={{ flex: "1 0 132px", position: "relative", height: 132, background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span aria-hidden className="sema-papel" style={{ position: "absolute", left: "50%", top: "50%", width: 104, height: 108, marginLeft: -52, marginTop: -44, borderRadius: 12, backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, transform: "rotate(4deg)" }} />
-            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={132} showShadow={false} style={{ position: "relative" }} />
+          <button
+            onClick={onOpenPet}
+            aria-label={`Ver a ${pet.pet_name}`}
+            className="btn-press sema-no-hover"
+            style={{
+              flex: "0 0 auto", width: isDarkMode ? 223.5 : 200,
+              marginLeft: isDarkMode ? -24 : -12, marginRight: isDarkMode ? -48 : -36,
+              marginTop: isDarkMode ? -42 : -30, marginBottom: isDarkMode ? -34 : -22,
+              background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}
+          >
+            <PetDisplay
+              petType={pet.pet_type}
+              petName={pet.pet_name}
+              px={isDarkMode ? 323.5 : 300}
+              wPx={isDarkMode ? 223.5 : 200}
+              src={isDarkMode ? "/pets/cat-recorte.png" : undefined}
+              showShadow={false}
+            />
           </button>
         )}
       </div>
 
-      {/* Lo que dice el gato, debajo de la fila: frase en Bricolage 600 / inkSoft para no competir
-          con los títulos de libro. */}
+      {/* Lo que dice el gato (ronda 3): globo de cómic debajo de la fila, pegado a la derecha,
+          bajo el gato. Mismo globo que «Para ti» (recoCatBubbleStyle: bg, filo de tinta 1.5 px,
+          radio 18). Correcciones ronda 3: en vez de la esquina casi recta (no leía como cola),
+          una COLA triangular SVG de 18 × 10 px apuntando arriba, relleno bg y filo ink, que tapa
+          el filo del globo en su base. Va a 34 px del borde derecho del globo: el gato está
+          anclado a la derecha con ancho fijo, así que ahí caen siempre sus patas delanteras en
+          390, 375 y 360. El globo sube (marginTop −sp.lg) hasta casi tocar las patas y lleva
+          position: relative + zIndex 1 para que el botón del gato (márgenes negativos) no lo pise.
+          Va debajo y no junto a la cabeza porque la columna izquierda ya la llenan el saludo y
+          la racha: ahí un globo no cabe a 360 px sin partirse. */}
       {pet && (
-        <p style={{ ...display, fontWeight: 600, fontSize: "17px", lineHeight: 1.3, color: palette.inkSoft, marginTop: `-${sp.md}` }}>
+        <p style={{ ...recoCatBubbleStyle(), position: "relative", zIndex: 1, alignSelf: "flex-end", maxWidth: "88%", padding: "0.65rem 0.95rem", marginTop: `-${sp.lg}`, marginRight: "0.25rem" }}>
+          <svg aria-hidden width="18" height="11" viewBox="0 0 18 11" style={{ position: "absolute", top: -10, right: 34, display: "block", overflow: "visible" }}>
+            <polygon points="0,11 9,0.8 18,11" fill={palette.bg} />
+            <path d="M0,11 L9,0.8 L18,11" fill="none" stroke={palette.ink} strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
           <span className="sr-only">{pet.pet_name} dice: </span>{petLine}
         </p>
       )}
