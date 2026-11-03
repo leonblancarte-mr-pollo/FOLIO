@@ -5,7 +5,8 @@ import { palette, PALETTE_DARK, display } from "../theme.js";
 // 5.85:1 en oscuro), borde de 2 px en `onAccent` y sombra SÓLIDA desplazada sin desenfoque:
 // tinta en claro y firma lila en oscuro (la tinta oscura es blanca y leía como marco doble).
 // Al presionar se «hunde»: se traslada lo mismo que la sombra y la sombra baja a 0.
-// Brillo sutil arriba con color-mix de `onColor` (sin hex fuera de theme.js).
+// Relleno plano: el brillo de arriba se quitó en la ronda 2 de correcciones (en oscuro deslavaba
+// el durazno a beige).
 // Las reglas viven en index.css (.sema-sticker-btn); aquí solo se pasan los colores como variables.
 //
 //   <StickerButton icon={ArrowRight} onClick={...}>Leer ahora</StickerButton>
@@ -23,7 +24,6 @@ function StickerButton({ children, icon: Icon, leadingIcon: Lead, size = "md", f
       style={{
         "--sb-bg": palette.accent,
         "--sb-ink": palette.onAccent,
-        "--sb-shine": palette.onColor,
         "--sb-shadow": isDark ? palette.firma : palette.ink,
         "--sb-focus": palette.ink,
         width: fullWidth ? "100%" : "auto",

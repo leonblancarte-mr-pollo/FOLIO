@@ -21,7 +21,7 @@ Nunca se usan como fondo grande.
 
 **Reparto de los acentos (decidido con León, 2026-11-02):**
 - **Acción principal: durazno** `#F79F79` en claro y `#F9B294` en oscuro. El único botón relleno de cada pantalla, la píldora activa y el progreso.
-- **Firma de marca: lila** `#BBADFF`. Racha, stickers, borde rasgado de la barra inferior y marcos de celebración.
+- **Firma de marca: lila** `#BBADFF`. Racha, stickers, marca de la pestaña activa de la barra inferior (cinta lila, 2026-11-02, ronda 2) y marcos de celebración.
 - **Complemento frío: azul acero** `#456990`. Reseñas y estados informativos.
 
 **Degradados.** Permitidos **solo como acento** en tarjetas destacadas y barras de progreso, con dos combinaciones fijas de `sema-paleta`: cereza → durazno (`degradadoAcento`) y lila → azul acero (`degradadoFrio`). Nunca como fondo de pantalla completa ni como fondo de texto largo. Las reglas de texto encima están en `sema-paleta` §5.
@@ -44,7 +44,7 @@ Nunca se usan como fondo grande.
 
 ## 5. Aprobado por León
 
-- **Barra inferior** con borde superior **rasgado tipo revista**, en lila (firma `#BBADFF`).
+- **Barra inferior** de papel arrugado con borde superior **rasgado tipo revista**, de una sola pieza: el canto rasgado es la silueta de la barra, mismo color y textura que el cuerpo (`superficieSuave`: arena `#E7D7C1` en claro, ciruela `#483A58` en oscuro), sin franja ni filete lila (León, 2026-11-02, ronda 2). Pestaña activa: ícono y etiqueta en tinta con más peso y una cinta lila (`firma`) de 24×6 px girada −3° debajo, con contorno de tinta en claro; nunca la píldora durazno. Mascota es una pestaña más (huella Lucide + «Mascota»).
 - **Stickers y boletos** como complementos.
 - **El gato en Inicio:** pequeño, nunca ocupando la pantalla.
 - **Textura de papel arrugado:**

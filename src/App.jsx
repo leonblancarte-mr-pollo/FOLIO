@@ -709,9 +709,9 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
 
 function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }) {
   // Ronda 2 (2026-11-02): papel rasgado de una sola pieza (ver .sema-nav-rasgado en index.css).
-  // Activa: ícono y etiqueta en tinta con trazo y peso mayores + marca lila de 20×4 px debajo
-  // (en claro con contorno de tinta, porque lila sobre arena da 1.46). Inactivas en inkSoft
-  // (4.90 sobre arena, 7.1 sobre ciruela). Sin píldora durazno: el durazno queda solo para
+  // Activa: ícono y etiqueta en tinta con trazo y peso mayores + cinta lila de 24×6 px girada −3°
+  // (en claro con contorno de tinta, porque lila sobre arena da 1.41). Inactivas en inkSoft 600
+  // (4.90 sobre arena, 4.57 en el pliegue más oscuro del papel; 7.36 sobre ciruela). Sin píldora durazno: el durazno queda solo para
   // la acción principal de cada pantalla. Mascota es una pestaña más (huella + etiqueta) que
   // abre el panel de la mascota como antes. `pet` ya no se usa aquí (se deja por la firma).
   const isLight = palette.bg !== PALETTE_DARK.bg;
@@ -736,7 +736,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
             aria-current={active ? "page" : undefined}
             onClick={() => { haptic(HAPTIC.NAV); if (isCenter && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
             className="flex-1 flex flex-col items-center justify-center sema-nav-item"
-            style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 56, padding: "4px 0" }}
+            style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 56, padding: 0 }}
           >
             <div className={active ? undefined : "sema-nav-pill"} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
@@ -746,14 +746,16 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
               <span style={{ position: "relative", display: "inline-flex" }}>
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} color={tint} />
                 {badge > 0 && (
-                  <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif" }}>
+                  <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif", boxShadow: isLight ? "none" : `0 0 0 2px ${palette.bg}` }}>
                     {badge > 9 ? "9+" : badge}
                   </span>
                 )}
               </span>
-              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "12px", fontWeight: active ? 800 : 500, lineHeight: 1, color: tint }}>{t.label}</span>
+              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
+              {/* Marca activa tipo cinta (ronda 2 de correcciones): tira 24×6, radio 1, girada −3°. */}
               <span aria-hidden="true" style={{
-                width: 20, height: 4, borderRadius: 999,
+                width: 24, height: 6, borderRadius: 1,
+                transform: "rotate(-3deg)",
                 backgroundColor: active ? palette.firma : "transparent",
                 boxShadow: active && isLight ? `0 0 0 1.5px ${palette.ink}` : "none",
               }} />
@@ -2051,8 +2053,8 @@ const RECO_QUIZ_STEPS = [
     ],
   },
 ];
-const RECO_INTRO = "Elegir qué leer, eso sí depende de uno. Unas preguntas rápidas y te paso ideas.";
-const RECO_EXTRA_ASK = "Última, y es opcional: ¿algo más que deba saber? Un autor, un país, un final abierto…";
+const RECO_INTRO = "Elegir qué leer sí depende de uno. Cinco preguntas rapidito y te paso ideas.";
+const RECO_EXTRA_ASK = "Última: ¿algo más que deba saber? Un autor, un país, un final abierto…";
 // Texto visible de una respuesta guardada (el valor sigue siendo el de la IA).
 function recoLabel(key, value) {
   const q = RECO_QUIZ_STEPS.find((s) => s.key === key);
@@ -2105,7 +2107,9 @@ function RecoPoll({ q, n, onChoose, groupRef }) {
     <div className="reco-msg-in" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
       <RecoCatAvatar />
       <div style={{ ...recoCatBubbleStyle(), flex: 1, minWidth: 0, maxWidth: 320, overflow: "hidden", paddingTop: "0.75rem" }}>
-        <p id={qid} style={{ ...body, fontSize: "16px", fontWeight: 600, lineHeight: 1.4, color: palette.ink, margin: 0, padding: "0 0.95rem" }}>
+        {/* La pregunta abierta se destaca con la fuente de títulos (Bricolage 17 px), no con más
+            peso de Figtree: así no se lee como formulario junto a los globos de 400. */}
+        <p id={qid} style={{ ...display, fontSize: "17px", fontWeight: 700, lineHeight: 1.35, color: palette.ink, margin: 0, padding: "0 0.95rem" }}>
           {q.ask}
         </p>
         <p id={cid} style={{ ...ts.label, margin: "0.3rem 0 0.5rem", padding: "0 0.95rem" }}>
@@ -2375,7 +2379,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
           <RecoCatBubble>
             {empty
               ? "Esta vez no di con nada que te quede. Pasa a veces. ¿Probamos con otro ánimo?"
-              : "Listo. Esto es lo que yo leería en tu lugar hoy."}
+              : "Listo. Si yo fuera tú, que no lo soy, hoy leería esto."}
           </RecoCatBubble>
         </div>
 
@@ -5118,11 +5122,11 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
 
   const score = Math.min(100, Math.round(genreScore + bookScore + ratingScore + habitScore));
 
-  const label = score >= 90 ? "Almas gemelas literarias"
-    : score >= 70 ? "Lectores muy compatibles"
-    : score >= 50 ? "Buenos compañeros de lectura"
-    : score >= 30 ? "Mundos distintos, misma pasión"
-    : "Se complementan perfectamente";
+  const label = score >= 90 ? "Casi el mismo estante"
+    : score >= 70 ? "Leen muy parecido"
+    : score >= 50 ? "Buen par para prestarse libros"
+    : score >= 30 ? "Gustos distintos, buena plática"
+    : "Cada quien por su lado. Ahí hay recomendaciones.";
 
   const onlyU = [...uGenres].filter((g) => !fGenres.has(g)).sort((a, b) => (uGenreCounts[b] || 0) - (uGenreCounts[a] || 0));
   const onlyF = [...fGenres].filter((g) => !uGenres.has(g)).sort((a, b) => (fGenreCounts[b] || 0) - (fGenreCounts[a] || 0));
@@ -5193,7 +5197,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
                 {topCommon.map((g) => <span key={g} style={chip(palette.ink, palette.bg)}>{g}</span>)}
               </div>
             ) : (
-              <p style={{ ...body, fontSize: "15px", color: palette.ink }}>Ningún género todavía. Buen pretexto para prestarse uno.</p>
+              <p style={{ ...body, fontSize: "15px", color: palette.ink }}>Todavía nada en común.<br />Buen pretexto para prestarse un libro.</p>
             )}
           </div>
           {onlyF.length > 0 && (
@@ -5409,25 +5413,27 @@ function FriendProfileModal({ friend, user, onClose }) {
     setMainRequestSent(true);
   }
 
-  // Estadística: bloque de color de SEMA_EXTENDIDA con canto de sticker (filo bg + línea ink),
-  // número y etiqueta en onFirma (#483A58, ≥ 4.77:1 en los 9 colores).
+  // Estadística (ronda 2, corrección): sin caja rellena. Cifra 28 px 800 en ink, una cinta gruesa
+  // del color de SEMA_EXTENDIDA debajo (decorativa: la información está en la cifra y la etiqueta)
+  // y la etiqueta en inkSoft. Foco: el global en ink (sin sema-focus-onfirma).
   function StatCard({ label, value, statKey }) {
-    const c = statColors[`${friend.id}:${statKey}`] || { hex: palette.firma, on: palette.onFirma };
+    const c = statColors[`${friend.id}:${statKey}`] || { hex: palette.firma };
     return (
       <button
         onClick={() => setExpandedStat(statKey)}
         aria-label={`${value} ${label}. Ver lista`}
-        className="btn-press sema-focus-onfirma"
+        className="btn-press"
         style={{
-          flex: 1, minWidth: 0, backgroundColor: c.hex, color: c.on,
-          border: `2px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
-          borderRadius: 12, padding: "0.7rem 0.25rem 0.5rem", textAlign: "center", cursor: "pointer",
-          minHeight: 84, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2,
+          flex: 1, minWidth: 0, background: "none", border: "none", borderRadius: 8,
+          padding: "0.25rem 0.25rem 0.4rem", textAlign: "center", cursor: "pointer",
+          minHeight: 84, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
         }}
       >
-        <span style={{ ...display, fontSize: "1.6rem", fontWeight: 800, color: c.on, lineHeight: 1 }}>{value}</span>
-        <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: c.on }}>{label}</span>
-        <ChevronDown size={14} color={c.on} aria-hidden />
+        <span style={{ ...display, fontSize: "28px", fontWeight: 800, color: palette.ink, lineHeight: 1 }}>{value}</span>
+        <span aria-hidden style={{ display: "block", width: "72%", maxWidth: 64, height: 8, borderRadius: 2, backgroundColor: c.hex }} />
+        <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, display: "inline-flex", alignItems: "center", gap: 2 }}>
+          {label}<ChevronDown size={14} color={palette.inkSoft} aria-hidden />
+        </span>
       </button>
     );
   }
@@ -5480,7 +5486,7 @@ function FriendProfileModal({ friend, user, onClose }) {
           )}
         </div>
 
-        {/* Agregar como amigo: única acción principal (durazno + onAccent) */}
+        {/* Mandar solicitud: única acción principal (durazno + onAccent) */}
         {user && !loading && friend.id !== user.id && !userFriendIds.has(friend.id) && (
           <div style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: "0.75rem" }}>
             {(userPendingIds.has(friend.id) || mainRequestSent) ? (
@@ -5494,7 +5500,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                 style={{ width: "100%", minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "999px", padding: "0.75rem 1rem", cursor: "pointer", ...display, fontSize: "16px", fontWeight: 700 }}
               >
                 <UserPlus size={18} aria-hidden />
-                Agregar como amigo
+                Mandar solicitud
               </button>
             )}
           </div>
@@ -5528,7 +5534,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                 </div>
                 <p style={{ ...display, fontSize: "1.15rem", fontWeight: 700, color: palette.ink, marginBottom: "0.35rem" }}>Este perfil es privado</p>
                 <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.5, maxWidth: 300, margin: "0 auto" }}>
-                  Solo sus amigos ven sus libros, su racha y su actividad. Con una solicitud se abre la biblioteca.
+                  Sus libros, su racha y su actividad solo los ven sus amigos.<br />Si acepta la solicitud, se abre todo.
                 </p>
               </div>
             ) : (
@@ -5539,30 +5545,50 @@ function FriendProfileModal({ friend, user, onClose }) {
                 </div>
 
                 {/* Racha: el mismo sticker lila con papel de Inicio y Mi perfil (antes dos tarjetas verdes) */}
-                {friendStreak && (() => {
-                  const cur = friendStreak.current_streak || 0;
-                  const best = friendStreak.longest_streak || 0;
+                {/* Corrección ronda 2: la mascota del amigo va al lado del sticker (como en Inicio), sin hueco a la derecha */}
+                {(friendStreak || friendPet) && (() => {
+                  const cur = friendStreak?.current_streak || 0;
+                  const best = friendStreak?.longest_streak || 0;
                   const dayWord = (n) => (n === 1 ? "día" : "días");
                   const sub = cur > 0 && cur >= best ? "Esto ya es récord" : best > 0 ? `Récord: ${best} ${dayWord(best)}` : "Todavía sin racha";
                   return (
-                    <div
-                      className="sema-papel sema-sticker"
-                      role="img"
-                      aria-label={`${cur} ${dayWord(cur)} de racha. ${sub}`}
-                      style={{
-                        width: "fit-content", maxWidth: "100%", marginLeft: 4,
-                        backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
-                        border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
-                        padding: "0.9rem 1.15rem 1rem", display: "flex", alignItems: "center", gap: sp.md,
-                      }}
-                    >
-                      <Flame size={34} strokeWidth={2} color={palette.onFirma} style={{ flexShrink: 0 }} aria-hidden />
-                      <div style={{ minWidth: 0 }}>
-                        <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
-                          {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
-                        </p>
-                        <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, marginTop: "0.35rem" }}>{sub}</p>
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: sp.sm }}>
+                      {friendStreak && (
+                        <div
+                          className="sema-papel sema-sticker"
+                          role="img"
+                          aria-label={`${cur} ${dayWord(cur)} de racha. ${sub}`}
+                          style={{
+                            flex: friendPet ? "1 1 auto" : "1 1 100%", minWidth: 0, marginLeft: 4,
+                            backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
+                            border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
+                            padding: "0.9rem 1rem 1rem", display: "flex", alignItems: "center", gap: sp.sm,
+                          }}
+                        >
+                          <Flame size={30} strokeWidth={2} color={palette.onFirma} style={{ flexShrink: 0 }} aria-hidden />
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
+                              {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
+                            </p>
+                            <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, marginTop: "0.35rem" }}>{sub}</p>
+                          </div>
+                        </div>
+                      )}
+                      {/* Su mascota: pequeña, al lado; en oscuro, disco lila detrás como en Inicio */}
+                      {friendPet && (
+                        <div role="img" aria-label={`Su mascota: ${friendPet.pet_name || "sin nombre"}, nivel ${friendPet.level}`} style={{ flexShrink: 0, width: 88, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                          <span style={{ position: "relative", display: "inline-flex", width: 80, height: 80 }}>
+                            {isDark && (
+                              <span aria-hidden style={{ position: "absolute", left: 4, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma }} />
+                            )}
+                            <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} px={80} showShadow={false} style={{ position: "relative" }} />
+                          </span>
+                          <p style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink, lineHeight: 1.15, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+                            {friendPet.pet_name || "Su mascota"}
+                          </p>
+                          <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft }}>Nivel {friendPet.level}</p>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -5595,29 +5621,6 @@ function FriendProfileModal({ friend, user, onClose }) {
                   </div>
                 )}
 
-                {/* Su compañero (mascota): sin caja; en oscuro, disco lila detrás como en Inicio */}
-                {friendPet && (
-                  <div>
-                    <p style={secLabel}>Su compañero</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: sp.md }}>
-                      <span style={{ flexShrink: 0, position: "relative", display: "inline-flex", width: 96, height: 96, marginLeft: isDark ? -10 : -28 }}>
-                        {isDark && (
-                          <span aria-hidden style={{ position: "absolute", left: 10, top: 5, width: 86, height: 86, borderRadius: "50%", backgroundColor: palette.firma }} />
-                        )}
-                        <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} px={96} showShadow={false} style={{ position: "relative" }} />
-                      </span>
-                      <div>
-                        <p style={{ ...display, fontWeight: 800, fontSize: "1.3rem", color: palette.ink, lineHeight: 1.1 }}>
-                          {friendPet.pet_name || "Su compañero"}
-                        </p>
-                        <p style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.inkSoft, marginTop: "0.25rem" }}>
-                          Nivel {friendPet.level}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <ReadingHeatmap userId={friend.id} />
 
                 <LiteraryCompatibility
@@ -5641,7 +5644,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                             key={genre}
                             onClick={() => setExpandedGenreF(isOpen ? null : genre)}
                             aria-expanded={isOpen}
-                            className={isOpen ? "btn-press sema-focus-onfirma" : "btn-press"}
+                            className="btn-press"
                             style={{
                               ...body, fontSize: "15px", fontWeight: 600, minHeight: 44, padding: "0 1rem", borderRadius: 999, cursor: "pointer",
                               backgroundColor: isOpen ? palette.firma : palette.bg,
@@ -5696,7 +5699,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                           <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>+{mutuals.length - 3} más</span>
                         )}
                         <button onClick={() => setMutualsExpanded(!mutualsExpanded)} aria-expanded={mutualsExpanded} style={quietBtn}>
-                          {mutualsExpanded ? "Ocultar" : "Ver todos"}
+                          {mutualsExpanded ? "Ver menos" : "Ver todos"}
                           <ChevronDown size={16} aria-hidden style={{ transform: mutualsExpanded ? "rotate(180deg)" : "none" }} />
                         </button>
                       </div>
@@ -5746,7 +5749,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                                   <Check size={14} color={palette.success} aria-hidden /> Amigos
                                 </span>
                               ) : isPending ? (
-                                <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, flexShrink: 0 }}>Enviado</span>
+                                <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, flexShrink: 0 }}>Enviada</span>
                               ) : (
                                 <button
                                   onClick={() => sendRequestToFriendOfFriend(fof.id)}
@@ -5820,29 +5823,13 @@ function FriendProfileModal({ friend, user, onClose }) {
                 {friendPublicQuotes.length > 0 && (
                   <div>
                     <p style={secLabel}>Frases guardadas ({friendPublicQuotes.length})</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: sp.sm }}>
-                      {friendPublicQuotes.map(q => {
-                        const moodLabel = MOOD_OPTIONS.find(m => m.key === q.mood)?.label?.replace(/^[^\p{L}]+/u, "");
-                        return (
-                          <div key={q.id} style={{ backgroundColor: isDark ? palette.superficieSuave : palette.ink, borderRadius: 14, padding: "1.1rem 1.1rem 1rem" }}>
-                            <p style={{ ...quoteFont, fontSize: "20px", fontStyle: "italic", color: palette.onColor, lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                              {q.text}
-                            </p>
-                            <div style={{ display: "flex", alignItems: "center", gap: sp.sm, marginTop: sp.sm, flexWrap: "wrap" }}>
-                              {q.bookTitle && (
-                                <span style={{ ...body, fontSize: "13px", color: palette.onDarkSoft, fontWeight: 500 }}>
-                                  {q.bookTitle}
-                                </span>
-                              )}
-                              {moodLabel && (
-                                <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, backgroundColor: palette.firma, borderRadius: "999px", padding: "2px 10px" }}>
-                                  {moodLabel}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {/* Corrección ronda 2: el mismo cuerpo de frase del feed (FeedQuoteBody), separadas con filete */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {friendPublicQuotes.map((q, i) => (
+                        <div key={q.id} style={{ padding: "0.75rem 0 1rem", ...rowDivider(i, friendPublicQuotes.length) }}>
+                          <FeedQuoteBody quote={q} />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -6003,17 +5990,17 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
         borderBottom: `1px solid ${palette.border}`,
         flexShrink: 0,
       }}>
-        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.4rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
-          <ChevronLeft size={22} color={palette.ink} />
+        <button onClick={onClose} aria-label="Volver" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, width: 44, height: 44, marginLeft: -10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <ChevronLeft size={22} color={palette.ink} aria-hidden />
         </button>
         <div style={{ flex: 1, overflow: "hidden" }}>
           <p style={{ ...display, fontSize: "0.88rem", color: palette.ink, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {cuento.titulo}
           </p>
-          <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, margin: 0 }}>{cuento.autor}</p>
+          <p style={{ ...body, fontSize: "13px", color: palette.inkFaint, margin: 0 }}>{cuento.autor}</p>
         </div>
-        <span style={{ ...body, fontSize: "0.75rem", color: pct >= 95 ? palette.sage : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
-          {pct >= 95 ? "✓ Leído" : `${pct}%`}
+        <span style={{ ...body, fontSize: "13px", color: pct >= 95 ? palette.sage : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
+          {pct >= 95 ? "Leído" : `${pct}%`}
         </span>
       </div>
 
@@ -8301,7 +8288,7 @@ function cuentoDuracion(c) {
 // ── Cuento del día hero ────────────────────────────────────────────────────
 // Ronda 2 (2026-11-02): tarjeta destacada con carácter. Contenedor de una acción (borde 2 px de
 // tinta), franja superior con degradado de acento de la paleta extendida (uno por cuento, estable
-// con pickByHash; se salta el cereza → durazno para que la franja no se funda con el botón
+// con pickByHash; solo los fríos, para que la franja no se funda con el botón
 // durazno). Sobre el degradado solo van stickers con su propio fondo (bg / firma) y la portada de
 // papel: ningún texto chico toca el degradado (sema-paleta §5). Título, autor y descripción van
 // sobre bg. «Leer ahora» es la única acción rellena de Social (principio 1), con StickerButton.
@@ -8309,7 +8296,10 @@ function SnacksHero({ onRead }) {
   const cuento = getCuentoDelDia();
   if (!cuento) return null;
 
-  const grad = pickByHash(SEMA_GRADIENTES_TERMINADO.filter((g) => g.key !== "acento"), cuento.id);
+  // Solo degradados fríos (corrección ronda 2): los cálidos le restaban fuerza al botón durazno y
+  // coincidían con «Libro terminado» del feed vecino.
+  const FRIOS = ["turquesa-cielo", "cielo-pervinca", "menta-turquesa", "pervinca-orquidea"];
+  const grad = pickByHash(SEMA_GRADIENTES_TERMINADO.filter((g) => FRIOS.includes(g.key)), cuento.id);
   const minutos = cuentoDuracion(cuento);
   const inicial = (cuento.titulo || "").replace(/^(El|La|Los|Las|Un|Una)\s+/i, "").trim().charAt(0).toUpperCase();
   const isDark = palette.bg === PALETTE_DARK.bg;
@@ -8650,20 +8640,20 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
               {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{primary.title}</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Continuar</p>
               <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{primary.author}</p>
             </div>
           </button>
         )}
         {cuento && (
-          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.border}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
             {/* Ícono suelto, sin cuadro de color (sema-identidad: nada de íconos genéricos en círculos) */}
             <div style={{ width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Feather size={24} color={palette.ink} strokeWidth={1.8} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día{cuentoDuracion(cuento) ? ` · ${cuentoDuracion(cuento)}` : ""}</p>
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Cuento del día{cuentoDuracion(cuento) ? ` · ${cuentoDuracion(cuento)}` : ""}</p>
               <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{cuento.autor}</p>
             </div>
@@ -8822,13 +8812,13 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         </button>
 
         {/* El gato junto a la racha (principio 6). Solo cambia su tamaño y posición; la animación
-            es la de PetDisplay. En oscuro, disco plano lila (firma, igual que el de la
-            barra inferior) que recorta al gato negro del fondo. */}
+            es la de PetDisplay. Detrás, igual en claro y oscuro, un sticker de papel lila
+            rectangular girado +4° con canto bg y filo ink (como la racha); el gato va encima y
+            sin girar, con las orejas asomando por arriba (collage). Reemplaza al disco lila que
+            solo iba en oscuro (leía como «ícono en círculo»). */}
         {pet && (
           <button onClick={onOpenPet} aria-label={`Ver a ${pet.pet_name}`} className="btn-press sema-no-hover" style={{ flex: "1 0 132px", position: "relative", height: 132, background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {isDarkMode && (
-              <span aria-hidden style={{ position: "absolute", left: "50%", top: "50%", width: 120, height: 120, marginLeft: -60, marginTop: -60, borderRadius: "50%", backgroundColor: palette.firma }} />
-            )}
+            <span aria-hidden className="sema-papel" style={{ position: "absolute", left: "50%", top: "50%", width: 104, height: 108, marginLeft: -52, marginTop: -44, borderRadius: 12, backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, transform: "rotate(4deg)" }} />
             <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={132} showShadow={false} style={{ position: "relative" }} />
           </button>
         )}
@@ -9318,8 +9308,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   );
   // Franja superior del tipo de publicación (texto 14 px en negritas; contraste en la tabla de §6).
   const band = (bg, color, Icon, label, extra, extraStyle = {}) => (
-    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 16px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
-      <Icon size={17} strokeWidth={2.1} color={color} aria-hidden />
+    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "7px 14px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
+      <Icon size={14} strokeWidth={2.2} color={color} aria-hidden />
       <span>{label}</span>
       {extra}
     </div>
@@ -9343,9 +9333,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         ) : <span style={{ minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Avatar author={post.author} size={40} /></span>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.3 }}>
-            {other ? (
-              <button tabIndex={-1} onClick={(e) => { e.stopPropagation(); openAuthor(post); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</button>
-            ) : <span style={{ ...display, fontWeight: 700, color: palette.ink }}>{name}</span>}
+            {/* Ronda 2 (accesibilidad): el nombre ya no es botón (medía 20 px de alto); el perfil se abre con el avatar de 44×44 */}
+            <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</span>
             {verb ? <> {verb}</> : null}
           </p>
           <span style={{ ...ts.caption, color: palette.inkSoft }}>{timeAgo(post.created_at)}</span>
@@ -9420,7 +9409,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     <div className="sema-sticker">
                       <div className="achieve-icon-enter sema-papel" style={{ display: "inline-flex", alignItems: "center", gap: 10, backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, borderRadius: 12, padding: "10px 18px 10px 14px" }}>
                         <AchIcon size={26} color={palette.onFirma} strokeWidth={2} aria-hidden />
-                        <span style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.onFirma, letterSpacing: "-0.01em" }}>{achDef ? achDef.name : "Logro"}</span>
+                        <span style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.onFirma, letterSpacing: "-0.01em" }}>{achDef ? achDef.name : "Logro nuevo"}</span>
                       </div>
                     </div>
                     {/* Sin achDef.desc: viene de achievementsService en 2.ª persona. Solo el nombre del logro. */}
@@ -9456,7 +9445,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               return (
                 <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
-                  {postBand(post, BookOpen, "Leyó", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
+                  {postBand(post, BookOpen, stats ? "Leyó" : "Leyó un rato", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
                   {postHeader(post, null)}
                   {(post.book || post.content) && (
                     <div style={{ padding: "10px 16px 0" }}>
@@ -9499,15 +9488,15 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   </div>
                   <div style={{ padding: "12px 16px 0" }}>
                     {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
-                    {/* Reseña, una sola vez: «Reseña» + estrellas en tinta y la reseña como cita (filete azul
-                        acero). Si post.content repite la reseña no se muestra debajo (sameReview). */}
+                    {/* Reseña, una sola vez: «Reseña» + estrellas en tinta y la reseña como cita (filete en ink:
+                        la tarjeta ya lleva franja y degradado, no suma un tercer color). Si post.content repite la reseña no se muestra debajo (sameReview). */}
                     {(reviewText || rating > 0) && (
                       <div style={{ marginTop: "0.9rem" }}>
                         <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700 }}>
                           Reseña {rating > 0 && starsOn(rating, palette.ink)}
                         </p>
                         {reviewText && (
-                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
+                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.ink}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
                             «{reviewText}»
                           </p>
                         )}
@@ -9530,7 +9519,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   ? postBand(post, BookOpen, "Empezó a leer")
                   : hasReview
                     ? postBand(post, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, bandOn) : null)
-                    : postBand(post, PenLine, "Publicó")}
+                    : postBand(post, PenLine, "Nota")}
                 {postHeader(post, null)}
                 <div style={{ padding: "10px 16px 0" }}>
                   {post.type === "book_update" && bookRow(post)}
@@ -12774,9 +12763,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
 function TutorialOverlay({ onDone }) {
   const STEPS = [
     // Voz sema-voz (2026-11-02): corto, sin admiraciones ni tono de coach.
-    { key: 'nav-home',    text: 'Inicio: el cuento del día y lo que estás leyendo', dir: 'above' },
+    { key: 'nav-home',    text: 'Inicio: la racha y lo que estás leyendo',           dir: 'above' },
     { key: 'nav-mascota', text: 'El gato sube de nivel contigo',                   dir: 'above' },
-    { key: 'snacks-hero', text: 'Un cuento corto. Una página ya cuenta',            dir: 'below' },
+    { key: 'snacks-hero', text: 'Un cuento corto al día. Cabe en cualquier rato',   dir: 'below' },
     { key: 'gems',        text: 'Las gemas se ganan leyendo',                      dir: 'below' },
     // 2026-11-02: nav-perfil es la foto de perfil de la cabecera; el globo va debajo.
     { key: 'nav-perfil',  text: 'Biblioteca, logros y estadísticas',           dir: 'below' },

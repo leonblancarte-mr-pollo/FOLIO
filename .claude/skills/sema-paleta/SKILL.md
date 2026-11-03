@@ -16,8 +16,8 @@ Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un co
 | Fondo | `#FFFFFF` | Tinta | Fondo de toda la app |
 | Tinta | `#483A58` | — | Texto principal, íconos, logo |
 | Texto secundario | `#5E5768` | — | Texto secundario y placeholders |
-| Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora de la pestaña activa. Nunca texto sobre blanco |
-| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior, marcos de celebración |
+| Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora activa de filtros. Ya no marca la pestaña activa de la barra inferior (ronda 2, 2026-11-02). Nunca texto sobre blanco |
+| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, cinta de la pestaña activa de la barra inferior (en claro con contorno `#483A58`: lila sobre arena da 1.41), marcos de celebración. La barra en sí es `superficieSuave` con el canto rasgado del mismo papel, sin lila |
 | Acento cálido | `#F79F79` | `#483A58` | Celebraciones, gemas, segundo sticker. Desde el 2026-11-02 es el mismo valor que la acción principal: en una pantalla, el durazno relleno es la acción y el cálido solo aparece en detalles chicos |
 | Superficie suave | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del blanco |
 | Complemento frío | `#456990` | `#FFFFFF` (`onColor`) cuando es fondo; sirve como texto sobre blanco | Enlaces, estados informativos, íconos secundarios, filete de las reseñas del feed |
@@ -182,10 +182,10 @@ Reglas:
 | `session` | `#5C6B3D` | `#7A9B5C` | Post de sesión de lectura (= éxito) |
 | `sessionInk` | `#5C6B3D` | `#7A9B5C` | Texto del post de sesión |
 | `freeze` | `#456990` | `#E7D7C1` | Protector de racha (frío en claro; en oscuro el frío no alcanza en íconos chicos) |
-| **`firma`** *(nuevo)* | `#BBADFF` | `#BBADFF` | Racha, stickers, resaltados, borde rasgado de la barra inferior |
+| **`firma`** *(nuevo)* | `#BBADFF` | `#BBADFF` | Racha, stickers, resaltados, cinta de la pestaña activa de la barra inferior |
 | **`onFirma`** *(nuevo)* | `#483A58` | `#483A58` | Texto sobre `firma` y sobre `acentoCalido`, en ambos modos |
 | **`acentoCalido`** *(nuevo)* | `#F79F79` | `#F79F79` | Celebraciones, gemas, segundo sticker |
-| **`superficieSuave`** *(nuevo)* | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo. Texto encima: `ink` |
+| **`superficieSuave`** *(nuevo)* | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo, barra inferior (con su canto rasgado). Texto encima: `ink` (activa) e `inkSoft` (inactivas: 4.90 en claro, 7.36 en oscuro) |
 | **`complementoFrio`** *(nuevo)* | `#456990` | `#456990` | Enlaces, estados informativos, íconos secundarios, reseñas (en oscuro solo en elementos grandes) |
 | **`SEMA_GRADIENTS.acento`** *(2026-11-02, fuera de `palette`)* | cereza → durazno | igual | Tarjetas destacadas y barras de progreso (§5) |
 | **`SEMA_GRADIENTS.frio`** *(2026-11-02, fuera de `palette`)* | lila → azul acero | igual | Barras y marcos, sin texto encima (§5) |
