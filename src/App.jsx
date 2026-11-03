@@ -89,7 +89,7 @@ import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./service
 import { normalizeGenre } from "./services/genreService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
 import { fetchQuotes, fetchQuotesForBook, insertQuote, updateQuoteInDB, deleteQuoteFromDB, toggleQuoteFavorite, setQuotePublic } from "./services/quotesService.js";
-import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
+import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, updateSessionPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
 import { logReadingSession, syncPendingLogs } from "./services/readingService.js";
 import { ACHIEVEMENT_DEFS, achievementBus, checkAchievements } from "./services/achievementsService.js";
 import { enrichBook, getMoodRecommendations } from "./services/aiService.js";
@@ -6756,6 +6756,21 @@ async function attachNotifTargets(notifs) {
   });
 }
 
+// Los likes «en pares» venían de publicaciones de sesión duplicadas (mismo
+// libro y hora, ids distintos): la misma persona daba like a las dos. Se
+// muestra una sola notificación por (tipo, quien, a qué) en 10 minutos.
+function collapseTwinNotifs(notifs) {
+  const out = [];
+  for (const n of notifs) {
+    const t = new Date(n.created_at).getTime();
+    const twin = out.find((o) => o.type === n.type && o.actor?.id === n.actor?.id && (o.target || o.post_id || o.comment_id) === (n.target || n.post_id || n.comment_id)
+      && Math.abs(new Date(o.created_at).getTime() - t) < 10 * 60 * 1000);
+    if (twin) { if (!n.read) twin.read = false; twin.twinIds = [...(twin.twinIds || []), n.id]; continue; }
+    out.push({ ...n });
+  }
+  return out;
+}
+
 function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
   const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
@@ -6793,7 +6808,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
         console.error("Error fetching notifications:", error);
         setNotifications([]);
       } else {
-        setNotifications(await attachNotifTargets(data || []));
+        setNotifications(collapseTwinNotifs(await attachNotifTargets(data || [])));
       }
     } catch (err) {
       console.error("Catch error notifications:", err);
@@ -6845,7 +6860,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                 <div
                   key={notif.id}
                   onClick={async () => {
-                    await supabase.from("notifications").update({ read: true }).eq("id", notif.id);
+                    await supabase.from("notifications").update({ read: true }).in("id", [notif.id, ...(notif.twinIds || [])]);
                     setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
                     onNotifsRead?.();
                     onClose();
@@ -7675,7 +7690,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
     setSaving(true);
     setSaveError("");
     try {
-      await logReadingSession({
+      const logResult = await logReadingSession({
         userId: user.id,
         bookId: selectedBook.id,
         pagesRead: parseInt(pages) || null,
@@ -7687,7 +7702,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
       // insertar el reading_log; aquí solo se refleja en la UI.
       gemsEventBus.emit(5);
       gemToastBus.emit(5, "+5 gemas");
-      onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0 });
+      onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0, postIdPromise: logResult?.postIdPromise, offline: !!logResult?.offline });
     } catch (err) {
       console.error("[reading] Error registrando sesión:", err);
       setSaveError("No se guardó la sesión. Puede ser el internet; otro intento y listo.");
@@ -8040,15 +8055,23 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
       userId: user?.id,
     });
     try {
-      await createFeedPost({
-        userId: user.id,
-        type: "reading_session",
-        bookId: book.id,
-        content: comment.trim() || "",
-        pagesRead: pages,
-        minutesRead: minutes || null,
-        imageUrl: null,
-      });
+      // logReadingSession ya publicó la sesión: aquí solo se completa ese post
+      // (comentario y minutos). Insertar otro era el duplicado del feed.
+      const existingId = await session.postIdPromise;
+      if (existingId) {
+        await updateSessionPost({ postId: existingId, userId: user.id, content: comment.trim(), minutesRead: minutes || null });
+      } else if (!session.offline) {
+        await createFeedPost({
+          userId: user.id,
+          type: "reading_session",
+          bookId: book.id,
+          content: comment.trim() || "",
+          pagesRead: pages,
+          minutesRead: minutes || null,
+          imageUrl: null,
+        });
+      }
+      // Sin conexión: el post de la sesión se crea al sincronizar el log.
       setShared(true);
       onShared?.();
       setTimeout(() => onClose(), 1500);
@@ -9189,6 +9212,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     </span>
   );
   const pagesText = (p) => `${p} ${p === 1 ? "página" : "páginas"}`;
+  // La reseña vive en books.review y el post de «terminado» guarda una copia en
+  // content (con trim, a veces sin comillas o editada después): si es la misma
+  // reseña no se repite debajo como texto suelto.
+  const normText = (t) => (t || "").replace(/[«»"“”'‘’]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const sameReview = (a, b) => { const x = normText(a), y = normText(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
 
   // Una publicación del feed según su tipo (mapa de color en sema-paleta §6).
   const renderPost = (post) => {
@@ -9268,7 +9296,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             // ── Libro terminado: degradado cereza → durazno con la portada al frente ──
             if (isFinished) {
               const reviewText = post.book?.review || post.content || "";
-              const extraText = post.content && post.content !== reviewText ? post.content : "";
+              const extraText = post.content && !sameReview(post.content, reviewText) ? post.content : "";
               const rating = post.book?.rating || 0;
               return (
                 <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
@@ -9332,7 +9360,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       «{post.book.review}»
                     </p>
                   )}
-                  {post.content && (
+                  {post.content && !(hasReview && sameReview(post.content, post.book?.review)) && (
                     <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
                   )}
                   {post.image_url && (
@@ -9648,7 +9676,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             setShowLogModal(false);
             loadStreakInfo();
             if (result?.pages > 0) {
-              setShareSession({ book: result.book, pages: result.pages, minutes: timerMinutes });
+              setShareSession({ book: result.book, pages: result.pages, minutes: timerMinutes, postIdPromise: result.postIdPromise, offline: result.offline });
               setTimerMinutes(null);
             }
           }}

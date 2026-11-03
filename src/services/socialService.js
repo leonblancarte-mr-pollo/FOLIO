@@ -65,7 +65,7 @@ async function fetchFeed(userId) {
   const allIds = [userId, ...friendIds];
   devLog("[fetchFeed] userId:", userId, "allIds:", allIds);
 
-  const { data: posts, error: postsError } = await supabase
+  const { data: rawPosts, error: postsError } = await supabase
     .from("posts")
     .select("id, type, action, content, image_url, created_at, user_id, book_id, pages_read, minutes_read")
     .in("user_id", allIds)
@@ -76,8 +76,9 @@ async function fetchFeed(userId) {
     console.error("[fetchFeed] Error al leer posts:", postsError);
     throw postsError;
   }
-  devLog("[fetchFeed] posts recibidos:", posts?.length ?? 0);
-  if (!posts || posts.length === 0) return [];
+  devLog("[fetchFeed] posts recibidos:", rawPosts?.length ?? 0);
+  if (!rawPosts || rawPosts.length === 0) return [];
+  const posts = collapseDuplicateSessions(rawPosts);
 
   const bookIds = [...new Set(posts.filter((p) => p.book_id).map((p) => p.book_id))];
   let bookMap = {};
@@ -225,13 +226,44 @@ async function createFeedPost({ userId, type, bookId, action, content, imageUrl,
   // quote_id stored in content as JSON — no schema column required
   devLog("[createFeedPost] insertando:", payload);
   devLog("[createFeedPost] User ID:", userId);
-  const { error } = await supabase.from("posts").insert(payload);
+  const { data, error } = await supabase.from("posts").insert(payload).select("id").maybeSingle();
   if (error) {
     console.error("[createFeedPost] error:", error);
     console.error("[createFeedPost] message:", error?.message, "| code:", error?.code, "| details:", error?.details);
     throw error;
   }
   devLog("[createFeedPost] OK");
+  return data?.id || null;
+}
+
+// Completa el post de sesión que ya creó logReadingSession (comentario y
+// minutos) en vez de insertar otro: antes «¿Compartir tu sesión?» insertaba
+// un segundo reading_session con el mismo libro, páginas y hora.
+async function updateSessionPost({ postId, userId, content, minutesRead }) {
+  const patch = { content: content || "" };
+  if (minutesRead) patch.minutes_read = minutesRead;
+  const { error } = await supabase.from("posts").update(patch).eq("id", postId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+// Duplicados ya guardados (2026-11): dos reading_session del mismo autor,
+// libro y páginas con menos de 10 min de diferencia son la misma sesión.
+// Se muestra una sola: la que trae comentario o, si ninguna, la más vieja.
+const SESSION_DUP_WINDOW_MS = 10 * 60 * 1000;
+function collapseDuplicateSessions(posts) {
+  const kept = [];
+  for (const p of posts) {
+    if (p.type !== "reading_session") { kept.push(p); continue; }
+    const t = new Date(p.created_at).getTime();
+    const twinIdx = kept.findIndex((k) => k.type === "reading_session" && k.user_id === p.user_id && k.book_id === p.book_id
+      && (k.pages_read || 0) === (p.pages_read || 0) && Math.abs(new Date(k.created_at).getTime() - t) < SESSION_DUP_WINDOW_MS);
+    if (twinIdx === -1) { kept.push(p); continue; }
+    const twin = kept[twinIdx];
+    // posts viene de más nuevo a más viejo: p es el más viejo del par.
+    const pick = (p.content || "").trim() && !(twin.content || "").trim() ? p : twin;
+    kept[twinIdx] = { ...pick, minutes_read: pick.minutes_read || p.minutes_read || twin.minutes_read, duplicateIds: [...(twin.duplicateIds || []), pick === p ? twin.id : p.id] };
+  }
+  return kept;
 }
 
 async function createComment({ postId, userId, content }) {
@@ -271,4 +303,4 @@ async function syncPendingPosts() {
 }
 
 
-export { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, createComment, createReply, deleteFeedPost, syncPendingPosts };
+export { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, updateSessionPost, collapseDuplicateSessions, createComment, createReply, deleteFeedPost, syncPendingPosts };
