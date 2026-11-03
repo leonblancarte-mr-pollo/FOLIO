@@ -540,9 +540,16 @@ button:not(:disabled):not(.sema-no-hover):active,
 .sema-focus-wrapped:focus-visible { outline-color: var(--sema-ink) !important; outline-offset: 3px !important; }
 
 /* ─── Botón sticker (StickerButton, Inicio y Cuento del día, ronda 2 del 2026-11-02) ───
-   Neobrutalismo suave: relleno durazno, borde 2 px, sombra sólida desplazada sin desenfoque.
-   Colores por variables que pone el componente desde palette (sin hex aquí). Al presionar
-   se hunde: se traslada lo mismo que la sombra y la sombra baja a 0. */
+   Neobrutalismo suave: relleno durazno, sombra sólida desplazada sin desenfoque. Colores por
+   variables que pone el componente desde palette (sin hex aquí). Al presionar se hunde: se
+   traslada lo mismo que la sombra y la sombra baja a 0.
+   Ronda 3 (2026-11-02, pedido de León) y correcciones: el relleno ya no es plano, lleva un
+   degradado leve dentro del durazno (accent + blanco según --sb-luz → accent, nunca más oscuro
+   que accent, así onAccent sigue ≥ 5:1) y un reflejo de vinil (reglas al final del archivo,
+   bloque «Botón sticker (ronda 3)»). El borde de 2 px en tinta se cambió por el canto troquelado
+   de la racha: filo de 3 px en bg (--sb-canto) y anillo de 1.5 px en ink (--sb-anillo, blanco en
+   oscuro como el de la racha) en el box-shadow,
+   junto con la sombra desplazada. El disco con flecha Lucide se quitó: flecha SVG a mano. */
 .sema-sticker-btn {
   position: relative;
   display: inline-flex;
@@ -550,34 +557,35 @@ button:not(:disabled):not(.sema-no-hover):active,
   justify-content: center;
   gap: 0.7rem;
   border-radius: 16px;
-  border: 2px solid var(--sb-ink);
+  /* Canto troquelado: filo del color del fondo, como sticker recortado de la misma hoja. */
+  border: 3px solid var(--sb-canto);
   color: var(--sb-ink);
-  /* Durazno plano (ronda 2 de correcciones: el brillo lo deslavaba a beige en oscuro). */
-  background: var(--sb-bg);
-  box-shadow: 4px 4px 0 0 var(--sb-shadow);
+  /* Degradado leve dentro del durazno (ronda 3): luz arriba-izquierda, como un sticker de vinil. */
+  background: linear-gradient(160deg, color-mix(in srgb, var(--sb-bg) var(--sb-luz), white) 0%, var(--sb-bg) 70%);
+  box-shadow: 0 0 0 1.5px var(--sb-anillo), 4px 4px 0 1.5px var(--sb-shadow);
   cursor: pointer;
   transform: translate(0, 0);
   transition: transform 110ms cubic-bezier(0.3, 0.7, 0.4, 1), box-shadow 110ms cubic-bezier(0.3, 0.7, 0.4, 1);
   -webkit-tap-highlight-color: transparent;
 }
-.sema-sticker-btn__disc {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.sema-sticker-btn__texto,
+.sema-sticker-btn__flecha {
+  position: relative;
+  z-index: 1;
+}
+.sema-sticker-btn__flecha {
   flex-shrink: 0;
-  border-radius: 999px;
-  background-color: var(--sb-ink);
-  color: var(--sb-bg);
+  margin-left: -0.15rem;
 }
 @media (hover: hover) and (pointer: fine) {
   .sema-sticker-btn:hover {
     transform: translate(-1px, -1px);
-    box-shadow: 5px 5px 0 0 var(--sb-shadow);
+    box-shadow: 0 0 0 1.5px var(--sb-anillo), 5px 5px 0 1.5px var(--sb-shadow);
   }
 }
 .sema-sticker-btn:active {
   transform: translate(4px, 4px);
-  box-shadow: 0 0 0 0 var(--sb-shadow);
+  box-shadow: 0 0 0 1.5px var(--sb-anillo), 0 0 0 1.5px var(--sb-shadow);
 }
 .sema-sticker-btn:focus-visible {
   outline: 3px solid var(--sb-focus) !important;
@@ -586,7 +594,7 @@ button:not(:disabled):not(.sema-no-hover):active,
 @media (prefers-reduced-motion: reduce) {
   /* Sin levantarse en hover; al presionar el cambio es instantáneo (el estado sigue visible). */
   .sema-sticker-btn { transition: none; }
-  .sema-sticker-btn:hover { transform: none; box-shadow: 4px 4px 0 0 var(--sb-shadow); }
+  .sema-sticker-btn:hover { transform: none; box-shadow: 0 0 0 1.5px var(--sb-anillo), 4px 4px 0 1.5px var(--sb-shadow); }
 }
 
 /* Cuento del día (ronda 2): portada de papel del collage, girada como pegada a mano. */

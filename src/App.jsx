@@ -8383,8 +8383,7 @@ function SnacksHero({ onRead }) {
           {cuento.desc}
         </p>
         <StickerButton
-          icon={ArrowRight}
-          style={{ width: "calc(100% - 4px)" }}
+          style={{ width: "calc(100% - 6px)" }}
           onClick={() => {
             haptic(HAPTIC.NAV);
             try {
@@ -8873,7 +8872,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
       )}
 
       {/* Única acción principal */}
-      <StickerButton size="lg" icon={ArrowRight} onClick={() => setLeerOpen(true)} style={{ width: "calc(100% - 4px)" }}>
+      <StickerButton size="lg" onClick={() => setLeerOpen(true)} style={{ width: "calc(100% - 6px)" }}>
         Leer ahora
       </StickerButton>
 
