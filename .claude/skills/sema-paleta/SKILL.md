@@ -84,7 +84,7 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 
 ## 5. Degradados permitidos (2026-11-02)
 
-Solo dos, definidos en `theme.js` como `SEMA_GRADIENTS`, y solo como **acento** en tarjetas destacadas y barras de progreso. Nunca como fondo de pantalla completa ni debajo de texto largo (sema-identidad §2).
+Dos base, definidos en `theme.js` como `SEMA_GRADIENTS` (más las variantes de «Libro terminado» de §7, ronda 2), y solo como **acento** en tarjetas destacadas y barras de progreso. Nunca como fondo de pantalla completa ni debajo de texto largo (sema-identidad §2).
 
 | Nombre | Valor | Dónde | Texto encima |
 |---|---|---|---|
@@ -117,6 +117,29 @@ Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pi
 | Frase (`quote`) | Toda la tarjeta salvo el pie | `#483A58` (`ink` en claro / `superficieSuave` en oscuro) | `onColor` en Instrument Serif; secundario `onDarkSoft` `#E7D7C1`; ánimo como sticker `firma` + `onFirma` (sin el emoji de la etiqueta) | 10.39 · 7.36 · 5.21 |
 | Texto | Sin tarjeta | `bg` | `ink` | 10.39 / 21.00 |
 | Logro | Sticker rectangular con papel, canto `bg`, filo `ink` y giro, con el nombre del logro | `firma` | Ícono y nombre en `onFirma` (20 px 800) | 5.21 |
+
+## 7. Paleta extendida (apoyo, 2026-11-02, ronda 2)
+
+Colores de **apoyo** para dar variedad donde muchas piezas iguales seguidas se volverían monótonas: franja superior de cada publicación del feed, degradados de «Libro terminado», banners del perfil de un amigo. **No reemplazan a los tokens**: la acción principal sigue siendo durazno con texto `#483A58`, la firma sigue siendo lila. Están en `src/theme.js` como `SEMA_EXTENDIDA` y son iguales en claro y oscuro.
+
+| Clave | Nombre | Hex | Texto encima (`on`) | Contraste |
+|---|---|---|---|---|
+| `chicle` | Rosa chicle | `#FF8FB8` | `#483A58` | 4.88:1 |
+| `coral` | Coral | `#FF9478` | `#483A58` | 4.83:1 |
+| `mostaza` | Mostaza | `#F5C451` | `#483A58` | 6.38:1 |
+| `limon` | Limón | `#F2E27A` | `#483A58` | 7.88:1 |
+| `menta` | Menta | `#9DE3C3` | `#483A58` | 7.03:1 |
+| `turquesa` | Turquesa | `#4FC9B4` | `#483A58` | 5.12:1 |
+| `cielo` | Cielo | `#7CC3F0` | `#483A58` | 5.40:1 |
+| `pervinca` | Pervinca | `#9AABFF` | `#483A58` | 4.77:1 |
+| `orquidea` | Orquídea | `#E59BE6` | `#483A58` | 5.03:1 |
+
+Reglas:
+- **Texto encima siempre `#483A58`.** Blanco encima está prohibido (≤ 2.2:1 en todos).
+- Sobre el fondo blanco ninguno llega a 3:1: se usan como **bloque de color con texto en tinta encima**, nunca como color de texto, de ícono suelto ni como único borde de un control. En oscuro (negro) todos pasan > 9:1.
+- **Descartados** por apagados o fangosos: verde pantano, oliva, mostaza oscura, café. El verde `#5C6B3D` que queda en `theme.js` (`sage`, `success`, `session`) no se usa para variedad.
+- **Asignación determinista**: `stableHash(id)` (FNV-1a) → índice. Nunca `Math.random()` en render. Para listas, `assignSequenceColors(ids)` evita que dos piezas seguidas repitan color.
+- **Degradados de «Libro terminado»** (`SEMA_GRADIENTES_TERMINADO`, 135°): cereza → durazno (el original), chicle → mostaza, turquesa → cielo, orquídea → chicle, coral → limón, cielo → pervinca, menta → turquesa, pervinca → orquídea. Texto encima `#483A58` grande (≥ 19 px negritas); todos los extremos ≥ 4.5:1 salvo la cereza del original (3.24, solo grande). Uno por publicación con `pickByHash(SEMA_GRADIENTES_TERMINADO, post.id)`. Sigue valiendo §5: acento de una tarjeta, nunca fondo de pantalla.
 
 ## 4. Regla de implementación
 

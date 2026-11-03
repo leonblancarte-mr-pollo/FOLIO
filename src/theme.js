@@ -121,6 +121,62 @@ const SEMA_GRADIENTS = {
   cereza: "#F45B69",
 };
 
+// Paleta extendida (sema-paleta §7, 2026-11-02, ronda 2). Colores de APOYO para dar variedad
+// (franja de cada publicación del feed, degradados de «Libro terminado», banners del perfil de
+// un amigo). No sustituyen a los tokens: la acción principal sigue siendo durazno y la firma lila.
+// Iguales en claro y oscuro. Texto encima SIEMPRE #483A58 (`on`), ≥ 4.5:1 en todos; blanco
+// encima está prohibido (≤ 2.2:1). Sobre blanco no llegan a 3:1: como bloque de color llevan el
+// texto encima en tinta, no se usan como texto ni como único borde de un control.
+const SEMA_EXTENDIDA = [
+  { key: "chicle",   name: "Rosa chicle", hex: "#FF8FB8", on: "#483A58" }, // 4.88
+  { key: "coral",    name: "Coral",       hex: "#FF9478", on: "#483A58" }, // 4.83
+  { key: "mostaza",  name: "Mostaza",     hex: "#F5C451", on: "#483A58" }, // 6.38
+  { key: "limon",    name: "Limón",       hex: "#F2E27A", on: "#483A58" }, // 7.88
+  { key: "menta",    name: "Menta",       hex: "#9DE3C3", on: "#483A58" }, // 7.03
+  { key: "turquesa", name: "Turquesa",    hex: "#4FC9B4", on: "#483A58" }, // 5.12
+  { key: "cielo",    name: "Cielo",       hex: "#7CC3F0", on: "#483A58" }, // 5.40
+  { key: "pervinca", name: "Pervinca",    hex: "#9AABFF", on: "#483A58" }, // 4.77
+  { key: "orquidea", name: "Orquídea",    hex: "#E59BE6", on: "#483A58" }, // 5.03
+];
+const EXT = Object.fromEntries(SEMA_EXTENDIDA.map((c) => [c.key, c.hex]));
+
+// Degradados de «Libro terminado» (variedad). El primero es el original cereza → durazno.
+// Texto encima en #483A58, grande (≥ 19 px negritas); en todos los extremos ≥ 4.5:1 salvo la
+// cereza del original (3.24, solo texto grande).
+const SEMA_GRADIENTES_TERMINADO = [
+  { key: "acento",          from: "#F45B69",     to: "#F79F79" },
+  { key: "chicle-mostaza",  from: EXT.chicle,    to: EXT.mostaza },
+  { key: "turquesa-cielo",  from: EXT.turquesa,  to: EXT.cielo },
+  { key: "orquidea-chicle", from: EXT.orquidea,  to: EXT.chicle },
+  { key: "coral-limon",     from: EXT.coral,     to: EXT.limon },
+  { key: "cielo-pervinca",  from: EXT.cielo,     to: EXT.pervinca },
+  { key: "menta-turquesa",  from: EXT.menta,     to: EXT.turquesa },
+  { key: "pervinca-orquidea", from: EXT.pervinca, to: EXT.orquidea },
+].map((g) => ({ ...g, css: `linear-gradient(135deg, ${g.from} 0%, ${g.to} 100%)`, on: "#483A58" }));
+
+// Hash estable (FNV-1a) de un id: el mismo post da siempre el mismo color, en cualquier render
+// o recarga.
+function stableHash(id) {
+  const str = String(id ?? "");
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+function pickByHash(list, id) { return list[stableHash(id) % list.length]; }
+// Asigna un color de la lista a cada id de una secuencia, sin repetir el del anterior: parte del
+// hash y, si coincide con el previo, avanza al siguiente de la lista (determinista).
+function assignSequenceColors(ids, list = SEMA_EXTENDIDA) {
+  const out = {};
+  let prev = -1;
+  for (const id of ids) {
+    let i = stableHash(id) % list.length;
+    if (i === prev) i = (i + 1) % list.length;
+    out[id] = list[i];
+    prev = i;
+  }
+  return out;
+}
+
 // Identidad fija (no cambia con el tema).
 const BRAND = {
   wine: "#7A2E2E", wineDeep: "#6B1E2A", amber: "#C8924A", amberLight: "#D4A574", amberGlow: "#F4C77A",
@@ -276,6 +332,7 @@ function genreColor(genre) {
 
 export {
   FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS,
+  SEMA_EXTENDIDA, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, SEMA_COVER_COMBOS, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
   display, body, quote, sp, FONT_DISPLAY, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,
