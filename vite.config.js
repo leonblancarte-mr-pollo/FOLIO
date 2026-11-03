@@ -107,8 +107,13 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        // Por defecto el proxy local (server.js, puerto 3001). Para probar «Para ti» sin clave de
+        // Anthropic en la máquina, apuntar al despliegue, que ya tiene la clave en Vercel:
+        //   SEMA_API_TARGET=https://folio-final.vercel.app npm run dev
+        // (sirve también /api/books y /api/recommendations, que en local no existen).
+        target: process.env.SEMA_API_TARGET || 'http://localhost:3001',
         changeOrigin: true,
+        secure: true,
       },
     },
   },

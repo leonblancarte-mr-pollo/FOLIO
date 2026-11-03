@@ -2055,6 +2055,22 @@ const RECO_QUIZ_STEPS = [
 ];
 const RECO_INTRO = "Elegir qué leer sí depende de uno. Cinco preguntas rapidito y te paso ideas.";
 const RECO_EXTRA_ASK = "Última: ¿algo más que deba saber? Un autor, un país, un final abierto…";
+// Qué dice el gato cuando no llegan ideas (ronda 3, 2026-11-02). Una línea por causa
+// (`kind` de AiError en aiService.js), en su voz y sin tecnicismos; «Intentar otra vez» vuelve a
+// mandar LAS MISMAS respuestas. Para la sesión caída el reintento no sirve: se pide entrar de nuevo.
+const RECO_ERROR_LINES = {
+  network: "Se fue el internet. Cuando vuelva, lo intentamos otra vez.",
+  timeout: "Me quedé pensando de más. Pasa. ¿Lo intentamos otra vez?",
+  rate: "Hay mucha gente preguntando ahorita. Dame un minuto y lo volvemos a intentar.",
+  session: "Se me cerró la sesión. Entra otra vez y seguimos donde íbamos.",
+  config: "Hoy no me llega la señal con la que pienso. No es cosa tuya: es del servidor. Vuelve al rato.",
+  parse: "Pensé tanto que me hice bolas. Lo intentamos otra vez.",
+  upstream: "Se me trabó algo. Cosas del absurdo. Lo intentamos otra vez.",
+};
+function recoErrorLine(e) {
+  return RECO_ERROR_LINES[e?.kind] || (/solicitudes/i.test(e?.message || "") ? RECO_ERROR_LINES.rate : RECO_ERROR_LINES.upstream);
+}
+
 // Texto visible de una respuesta guardada (el valor sigue siendo el de la IA).
 function recoLabel(key, value) {
   const q = RECO_QUIZ_STEPS.find((s) => s.key === key);
@@ -2180,6 +2196,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
+  const [errorDetail, setErrorDetail] = useState(""); // solo en desarrollo: causa técnica debajo del globo
   const [addedTitles, setAddedTitles] = useState(new Set());
   const [threadOpen, setThreadOpen] = useState(false); // con resultados, el hilo se colapsa en una línea
   const [typing, setTyping] = useState(false); // «escribiendo…» del gato entre una respuesta y la siguiente pregunta
@@ -2243,11 +2260,11 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       const res = await getMoodRecommendations(books, ans);
       setResults(res);
     } catch (e) {
-      console.error(e);
-      // El gato no repite errores técnicos: solo distingue «mucha gente» del resto.
-      setError(/solicitudes/i.test(e?.message || "")
-        ? "Hay mucha gente preguntando ahorita. Dame un minuto y lo volvemos a intentar."
-        : "Se me trabó algo. Cosas del absurdo. Lo intentamos otra vez.");
+      // La causa técnica va a consola (y, en desarrollo, debajo del globo); el gato solo dice
+      // una línea en su voz según el tipo de error (RECO_ERROR_LINES).
+      console.error("[Para ti] no llegaron recomendaciones:", e?.kind || "desconocido", e?.status || "", e?.detail || e?.message || e);
+      setError(recoErrorLine(e));
+      setErrorDetail(import.meta.env.DEV ? [e?.kind || "error", e?.status, e?.detail || e?.message].filter(Boolean).join(" · ") : "");
     } finally {
       setLoading(false);
     }
@@ -2532,7 +2549,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
         {error && !loading && (
           <>
             <div role="alert">
-              <RecoCatBubble>{error}</RecoCatBubble>
+              <RecoCatBubble caption={errorDetail ? `Solo en desarrollo: ${errorDetail}` : null}>{error}</RecoCatBubble>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.25rem", marginTop: "0.2rem" }}>
               <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>

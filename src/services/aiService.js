@@ -2,18 +2,75 @@ import { supabase } from "../supabase.js";
 import { STATUS_LABELS } from "./booksService.js";
 
 // ============ IA (proxy /api/anthropic) ============
+
+// Error con «tipo» para que la interfaz (el gato de «Para ti») diga algo útil y distinto según
+// la causa, en vez de un «se me trabó algo» para todo (ronda 3, 2026-11-02).
+//   kind: "network" (sin red / proxy caído) · "timeout" · "session" (el proxy no aceptó la sesión)
+//         · "rate" (429) · "config" (el servidor no tiene clave válida de Anthropic)
+//         · "upstream" (otro error del proxy o de Anthropic) · "parse" (la respuesta no era JSON)
+class AiError extends Error {
+  constructor(message, kind, status = 0) {
+    super(message);
+    this.name = "AiError";
+    this.kind = kind;
+    this.status = status;
+  }
+}
+const AI_TIMEOUT_MS = 60000;
+
+async function callAnthropic(body, fallbackMessage) {
+  let response;
+  try {
+    response = await fetch("/api/anthropic", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof AiError) throw err;
+    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+      throw new AiError("La IA tardó demasiado en responder. Intenta de nuevo.", "timeout");
+    }
+    throw new AiError("Sin conexión con el servidor. Revisa tu internet e intenta de nuevo.", "network");
+  }
+  const data = await response.json().catch(() => null);
+  if (response.status === 429) {
+    throw new AiError("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.", "rate", 429);
+  }
+  if (!response.ok || !Array.isArray(data?.content)) {
+    // El proxy contesta { error: "texto" }; Anthropic contesta { type: "error", error: { type, message } }.
+    const proxyMsg = typeof data?.error === "string" ? data.error : "";
+    const upstreamType = typeof data?.error === "object" ? data?.error?.type : "";
+    const upstreamMsg = typeof data?.error === "object" ? data?.error?.message : "";
+    let kind = "upstream";
+    if (/ANTHROPIC_API_KEY/i.test(proxyMsg) || upstreamType === "authentication_error" || upstreamType === "permission_error") kind = "config";
+    else if (response.status === 401) kind = "session";
+    const err = new AiError(fallbackMessage, kind, response.status);
+    err.detail = proxyMsg || (upstreamType ? `${upstreamType}: ${upstreamMsg}` : "") || `HTTP ${response.status}`;
+    throw err;
+  }
+  const text = data.content.find((b) => b.type === "text")?.text || "";
+  const clean = text.replace(/```json|```/g, "").trim();
+  try {
+    return JSON.parse(clean);
+  } catch {
+    const err = new AiError("La IA respondió algo que no se pudo leer. Intenta de nuevo.", "parse", response.status);
+    err.detail = clean.slice(0, 120);
+    throw err;
+  }
+}
+
 async function authHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-  if (!token) throw new Error("Debes iniciar sesión de nuevo para usar esta función.");
+  if (!token) throw new AiError("Debes iniciar sesión de nuevo para usar esta función.", "session", 401);
   return { Authorization: `Bearer ${token}` };
 }
 
 async function enrichBook(title, author) {
-  const response = await fetch("/api/anthropic", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({
+  return callAnthropic(
+    {
       max_tokens: 600,
       messages: [
         {
@@ -28,18 +85,9 @@ async function enrichBook(title, author) {
 Si no conoces el libro con seguridad, haz tu mejor estimación basada en el título y autor.`,
         },
       ],
-    }),
-  });
-  if (response.status === 429) {
-    throw new Error("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.");
-  }
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !Array.isArray(data?.content)) {
-    throw new Error("No se pudo obtener la información del libro. Intenta de nuevo.");
-  }
-  const text = data.content.find((b) => b.type === "text")?.text || "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+    },
+    "No se pudo obtener la información del libro. Intenta de nuevo."
+  );
 }
 
 async function getMoodRecommendations(books, moodAnswers) {
@@ -103,25 +151,11 @@ Responde SOLO con JSON válido (sin markdown, sin texto extra):
   ]
 }`;
 
-  const response = await fetch("/api/anthropic", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({
-      max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-  if (response.status === 429) {
-    throw new Error("Estamos recibiendo muchas solicitudes ahora mismo. Intenta de nuevo en un minuto.");
-  }
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !Array.isArray(data?.content)) {
-    throw new Error("No se pudieron generar recomendaciones. Intenta de nuevo.");
-  }
-  const text = data.content.find((b) => b.type === "text")?.text || "";
-  const clean = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(clean);
+  return callAnthropic(
+    { max_tokens: 2000, messages: [{ role: "user", content: prompt }] },
+    "No se pudieron generar recomendaciones. Intenta de nuevo."
+  );
 }
 
 
-export { enrichBook, getMoodRecommendations };
+export { enrichBook, getMoodRecommendations, AiError };

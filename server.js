@@ -1,5 +1,11 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
+
+// Carga .env y DESPUÉS .env.local (que manda): ANTHROPIC_API_KEY vive en .env.local, igual que las
+// variables de Vite y de scripts/captura.js. Antes solo se leía .env, así que en local el proxy
+// contestaba 500 «ANTHROPIC_API_KEY not set» y «Para ti» se quedaba en «Se me trabó algo» (ronda 3).
+dotenv.config({ path: ".env", quiet: true });
+dotenv.config({ path: ".env.local", override: true, quiet: true });
 import { createClient } from "@supabase/supabase-js";
 
 const app = express();
@@ -47,6 +53,11 @@ app.post("/api/anthropic", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () =>
-  console.log(`[proxy] Anthropic proxy → http://localhost:${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`[proxy] Anthropic proxy → http://localhost:${PORT}`);
+  if (!API_KEY) {
+    console.warn("[proxy] AVISO: falta ANTHROPIC_API_KEY en .env.local. «Para ti» y «Enriquecer libro» van a fallar en local.");
+  } else if (!/^sk-ant-/.test(API_KEY)) {
+    console.warn("[proxy] AVISO: ANTHROPIC_API_KEY no tiene el formato esperado (sk-ant-…).");
+  }
+});
