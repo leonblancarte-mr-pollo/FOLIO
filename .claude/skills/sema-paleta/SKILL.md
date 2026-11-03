@@ -17,10 +17,10 @@ Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un co
 | Tinta | `#483A58` | — | Texto principal, íconos, logo |
 | Texto secundario | `#5E5768` | — | Texto secundario y placeholders |
 | Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora de la pestaña activa. Nunca texto sobre blanco |
-| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior, marcos de celebración, publicación «leyó hoy» |
+| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior, marcos de celebración |
 | Acento cálido | `#F79F79` | `#483A58` | Celebraciones, gemas, segundo sticker. Desde el 2026-11-02 es el mismo valor que la acción principal: en una pantalla, el durazno relleno es la acción y el cálido solo aparece en detalles chicos |
 | Superficie suave | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del blanco |
-| Complemento frío | `#456990` | `#FFFFFF` (`onColor`) cuando es fondo; sirve como texto sobre blanco | Enlaces, estados informativos, íconos secundarios, reseñas (publicación «reseña» del feed) |
+| Complemento frío | `#456990` | `#FFFFFF` (`onColor`) cuando es fondo; sirve como texto sobre blanco | Enlaces, estados informativos, íconos secundarios, filete de las reseñas del feed |
 | Cereza (solo en degradado) | `#F45B69` | ver §5 | **Ya no es acción principal.** Solo existe como extremo del `degradadoAcento`; nunca sola como relleno ni como texto |
 | Éxito («Leído») | `#5C6B3D` | — | Token actual `success` de `theme.js` |
 | Error | `#B03A2E` | — | Errores y acciones destructivas |
@@ -93,30 +93,30 @@ Dos base, definidos en `theme.js` como `SEMA_GRADIENTS` (más las variantes de �
 
 Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pista actual de `ProgressBarBook`), porque el durazno y el lila no llegan a 3:1 sobre blanco por sí solos.
 
-## 6. Mapa de color por tipo de publicación (feed, 2026-11-02)
+## 6. Color de las publicaciones del feed (2026-11-02, ronda 2: el tipo ya no define el color)
 
-| Tipo | Color | Texto |
-|---|---|---|
-| Leyó hoy (`reading_session` con libro) | `firma` lila como fondo de tarjeta o franja | `onFirma` `#483A58` |
-| Libro terminado (`book_update` → leído) | `degradadoAcento` con la portada en primer plano | Título grande en `#483A58`; texto chico sobre `bg` |
-| Reseña (`book_update` con reseña o calificación) | `complementoFrio` azul acero como franja o marco | `onColor` `#FFFFFF` sobre el azul; `ink` sobre `bg` |
-| Frase guardada (`quote`) | Ciruela oscuro `#483A58` (`superficieSuave` oscuro / `ink` claro) de fondo, tipografía Instrument Serif itálica | `onColor` `#FFFFFF` (10.39:1) y `#E7D7C1` para secundario (7.36:1) |
-| Sesión sin libro | Neutro: `bg` con texto `ink` y `inkSoft`, sin color | `ink` |
-| Logro | `firma` (sticker) | `onFirma` |
+**Sistema actual (punto 7 de León, ronda 2).** Todas las publicaciones tienen el **mismo formato**: tarjeta neutra (`bg` + borde `border`, radio 16, sin sombras de color) → **franja superior** con ícono Lucide + etiqueta → cabecera (avatar, nombre, hora; sin verbo, el qué lo dice la franja) → cuerpo → pie (me gusta, comentarios).
 
-**Implementación en Social (2026-11-02, ronda 2, pendiente de León).** Las publicaciones con color van en tarjeta neutra (`bg` + borde `border`, sin sombras de color) y el color vive solo en su franja o zona. Las que no tienen color (texto, sesión sin libro) no llevan tarjeta: van sobre el fondo, separadas con un filete abajo.
+- **El color de la franja se asigna por publicación**, no por autor ni por tipo: `assignSequenceColors(ids)` de `theme.js` sobre la lista ordenada de publicaciones visibles (`useMemo` en `FeedView`). Es determinista (no cambia al recargar) y dos publicaciones seguidas no repiten color. Sale de la paleta extendida (§7).
+- **Texto e ícono de la franja: siempre `#483A58`** (el `on` del color), 14 px negritas: 4.77–7.88:1 en los nueve colores, en claro y en oscuro.
+- **El tipo se distingue por ícono + etiqueta**, no por color:
 
-| Tipo | Zona de color | Fondo | Texto encima | Contraste (claro / oscuro) |
-|---|---|---|---|---|
-| Leyó (`reading_session` con libro) | Franja superior «Leyó · N páginas · M min» (sin «hoy»: la hora va en la cabecera) | `firma` `#BBADFF` | `onFirma` `#483A58`, 14 px negritas | 5.21 / 5.21 |
-| Sesión sin libro | Sin tarjeta; el número de páginas en grande | `bg` | `ink` (24 px) y `inkSoft` | 10.39 / 21.00 |
-| Empezó a leer (`book_update` started) | Franja superior «Empezó a leer». En oscuro, sin relleno y con filete abajo (la superficie `#483A58` era igual a la frase) | Claro `superficieSuave` `#E7D7C1`; oscuro `bg` | `ink` (`#483A58` / `#FFFFFF`) | 7.36 / 21.00 |
-| Libro terminado (`book_update` finished) | Zona central con la portada grande al frente (real o genérica compacta) | `SEMA_GRADIENTS.acento` | Título en `onAccent` `#483A58` 22 px 800 (grande); único sticker «Libro terminado» sobre `bg`; autor y reseña debajo, sobre `bg` | Título 3.24 (cereza) – 5.04 (durazno); sticker 10.39 / 21.00 |
-| Reseña dentro de «terminado» | Solo el filete izquierdo de 3 px del texto de la reseña | `complementoFrio` `#456990` (filete) | «Reseña» + estrellas Lucide en `ink`; la reseña en `ink` sobre `bg` | Filete 5.71 / 3.68 (objeto ≥ 3:1); texto 10.39 / 21.00 |
-| Reseña suelta (`book_update` sin started/finished con reseña o calificación) | Franja superior «Reseña» + estrellas | `complementoFrio` | `onColor` `#FFFFFF` | 5.71 / 5.71 |
-| Frase (`quote`) | Toda la tarjeta salvo el pie | `#483A58` (`ink` en claro / `superficieSuave` en oscuro) | `onColor` en Instrument Serif; secundario `onDarkSoft` `#E7D7C1`; ánimo como sticker `firma` + `onFirma` (sin el emoji de la etiqueta) | 10.39 · 7.36 · 5.21 |
-| Texto | Sin tarjeta | `bg` | `ink` | 10.39 / 21.00 |
-| Logro | Sticker rectangular con papel, canto `bg`, filo `ink` y giro, con el nombre del logro | `firma` | Ícono y nombre en `onFirma` (20 px 800) | 5.21 |
+| Tipo | Ícono | Etiqueta de la franja | Cuerpo |
+|---|---|---|---|
+| Sesión (`reading_session`) | `BookOpen` | «Leyó · N páginas · M min» | Libro en línea (si hay) y texto |
+| Empezó a leer (`book_update` started) | `BookOpen` | «Empezó a leer» | Libro en línea y texto |
+| Libro terminado (`book_update` finished) | `BookmarkCheck` | «Libro terminado» | Zona con degradado de `SEMA_GRADIENTES_TERMINADO` (uno por publicación, `pickByHash(…, post.id)`), portada al frente y título en `#483A58` 22 px 800; debajo, sobre `bg`: autor, «Reseña» + estrellas y la reseña como cita **una sola vez** |
+| Reseña suelta (`book_update` con reseña o calificación) | `MessageCircle` | «Reseña» + estrellas en `#483A58` | Libro en línea y la reseña como cita (filete `complementoFrio`) |
+| Frase (`quote`) | `Feather` | «Frase» | La frase en Instrument Serif itálica grande, en `ink` sobre `bg`; libro en `inkSoft`; ánimo como sticker `firma` + `onFirma`. **Ya no es tarjeta ciruela** |
+| Logro | `Award` | «Logro» | Sticker `firma` con papel, canto `bg`, filo `ink` y giro, con el nombre del logro (`onFirma` 20 px 800, 5.21:1) |
+| Texto | `PenLine` | «Publicó» | Texto e imagen |
+
+- En «Libro terminado», si el color asignado a la franja es un extremo de su degradado (o el de la publicación vecina), se avanza al siguiente color de la lista para que franja y degradado no se fundan.
+- Los acentos de siempre no cambian dentro del cuerpo: filete azul acero de la reseña, sticker lila del ánimo y del logro.
+
+Contraste de lo nuevo: franja `#483A58` sobre chicle 4.88, coral 4.83, mostaza 6.38, limón 7.88, menta 7.03, turquesa 5.12, cielo 5.40, pervinca 4.77, orquídea 5.03. Frase en `ink` sobre `bg`: 10.39 (claro) / 21.00 (oscuro); libro en `inkSoft`: 6.91 / 14.89. Título del terminado sobre su degradado: ≥ 4.5 en todos los extremos salvo la cereza del original (3.24, texto grande).
+
+> Sustituye al mapa por tipo de la ronda 1 (lila = leyó, azul acero = reseña, ciruela = frase, superficie suave = empezó, sin tarjeta = texto y sesión sin libro).
 
 ## 7. Paleta extendida (apoyo, 2026-11-02, ronda 2)
 

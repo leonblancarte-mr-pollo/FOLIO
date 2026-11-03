@@ -159,6 +159,24 @@
 @media (prefers-reduced-motion: reduce) {
   .reco-typing-dot { animation: none; opacity: 0.7; }
 }
+/* Encuesta del gato (Para ti): filas dentro del globo. El foco va por dentro de la fila
+   (offset negativo) para no salirse del globo ni pisar la fila vecina. Al pasar o presionar,
+   el círculo se llena de firma (lila con filo de tinta: 5.21:1 con el filo). */
+.reco-poll-row:focus-visible { outline: 2px solid var(--sema-ink); outline-offset: -4px; }
+.reco-poll-dot { transition: background-color 120ms ease; }
+.reco-poll-row:active .reco-poll-dot { background-color: var(--sema-firma); }
+@media (hover: hover) and (pointer: fine) {
+  .reco-poll-row:hover .reco-poll-dot { background-color: var(--sema-firma); }
+}
+/* Mensaje nuevo del chat: entra subiendo 6 px. Sin movimiento con reduced-motion. */
+.reco-msg-in { animation: recoMsgIn 220ms ease-out both; }
+@keyframes recoMsgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reco-msg-in { animation: none; }
+}
 /* Caja de texto del paso 5: placeholder legible (inkFaint) y foco visible */
 .reco-extra::placeholder { color: var(--sema-ink-faint); opacity: 1; }
 .reco-extra:focus { outline: none; }
@@ -417,8 +435,9 @@ button:not(:disabled):not(.sema-no-hover):active,
    → ocupa hasta ~138 px). Antes era pb-24 (96 px) y el "+" tapaba el sábado del
    calendario, "Mis listas" y bordes de tarjetas. En escritorio no hay barra
    inferior, pero el "+" sigue fijo, así que se deja el mismo margen.
-   2026-11-02: +10 px por el borde rasgado lila (.sema-nav-rasgado::before sube 10 px
-   sobre la barra y tapaba la última fila de Descubrir y de Perfil). */
+   2026-11-02: +10 px por el borde rasgado de la barra (ronda 2: ahora es el padding-top
+   recortado de la propia barra, .sema-nav-rasgado; la barra mide 70 px + safe area y el
+   «+» ocupa de 80 a 138 px, así que 166 px dejan ≈ 28 px de aire bajo el último elemento). */
 .main-fab-clearance {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 166px);
 }
@@ -436,18 +455,16 @@ button:not(:disabled):not(.sema-no-hover):active,
   display: none;                  /* Chrome, Safari, Android */
 }
 
-/* ═══ Inicio — rediseño SEMA 2026-11-02 ═══════════════════════════════════════
-   Borde superior rasgado tipo revista de la barra inferior, en lila (firma).
-   Una tira de 12 px con el canto de arriba irregular (clip-path), sin imágenes.
-   El color sale del token (--sema-firma), no hay hex aquí. */
-/* 2026-11-02 (Social): la barra es papel, no color plano. El cuerpo lleva superficie suave
-   (inline en BottomNav) y encima la textura SVG de .sema-papel en un ::after al 45 % en multiply
-   (ronda 2: a opacidad completa se veían manchas de café). La tira lila del canto lleva una versión
-   más clara del mismo papel (diffuseConstant 1.4). Filo de tinta de 1.5 px siguiendo el canto
-   rasgado (drop-shadow de la barra entera: el clip-path del ::before recortaría su propia sombra),
-   para que el lila no se funda con contenido lila que pase por debajo. Sin hex ni imágenes. */
+/* ═══ Barra inferior — papel rasgado de una sola pieza (ronda 2, 2026-11-02) ═══
+   Pedido de León: el borde rasgado es la silueta superior de la barra, no una tira encima.
+   La barra entera (color superficieSuave inline en BottomNav + textura de papel en ::after)
+   se recorta con un solo clip-path cuyo canto superior es el perfil rasgado de 10 px
+   (antes: tira lila en ::before + filo de tinta con drop-shadow). Sin filete, sin lila,
+   sin hex: el color sale de palette.superficieSuave (arena en claro, ciruela en oscuro).
+   El padding-top de 10 px deja los botones debajo del canto. */
 .sema-nav-rasgado {
-  filter: drop-shadow(0 -1.5px 0 var(--sema-ink));
+  padding-top: 10px;
+  clip-path: polygon(0% 100%, 0% 5.5px, 1.9% 0.5px, 4.9% 0.3px, 6.2% 1.5px, 8.6% 0.2px, 11.2% 3.3px, 12.5% 0.8px, 14.3% 3.5px, 16.8% 2.4px, 18.8% 1.9px, 21.4% 5.4px, 23.6% 3.2px, 26.5% 4.1px, 28.9% 6.3px, 31.4% 0.3px, 34.3% 0.5px, 37.6% 5.5px, 39.6% 5.2px, 40.9% 0.3px, 42.2% 5.9px, 44.1% 1.4px, 47.3% 5.7px, 48.7% 2.7px, 50.7% 3.2px, 52.9% 7px, 56% 4.9px, 58.7% 1.3px, 60.3% 4.1px, 63.4% 0.6px, 65.5% 1.3px, 68.2% 1.8px, 70.4% 7.3px, 72.5% 5.2px, 73.8% 0.2px, 75.3% 2.1px, 77.6% 3.3px, 80.8% 3.7px, 84.1% 2.1px, 87.1% 5.1px, 89% 6.4px, 91.3% 2.4px, 94.6% 1.8px, 97.4% 1px, 100% 0.9px, 100% 100%);
 }
 .sema-nav-rasgado > * {
   position: relative;
@@ -464,19 +481,10 @@ button:not(:disabled):not(.sema-no-hover):active,
   mix-blend-mode: multiply;
   opacity: 0.45;
 }
-.sema-nav-rasgado::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -10px;
-  height: 13px;
-  background-color: var(--sema-firma);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='4' seed='11'/%3E%3CfeDiffuseLighting surfaceScale='4' diffuseConstant='1.4'%3E%3CfeDistantLight azimuth='225' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
-  background-size: 240px 240px;
-  background-blend-mode: multiply;
-  clip-path: polygon(0% 100%, 0% 55%, 1.9% 5%, 4.9% 3%, 6.2% 15%, 8.6% 2%, 11.2% 33%, 12.5% 8%, 14.3% 35%, 16.8% 24%, 18.8% 19%, 21.4% 54%, 23.6% 32%, 26.5% 41%, 28.9% 63%, 31.4% 3%, 34.3% 5%, 37.6% 55%, 39.6% 52%, 40.9% 3%, 42.2% 59%, 44.1% 14%, 47.3% 57%, 48.7% 27%, 50.7% 32%, 52.9% 70%, 56.0% 49%, 58.7% 13%, 60.3% 41%, 63.4% 6%, 65.5% 13%, 68.2% 18%, 70.4% 73%, 72.5% 52%, 73.8% 2%, 75.3% 21%, 77.6% 33%, 80.8% 37%, 84.1% 21%, 87.1% 51%, 89.0% 64%, 91.3% 24%, 94.6% 18%, 97.4% 10%, 100.0% 9%, 100% 100%);
-  pointer-events: none;
+/* El clip-path recorta lo que sale de la barra: el foco con teclado va por dentro del botón. */
+.sema-nav-item:focus-visible {
+  outline-offset: -3px !important;
+  border-radius: 12px;
 }
 
 /* Textura de papel arrugado: solo en stickers y tarjetas, nunca en el fondo.
@@ -529,3 +537,58 @@ button:not(:disabled):not(.sema-no-hover):active,
 /* Wrapped de Perfil (ronda 2): el contorno va por fuera en tinta. El de onAccent (#483A58) por fuera
    sobre negro daba 2.02:1; ink por fuera da 10.39 en claro y 21.00 en oscuro. */
 .sema-focus-wrapped:focus-visible { outline-color: var(--sema-ink) !important; outline-offset: 3px !important; }
+
+/* ─── Botón sticker (StickerButton, Inicio y Cuento del día, ronda 2 del 2026-11-02) ───
+   Neobrutalismo suave: relleno durazno, borde 2 px, sombra sólida desplazada sin desenfoque.
+   Colores por variables que pone el componente desde palette (sin hex aquí). Al presionar
+   se hunde: se traslada lo mismo que la sombra y la sombra baja a 0. */
+.sema-sticker-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  border-radius: 16px;
+  border: 2px solid var(--sb-ink);
+  color: var(--sb-ink);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sb-shine) 34%, transparent) 0%, color-mix(in srgb, var(--sb-shine) 0%, transparent) 52%),
+    var(--sb-bg);
+  box-shadow: 4px 4px 0 0 var(--sb-shadow);
+  cursor: pointer;
+  transform: translate(0, 0);
+  transition: transform 110ms cubic-bezier(0.3, 0.7, 0.4, 1), box-shadow 110ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+.sema-sticker-btn__disc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background-color: var(--sb-ink);
+  color: var(--sb-bg);
+}
+@media (hover: hover) and (pointer: fine) {
+  .sema-sticker-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 5px 5px 0 0 var(--sb-shadow);
+  }
+}
+.sema-sticker-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 0 var(--sb-shadow);
+}
+.sema-sticker-btn:focus-visible {
+  outline: 3px solid var(--sb-focus) !important;
+  outline-offset: 5px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Sin levantarse en hover; al presionar el cambio es instantáneo (el estado sigue visible). */
+  .sema-sticker-btn { transition: none; }
+  .sema-sticker-btn:hover { transform: none; box-shadow: 4px 4px 0 0 var(--sb-shadow); }
+}
+
+/* Cuento del día (ronda 2): portada de papel del collage, girada como pegada a mano. */
+.sema-cuento-portada { transform: rotate(4deg); }
+.sema-cuento-sticker { transform: rotate(-3deg); }
