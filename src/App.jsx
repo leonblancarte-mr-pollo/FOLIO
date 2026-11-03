@@ -2057,13 +2057,14 @@ const RECO_INTRO = "Elegir qué leer sí depende de uno. Cinco preguntas rapidit
 const RECO_EXTRA_ASK = "Última: ¿algo más que deba saber? Un autor, un país, un final abierto…";
 // Qué dice el gato cuando no llegan ideas (ronda 3, 2026-11-02). Una línea por causa
 // (`kind` de AiError en aiService.js), en su voz y sin tecnicismos; «Intentar otra vez» vuelve a
-// mandar LAS MISMAS respuestas. Para la sesión caída el reintento no sirve: se pide entrar de nuevo.
+// mandar LAS MISMAS respuestas. Para la sesión caída el reintento no sirve: se pide entrar de nuevo
+// y el botón de reintento no se muestra (corrección de crítico y copy, ronda 3).
 const RECO_ERROR_LINES = {
   network: "Se fue el internet. Cuando vuelva, lo intentamos otra vez.",
   timeout: "Me quedé pensando de más. Pasa. ¿Lo intentamos otra vez?",
-  rate: "Hay mucha gente preguntando ahorita. Dame un minuto y lo volvemos a intentar.",
-  session: "Se me cerró la sesión. Entra otra vez y seguimos donde íbamos.",
-  config: "Hoy no me llega la señal con la que pienso. No es cosa tuya: es del servidor. Vuelve al rato.",
+  rate: "Hay mucha gente preguntando ahorita. Dame un minuto y lo intentamos otra vez.",
+  session: "Se cerró la sesión. Entra de nuevo a la cuenta y aquí sigo.",
+  config: "Hoy no logro pensar. La falla es de mi lado, no tuya. Vuelve al rato.",
   parse: "Pensé tanto que me hice bolas. Lo intentamos otra vez.",
   upstream: "Se me trabó algo. Cosas del absurdo. Lo intentamos otra vez.",
 };
@@ -2196,6 +2197,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
+  const [errorKind, setErrorKind] = useState(""); // kind de AiError: con "session" no hay reintento
   const [errorDetail, setErrorDetail] = useState(""); // solo en desarrollo: causa técnica debajo del globo
   const [addedTitles, setAddedTitles] = useState(new Set());
   const [threadOpen, setThreadOpen] = useState(false); // con resultados, el hilo se colapsa en una línea
@@ -2548,14 +2550,20 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
 
         {error && !loading && (
           <>
-            <div role="alert">
-              <RecoCatBubble caption={errorDetail ? `Solo en desarrollo: ${errorDetail}` : null}>{error}</RecoCatBubble>
+            {/* El globo es lo que dice el gato; la causa técnica (solo en dev) va FUERA del globo,
+                como nota del sistema, para que el gato no «diga» un stack (crítico, ronda 3). */}
+            <div role="alert" id="reco-error-globo">
+              <RecoCatBubble>{error}</RecoCatBubble>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.25rem", marginTop: "0.2rem" }}>
-              <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>
-              <button ref={retryRef} onClick={() => fetchRecs(answers)} className="btn-press" style={filledBtn}>
-                Intentar otra vez
-              </button>
+              {errorKind === "session"
+                ? <button ref={retryRef} onClick={() => editStep(0)} className="btn-press" style={filledBtn} aria-describedby="reco-error-globo">Empezar de nuevo</button>
+                : <>
+                    <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>
+                    <button ref={retryRef} onClick={() => fetchRecs(answers)} className="btn-press" style={filledBtn} aria-describedby="reco-error-globo">
+                      Intentar otra vez
+                    </button>
+                  </>}
             </div>
           </>
         )}
