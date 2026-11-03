@@ -139,6 +139,9 @@ const SEMA_EXTENDIDA = [
   { key: "orquidea", name: "Orquídea",    hex: "#E59BE6", on: "#483A58" }, // 5.03
 ];
 const EXT = Object.fromEntries(SEMA_EXTENDIDA.map((c) => [c.key, c.hex]));
+// Papel fijo de boletos/stickers sobre franjas de color, igual en claro y oscuro (ronda 3,
+// 2026-11-02): arena con texto tinta (7.36:1). Solo sobre un bloque de color, nunca sobre bg.
+const SEMA_PAPEL = { bg: "#E7D7C1", on: "#483A58" };
 
 // Degradados de «Libro terminado» (variedad). El primero es el original cereza → durazno.
 // Texto encima en #483A58, grande (≥ 19 px negritas); en todos los extremos ≥ 4.5:1 salvo la
@@ -332,7 +335,7 @@ function genreColor(genre) {
 
 export {
   FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS,
-  SEMA_EXTENDIDA, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors,
+  SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, SEMA_COVER_COMBOS, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
   display, body, quote, sp, FONT_DISPLAY, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,

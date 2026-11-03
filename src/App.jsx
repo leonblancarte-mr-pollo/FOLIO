@@ -85,7 +85,7 @@ import StickerButton from "./components/StickerButton.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
 import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
 // Ronda 2: paleta extendida (sema-paleta §7): franja por publicación, «Libro terminado», perfil de amigo.
-import { SEMA_EXTENDIDA, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors } from "./theme.js";
+import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
@@ -8328,18 +8328,33 @@ function SnacksHero({ onRead }) {
   const minutos = cuentoDuracion(cuento);
   const inicial = (cuento.titulo || "").replace(/^(El|La|Los|Las|Un|Una)\s+/i, "").trim().charAt(0).toUpperCase();
   const isDark = palette.bg === PALETTE_DARK.bg;
-  const stickerBase = { ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.1, borderRadius: 8, border: `1.5px solid ${palette.ink}`, padding: "0.35rem 0.6rem", display: "inline-flex", alignItems: "center", gap: 6, alignSelf: "flex-start" };
+  // Ronda 3 (2026-11-02): las dos etiquetas son boletos de papel, sin iconos. Tipografía Bricolage
+  // 800 en mayúsculas con tracking (el eje `wdth` no está cargado; pendiente de León). Formas con
+  // mask-image en index.css («Cuento del día · boletos»). Texto visible intacto para lectores de
+  // pantalla; el talón (fecha corta) es decorativo (aria-hidden). Correcciones ronda 3: el boleto
+  // principal es papel fijo (SEMA_PAPEL, arena + tinta en ambos modos: va sobre la franja, no
+  // sobre bg) y bordes de 2 px. Se probó 14 px: a 390 y a 360 el boleto largo pisa la portada
+  // (medido con getBoundingClientRect), así que se queda en 13 px.
+  const boletoBase = { ...display, fontSize: "13px", fontWeight: 800, lineHeight: 1, textTransform: "uppercase", display: "inline-flex", alignItems: "center", alignSelf: "flex-start", whiteSpace: "nowrap" };
+  // Talón con la fecha corta («02 NOV»). Se arma a mano: con day+month juntos Chromium devuelve
+  // «02-nov» y Safari «02 nov.»; así sale igual en todos, sin punto ni guion.
+  const hoy = new Date();
+  const fechaBoleto = `${String(hoy.getDate()).padStart(2, "0")} ${hoy.toLocaleDateString("es-MX", { month: "short" }).replace(/[^\p{L}]/gu, "")}`.toUpperCase();
+  // Estampilla de minutos: cálido de la paleta extendida (mostaza o limón), estable por cuento. Nunca
+  // los fríos del degradado de la franja ni coral (se funde con el botón durazno).
+  const estampilla = pickByHash(SEMA_EXTENDIDA.filter((c) => ["mostaza", "limon"].includes(c.key)), cuento.id);
 
   return (
     <section data-tutorial="snacks-hero" aria-labelledby="cuento-dia-titulo" style={{ marginBottom: "2rem", borderRadius: 18, border: `2px solid ${palette.ink}`, overflow: "hidden", backgroundColor: palette.bg }}>
-      {/* Franja de acento: collage de stickers + portada de papel */}
-      <div style={{ position: "relative", height: 150, background: grad.css, borderBottom: `2px solid ${palette.ink}`, padding: "1rem 1rem", display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-        <span className="sema-cuento-sticker" style={{ ...stickerBase, backgroundColor: palette.bg, color: palette.ink }}>
-          <BookOpen size={16} strokeWidth={2.2} aria-hidden /> Cuento del día
+      {/* Franja de acento: collage de boletos + portada de papel */}
+      <div style={{ position: "relative", height: 150, background: grad.css, borderBottom: `2px solid ${palette.ink}`, padding: "1rem 1rem", display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+        <span className="sema-boleto sema-boleto--cuento" style={{ ...boletoBase, backgroundColor: SEMA_PAPEL.bg, color: SEMA_PAPEL.on, border: `2px solid ${SEMA_PAPEL.on}` }}>
+          <span aria-hidden className="sema-boleto__talon">{fechaBoleto}</span>
+          <span className="sema-boleto__cuerpo">Cuento del día</span>
         </span>
         {minutos && (
-          <span className="sema-sticker" style={{ ...stickerBase, marginLeft: 10, backgroundColor: palette.firma, color: palette.onFirma, borderColor: palette.onFirma }}>
-            <Clock size={15} strokeWidth={2.2} aria-hidden /> {minutos} de lectura
+          <span className="sema-boleto sema-boleto--minutos" style={{ ...boletoBase, marginLeft: 18, backgroundColor: estampilla.hex, color: estampilla.on, border: `2px solid ${estampilla.on}` }}>
+            {minutos} de lectura
           </span>
         )}
         {/* Portada de papel (SVG/CSS propio, sin imagen): capitular del título en Instrument Serif itálica
