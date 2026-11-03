@@ -159,6 +159,24 @@
 @media (prefers-reduced-motion: reduce) {
   .reco-typing-dot { animation: none; opacity: 0.7; }
 }
+/* Encuesta del gato (Para ti): filas dentro del globo. El foco va por dentro de la fila
+   (offset negativo) para no salirse del globo ni pisar la fila vecina. Al pasar o presionar,
+   el círculo se llena de firma (lila con filo de tinta: 5.21:1 con el filo). */
+.reco-poll-row:focus-visible { outline: 2px solid var(--sema-ink); outline-offset: -4px; }
+.reco-poll-dot { transition: background-color 120ms ease; }
+.reco-poll-row:active .reco-poll-dot { background-color: var(--sema-firma); }
+@media (hover: hover) and (pointer: fine) {
+  .reco-poll-row:hover .reco-poll-dot { background-color: var(--sema-firma); }
+}
+/* Mensaje nuevo del chat: entra subiendo 6 px. Sin movimiento con reduced-motion. */
+.reco-msg-in { animation: recoMsgIn 220ms ease-out both; }
+@keyframes recoMsgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reco-msg-in { animation: none; }
+}
 /* Caja de texto del paso 5: placeholder legible (inkFaint) y foco visible */
 .reco-extra::placeholder { color: var(--sema-ink-faint); opacity: 1; }
 .reco-extra:focus { outline: none; }
@@ -417,8 +435,9 @@ button:not(:disabled):not(.sema-no-hover):active,
    → ocupa hasta ~138 px). Antes era pb-24 (96 px) y el "+" tapaba el sábado del
    calendario, "Mis listas" y bordes de tarjetas. En escritorio no hay barra
    inferior, pero el "+" sigue fijo, así que se deja el mismo margen.
-   2026-11-02: +10 px por el borde rasgado lila (.sema-nav-rasgado::before sube 10 px
-   sobre la barra y tapaba la última fila de Descubrir y de Perfil). */
+   2026-11-02: +10 px por el borde rasgado de la barra (ronda 2: ahora es el padding-top
+   recortado de la propia barra, .sema-nav-rasgado; la barra mide 69 px + safe area y el
+   «+» ocupa de 80 a 138 px, así que 166 px dejan ≈ 28 px de aire bajo el último elemento). */
 .main-fab-clearance {
   padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 166px);
 }
@@ -436,18 +455,17 @@ button:not(:disabled):not(.sema-no-hover):active,
   display: none;                  /* Chrome, Safari, Android */
 }
 
-/* ═══ Inicio — rediseño SEMA 2026-11-02 ═══════════════════════════════════════
-   Borde superior rasgado tipo revista de la barra inferior, en lila (firma).
-   Una tira de 12 px con el canto de arriba irregular (clip-path), sin imágenes.
-   El color sale del token (--sema-firma), no hay hex aquí. */
-/* 2026-11-02 (Social): la barra es papel, no color plano. El cuerpo lleva superficie suave
-   (inline en BottomNav) y encima la textura SVG de .sema-papel en un ::after al 45 % en multiply
-   (ronda 2: a opacidad completa se veían manchas de café). La tira lila del canto lleva una versión
-   más clara del mismo papel (diffuseConstant 1.4). Filo de tinta de 1.5 px siguiendo el canto
-   rasgado (drop-shadow de la barra entera: el clip-path del ::before recortaría su propia sombra),
-   para que el lila no se funda con contenido lila que pase por debajo. Sin hex ni imágenes. */
+/* ═══ Barra inferior — papel rasgado de una sola pieza (ronda 2, 2026-11-02) ═══
+   Pedido de León: el borde rasgado es la silueta superior de la barra, no una tira encima.
+   La barra entera (color superficieSuave inline en BottomNav + textura de papel en ::after)
+   se recorta con un solo clip-path cuyo canto superior es el perfil rasgado de 13 px
+   (antes: tira lila en ::before + filo de tinta con drop-shadow; ronda 2 de correcciones:
+   de 10 a 13 px porque en claro se veía tímido). Sin filete, sin lila, sin hex: el color
+   sale de palette.superficieSuave (arena en claro, ciruela en oscuro).
+   El padding-top de 13 px deja los botones debajo del canto. */
 .sema-nav-rasgado {
-  filter: drop-shadow(0 -1.5px 0 var(--sema-ink));
+  padding-top: 13px;
+  clip-path: polygon(0% 100%, 0% 9.8px, 1.9% 0.9px, 4.9% 0.5px, 6.2% 2.7px, 8.6% 0.4px, 11.2% 5.9px, 12.5% 1.4px, 14.3% 6.2px, 16.8% 4.3px, 18.8% 3.4px, 21.4% 9.6px, 23.6% 5.7px, 26.5% 7.3px, 28.9% 11.2px, 31.4% 0.5px, 34.3% 0.9px, 37.6% 9.8px, 39.6% 9.3px, 40.9% 0.5px, 42.2% 10.5px, 44.1% 2.5px, 47.3% 10.1px, 48.7% 4.8px, 50.7% 5.7px, 52.9% 12.5px, 56% 8.7px, 58.7% 2.3px, 60.3% 7.3px, 63.4% 1.1px, 65.5% 2.3px, 68.2% 3.2px, 70.4% 13px, 72.5% 9.3px, 73.8% 0.4px, 75.3% 3.7px, 77.6% 5.9px, 80.8% 6.6px, 84.1% 3.7px, 87.1% 9.1px, 89% 11.4px, 91.3% 4.3px, 94.6% 3.2px, 97.4% 1.8px, 100% 1.6px, 100% 100%);
 }
 .sema-nav-rasgado > * {
   position: relative;
@@ -464,19 +482,10 @@ button:not(:disabled):not(.sema-no-hover):active,
   mix-blend-mode: multiply;
   opacity: 0.45;
 }
-.sema-nav-rasgado::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -10px;
-  height: 13px;
-  background-color: var(--sema-firma);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='4' seed='11'/%3E%3CfeDiffuseLighting surfaceScale='4' diffuseConstant='1.4'%3E%3CfeDistantLight azimuth='225' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
-  background-size: 240px 240px;
-  background-blend-mode: multiply;
-  clip-path: polygon(0% 100%, 0% 55%, 1.9% 5%, 4.9% 3%, 6.2% 15%, 8.6% 2%, 11.2% 33%, 12.5% 8%, 14.3% 35%, 16.8% 24%, 18.8% 19%, 21.4% 54%, 23.6% 32%, 26.5% 41%, 28.9% 63%, 31.4% 3%, 34.3% 5%, 37.6% 55%, 39.6% 52%, 40.9% 3%, 42.2% 59%, 44.1% 14%, 47.3% 57%, 48.7% 27%, 50.7% 32%, 52.9% 70%, 56.0% 49%, 58.7% 13%, 60.3% 41%, 63.4% 6%, 65.5% 13%, 68.2% 18%, 70.4% 73%, 72.5% 52%, 73.8% 2%, 75.3% 21%, 77.6% 33%, 80.8% 37%, 84.1% 21%, 87.1% 51%, 89.0% 64%, 91.3% 24%, 94.6% 18%, 97.4% 10%, 100.0% 9%, 100% 100%);
-  pointer-events: none;
+/* El clip-path recorta lo que sale de la barra: el foco con teclado va por dentro del botón. */
+.sema-nav-item:focus-visible {
+  outline-offset: -3px !important;
+  border-radius: 12px;
 }
 
 /* Textura de papel arrugado: solo en stickers y tarjetas, nunca en el fondo.
@@ -529,3 +538,230 @@ button:not(:disabled):not(.sema-no-hover):active,
 /* Wrapped de Perfil (ronda 2): el contorno va por fuera en tinta. El de onAccent (#483A58) por fuera
    sobre negro daba 2.02:1; ink por fuera da 10.39 en claro y 21.00 en oscuro. */
 .sema-focus-wrapped:focus-visible { outline-color: var(--sema-ink) !important; outline-offset: 3px !important; }
+
+/* ─── Botón sticker (StickerButton, Inicio y Cuento del día, ronda 2 del 2026-11-02) ───
+   Neobrutalismo suave: relleno durazno, sombra sólida desplazada sin desenfoque. Colores por
+   variables que pone el componente desde palette (sin hex aquí). Al presionar se hunde: se
+   traslada lo mismo que la sombra y la sombra baja a 0.
+   Ronda 3 (2026-11-02, pedido de León) y correcciones: el relleno ya no es plano, lleva un
+   degradado leve dentro del durazno (accent + blanco según --sb-luz → accent, nunca más oscuro
+   que accent, así onAccent sigue ≥ 5:1) y un reflejo de vinil (reglas al final del archivo,
+   bloque «Botón sticker (ronda 3)»). El borde de 2 px en tinta se cambió por el canto troquelado
+   de la racha: filo de 3 px en bg (--sb-canto) y anillo de 1.5 px en ink (--sb-anillo, blanco en
+   oscuro como el de la racha) en el box-shadow,
+   junto con la sombra desplazada. El disco con flecha Lucide se quitó: flecha SVG a mano. */
+.sema-sticker-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  border-radius: 16px;
+  /* Canto troquelado: filo del color del fondo, como sticker recortado de la misma hoja. */
+  border: 3px solid var(--sb-canto);
+  color: var(--sb-ink);
+  /* Degradado leve dentro del durazno (ronda 3): luz arriba-izquierda, como un sticker de vinil. */
+  background: linear-gradient(160deg, color-mix(in srgb, var(--sb-bg) var(--sb-luz), white) 0%, var(--sb-bg) 70%);
+  box-shadow: 0 0 0 1.5px var(--sb-anillo), 4px 4px 0 1.5px var(--sb-shadow);
+  cursor: pointer;
+  /* overflow recorta el reflejo (::before/::after) al padding box; anillo y sombra (box-shadow) no se recortan. */
+  overflow: hidden;
+  isolation: isolate;
+  transform: translate(0, 0);
+  transition: transform 110ms cubic-bezier(0.3, 0.7, 0.4, 1), box-shadow 110ms cubic-bezier(0.3, 0.7, 0.4, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+.sema-sticker-btn__texto,
+.sema-sticker-btn__flecha {
+  position: relative;
+  z-index: 1;
+}
+.sema-sticker-btn__flecha {
+  flex-shrink: 0;
+  margin-left: -0.15rem;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sema-sticker-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 0 0 0 1.5px var(--sb-anillo), 5px 5px 0 1.5px var(--sb-shadow);
+  }
+}
+.sema-sticker-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 1.5px var(--sb-anillo), 0 0 0 1.5px var(--sb-shadow);
+}
+.sema-sticker-btn:focus-visible {
+  outline: 3px solid var(--sb-focus) !important;
+  outline-offset: 7px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Sin levantarse en hover; al presionar el cambio es instantáneo (el estado sigue visible). */
+  .sema-sticker-btn { transition: none; }
+  .sema-sticker-btn:hover { transform: none; box-shadow: 0 0 0 1.5px var(--sb-anillo), 4px 4px 0 1.5px var(--sb-shadow); }
+}
+
+/* Cuento del día (ronda 2): portada de papel del collage, girada como pegada a mano. */
+.sema-cuento-portada { transform: rotate(4deg); }
+/* .sema-cuento-sticker se retiró en la ronda 3 (2026-11-02): las etiquetas ahora son .sema-boleto. */
+
+/* ─── Botón sticker (ronda 3, 2026-11-02; correcciones de la misma fecha) ───
+   Reflejo de vinil pedido por León. Dos piezas, las dos recortadas por el overflow del botón:
+   · ::after = reflejo FIJO: banda corta blanca al 30 %, bordes duros, en la esquina superior
+     izquierda (≈ 20 % del ancho). Es lo que se ve en reposo y lo único que queda con
+     prefers-reduced-motion.
+   · ::before = barrido diagonal de 1.1 s: una vez al montar (1.2 s después), al hover/foco y
+     luego cada 24 s (León pidió «rara vez»; el crítico pedía quitarlo; se deja raro y se anota).
+   Nada de shimmer continuo de plantilla: casi todo el tiempo el botón está quieto.
+   Intensidad del barrido por `--sb-barrido` / `--sb-barrido-borde` (QA ronda 3: en oscuro, con
+   52 % de blanco, el durazno caía en beige a media pasada; el componente baja a 30 % / 18 %). */
+.sema-sticker-btn::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 5px;
+  left: 5%;
+  width: 20%;
+  height: 7px;
+  border-radius: 3px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--sb-brillo) 30%, transparent);
+  transform: skewX(-24deg);
+}
+.sema-sticker-btn::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: -60%;
+  left: 0;
+  width: 42%;
+  height: 220%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--sb-brillo) var(--sb-barrido-borde, 34%), transparent) 42%,
+    color-mix(in srgb, var(--sb-brillo) var(--sb-barrido, 52%), transparent) 50%,
+    color-mix(in srgb, var(--sb-brillo) var(--sb-barrido-borde, 34%), transparent) 58%,
+    transparent 100%
+  );
+  transform: translateX(-140%) skewX(-22deg);
+  /* Ciclo de 24 s: el barrido ocupa el 4.6 % (1.1 s) y el resto está fuera del botón. */
+  animation: sema-sb-reflejo 24s cubic-bezier(0.4, 0, 0.2, 1) 1.2s infinite;
+}
+@keyframes sema-sb-reflejo {
+  0%    { transform: translateX(-140%) skewX(-22deg); }
+  4.6%  { transform: translateX(300%) skewX(-22deg); }
+  100%  { transform: translateX(300%) skewX(-22deg); }
+}
+/* Al hover o foco con teclado: una pasada corta (cambiar el nombre reinicia la animación). */
+@keyframes sema-sb-reflejo-una {
+  from { transform: translateX(-140%) skewX(-22deg); }
+  to   { transform: translateX(300%) skewX(-22deg); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .sema-sticker-btn:hover::before { animation: sema-sb-reflejo-una 1.1s cubic-bezier(0.4, 0, 0.2, 1) 1 forwards; }
+}
+.sema-sticker-btn:focus-visible::before { animation: sema-sb-reflejo-una 1.1s cubic-bezier(0.4, 0, 0.2, 1) 1 forwards; }
+@media (prefers-reduced-motion: reduce) {
+  /* Solo el reflejo fijo de la esquina: el barrido desaparece. */
+  .sema-sticker-btn::before,
+  .sema-sticker-btn:hover::before,
+  .sema-sticker-btn:focus-visible::before { animation: none; display: none; }
+}
+
+/* ═══ Inicio · gato (ronda 3, 2026-11-02) ════════════════════════════════════════════
+   El contorno de silueta en oscuro ya NO se hace aquí (correcciones ronda 3): la pila de ocho
+   drop-shadow dejaba un halo difuso en los bigotes semitransparentes y recalculaba 8 filtros por
+   fotograma sobre la capa animada. Ahora HomeView carga /pets/cat-recorte.png (canto blanco
+   horneado en el PNG) cuando isDarkMode; en claro sigue cat.png sin contorno.
+   Lo único que queda es el movimiento reducido: a 300 px el bob y la respiración son movimiento
+   continuo en la primera pantalla, así que con prefers-reduced-motion se detienen SOLO en el
+   botón del gato de Inicio (aria-label «Ver a …»), no en la pestaña Mascota. !important porque
+   .pet-sprite-wrap / .pet-sprite-img ya usan !important para sobrevivir al reset global. */
+@media (prefers-reduced-motion: reduce) {
+  button[aria-label^="Ver a"] .pet-sprite-wrap,
+  button[aria-label^="Ver a"] .pet-sprite-img {
+    animation: none !important;
+  }
+}
+
+/* ─── Cuento del día · boletos (ronda 3, 2026-11-02) ───
+   Las dos etiquetas de la franja son boletos de papel, sin iconos. Las formas salen de mask-image:
+   la franja es un degradado, así que la muesca deja ver el fondo real sin pintar nada encima.
+   Los colores los pone el componente por `style` (palette / SEMA_EXTENDIDA); aquí solo hay
+   `black` / `transparent` de máscara, que no pintan color: solo recortan. */
+.sema-boleto { position: relative; letter-spacing: 0.1em; }
+/* Boleto con talón: «Nº 306 ¦ CUENTO DEL DÍA». Muescas semicirculares arriba y abajo sobre la línea
+   de corte (dos capas de máscara, cada una cubre media altura) y perforado dashed entre talón y
+   cuerpo. --corte es el ancho fijo del talón (3 cifras + «Nº»). */
+.sema-boleto--cuento {
+  --corte: 62px; /* «02 NOV» a 13 px (correcciones ronda 3) */
+  --muesca: 5px;
+  transform: rotate(-3deg);
+  transform-origin: left center;
+  border-radius: 4px;
+  -webkit-mask-image:
+    radial-gradient(circle at var(--corte) 0, transparent var(--muesca), black calc(var(--muesca) + 0.75px)),
+    radial-gradient(circle at var(--corte) 100%, transparent var(--muesca), black calc(var(--muesca) + 0.75px));
+  mask-image:
+    radial-gradient(circle at var(--corte) 0, transparent var(--muesca), black calc(var(--muesca) + 0.75px)),
+    radial-gradient(circle at var(--corte) 100%, transparent var(--muesca), black calc(var(--muesca) + 0.75px));
+  /* Las dos mitades se traslapan 1 px: sin eso queda una costura a media altura al girar. */
+  -webkit-mask-size: 100% calc(50% + 1px); mask-size: 100% calc(50% + 1px);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: top, bottom; mask-position: top, bottom;
+}
+.sema-boleto--cuento::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--corte) - 3px);
+  top: calc(var(--muesca) + 1px);
+  bottom: calc(var(--muesca) + 1px);
+  width: 0;
+  border-left: 2px dashed currentColor;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.sema-boleto__talon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: calc(var(--corte) - 2px);
+  align-self: stretch;
+  padding: 0.5rem 0 0.5rem 0;
+  letter-spacing: 0.06em;
+}
+.sema-boleto__cuerpo { padding: 0.5rem 0.75rem 0.5rem 0.7rem; }
+
+/* Estampilla de minutos: troquel dentado en los lados (bites de 3.5 px cada 9 px, repetidos) con una
+   capa central lisa; el color cálido lo pone el componente. */
+.sema-boleto--minutos {
+  --diente: 3.5px;
+  --paso: 9px;
+  transform: rotate(2deg);
+  transform-origin: left center;
+  padding: 0.5rem 0.9rem;
+  border-radius: 2px;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--diente), black calc(var(--diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--diente), black calc(var(--diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--diente), black calc(var(--diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--diente), black calc(var(--diente) + 0.75px));
+  -webkit-mask-size: var(--paso) var(--paso), calc(100% - 2 * var(--paso) + 1px) 100%, var(--paso) var(--paso);
+  mask-size: var(--paso) var(--paso), calc(100% - 2 * var(--paso) + 1px) 100%, var(--paso) var(--paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+
+/* En 360–379 px el boleto largo rozaría la portada de papel (medido con getBoundingClientRect):
+   se aprietan tracking, talón y padding; el texto sigue en 13 px. */
+@media (max-width: 379px) {
+  .sema-boleto { letter-spacing: 0.04em; }
+  .sema-boleto--cuento { --corte: 54px; }
+  .sema-boleto__talon { letter-spacing: 0.02em; }
+  .sema-boleto__cuerpo { padding-right: 0.5rem; padding-left: 0.5rem; }
+  .sema-boleto--minutos { padding-left: 0.75rem; padding-right: 0.75rem; }
+}

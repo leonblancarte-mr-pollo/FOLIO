@@ -13,7 +13,8 @@ async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId })
   const sid = sessionId || newClientUuid();
   if (!navigator.onLine) {
     addPendingLog({ userId, bookId, pagesRead: pagesRead || null, mood, date: localDateStr(), sessionId: sid });
-    return;
+    // El post de la sesión se crea al sincronizar el log (no aquí).
+    return { offline: true, postIdPromise: Promise.resolve(null) };
   }
   const today = localDateStr();
 
@@ -29,14 +30,17 @@ async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId })
     if (logError.code === "23505") {
       // Esta sesión ya se sincronizó antes (reintento offline duplicado): no
       // repetir el post/racha, ya se hicieron la primera vez.
-      return;
+      return { postIdPromise: Promise.resolve(null) };
     }
     throw logError;
   }
 
+  // Único post de la sesión. Quien ofrezca «compartir» (ShareSessionModal)
+  // recibe la promesa con su id y lo completa en vez de insertar otro.
+  let postIdPromise = Promise.resolve(null);
   if (pagesRead > 0 && bookId) {
-    createFeedPost({ userId, type: 'reading_session', bookId, content: '', pagesRead, imageUrl: null })
-      .catch((err) => console.error("[reading] no se pudo publicar la sesión en el feed:", err));
+    postIdPromise = createFeedPost({ userId, type: 'reading_session', bookId, content: '', pagesRead, imageUrl: null })
+      .catch((err) => { console.error("[reading] no se pudo publicar la sesión en el feed:", err); return null; });
   }
 
   // La racha ya no la escribe el cliente: el servidor la avanza (RPC
@@ -49,6 +53,7 @@ async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId })
   if (pagesXp > 0) {
     addPetXP(userId, pagesXp).catch((err) => console.error("[PET] sync tras sesión de lectura falló:", err));
   }
+  return { postIdPromise };
 }
 
 // ============ SINCRONIZACIÓN OFFLINE (logs) ============

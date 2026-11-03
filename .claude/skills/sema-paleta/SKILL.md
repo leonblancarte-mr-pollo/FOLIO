@@ -16,11 +16,11 @@ Valores exactos. **Nadie inventa otros colores.** Si una pantalla necesita un co
 | Fondo | `#FFFFFF` | Tinta | Fondo de toda la app |
 | Tinta | `#483A58` | — | Texto principal, íconos, logo |
 | Texto secundario | `#5E5768` | — | Texto secundario y placeholders |
-| Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora de la pestaña activa. Nunca texto sobre blanco |
-| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, borde rasgado de la barra inferior, marcos de celebración, publicación «leyó hoy» |
+| Acción principal (durazno) | `#F79F79` | siempre `#483A58` (`onAccent`) | Botón «Leer ahora», progreso, píldora activa de filtros. Ya no marca la pestaña activa de la barra inferior (ronda 2, 2026-11-02). Nunca texto sobre blanco |
+| Firma de marca | `#BBADFF` | siempre `#483A58` | Racha, stickers, resaltados, cinta de la pestaña activa de la barra inferior (en claro con contorno `#483A58`: lila sobre arena da 1.41), marcos de celebración. La barra en sí es `superficieSuave` con el canto rasgado del mismo papel, sin lila |
 | Acento cálido | `#F79F79` | `#483A58` | Celebraciones, gemas, segundo sticker. Desde el 2026-11-02 es el mismo valor que la acción principal: en una pantalla, el durazno relleno es la acción y el cálido solo aparece en detalles chicos |
 | Superficie suave | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del blanco |
-| Complemento frío | `#456990` | `#FFFFFF` (`onColor`) cuando es fondo; sirve como texto sobre blanco | Enlaces, estados informativos, íconos secundarios, reseñas (publicación «reseña» del feed) |
+| Complemento frío | `#456990` | `#FFFFFF` (`onColor`) cuando es fondo; sirve como texto sobre blanco | Enlaces, estados informativos, íconos secundarios, filete de las reseñas del feed |
 | Cereza (solo en degradado) | `#F45B69` | ver §5 | **Ya no es acción principal.** Solo existe como extremo del `degradadoAcento`; nunca sola como relleno ni como texto |
 | Éxito («Leído») | `#5C6B3D` | — | Token actual `success` de `theme.js` |
 | Error | `#B03A2E` | — | Errores y acciones destructivas |
@@ -84,7 +84,7 @@ Contraste medido (fórmula WCAG 2.x, 2026-11-02):
 
 ## 5. Degradados permitidos (2026-11-02)
 
-Solo dos, definidos en `theme.js` como `SEMA_GRADIENTS`, y solo como **acento** en tarjetas destacadas y barras de progreso. Nunca como fondo de pantalla completa ni debajo de texto largo (sema-identidad §2).
+Dos base, definidos en `theme.js` como `SEMA_GRADIENTS` (más las variantes de «Libro terminado» de §7, ronda 2), y solo como **acento** en tarjetas destacadas y barras de progreso. Nunca como fondo de pantalla completa ni debajo de texto largo (sema-identidad §2).
 
 | Nombre | Valor | Dónde | Texto encima |
 |---|---|---|---|
@@ -93,30 +93,53 @@ Solo dos, definidos en `theme.js` como `SEMA_GRADIENTS`, y solo como **acento** 
 
 Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pista actual de `ProgressBarBook`), porque el durazno y el lila no llegan a 3:1 sobre blanco por sí solos.
 
-## 6. Mapa de color por tipo de publicación (feed, 2026-11-02)
+## 6. Color de las publicaciones del feed (2026-11-02, ronda 2: el tipo ya no define el color)
 
-| Tipo | Color | Texto |
-|---|---|---|
-| Leyó hoy (`reading_session` con libro) | `firma` lila como fondo de tarjeta o franja | `onFirma` `#483A58` |
-| Libro terminado (`book_update` → leído) | `degradadoAcento` con la portada en primer plano | Título grande en `#483A58`; texto chico sobre `bg` |
-| Reseña (`book_update` con reseña o calificación) | `complementoFrio` azul acero como franja o marco | `onColor` `#FFFFFF` sobre el azul; `ink` sobre `bg` |
-| Frase guardada (`quote`) | Ciruela oscuro `#483A58` (`superficieSuave` oscuro / `ink` claro) de fondo, tipografía Instrument Serif itálica | `onColor` `#FFFFFF` (10.39:1) y `#E7D7C1` para secundario (7.36:1) |
-| Sesión sin libro | Neutro: `bg` con texto `ink` y `inkSoft`, sin color | `ink` |
-| Logro | `firma` (sticker) | `onFirma` |
+**Sistema actual (punto 7 de León, ronda 2).** Todas las publicaciones tienen el **mismo formato**: tarjeta neutra (`bg` + borde `border`, radio 16, sin sombras de color) → **franja superior** con ícono Lucide + etiqueta → cabecera (avatar, nombre, hora; sin verbo, el qué lo dice la franja) → cuerpo → pie (me gusta, comentarios).
 
-**Implementación en Social (2026-11-02, ronda 2, pendiente de León).** Las publicaciones con color van en tarjeta neutra (`bg` + borde `border`, sin sombras de color) y el color vive solo en su franja o zona. Las que no tienen color (texto, sesión sin libro) no llevan tarjeta: van sobre el fondo, separadas con un filete abajo.
+- **El color de la franja se asigna por publicación**, no por autor ni por tipo: `assignSequenceColors(ids)` de `theme.js` sobre la lista ordenada de publicaciones visibles (`useMemo` en `FeedView`). Es determinista (no cambia al recargar) y dos publicaciones seguidas no repiten color. Sale de la paleta extendida (§7).
+- **Texto e ícono de la franja: siempre `#483A58`** (el `on` del color), 14 px negritas: 4.77–7.88:1 en los nueve colores, en claro y en oscuro.
+- **El tipo se distingue por ícono + etiqueta**, no por color:
 
-| Tipo | Zona de color | Fondo | Texto encima | Contraste (claro / oscuro) |
+| Tipo | Ícono | Etiqueta de la franja | Cuerpo |
+|---|---|---|---|
+| Sesión (`reading_session`) | `BookOpen` | «Leyó · N páginas · M min» | Libro en línea (si hay) y texto |
+| Empezó a leer (`book_update` started) | `BookOpen` | «Empezó a leer» | Libro en línea y texto |
+| Libro terminado (`book_update` finished) | `BookmarkCheck` | «Libro terminado» | Zona con degradado de `SEMA_GRADIENTES_TERMINADO` (uno por publicación, `pickByHash(…, post.id)`), portada al frente y título en `#483A58` 22 px 800; debajo, sobre `bg`: autor, «Reseña» + estrellas y la reseña como cita **una sola vez** |
+| Reseña suelta (`book_update` con reseña o calificación) | `MessageCircle` | «Reseña» + estrellas en `#483A58` | Libro en línea y la reseña como cita (filete `complementoFrio`) |
+| Frase (`quote`) | `Feather` | «Frase» | La frase en Instrument Serif itálica grande, en `ink` sobre `bg`; libro en `inkSoft`; ánimo como sticker `firma` + `onFirma`. **Ya no es tarjeta ciruela** |
+| Logro | `Award` | «Logro» | Sticker `firma` con papel, canto `bg`, filo `ink` y giro, con el nombre del logro (`onFirma` 20 px 800, 5.21:1) |
+| Texto | `PenLine` | «Publicó» | Texto e imagen |
+
+- En «Libro terminado», si el color asignado a la franja es un extremo de su degradado (o el de la publicación vecina), se avanza al siguiente color de la lista para que franja y degradado no se fundan.
+- Los acentos de siempre no cambian dentro del cuerpo: filete azul acero de la reseña, sticker lila del ánimo y del logro.
+
+Contraste de lo nuevo: franja `#483A58` sobre chicle 4.88, coral 4.83, mostaza 6.38, limón 7.88, menta 7.03, turquesa 5.12, cielo 5.40, pervinca 4.77, orquídea 5.03. Frase en `ink` sobre `bg`: 10.39 (claro) / 21.00 (oscuro); libro en `inkSoft`: 6.91 / 14.89. Título del terminado sobre su degradado: ≥ 4.5 en todos los extremos salvo la cereza del original (3.24, texto grande).
+
+> Sustituye al mapa por tipo de la ronda 1 (lila = leyó, azul acero = reseña, ciruela = frase, superficie suave = empezó, sin tarjeta = texto y sesión sin libro).
+
+## 7. Paleta extendida (apoyo, 2026-11-02, ronda 2)
+
+Colores de **apoyo** para dar variedad donde muchas piezas iguales seguidas se volverían monótonas: franja superior de cada publicación del feed, degradados de «Libro terminado», banners del perfil de un amigo. **No reemplazan a los tokens**: la acción principal sigue siendo durazno con texto `#483A58`, la firma sigue siendo lila. Están en `src/theme.js` como `SEMA_EXTENDIDA` y son iguales en claro y oscuro.
+
+| Clave | Nombre | Hex | Texto encima (`on`) | Contraste |
 |---|---|---|---|---|
-| Leyó (`reading_session` con libro) | Franja superior «Leyó · N páginas · M min» (sin «hoy»: la hora va en la cabecera) | `firma` `#BBADFF` | `onFirma` `#483A58`, 14 px negritas | 5.21 / 5.21 |
-| Sesión sin libro | Sin tarjeta; el número de páginas en grande | `bg` | `ink` (24 px) y `inkSoft` | 10.39 / 21.00 |
-| Empezó a leer (`book_update` started) | Franja superior «Empezó a leer». En oscuro, sin relleno y con filete abajo (la superficie `#483A58` era igual a la frase) | Claro `superficieSuave` `#E7D7C1`; oscuro `bg` | `ink` (`#483A58` / `#FFFFFF`) | 7.36 / 21.00 |
-| Libro terminado (`book_update` finished) | Zona central con la portada grande al frente (real o genérica compacta) | `SEMA_GRADIENTS.acento` | Título en `onAccent` `#483A58` 22 px 800 (grande); único sticker «Libro terminado» sobre `bg`; autor y reseña debajo, sobre `bg` | Título 3.24 (cereza) – 5.04 (durazno); sticker 10.39 / 21.00 |
-| Reseña dentro de «terminado» | Solo el filete izquierdo de 3 px del texto de la reseña | `complementoFrio` `#456990` (filete) | «Reseña» + estrellas Lucide en `ink`; la reseña en `ink` sobre `bg` | Filete 5.71 / 3.68 (objeto ≥ 3:1); texto 10.39 / 21.00 |
-| Reseña suelta (`book_update` sin started/finished con reseña o calificación) | Franja superior «Reseña» + estrellas | `complementoFrio` | `onColor` `#FFFFFF` | 5.71 / 5.71 |
-| Frase (`quote`) | Toda la tarjeta salvo el pie | `#483A58` (`ink` en claro / `superficieSuave` en oscuro) | `onColor` en Instrument Serif; secundario `onDarkSoft` `#E7D7C1`; ánimo como sticker `firma` + `onFirma` (sin el emoji de la etiqueta) | 10.39 · 7.36 · 5.21 |
-| Texto | Sin tarjeta | `bg` | `ink` | 10.39 / 21.00 |
-| Logro | Sticker rectangular con papel, canto `bg`, filo `ink` y giro, con el nombre del logro | `firma` | Ícono y nombre en `onFirma` (20 px 800) | 5.21 |
+| `chicle` | Rosa chicle | `#FF8FB8` | `#483A58` | 4.88:1 |
+| `coral` | Coral | `#FF9478` | `#483A58` | 4.83:1 |
+| `mostaza` | Mostaza | `#F5C451` | `#483A58` | 6.38:1 |
+| `limon` | Limón | `#F2E27A` | `#483A58` | 7.88:1 |
+| `menta` | Menta | `#9DE3C3` | `#483A58` | 7.03:1 |
+| `turquesa` | Turquesa | `#4FC9B4` | `#483A58` | 5.12:1 |
+| `cielo` | Cielo | `#7CC3F0` | `#483A58` | 5.40:1 |
+| `pervinca` | Pervinca | `#9AABFF` | `#483A58` | 4.77:1 |
+| `orquidea` | Orquídea | `#E59BE6` | `#483A58` | 5.03:1 |
+
+Reglas:
+- **Texto encima siempre `#483A58`.** Blanco encima está prohibido (≤ 2.2:1 en todos).
+- Sobre el fondo blanco ninguno llega a 3:1: se usan como **bloque de color con texto en tinta encima**, nunca como color de texto, de ícono suelto ni como único borde de un control. En oscuro (negro) todos pasan > 9:1.
+- **Descartados** por apagados o fangosos: verde pantano, oliva, mostaza oscura, café. El verde `#5C6B3D` que queda en `theme.js` (`sage`, `success`, `session`) no se usa para variedad.
+- **Asignación determinista**: `stableHash(id)` (FNV-1a) → índice. Nunca `Math.random()` en render. Para listas, `assignSequenceColors(ids)` evita que dos piezas seguidas repitan color.
+- **Degradados de «Libro terminado»** (`SEMA_GRADIENTES_TERMINADO`, 135°): cereza → durazno (el original), chicle → mostaza, turquesa → cielo, orquídea → chicle, coral → limón, cielo → pervinca, menta → turquesa, pervinca → orquídea. Texto encima `#483A58` grande (≥ 19 px negritas); todos los extremos ≥ 4.5:1 salvo la cereza del original (3.24, solo grande). Uno por publicación con `pickByHash(SEMA_GRADIENTES_TERMINADO, post.id)`. Sigue valiendo §5: acento de una tarjeta, nunca fondo de pantalla.
 
 ## 4. Regla de implementación
 
@@ -159,10 +182,10 @@ Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pi
 | `session` | `#5C6B3D` | `#7A9B5C` | Post de sesión de lectura (= éxito) |
 | `sessionInk` | `#5C6B3D` | `#7A9B5C` | Texto del post de sesión |
 | `freeze` | `#456990` | `#E7D7C1` | Protector de racha (frío en claro; en oscuro el frío no alcanza en íconos chicos) |
-| **`firma`** *(nuevo)* | `#BBADFF` | `#BBADFF` | Racha, stickers, resaltados, borde rasgado de la barra inferior |
+| **`firma`** *(nuevo)* | `#BBADFF` | `#BBADFF` | Racha, stickers, resaltados, cinta de la pestaña activa de la barra inferior |
 | **`onFirma`** *(nuevo)* | `#483A58` | `#483A58` | Texto sobre `firma` y sobre `acentoCalido`, en ambos modos |
 | **`acentoCalido`** *(nuevo)* | `#F79F79` | `#F79F79` | Celebraciones, gemas, segundo sticker |
-| **`superficieSuave`** *(nuevo)* | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo. Texto encima: `ink` |
+| **`superficieSuave`** *(nuevo)* | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo, barra inferior (con su canto rasgado). Texto encima: `ink` (activa) e `inkSoft` (inactivas: 4.90 en claro, 7.36 en oscuro) |
 | **`complementoFrio`** *(nuevo)* | `#456990` | `#456990` | Enlaces, estados informativos, íconos secundarios, reseñas (en oscuro solo en elementos grandes) |
 | **`SEMA_GRADIENTS.acento`** *(2026-11-02, fuera de `palette`)* | cereza → durazno | igual | Tarjetas destacadas y barras de progreso (§5) |
 | **`SEMA_GRADIENTS.frio`** *(2026-11-02, fuera de `palette`)* | lila → azul acero | igual | Barras y marcos, sin texto encima (§5) |

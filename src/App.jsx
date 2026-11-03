@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Component } from "react";
+import { useState, useEffect, useRef, useMemo, Component } from "react";
 import { createPortal } from "react-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
@@ -81,15 +81,18 @@ import { ReadDateModal } from "./components/ReadDateModal.jsx";
 import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { EmptyState } from "./components/EmptyState.jsx";
+import StickerButton from "./components/StickerButton.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
 import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
+// Ronda 2: paleta extendida (sema-paleta §7): franja por publicación, «Libro terminado», perfil de amigo.
+import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
 import { normalizeGenre } from "./services/genreService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
 import { fetchQuotes, fetchQuotesForBook, insertQuote, updateQuoteInDB, deleteQuoteFromDB, toggleQuoteFavorite, setQuotePublic } from "./services/quotesService.js";
-import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
+import { getOrCreateConversation, markConversationRead, getUnreadMessagesCount, fetchFeed, fetchComments, compressAndUploadPostImage, createFeedPost, updateSessionPost, createComment, createReply, deleteFeedPost, syncPendingPosts } from "./services/socialService.js";
 import { logReadingSession, syncPendingLogs } from "./services/readingService.js";
 import { ACHIEVEMENT_DEFS, achievementBus, checkAchievements } from "./services/achievementsService.js";
 import { enrichBook, getMoodRecommendations } from "./services/aiService.js";
@@ -705,65 +708,58 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
 }
 
 function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }) {
+  // Ronda 2 (2026-11-02): papel rasgado de una sola pieza (ver .sema-nav-rasgado en index.css).
+  // Activa: ícono y etiqueta en tinta con trazo y peso mayores + cinta lila de 24×6 px girada −3°
+  // (en claro con contorno de tinta, porque lila sobre arena da 1.41). Inactivas en inkSoft 600
+  // (4.90 sobre arena, 4.57 en el pliegue más oscuro del papel; 7.36 sobre ciruela). Sin píldora durazno: el durazno queda solo para
+  // la acción principal de cada pantalla. Mascota es una pestaña más (huella + etiqueta) que
+  // abre el panel de la mascota como antes. `pet` ya no se usa aquí (se deja por la firma).
+  const isLight = palette.bg !== PALETTE_DARK.bg;
   return (
     <nav
       className="sm:hidden fixed bottom-0 left-0 right-0 z-20 flex items-center sema-nav-rasgado"
       style={{
-        // Barra de papel (2026-11-02): superficie suave opaca + textura de .sema-nav-rasgado,
-        // para que se separe del fondo blanco (antes era blanco translúcido con desenfoque).
         backgroundColor: palette.superficieSuave,
         paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       {NAV_ITEMS.map((t) => {
         const Icon = t.icon;
-        const active = tab === t.id;
         const isCenter = t.id === "mascota";
+        const active = !isCenter && tab === t.id;
         const badge = t.id === "social" ? pendingCount + unreadMessages : 0;
+        const tint = active ? palette.ink : palette.inkSoft;
         return (
           <button
             key={t.id}
             data-tutorial={`nav-${t.id}`}
-            aria-label={isCenter ? "Mascota" : undefined}
-            aria-current={active && !isCenter ? "page" : undefined}
+            aria-current={active ? "page" : undefined}
             onClick={() => { haptic(HAPTIC.NAV); if (isCenter && onOpenPet) { onOpenPet(); } else { setTab(t.id); } }}
-            className={`flex-1 flex flex-col items-center justify-center py-1.5 sema-nav-item${isCenter ? " nav-add-btn" : ""}`}
-            style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 54 }}
+            className="flex-1 flex flex-col items-center justify-center sema-nav-item"
+            style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 56, padding: 0 }}
           >
-            {isCenter ? (
-              <div style={{
-                width: 52, height: 52, borderRadius: "50%",
-                backgroundColor: palette.firma,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                marginBottom: 1, overflow: "hidden",
-              }}>
-                {pet ? (
-                  <img src={petImageSrc(pet.pet_type)} alt="" className="pet-sprite-img" style={{ width: 42, height: 42, objectFit: "contain", display: "block" }} />
-                ) : (
-                  <PawPrint size={24} color={palette.onFirma} strokeWidth={2.5} />
+            <div className={active ? undefined : "sema-nav-pill"} style={{
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              padding: "4px 12px",
+              borderRadius: "12px",
+            }}>
+              <span style={{ position: "relative", display: "inline-flex" }}>
+                <Icon size={22} strokeWidth={active ? 2.4 : 1.8} color={tint} />
+                {badge > 0 && (
+                  <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif", boxShadow: isLight ? "none" : `0 0 0 2px ${palette.bg}` }}>
+                    {badge > 9 ? "9+" : badge}
+                  </span>
                 )}
-              </div>
-            ) : (
-              <div className={active ? undefined : "sema-nav-pill"} style={{
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                padding: "6px 12px",
-                borderRadius: "999px",
-                backgroundColor: active ? palette.accent : "transparent",
-                // En claro el durazno contra la barra beige da 1.46: contorno de tinta para que la píldora se lea.
-                boxShadow: active && palette.bg !== PALETTE_DARK.bg ? `inset 0 0 0 1.5px ${palette.ink}` : "none",
-                transition: "background-color 200ms ease",
-              }}>
-                <span style={{ position: "relative", display: "inline-flex" }}>
-                  <Icon size={21} strokeWidth={active ? 2.2 : 1.8} color={active ? palette.onAccent : palette.ink} style={{ transition: "color 200ms ease" }} />
-                  {badge > 0 && (
-                    <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif" }}>
-                      {badge > 9 ? "9+" : badge}
-                    </span>
-                  )}
-                </span>
-                <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "12px", fontWeight: active ? 700 : 500, lineHeight: 1, color: active ? palette.onAccent : palette.ink, transition: "color 200ms ease" }}>{t.label}</span>
-              </div>
-            )}
+              </span>
+              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
+              {/* Marca activa tipo cinta (ronda 2 de correcciones): tira 24×6, radio 1, girada −3°. */}
+              <span aria-hidden="true" style={{
+                width: 24, height: 6, borderRadius: 1,
+                transform: "rotate(-3deg)",
+                backgroundColor: active ? palette.firma : "transparent",
+                boxShadow: active && isLight ? `0 0 0 1.5px ${palette.ink}` : "none",
+              }} />
+            </div>
           </button>
         );
       })}
@@ -2012,9 +2008,9 @@ function CollaborativeRecommendations({ user, onAdd }) {
 }
 
 // ── «Recomiéndame» como conversación (Explorar → Para ti) ──
-// El gato pregunta en globos (superficieSuave + ink, colita recta) y las opciones son burbujas
-// tocables del lado del usuario; la respuesta elegida queda en el hilo como globo firma
-// (lila + onFirma). Cada opción separa `value` (lo que va a answers[key] y a
+// Estilo chat con ENCUESTA (2026-11-02, ronda 2): el gato pregunta en un globo `bg` con filo de
+// tinta y las opciones son filas con círculo dentro de ese mismo globo (RecoPoll); al tocar una,
+// sale a la derecha como globo firma (lila + onFirma), el gato «escribe» y llega la siguiente. Cada opción separa `value` (lo que va a answers[key] y a
 // getMoodRecommendations, SIN CAMBIOS) de `label` (lo que se ve, en voz del usuario y neutro).
 const RECO_QUIZ_STEPS = [
   {
@@ -2057,8 +2053,25 @@ const RECO_QUIZ_STEPS = [
     ],
   },
 ];
-const RECO_INTRO = "Elegir qué leer, eso sí depende de uno. Unas preguntas rápidas y te paso ideas.";
-const RECO_EXTRA_ASK = "Última, y es opcional: ¿algo más que deba saber? Un autor, un país, un final abierto…";
+const RECO_INTRO = "Elegir qué leer sí depende de uno. Cinco preguntas rapidito y te paso ideas.";
+const RECO_EXTRA_ASK = "Última: ¿algo más que deba saber? Un autor, un país, un final abierto…";
+// Qué dice el gato cuando no llegan ideas (ronda 3, 2026-11-02). Una línea por causa
+// (`kind` de AiError en aiService.js), en su voz y sin tecnicismos; «Intentar otra vez» vuelve a
+// mandar LAS MISMAS respuestas. Para la sesión caída el reintento no sirve: se pide entrar de nuevo
+// y el botón de reintento no se muestra (corrección de crítico y copy, ronda 3).
+const RECO_ERROR_LINES = {
+  network: "Se fue el internet. Cuando vuelva, lo intentamos otra vez.",
+  timeout: "Me quedé pensando de más. Pasa. ¿Lo intentamos otra vez?",
+  rate: "Hay mucha gente preguntando ahorita. Dame un minuto y lo intentamos otra vez.",
+  session: "Se cerró la sesión. Entra de nuevo a la cuenta y aquí sigo.",
+  config: "Hoy no logro pensar. La falla es de mi lado, no tuya. Vuelve al rato.",
+  parse: "Pensé tanto que me hice bolas. Lo intentamos otra vez.",
+  upstream: "Se me trabó algo. Cosas del absurdo. Lo intentamos otra vez.",
+};
+function recoErrorLine(e) {
+  return RECO_ERROR_LINES[e?.kind] || (/solicitudes/i.test(e?.message || "") ? RECO_ERROR_LINES.rate : RECO_ERROR_LINES.upstream);
+}
+
 // Texto visible de una respuesta guardada (el valor sigue siendo el de la IA).
 function recoLabel(key, value) {
   const q = RECO_QUIZ_STEPS.find((s) => s.key === key);
@@ -2078,19 +2091,65 @@ function RecoCatAvatar({ hidden = false }) {
   );
 }
 
-// Globo del gato. El avatar va en el ÚLTIMO globo de una racha seguida (como en mensajería);
-// los anteriores dejan el hueco. Colita recta (esquina inferior izquierda en 0).
-function RecoCatBubble({ children, avatar = true, focusRef }) {
+// Globo del gato (encuesta 2026-11-02): fondo `bg` con filo de tinta de 1.5 px, como globo de
+// cómic; el del usuario es firma lila. Se distinguen por relleno (blanco/negro vs. lila) y por lado.
+// El avatar va en el ÚLTIMO globo de una racha seguida (como en mensajería); los anteriores dejan
+// el hueco. Colita: esquina inferior izquierda casi recta.
+const recoCatBubbleStyle = () => ({
+  ...body, fontSize: "15px", lineHeight: 1.45, color: palette.ink, outline: "none",
+  backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`,
+  borderRadius: "18px 18px 18px 4px",
+});
+function RecoCatBubble({ children, avatar = true, focusRef, caption }) {
   return (
-    <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: "88%" }}>
+    <div className="reco-msg-in" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end", maxWidth: "88%" }}>
       <RecoCatAvatar hidden={!avatar} />
-      <div ref={focusRef} tabIndex={focusRef ? -1 : undefined} style={{
-        ...body, fontSize: "15px", lineHeight: 1.45, color: palette.ink, outline: "none",
-        backgroundColor: palette.superficieSuave,
-        padding: "0.65rem 0.95rem", borderRadius: "16px 16px 16px 0",
-      }}>
+      <div ref={focusRef} tabIndex={focusRef ? -1 : undefined} style={{ ...recoCatBubbleStyle(), padding: "0.65rem 0.95rem" }}>
         <span className="sr-only">El gato: </span>
         {children}
+        {caption && <span style={{ ...ts.label, display: "block", marginTop: "0.35rem" }}>{caption}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Pregunta actual como ENCUESTA (estilo WhatsApp): un solo globo del gato con la pregunta, el
+// contador discreto y las opciones como filas con círculo. Tocar una fila la «envía».
+// Son botones (no radios): elegir manda la respuesta al instante, y con radios las flechas del
+// teclado mandarían sin querer. El grupo se nombra con la pregunta y se describe con el contador.
+function RecoPoll({ q, n, onChoose, groupRef }) {
+  const qid = `reco-q-${q.key}`;
+  const cid = `reco-c-${q.key}`;
+  return (
+    <div className="reco-msg-in" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
+      <RecoCatAvatar />
+      <div style={{ ...recoCatBubbleStyle(), flex: 1, minWidth: 0, maxWidth: 320, overflow: "hidden", paddingTop: "0.75rem" }}>
+        {/* La pregunta abierta se destaca con la fuente de títulos (Bricolage 17 px), no con más
+            peso de Figtree: así no se lee como formulario junto a los globos de 400. */}
+        <p id={qid} style={{ ...display, fontSize: "17px", fontWeight: 700, lineHeight: 1.35, color: palette.ink, margin: 0, padding: "0 0.95rem" }}>
+          {q.ask}
+        </p>
+        <p id={cid} style={{ ...ts.label, margin: "0.3rem 0 0.5rem", padding: "0 0.95rem" }}>
+          Pregunta {n} de 5 · elige una
+        </p>
+        <div ref={groupRef} role="group" aria-labelledby={qid} aria-describedby={cid}>
+          {q.options.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => onChoose(opt.value)}
+              className="reco-poll-row"
+              style={{
+                ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.35, color: palette.ink, textAlign: "left",
+                display: "flex", alignItems: "center", gap: "0.75rem", width: "100%", minHeight: 48,
+                padding: "0.6rem 0.95rem", background: "none", border: "none",
+                borderTop: `1px solid ${palette.borderSoft}`, cursor: "pointer",
+              }}
+            >
+              <span aria-hidden className="reco-poll-dot" style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${palette.ink}`, flexShrink: 0, boxSizing: "border-box" }} />
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2101,26 +2160,27 @@ function RecoUserBubble({ children, onEdit, pencil = false }) {
   const style = {
     ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.4, textAlign: "left",
     color: palette.onFirma, backgroundColor: palette.firma, border: "none",
-    padding: "0.65rem 0.95rem", minHeight: 44, borderRadius: "16px 16px 0 16px",
+    padding: "0.65rem 0.95rem", minHeight: 44, borderRadius: "18px 18px 4px 18px",
     alignSelf: "flex-end", maxWidth: "82%",
     display: "inline-flex", alignItems: "center", gap: "0.5rem",
   };
-  if (!onEdit) return <p style={{ ...style, margin: 0 }}><span className="sr-only">Tú: </span>{children}</p>;
+  if (!onEdit) return <p className="reco-msg-in" style={{ ...style, margin: 0 }}><span className="sr-only">Tú: </span>{children}</p>;
   return (
-    <button onClick={onEdit} className="quiz-pill-press" aria-label={`Tú: ${children}. Cambiar respuesta`} style={{ ...style, cursor: "pointer" }}>
+    <button onClick={onEdit} className="quiz-pill-press reco-msg-in" aria-label={`Tú: ${children}. Cambiar respuesta`} style={{ ...style, cursor: "pointer" }}>
       {children}
       {pencil && <Pencil size={14} aria-hidden style={{ flexShrink: 0 }} />}
     </button>
   );
 }
 
-// Escribiendo… (tres puntos) mientras la IA responde.
-function RecoTyping() {
+// Escribiendo… (tres puntos): entre pregunta y pregunta y mientras la IA responde.
+// role="status" (aviso discreto, polite) con el texto solo para lector de pantalla.
+function RecoTyping({ label = "El gato está escribiendo" }) {
   return (
-    <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }} role="status">
+    <div className="reco-msg-in" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }} role="status">
       <RecoCatAvatar />
-      <div style={{ backgroundColor: palette.superficieSuave, padding: "0.95rem 1.05rem", borderRadius: "16px 16px 16px 0", display: "flex", gap: 5 }}>
-        <span className="sr-only">El gato está pensando</span>
+      <div style={{ ...recoCatBubbleStyle(), padding: "0.95rem 1.05rem", display: "flex", gap: 5 }}>
+        <span className="sr-only">{label}</span>
         {[0, 1, 2].map((i) => (
           <span key={i} aria-hidden className="reco-typing-dot" style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: palette.ink, animationDelay: `${i * 160}ms` }} />
         ))}
@@ -2137,8 +2197,13 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
+  const [errorKind, setErrorKind] = useState(""); // kind de AiError: con "session" no hay reintento
+  const [errorDetail, setErrorDetail] = useState(""); // solo en desarrollo: causa técnica debajo del globo
   const [addedTitles, setAddedTitles] = useState(new Set());
   const [threadOpen, setThreadOpen] = useState(false); // con resultados, el hilo se colapsa en una línea
+  const [typing, setTyping] = useState(false); // «escribiendo…» del gato entre una respuesta y la siguiente pregunta
+  const typingTimer = useRef(null);
+  useEffect(() => () => clearTimeout(typingTimer.current), []);
   const endRef = useRef(null);
   const resultsRef = useRef(null);
   const rootRef = useRef(null);
@@ -2153,7 +2218,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
   // anterior (no con «ya montó») para que el doble efecto de StrictMode no mueva la pantalla al
   // abrir la pestaña.
   useEffect(() => {
-    const key = `${step}|${sent}|${loading}|${error}|${results ? 1 : 0}`;
+    const key = `${step}|${sent}|${loading}|${error}|${results ? 1 : 0}|${typing ? 1 : 0}`;
     if (lastThreadKey.current === null || lastThreadKey.current === key) { lastThreadKey.current = key; return; }
     lastThreadKey.current = key;
     if (results) {
@@ -2162,11 +2227,12 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+    if (typing) { endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
     if (error && !loading) retryRef.current?.focus({ preventScroll: true });
     else if (step < 4 && !loading) optionsRef.current?.querySelector("button")?.focus({ preventScroll: true });
     else if (step >= 4 && !sent) extraAskRef.current?.focus({ preventScroll: true }); // no la caja: en Android abriría el teclado
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [step, sent, loading, error, results]);
+  }, [step, sent, loading, error, results, typing]);
 
   if (books.length === 0) {
     // Principio 6: el vacío lo dice el gato (texto ya aprobado).
@@ -2196,11 +2262,12 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       const res = await getMoodRecommendations(books, ans);
       setResults(res);
     } catch (e) {
-      console.error(e);
-      // El gato no repite errores técnicos: solo distingue «mucha gente» del resto.
-      setError(/solicitudes/i.test(e?.message || "")
-        ? "Hay mucha gente preguntando ahorita. Dame un minuto y lo volvemos a intentar."
-        : "Se me trabó algo. Cosas del absurdo. Lo intentamos otra vez.");
+      // La causa técnica va a consola (y, en desarrollo, debajo del globo); el gato solo dice
+      // una línea en su voz según el tipo de error (RECO_ERROR_LINES).
+      console.error("[Para ti] no llegaron recomendaciones:", e?.kind || "desconocido", e?.status || "", e?.detail || e?.message || e);
+      setError(recoErrorLine(e));
+      setErrorKind(e?.kind || "");
+      setErrorDetail(import.meta.env.DEV ? [e?.kind || "error", e?.status, e?.detail || e?.message].filter(Boolean).join(" · ") : "");
     } finally {
       setLoading(false);
     }
@@ -2215,16 +2282,26 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     setError("");
     setAddedTitles(new Set());
     setThreadOpen(false);
+    clearTimeout(typingTimer.current);
+    setTyping(false);
   }
 
+  // Elegir = enviar: la respuesta sale como globo del usuario, el gato «escribe» un momento
+  // (650 ms; con reduced-motion los puntos quedan quietos pero el aviso se mantiene) y llega
+  // la siguiente pregunta.
   function choose(key, value) {
     setAnswers({ ...answers, [key]: value });
     setStep(step + 1);
+    setTyping(true);
+    clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => setTyping(false), 650);
   }
 
   // Regresar a una pregunta ya contestada: se borra de ahí en adelante para que el hilo cuadre.
   function editStep(i) {
     if (loading) return;
+    clearTimeout(typingTimer.current);
+    setTyping(false);
     const cleared = { ...answers };
     RECO_QUIZ_STEPS.slice(i).forEach((q) => { cleared[q.key] = ""; });
     cleared.extra = "";
@@ -2261,11 +2338,6 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     setAddedTitles(new Set([...addedTitles, suggestion.title.toLowerCase().trim()]));
   }
 
-  const optionStyle = {
-    ...body, fontSize: "15px", fontWeight: 500, lineHeight: 1.3, color: palette.ink,
-    backgroundColor: "transparent", border: `1.5px solid ${palette.inkSoft}`,
-    borderRadius: 999, minHeight: 44, padding: "0.55rem 1.1rem", cursor: "pointer", textAlign: "left",
-  };
   const quietBtn = {
     ...body, fontSize: "15px", fontWeight: 500, color: palette.inkSoft,
     background: "none", border: "none", minHeight: 44, padding: "0 0.5rem",
@@ -2275,27 +2347,23 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     minHeight: 44, padding: "0 1.2rem", borderRadius: 999, backgroundColor: palette.accent, color: palette.onAccent,
     border: "none", ...body, fontSize: "15px", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.4rem", cursor: "pointer",
   };
-  // Progreso (principio 4): va pegado a la pregunta actual, así nunca se va con el scroll.
-  const counter = (n) => (
-    <p key="counter" style={{ ...ts.label, margin: "-0.2rem 0 0 calc(36px + 0.5rem)" }}>
-      Pregunta {n} de 5
-    </p>
-  );
-
   // ── Hilo de la conversación (role="log": el lector de pantalla anuncia cada globo nuevo) ──
+  // Las encuestas ya contestadas se COLAPSAN: queda solo la pregunta del gato (sin filas) y, a la
+  // derecha, la respuesta del usuario. La opción elegida ya se lee en el globo lila; repetir las
+  // 3 a 6 filas de cada encuesta cerrada alargaría el hilo unas 4 pantallas sin dar información.
+  // La encuesta abierta (pregunta actual) va FUERA del log: así el lector no lee todas las
+  // opciones de golpe; el foco llega a la primera fila y el grupo se nombra con la pregunta.
   const thread = [];
   thread.push(<RecoCatBubble key="intro" avatar={false}>{RECO_INTRO}</RecoCatBubble>);
   RECO_QUIZ_STEPS.forEach((q, i) => {
-    if (i > step) return;
+    if (i >= step) return;
     thread.push(<RecoCatBubble key={`q${i}`}>{q.ask}</RecoCatBubble>);
-    if (i === step && !results) thread.push(counter(i + 1));
-    if (i < step && answers[q.key]) {
+    if (answers[q.key]) {
       thread.push(<RecoUserBubble key={`a${i}`} onEdit={loading ? null : () => editStep(i)} pencil={i === step - 1 && !sent}>{recoLabel(q.key, answers[q.key])}</RecoUserBubble>);
     }
   });
-  if (step >= 4) {
-    thread.push(<RecoCatBubble key="qextra" focusRef={extraAskRef}>{RECO_EXTRA_ASK}</RecoCatBubble>);
-    if (!sent) thread.push(counter(5));
+  if (step >= 4 && !typing) {
+    thread.push(<RecoCatBubble key="qextra" focusRef={extraAskRef} caption={sent ? null : "Pregunta 5 de 5 · opcional"}>{RECO_EXTRA_ASK}</RecoCatBubble>);
     if (sent) thread.push(<RecoUserBubble key="aextra">{answers.extra || "Nada más, así está bien."}</RecoUserBubble>);
   }
 
@@ -2331,7 +2399,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
           <RecoCatBubble>
             {empty
               ? "Esta vez no di con nada que te quede. Pasa a veces. ¿Probamos con otro ánimo?"
-              : "Listo. Esto es lo que yo leería en tu lugar hoy."}
+              : "Listo. Si yo fuera tú, que no lo soy, hoy leería esto."}
           </RecoCatBubble>
         </div>
 
@@ -2410,7 +2478,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     );
   }
 
-  const current = step < 4 && !results ? RECO_QUIZ_STEPS[step] : null;
+  const current = step < 4 && !results && !typing ? RECO_QUIZ_STEPS[step] : null;
 
   return (
     // Padding inferior: deja libre el espacio del FAB y de la barra inferior.
@@ -2434,27 +2502,23 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
           {thread}
         </div>
 
-        {/* Opciones de la pregunta actual: burbujas tocables del lado del usuario */}
+        {/* Pregunta actual: encuesta dentro de un solo globo del gato */}
         {current && (
-          <div ref={optionsRef} role="group" aria-label={current.ask} className="fade-in" style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.4rem" }}>
-            {current.options.map((opt) => (
-              <button key={opt.value} onClick={() => choose(current.key, opt.value)} className="quiz-pill-press" style={optionStyle}>
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          <RecoPoll key={current.key} q={current} n={step + 1} groupRef={optionsRef} onChoose={(v) => choose(current.key, v)} />
         )}
 
+        {typing && <RecoTyping />}
+
         {current && step > 0 && (
-          <div>
-            <button onClick={() => editStep(step - 1)} style={quietBtn}>
+          <div style={{ marginLeft: "calc(36px + 0.5rem)" }}>
+            <button onClick={() => editStep(step - 1)} style={{ ...quietBtn, padding: 0 }}>
               <ChevronLeft size={16} /> Volver
             </button>
           </div>
         )}
 
         {/* Paso 5: caja de texto tipo mensajería */}
-        {step >= 4 && !sent && (
+        {step >= 4 && !sent && !typing && (
           <div className="fade-in" style={{ marginTop: "0.4rem" }}>
             <label htmlFor="reco-extra" className="sr-only">Algo más para el gato (opcional)</label>
             <textarea
@@ -2483,18 +2547,27 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
           </div>
         )}
 
-        {loading && <RecoTyping />}
+        {loading && <RecoTyping label="El gato está pensando" />}
 
         {error && !loading && (
           <>
-            <div role="alert">
+            {/* El globo es lo que dice el gato; la causa técnica (solo en dev) va FUERA del globo,
+                como nota del sistema, para que el gato no «diga» un stack (crítico, ronda 3). */}
+            <div role="alert" id="reco-error-globo">
               <RecoCatBubble>{error}</RecoCatBubble>
             </div>
+            {errorDetail && (
+              <p style={{ ...ts.label, margin: "0.35rem 0 0 2.75rem" }}>Solo en desarrollo: {errorDetail}</p>
+            )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.25rem", marginTop: "0.2rem" }}>
-              <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>
-              <button ref={retryRef} onClick={() => fetchRecs(answers)} className="btn-press" style={filledBtn}>
-                Intentar otra vez
-              </button>
+              {errorKind === "session"
+                ? <button ref={retryRef} onClick={() => editStep(0)} className="btn-press" style={filledBtn} aria-describedby="reco-error-globo">Empezar de nuevo</button>
+                : <>
+                    <button onClick={() => editStep(0)} style={quietBtn}>Empezar de nuevo</button>
+                    <button ref={retryRef} onClick={() => fetchRecs(answers)} className="btn-press" style={filledBtn} aria-describedby="reco-error-globo">
+                      Intentar otra vez
+                    </button>
+                  </>}
             </div>
           </>
         )}
@@ -3769,6 +3842,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
         const dayWord = (n) => (n === 1 ? "día" : "días");
         const sub = cur === 0
           ? "Con 5 minutos arranca"
+          : cur === 1 ? "Día uno. Cuenta igual" // mismo copy que Inicio (ronda 3, 2026-11-02)
           : cur >= best ? "Esto ya es récord" : `Récord: ${best} ${dayWord(best)}`;
         return (
           <div style={{ padding: "0.75rem 1.25rem 0.5rem" }}>
@@ -4929,8 +5003,30 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
 }
 
 // ── Expanded stat drawer ─────────────────────────────────────────────────────
+// Estrellas de solo lectura del perfil de un amigo (ronda 2): Lucide en tinta, sin caracteres «★».
+// Llenas en ink (10.39:1 claro / 21:1 oscuro); vacías con contorno inkSoft (6.91 / 14.89).
+function FriendStars({ value = 0, size = 14 }) {
+  return (
+    <span role="img" aria-label={`${value} de 5 estrellas`} style={{ display: "inline-flex", gap: 2, flexShrink: 0 }}>
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star key={s} size={size} strokeWidth={1.75} color={s <= value ? palette.ink : palette.inkSoft} fill={s <= value ? palette.ink : "none"} aria-hidden />
+      ))}
+    </span>
+  );
+}
+
+// Botón «Volver» de las subvistas del perfil de un amigo: 44 px de alto, tinta.
+function FriendBackButton({ onClick }) {
+  return (
+    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: "0.3rem", minHeight: 44, background: "none", border: "none", cursor: "pointer", color: palette.ink, ...body, fontSize: "15px", fontWeight: 600, marginBottom: sp.sm, padding: 0 }}>
+      <ChevronLeft size={18} aria-hidden /> Volver
+    </button>
+  );
+}
+
 function StatExpandedView({ stat, friendBooks, friendName, onClose }) {
-  const secLabel = { ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.65rem" };
+  // Ronda 2: sin cajas (filas con filete), estados en texto inkSoft, estrellas Lucide.
+  const secTitle = { ...ts.h3, color: palette.ink, marginBottom: sp.sm };
 
   let books = [];
   let title = "";
@@ -4961,19 +5057,17 @@ function StatExpandedView({ stat, friendBooks, friendName, onClose }) {
     const total = friendBooks.length || 1;
     return (
       <div style={{ padding: "0 1.25rem 2rem" }}>
-        <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: "0.4rem 0" }}>
-          <ChevronLeft size={15} /> Volver
-        </button>
-        <p style={secLabel}>{`Géneros de ${friendName}`}</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+        <FriendBackButton onClick={onClose} />
+        <p style={secTitle}>{`Géneros de ${friendName}`}</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: sp.sm }}>
           {entries.map(([genre, count]) => (
             <div key={genre}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
-                <span style={{ ...display, fontSize: "0.88rem", color: palette.ink }}>{genre}</span>
-                <span style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{count} libro{count !== 1 ? "s" : ""}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                <span style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink }}>{genre}</span>
+                <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{count} libro{count !== 1 ? "s" : ""}</span>
               </div>
-              <div style={{ height: 7, backgroundColor: palette.bgSoft, borderRadius: "999px", overflow: "hidden" }}>
-                <div style={{ width: `${(count / total) * 100}%`, height: "100%", ...genreColor(genre), backgroundColor: genreColor(genre).color, borderRadius: "999px" }} />
+              <div style={{ height: 8, backgroundColor: palette.borderSoft, borderRadius: "999px", overflow: "hidden" }}>
+                <div style={{ width: `${(count / total) * 100}%`, height: "100%", backgroundColor: palette.ink, borderRadius: "999px" }} />
               </div>
             </div>
           ))}
@@ -4984,40 +5078,28 @@ function StatExpandedView({ stat, friendBooks, friendName, onClose }) {
 
   return (
     <div style={{ padding: "0 1.25rem 2rem" }}>
-      <button onClick={onClose} style={{ display: "flex", alignItems: "center", gap: "0.3rem", background: "none", border: "none", cursor: "pointer", color: palette.inkSoft, ...body, fontSize: "0.85rem", marginBottom: "1rem", padding: "0.4rem 0" }}>
-        <ChevronLeft size={15} /> Volver
-      </button>
-      <p style={secLabel}>{title} ({books.length})</p>
+      <FriendBackButton onClick={onClose} />
+      <p style={secTitle}>{title} ({books.length})</p>
       {books.length === 0 ? (
-        <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic" }}>Sin libros aquí aún.</p>
+        <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>Nada por aquí todavía.</p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           {books.map((book, i) => {
             const statusLabel = { reading: "Leyendo", want_to_read: "Por leer", wish: "Por leer", read: "Leído" }[book.status];
-            const statusColor = { reading: palette.accent, want_to_read: palette.slate, wish: palette.slate, read: palette.sage }[book.status] || palette.inkFaint;
             return (
-              <div key={i} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 8, padding: "0.7rem 0.85rem" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem" }}>
+              <div key={i} style={{ padding: "0.75rem 0", borderBottom: i < books.length - 1 ? `1px solid ${palette.borderSoft}` : "none" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: sp.sm }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, fontWeight: 600 }}>{book.title}</p>
-                    <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, fontStyle: "italic" }}>{book.author}</p>
+                    <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, lineHeight: 1.25 }}>{book.title}</p>
+                    <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: 2 }}>
+                      {book.author}{stat === "all" && statusLabel ? ` · ${statusLabel}` : ""}
+                    </p>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.2rem", flexShrink: 0 }}>
-                    {stat === "all" && statusLabel && (
-                      <span style={{ ...body, fontSize: "0.65rem", color: statusColor, border: `1px solid ${statusColor}44`, borderRadius: "999px", padding: "0.08rem 0.45rem" }}>{statusLabel}</span>
-                    )}
-                    {book.rating > 0 && (
-                      <div style={{ display: "flex", gap: "1px" }}>
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Star key={s} size={10} color={palette.amber} fill={s <= book.rating ? palette.amber : "none"} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  {book.rating > 0 && <FriendStars value={book.rating} />}
                 </div>
                 {book.review && (
-                  <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5, fontStyle: "italic", borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.4rem" }}>
-                    "{book.review}"
+                  <p style={{ ...body, fontSize: "14px", color: palette.ink, marginTop: "0.5rem", lineHeight: 1.5, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.65rem" }}>
+                    {book.review}
                   </p>
                 )}
               </div>
@@ -5030,7 +5112,11 @@ function StatExpandedView({ stat, friendBooks, friendName, onClose }) {
 }
 
 // ── LiteraryCompatibility ────────────────────────────────────────────────────
-function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStreak, friendName }) {
+// Ronda 2: sin caja; diagrama de Venn plano en firma (tú), el color del amigo (SEMA_EXTENDIDA,
+// el mismo de su portada) y tinta en la intersección. Números grandes dentro; los géneros van
+// en chips debajo con los mismos colores. Texto sobre firma y extendida en onFirma (#483A58,
+// ≥ 4.77:1); sobre la tinta, en bg (10.39 claro / 21 oscuro).
+function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStreak, friendName, friendColor }) {
   const norm = (s) => (s || "").toLowerCase().trim();
 
   const userRead = userBooks;
@@ -5066,11 +5152,11 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
 
   const score = Math.min(100, Math.round(genreScore + bookScore + ratingScore + habitScore));
 
-  const label = score >= 90 ? "Almas gemelas literarias"
-    : score >= 70 ? "Lectores muy compatibles"
-    : score >= 50 ? "Buenos compañeros de lectura"
-    : score >= 30 ? "Mundos distintos, misma pasión"
-    : "Se complementan perfectamente";
+  const label = score >= 90 ? "Casi el mismo estante"
+    : score >= 70 ? "Leen muy parecido"
+    : score >= 50 ? "Buen par para prestarse libros"
+    : score >= 30 ? "Gustos distintos, buena plática"
+    : "Cada quien por su lado. Ahí hay recomendaciones.";
 
   const onlyU = [...uGenres].filter((g) => !fGenres.has(g)).sort((a, b) => (uGenreCounts[b] || 0) - (uGenreCounts[a] || 0));
   const onlyF = [...fGenres].filter((g) => !uGenres.has(g)).sort((a, b) => (fGenreCounts[b] || 0) - (fGenreCounts[a] || 0));
@@ -5083,116 +5169,99 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
 
   if (userRead.length === 0 && friendRead.length === 0) return null;
 
+  const fColor = friendColor || palette.firma;
+  const shortFriend = (friendName || "").split(" ")[0] || friendName;
+  const chip = (bg, color) => ({ ...body, fontSize: "13px", fontWeight: 600, backgroundColor: bg, color, borderRadius: "999px", padding: "4px 12px" });
+  const groupLabel = { ...body, fontSize: "13px", color: palette.inkSoft, marginBottom: "0.35rem" };
+  const vennNum = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 28, fontWeight: 800 };
+
   return (
-    <div style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 14, padding: "1rem 1.1rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: sp.md }}>
       {/* Score header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: sp.md }}>
         <div style={{ flex: 1 }}>
-          <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.25rem" }}>Compatibilidad literaria</p>
-          <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, lineHeight: 1.3 }}>{label}</p>
+          <p style={{ ...ts.h3, color: palette.ink }}>Compatibilidad literaria</p>
+          <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.35, marginTop: 2 }}>{label}</p>
         </div>
-        <div style={{ textAlign: "center", flexShrink: 0 }}>
-          <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2.6rem", fontWeight: 800, color: palette.accent, lineHeight: 1 }}>{score}%</p>
-        </div>
+        <p style={{ ...display, fontSize: "2.6rem", fontWeight: 800, color: palette.ink, lineHeight: 1, letterSpacing: "-0.02em", flexShrink: 0 }}>{score}%</p>
       </div>
 
-      {/* Score bar */}
-      <div style={{ height: 6, backgroundColor: palette.bgSoft, borderRadius: 999, overflow: "hidden" }}>
-        <div style={{ width: `${score}%`, height: "100%", background: `linear-gradient(90deg, ${BRAND.wine}, ${BRAND.amber})`, borderRadius: 999, transition: "width 0.6s ease" }} />
+      {/* Barra de progreso: durazno con borde de tinta (sema-paleta §5) */}
+      <div role="img" aria-label={`Compatibilidad: ${score} %`} style={{ height: 12, border: `1.5px solid ${palette.ink}`, borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ width: `${score}%`, height: "100%", backgroundColor: palette.accent, transition: "width 0.6s ease" }} />
       </div>
 
-      {/* Venn diagram */}
+      {/* Venn */}
       {(uGenres.size > 0 || fGenres.size > 0) && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", paddingLeft: 4, paddingRight: 4 }}>
-            <p style={{ ...body, fontSize: "0.72rem", color: BRAND.wine, fontWeight: 600 }}>Tú</p>
-            <p style={{ ...body, fontSize: "0.72rem", color: palette.slate, fontWeight: 600, textAlign: "right" }}>{friendName}</p>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: sp.sm }}>
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 320 }}>
+            <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 700 }}>Tú</p>
+            <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 700, textAlign: "right" }}>{friendName}</p>
           </div>
-          <svg viewBox="0 0 320 110" width="100%" style={{ maxWidth: 320, overflow: "visible" }}>
+          <svg viewBox="0 0 320 124" width="100%" style={{ maxWidth: 320 }} aria-hidden>
             <defs>
-              <clipPath id="lc-left"><circle cx="120" cy="55" r="62" /></clipPath>
-              <clipPath id="lc-right"><circle cx="200" cy="55" r="62" /></clipPath>
+              <clipPath id="lc-left"><circle cx="125" cy="62" r="58" /></clipPath>
             </defs>
-            <circle cx="120" cy="55" r="62" fill={BRAND.wine} fillOpacity="0.15" stroke={BRAND.wine} strokeOpacity="0.5" strokeWidth="1.5" />
-            <circle cx="200" cy="55" r="62" fill={palette.slate} fillOpacity="0.15" stroke={palette.slate} strokeOpacity="0.5" strokeWidth="1.5" />
-            <circle cx="200" cy="55" r="62" fill={BRAND.amber} fillOpacity="0.28" clipPath="url(#lc-left)" />
-            {onlyU.slice(0, 2).map((g, i) => (
-              <text key={g} x="75" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={BRAND.wine} fontFamily="Figtree, sans-serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
-            ))}
-            {topCommon.slice(0, 2).map((g, i) => (
-              <text key={g} x="160" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.amberInk} fontFamily="Figtree, sans-serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
-            ))}
-            {onlyF.slice(0, 2).map((g, i) => (
-              <text key={g} x="245" y={42 + i * 16} textAnchor="middle" fontSize="9" fill={palette.slate} fontFamily="Figtree, sans-serif" fontWeight="600">{g.length > 9 ? g.slice(0, 9) + "…" : g}</text>
-            ))}
-            {onlyU.length === 0 && uGenres.size === 0 && (
-              <text x="75" y="57" textAnchor="middle" fontSize="8" fill={`${BRAND.wine}99`} fontFamily="Figtree, sans-serif" fontStyle="italic">sin géneros</text>
-            )}
-            {topCommon.length === 0 && (
-              <text x="160" y="57" textAnchor="middle" fontSize="8" fill={`${palette.amberInk}99`} fontFamily="Figtree, sans-serif" fontStyle="italic">ninguno</text>
-            )}
-            {onlyF.length === 0 && fGenres.size === 0 && (
-              <text x="245" y="57" textAnchor="middle" fontSize="8" fill={`${palette.slate}99`} fontFamily="Figtree, sans-serif" fontStyle="italic">sin géneros</text>
-            )}
+            <circle cx="125" cy="62" r="58" fill={palette.firma} />
+            <circle cx="195" cy="62" r="58" fill={fColor} />
+            <circle cx="195" cy="62" r="58" fill={palette.ink} clipPath="url(#lc-left)" />
+            <circle cx="125" cy="62" r="58" fill="none" stroke={palette.ink} strokeWidth="1.5" />
+            <circle cx="195" cy="62" r="58" fill="none" stroke={palette.ink} strokeWidth="1.5" />
+            <text x="92" y="63" textAnchor="middle" dominantBaseline="middle" fill={palette.onFirma} style={vennNum}>{onlyU.length}</text>
+            <text x="160" y="63" textAnchor="middle" dominantBaseline="middle" fill={palette.bg} style={vennNum}>{topCommon.length}</text>
+            <text x="228" y="63" textAnchor="middle" dominantBaseline="middle" fill={palette.onFirma} style={vennNum}>{onlyF.length}</text>
           </svg>
 
-          {/* Genre pills below diagram */}
           {onlyU.length > 0 && (
             <div style={{ width: "100%" }}>
-              <p style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginBottom: "0.3rem" }}>Solo tú:</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                {onlyU.map((g) => (
-                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: `${palette.accent}14`, color: palette.accent, border: `1px solid ${palette.accent}40`, borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
-                ))}
+              <p style={groupLabel}>Solo tú</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                {onlyU.map((g) => <span key={g} style={chip(palette.firma, palette.onFirma)}>{g}</span>)}
               </div>
             </div>
           )}
-          {topCommon.length > 0 && (
-            <div style={{ width: "100%" }}>
-              <p style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginBottom: "0.3rem" }}>En común:</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                {topCommon.map((g) => (
-                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: `${palette.amber}1A`, color: palette.amberInk, border: `1px solid ${palette.amber}55`, borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
-                ))}
+          <div style={{ width: "100%" }}>
+            <p style={groupLabel}>En común</p>
+            {topCommon.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                {topCommon.map((g) => <span key={g} style={chip(palette.ink, palette.bg)}>{g}</span>)}
               </div>
-            </div>
-          )}
+            ) : (
+              <p style={{ ...body, fontSize: "15px", color: palette.ink }}>Todavía nada en común.<br />Buen pretexto para prestarse un libro.</p>
+            )}
+          </div>
           {onlyF.length > 0 && (
             <div style={{ width: "100%" }}>
-              <p style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginBottom: "0.3rem" }}>Solo {friendName}:</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-                {onlyF.map((g) => (
-                  <span key={g} style={{ ...body, fontSize: "0.75rem", backgroundColor: `${palette.slate}14`, color: palette.slate, border: `1px solid ${palette.slate}40`, borderRadius: "20px", padding: "3px 10px" }}>{g}</span>
-                ))}
+              <p style={groupLabel}>Solo {shortFriend}</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                {onlyF.map((g) => <span key={g} style={chip(fColor, palette.onFirma)}>{g}</span>)}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Books in common */}
+      {/* Libros en común: filas sin caja */}
       {commonBooksDisplay.length > 0 && (
         <div>
-          <p style={{ ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.6rem" }}>
+          <p style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.25rem" }}>
             Libros en común ({commonBooksRaw.length})
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
             {commonBooksDisplay.map((b, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.65rem", backgroundColor: palette.bg, borderRadius: 10, padding: "0.5rem 0.65rem", border: `1px solid ${palette.borderSoft}` }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: sp.sm, padding: "0.6rem 0", borderBottom: i < commonBooksDisplay.length - 1 ? `1px solid ${palette.borderSoft}` : "none" }}>
                 {b.cover_url ? (
-                  <img src={b.cover_url} alt="" style={{ width: 32, height: 44, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} />
+                  <img src={b.cover_url} alt="" style={{ width: 32, height: 46, borderRadius: 4, objectFit: "cover", flexShrink: 0 }} />
                 ) : (
-                  <div style={{ width: 32, height: 44, borderRadius: 4, backgroundColor: palette.bgSoft, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <BookOpen size={14} color={palette.inkFaint} />
-                  </div>
+                  <BookCoverPlaceholder title={b.title} author={b.author} width={32} height={46} />
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ ...display, fontSize: "0.82rem", fontWeight: 600, color: palette.ink, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.title}</p>
-                  <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, marginTop: "0.1rem" }}>{b.author}</p>
+                  <p style={{ ...display, fontSize: "15px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.title}</p>
+                  <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: 2 }}>{b.author}</p>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  {b.rating > 0 && <p style={{ ...body, fontSize: "0.75rem", color: palette.amber }}>{"★".repeat(b.rating)}</p>}
-                  {b.friendRating > 0 && <p style={{ ...body, fontSize: "0.7rem", color: palette.inkFaint }}>{"★".repeat(b.friendRating)}</p>}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                  {b.rating > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...body, fontSize: "13px", color: palette.inkSoft }}>Tú <FriendStars value={b.rating} size={12} /></span>}
+                  {b.friendRating > 0 && <span style={{ display: "inline-flex", alignItems: "center", gap: 6, ...body, fontSize: "13px", color: palette.inkSoft }}>{shortFriend} <FriendStars value={b.friendRating} size={12} /></span>}
                 </div>
               </div>
             ))}
@@ -5337,7 +5406,30 @@ function FriendProfileModal({ friend, user, onClose }) {
     && friend.id !== user?.id
     && !userFriendIds.has(friend.id);
 
-  const secLabel = { ...display, fontSize: "0.78rem", color: palette.inkFaint, fontWeight: 500, marginBottom: "0.5rem" };
+  // Ronda 2 (identidad nueva): secciones separadas con espacio y título, sin cajas; color solo en
+  // la portada, las estadísticas (SEMA_EXTENDIDA, texto onFirma #483A58) y el sticker lila de racha.
+  const secLabel = { ...ts.h3, color: palette.ink, marginBottom: sp.sm };
+  const isDark = palette.bg === PALETTE_DARK.bg;
+  // Colores de la portada y de las estadísticas (sema-paleta §7): parten del hash del id del amigo
+  // (determinista) y avanzan de 2 en 2 por los 9 de SEMA_EXTENDIDA, así los 5 son distintos entre sí
+  // y dos vecinos nunca son tonos cercanos (9 y 2 son coprimos).
+  const extList = SEMA_EXTENDIDA;
+  const extStart = stableHash(friend.id) % extList.length;
+  const extAt = (n) => extList[(extStart + n * 2) % extList.length];
+  const bannerColor = extAt(0);
+  // Estadísticas visibles, cada una de un color distinto (y distinto de la portada).
+  const statDefs = [
+    { key: "read", label: readBooks.length === 1 ? "leído" : "leídos", value: readBooks.length, show: true },
+    { key: "all", label: "en total", value: friendBooks.length, show: true },
+    { key: "reading", label: "leyendo", value: readingBooks.length, show: readingBooks.length > 0 },
+    { key: "want", label: "por leer", value: wantBooks.length, show: wantBooks.length > 0 },
+  ].filter((s) => s.show);
+  const statColors = Object.fromEntries(statDefs.map((s, i) => [`${friend.id}:${s.key}`, extAt(i + 1)]));
+  const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  ratedF.forEach((b) => { const r = Math.round(b.rating); if (ratingCounts[r] !== undefined) ratingCounts[r]++; });
+  const ratingMax = Math.max(...Object.values(ratingCounts), 1);
+  const rowDivider = (i, n) => ({ borderBottom: i < n - 1 ? `1px solid ${palette.borderSoft}` : "none" });
+  const quietBtn = { ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, background: "none", border: "none", cursor: "pointer", padding: 0, minHeight: 44, display: "inline-flex", alignItems: "center", gap: 4, textDecoration: "underline", textUnderlineOffset: 3 };
 
   async function sendRequestToFriendOfFriend(toId) {
     const { error } = await supabase.from("friendships").insert({ user_id: user.id, friend_id: toId, status: "pending" });
@@ -5351,29 +5443,27 @@ function FriendProfileModal({ friend, user, onClose }) {
     setMainRequestSent(true);
   }
 
-  function StatCard({ label, value, statKey, color = palette.ink }) {
-    const bgMap = {
-      read: palette.bgCard, all: palette.bgCard, rating: palette.bgCard, reading: palette.bgCard, want: palette.bgCard,
-    };
-    const borderMap = {
-      read: palette.border, all: palette.border, rating: palette.border, reading: palette.border, want: palette.border,
-    };
+  // Estadística (ronda 2, corrección): sin caja rellena. Cifra 28 px 800 en ink, una cinta gruesa
+  // del color de SEMA_EXTENDIDA debajo (decorativa: la información está en la cifra y la etiqueta)
+  // y la etiqueta en inkSoft. Foco: el global en ink (sin sema-focus-onfirma).
+  function StatCard({ label, value, statKey }) {
+    const c = statColors[`${friend.id}:${statKey}`] || { hex: palette.firma };
     return (
       <button
         onClick={() => setExpandedStat(statKey)}
+        aria-label={`${value} ${label}. Ver lista`}
+        className="btn-press"
         style={{
-          flex: 1, backgroundColor: bgMap[statKey] || palette.bgCard,
-          border: `1px solid ${borderMap[statKey] || palette.borderSoft}`,
-          borderRadius: "12px", padding: "0.75rem 0.5rem", textAlign: "center",
-          cursor: "pointer", transition: "box-shadow 0.15s",
-          minHeight: "72px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "0.15rem",
-          boxShadow: "0 2px 6px rgba(42,31,26,0.05)",
+          flex: 1, minWidth: 0, background: "none", border: "none", borderRadius: 8,
+          padding: "0.25rem 0.25rem 0.4rem", textAlign: "center", cursor: "pointer",
+          minHeight: 84, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6,
         }}
-        className="hover-shadow-stat"
       >
-        <div style={{ ...display, fontSize: "1.4rem", fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-        <div style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint, marginTop: "0.1rem" }}>{label}</div>
-        <ChevronDown size={10} color={palette.inkFaint} style={{ marginTop: "0.1rem" }} />
+        <span style={{ ...display, fontSize: "28px", fontWeight: 800, color: palette.ink, lineHeight: 1 }}>{value}</span>
+        <span aria-hidden style={{ display: "block", width: "72%", maxWidth: 64, height: 8, borderRadius: 2, backgroundColor: c.hex }} />
+        <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft, display: "inline-flex", alignItems: "center", gap: 2 }}>
+          {label}<ChevronDown size={14} color={palette.inkSoft} aria-hidden />
+        </span>
       </button>
     );
   }
@@ -5388,57 +5478,59 @@ function FriendProfileModal({ friend, user, onClose }) {
         className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl overflow-y-auto scrollbar-hide"
         style={{ backgroundColor: palette.bg, maxHeight: "92vh", boxShadow: "0 -4px 40px rgba(42,31,26,0.18)" }}
       >
-        {/* Cover banner */}
-        <div style={{ position: "relative", height: 140, background: friend.cover_url ? "none" : BRAND.gradient, borderRadius: "1.25rem 1.25rem 0 0", overflow: "visible", flexShrink: 0 }}>
+        {/* Portada: foto del amigo o un color plano de SEMA_EXTENDIDA (antes degradado vino → ámbar) */}
+        <div style={{ position: "relative", height: 120, backgroundColor: friend.cover_url ? palette.bg : bannerColor.hex, borderBottom: friend.cover_url ? "none" : `1.5px solid ${palette.ink}`, borderRadius: "1.25rem 1.25rem 0 0", overflow: "visible", flexShrink: 0 }}>
           {friend.cover_url && (
             <img src={friend.cover_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "1.25rem 1.25rem 0 0", display: "block" }} />
           )}
-          <div style={{ position: "absolute", bottom: -38, left: 20, padding: 3, borderRadius: "50%", background: BRAND.gradient, boxShadow: "0 4px 16px rgba(122,46,46,0.4)", border: `4px solid ${palette.bg}` }}>
+          {/* Avatar con canto de sticker: filo bg + línea ink (antes aro con degradado vino) */}
+          <div style={{ position: "absolute", bottom: -38, left: 20, borderRadius: "50%", border: `4px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}` }}>
             {friend.avatar_url ? (
-              <img src={friend.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", display: "block" }} />
+              <img src={friend.avatar_url} alt="" style={{ width: 76, height: 76, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 72, height: 72, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
           </div>
-          <button onClick={onClose} style={{ position: "absolute", top: 10, right: 12, backgroundColor: "rgba(42,31,26,0.5)", border: "none", borderRadius: "50%", width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" }}>
-            <X size={16} color={palette.onColor} />
+          <button onClick={onClose} aria-label="Cerrar" style={{ position: "absolute", top: 8, right: 8, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <X size={20} color={palette.ink} aria-hidden />
           </button>
         </div>
 
-        {/* Name + Comparar button */}
-        <div style={{ paddingTop: 48, paddingLeft: 20, paddingRight: 20, paddingBottom: "0.5rem", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
-          <div>
-            <p style={{ ...display, fontWeight: 700, fontSize: "1.15rem", color: palette.ink, lineHeight: 1.2 }}>{friendName}</p>
-            {friend.username && <p style={{ ...body, fontSize: "0.82rem", color: palette.inkFaint }}>@{friend.username}</p>}
-            {friend.bio && <p style={{ ...body, fontSize: "0.88rem", color: palette.inkSoft, marginTop: "0.3rem", lineHeight: 1.45 }}>{friend.bio}</p>}
+        {/* Nombre + Comparar (botón silencioso: la acción principal es «Agregar como amigo» si aplica) */}
+        <div style={{ paddingTop: 50, paddingLeft: 20, paddingRight: 20, paddingBottom: "0.5rem", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: sp.sm }}>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ ...display, fontWeight: 800, fontSize: "1.5rem", color: palette.ink, lineHeight: 1.15, letterSpacing: "-0.01em" }}>{friendName}</p>
+            {friend.username && <p style={{ ...body, fontSize: "14px", color: palette.inkSoft }}>@{friend.username}</p>}
+            {friend.bio && <p style={{ ...body, fontSize: "15px", color: palette.ink, marginTop: "0.4rem", lineHeight: 1.45 }}>{friend.bio}</p>}
           </div>
           {user && !isPrivateLocked && (
             <button
               onClick={() => { setShowCompare(true); setExpandedStat(null); }}
-              style={{ ...display, fontSize: "0.8rem", fontWeight: 600, color: palette.accent, border: `1.5px solid ${palette.accent}55`, borderRadius: "999px", padding: "0.4rem 0.9rem", cursor: "pointer", backgroundColor: palette.accent + "10", flexShrink: 0, marginTop: "0.1rem" }}
+              className="btn-press"
+              style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 1rem", minHeight: 44, cursor: "pointer", backgroundColor: palette.bg, flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              ⚡ Comparar
+              <Users size={16} aria-hidden /> Comparar
             </button>
           )}
         </div>
 
-        {/* Add friend CTA — prominent, full-width, shown when not yet friends */}
+        {/* Mandar solicitud: única acción principal (durazno + onAccent) */}
         {user && !loading && friend.id !== user.id && !userFriendIds.has(friend.id) && (
           <div style={{ paddingLeft: 20, paddingRight: 20, paddingBottom: "0.75rem" }}>
             {(userPendingIds.has(friend.id) || mainRequestSent) ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", padding: "0.65rem 1rem" }}>
-                <Check size={14} color={palette.success} />
-                <span style={{ ...body, fontSize: "0.9rem", color: palette.inkSoft }}>Solicitud enviada</span>
-              </div>
+              <p role="status" style={{ display: "flex", alignItems: "center", gap: "0.5rem", minHeight: 44, ...body, fontSize: "15px", color: palette.inkSoft }}>
+                <Check size={16} color={palette.success} aria-hidden /> Solicitud enviada
+              </p>
             ) : (
               <button
                 onClick={handleAddMainFriend}
-                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "12px", padding: "0.75rem 1rem", cursor: "pointer", ...display, fontSize: "0.95rem", fontWeight: 600 }}
+                className="btn-press"
+                style={{ width: "100%", minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: palette.accent, color: palette.onAccent, border: "none", borderRadius: "999px", padding: "0.75rem 1rem", cursor: "pointer", ...display, fontSize: "16px", fontWeight: 700 }}
               >
-                <UserPlus size={16} />
-                Agregar como amigo
+                <UserPlus size={18} aria-hidden />
+                Mandar solicitud
               </button>
             )}
           </div>
@@ -5450,7 +5542,7 @@ function FriendProfileModal({ friend, user, onClose }) {
         ) : expandedStat ? (
           <StatExpandedView stat={expandedStat} friendBooks={friendBooks} friendName={friendName} onClose={() => setExpandedStat(null)} />
         ) : (
-          <div className="px-5 py-4" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div className="px-5 py-4" style={{ display: "flex", flexDirection: "column", gap: sp.xl }}>
             {loading ? (
               <SkeletonGroup label="Cargando perfil" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.6rem" }}>
@@ -5467,69 +5559,94 @@ function FriendProfileModal({ friend, user, onClose }) {
               </SkeletonGroup>
             ) : isPrivateLocked ? (
               <div style={{ textAlign: "center", padding: "1.5rem 1rem 2.5rem" }}>
-                <div style={{ width: 56, height: 56, borderRadius: "50%", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.85rem" }}>
-                  <Lock size={22} color={palette.inkFaint} />
+                <div style={{ width: 56, height: 56, borderRadius: "50%", border: `1.5px solid ${palette.ink}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.85rem" }}>
+                  <Lock size={22} color={palette.ink} aria-hidden />
                 </div>
-                <p style={{ ...display, fontSize: "1.05rem", fontWeight: 700, color: palette.ink, marginBottom: "0.35rem" }}>Este perfil es privado</p>
-                <p style={{ ...body, fontSize: "0.88rem", color: palette.inkFaint, lineHeight: 1.5, maxWidth: 300, margin: "0 auto" }}>
-                  Solo sus amigos pueden ver sus libros, stats y actividad. Envíale una solicitud para conocer su biblioteca.
+                <p style={{ ...display, fontSize: "1.15rem", fontWeight: 700, color: palette.ink, marginBottom: "0.35rem" }}>Este perfil es privado</p>
+                <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.5, maxWidth: 300, margin: "0 auto" }}>
+                  Sus libros, su racha y su actividad solo los ven sus amigos.<br />Si acepta la solicitud, se abre todo.
                 </p>
               </div>
             ) : (
               <>
-                {/* Stat cards (clickable) */}
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  <StatCard label="leídos" value={readBooks.length} statKey="read" color={palette.accent} />
-                  <StatCard label="en total" value={friendBooks.length} statKey="all" color={palette.ink} />
-                  {avgF && <StatCard label="promedio ★" value={avgF} statKey="rating" color={BRAND.amber} />}
-                  {readingBooks.length > 0 && <StatCard label="leyendo" value={readingBooks.length} statKey="reading" color={palette.slate} />}
-                  {wantBooks.length > 0 && <StatCard label="por leer" value={wantBooks.length} statKey="want" color={palette.sage} />}
+                {/* Estadísticas: un bloque de color por cifra (SEMA_EXTENDIDA, sin repetir contiguos) */}
+                <div style={{ display: "flex", gap: "0.6rem", padding: "2px" }}>
+                  {statDefs.map((s) => <StatCard key={s.key} label={s.label} value={s.value} statKey={s.key} />)}
                 </div>
-                <RatingDistribution books={friendBooks} />
 
-                {/* Streak mini cards */}
-                {friendStreak && (
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    {[
-                      { label: "Racha actual", value: friendStreak.current_streak || 0 },
-                      { label: "Mejor racha",  value: friendStreak.longest_streak  || 0 },
-                    ].map(({ label, value }) => (
-                      <div key={label} style={{
-                        flex: 1, position: "relative", overflow: "hidden",
-                        background: FRIEND_STREAK_GRADIENT,
-                        borderRadius: 12, padding: "0.75rem 0.75rem",
-                        boxShadow: "0 4px 14px rgba(61,139,55,0.22)",
-                      }}>
-                        <div style={{ position: "absolute", top: -20, right: -20, width: 70, height: 70, borderRadius: "50%", backgroundColor: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
-                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                          <div>
-                            <div style={{ ...display, fontSize: "2rem", fontWeight: 800, color: palette.onColor, lineHeight: 1 }}>{value}</div>
-                            <div style={{ ...body, fontSize: "0.68rem", color: "rgba(255,255,255,0.75)", marginTop: "0.1rem" }}>días</div>
+                {/* Racha: el mismo sticker lila con papel de Inicio y Mi perfil (antes dos tarjetas verdes) */}
+                {/* Corrección ronda 2: la mascota del amigo va al lado del sticker (como en Inicio), sin hueco a la derecha */}
+                {(friendStreak || friendPet) && (() => {
+                  const cur = friendStreak?.current_streak || 0;
+                  const best = friendStreak?.longest_streak || 0;
+                  const dayWord = (n) => (n === 1 ? "día" : "días");
+                  const sub = cur > 0 && cur >= best ? "Esto ya es récord" : best > 0 ? `Récord: ${best} ${dayWord(best)}` : "Todavía sin racha";
+                  return (
+                    <div style={{ display: "flex", alignItems: "center", gap: sp.sm }}>
+                      {friendStreak && (
+                        <div
+                          className="sema-papel sema-sticker"
+                          role="img"
+                          aria-label={`${cur} ${dayWord(cur)} de racha. ${sub}`}
+                          style={{
+                            flex: friendPet ? "1 1 auto" : "1 1 100%", minWidth: 0, marginLeft: 4,
+                            backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
+                            border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
+                            padding: "0.9rem 1rem 1rem", display: "flex", alignItems: "center", gap: sp.sm,
+                          }}
+                        >
+                          <Flame size={30} strokeWidth={2} color={palette.onFirma} style={{ flexShrink: 0 }} aria-hidden />
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
+                              {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
+                            </p>
+                            <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, marginTop: "0.35rem" }}>{sub}</p>
                           </div>
-                          <Flame size={20} color="rgba(255,255,255,0.7)" />
                         </div>
-                        <div style={{ ...body, fontSize: "0.72rem", color: "rgba(255,255,255,0.8)", marginTop: "0.35rem" }}>{label}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      )}
+                      {/* Su mascota: pequeña, al lado; en oscuro, disco lila detrás como en Inicio */}
+                      {friendPet && (
+                        <div role="img" aria-label={`Su mascota: ${friendPet.pet_name || "sin nombre"}, nivel ${friendPet.level}`} style={{ flexShrink: 0, width: 88, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+                          <span style={{ position: "relative", display: "inline-flex", width: 80, height: 80 }}>
+                            {isDark && (
+                              <span aria-hidden style={{ position: "absolute", left: 4, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma }} />
+                            )}
+                            <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} px={80} showShadow={false} style={{ position: "relative" }} />
+                          </span>
+                          <p style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink, lineHeight: 1.15, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+                            {friendPet.pet_name || "Su mascota"}
+                          </p>
+                          <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft }}>Nivel {friendPet.level}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
-                {/* Su compañero (mascota) — sin XP exacto */}
-                {friendPet && (
+                {/* Calificaciones: sin caja; barras en tinta (antes RatingDistribution con durazno como texto) */}
+                {ratedF.length > 0 && (
                   <div>
-                    <p style={secLabel}>Su compañero</p>
-                    <div style={{ borderRadius: 14, padding: "1rem 1.25rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.border}`, display: "flex", alignItems: "center", gap: "1rem" }}>
-                      <div style={{ flexShrink: 0 }}>
-                        <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} size="medium" />
-                      </div>
-                      <div>
-                        <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.15rem", color: palette.ink, lineHeight: 1.1 }}>
-                          {friendPet.pet_name || "Su compañero"}
-                        </p>
-                        <p style={{ ...display, fontSize: "0.88rem", fontWeight: 600, color: palette.accent, marginTop: "0.25rem" }}>
-                          Nivel {friendPet.level}
-                        </p>
-                      </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: sp.sm }}>
+                      <p style={{ ...ts.h3, color: palette.ink }}>Calificaciones</p>
+                      <button onClick={() => setExpandedStat("rating")} aria-label={`Promedio ${avgF} de 5. Ver libros calificados`} style={{ ...quietBtn, textDecoration: "none", gap: 6 }}>
+                        <span style={{ ...display, fontSize: "1.5rem", fontWeight: 800, color: palette.ink }}>{avgF}</span>
+                        <Star size={18} color={palette.ink} fill={palette.ink} aria-hidden />
+                        <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, fontWeight: 500 }}>promedio</span>
+                        <ChevronRight size={16} color={palette.ink} aria-hidden />
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }} role="img" aria-label={[5, 4, 3, 2, 1].map((s) => `${s} estrellas: ${ratingCounts[s]}`).join(". ")}>
+                      {[5, 4, 3, 2, 1].map((s) => (
+                        <div key={s} style={{ display: "flex", alignItems: "center", gap: sp.sm }}>
+                          <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, width: 30, display: "inline-flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+                            {s} <Star size={12} color={palette.inkSoft} fill={palette.inkSoft} aria-hidden />
+                          </span>
+                          <div style={{ flex: 1, height: 8, borderRadius: 999, backgroundColor: palette.borderSoft, overflow: "hidden" }}>
+                            <div style={{ width: `${(ratingCounts[s] / ratingMax) * 100}%`, height: "100%", borderRadius: 999, backgroundColor: palette.ink }} />
+                          </div>
+                          <span style={{ ...body, fontSize: "13px", color: ratingCounts[s] > 0 ? palette.ink : palette.inkSoft, width: 18, textAlign: "right", flexShrink: 0, fontWeight: ratingCounts[s] === ratingMax ? 700 : 400 }}>{ratingCounts[s]}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -5542,44 +5659,52 @@ function FriendProfileModal({ friend, user, onClose }) {
                   userStreak={userStreak}
                   friendStreak={friendStreak}
                   friendName={friendName}
+                  friendColor={bannerColor.hex}
                 />
 
-                {/* Genres (expandable) */}
+                {/* Géneros favoritos: chips neutros con contorno; el abierto en firma (antes vino/salvia/crema) */}
                 {topGenresF.length > 0 && (
                   <div>
                     <p style={secLabel}>Géneros favoritos</p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: expandedGenreF ? "0.65rem" : 0 }}>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: expandedGenreF ? sp.sm : 0 }}>
                       {topGenresF.map(([genre, count]) => {
                         const isOpen = expandedGenreF === genre;
                         return (
                           <button
                             key={genre}
                             onClick={() => setExpandedGenreF(isOpen ? null : genre)}
-                            style={{ ...body, ...genrePillStyle(genre, isOpen) }}
+                            aria-expanded={isOpen}
+                            className="btn-press"
+                            style={{
+                              ...body, fontSize: "15px", fontWeight: 600, minHeight: 44, padding: "0 1rem", borderRadius: 999, cursor: "pointer",
+                              backgroundColor: isOpen ? palette.firma : palette.bg,
+                              color: isOpen ? palette.onFirma : palette.ink,
+                              border: `1.5px solid ${palette.ink}`,
+                            }}
                           >
-                            {genre} <span style={{ opacity: 0.7, fontSize: "0.75rem" }}>({count})</span>
+                            {genre} <span style={{ fontWeight: 400 }}>({count})</span>
                           </button>
                         );
                       })}
                     </div>
                     {expandedGenreF && (
-                      <div style={{ backgroundColor: palette.bg, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", padding: "0.65rem", display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                        {friendBooks.filter((b) => b.genre === expandedGenreF).map((book, i) => {
-                          const statusLabel = { reading: "Leyendo", want_to_read: "Por leer", wish: "Por leer", read: "Leído" }[book.status];
-                          return (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                              <BookCoverPlaceholder title={book.title} author={book.author} width={36} height={52} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ ...display, fontSize: "0.85rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
-                                <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint }}>{book.author}</p>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.15rem" }}>
-                                  {statusLabel && <span style={{ ...body, fontSize: "0.65rem", color: palette.inkSoft }}>{statusLabel}</span>}
-                                  {book.rating > 0 && <span style={{ fontSize: "0.68rem", color: palette.amber }}>{"★".repeat(book.rating)}</span>}
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        {(() => {
+                          const list = friendBooks.filter((b) => b.genre === expandedGenreF);
+                          return list.map((book, i) => {
+                            const statusLabel = { reading: "Leyendo", want_to_read: "Por leer", wish: "Por leer", read: "Leído" }[book.status];
+                            return (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: sp.sm, padding: "0.55rem 0", ...rowDivider(i, list.length) }}>
+                                <BookCoverPlaceholder title={book.title} author={book.author} width={36} height={52} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+                                  <p style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{book.author}{statusLabel ? ` · ${statusLabel}` : ""}</p>
                                 </div>
+                                {book.rating > 0 && <FriendStars value={book.rating} size={12} />}
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                     )}
                   </div>
@@ -5592,32 +5717,30 @@ function FriendProfileModal({ friend, user, onClose }) {
                   return (
                     <div>
                       <p style={secLabel}>Amigos en común ({mutuals.length})</p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: sp.sm }}>
                         <div style={{ display: "flex" }}>
                           {mutuals.slice(0, 3).map((m, i) => (
                             <div key={m.id} style={{ marginLeft: i > 0 ? -8 : 0, position: "relative", zIndex: 3 - i, border: `2px solid ${palette.bg}`, borderRadius: "50%", display: "inline-block" }}>
-                              <Avatar author={m} size={28} />
+                              <Avatar author={m} size={32} />
                             </div>
                           ))}
                         </div>
                         {mutuals.length > 3 && (
-                          <span style={{ ...body, fontSize: "0.8rem", color: palette.inkSoft }}>+{mutuals.length - 3} más</span>
+                          <span style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>+{mutuals.length - 3} más</span>
                         )}
-                        <button
-                          onClick={() => setMutualsExpanded(!mutualsExpanded)}
-                          style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                        >
-                          {mutualsExpanded ? "ocultar ▲" : "ver todos ▼"}
+                        <button onClick={() => setMutualsExpanded(!mutualsExpanded)} aria-expanded={mutualsExpanded} style={quietBtn}>
+                          {mutualsExpanded ? "Ver menos" : "Ver todos"}
+                          <ChevronDown size={16} aria-hidden style={{ transform: mutualsExpanded ? "rotate(180deg)" : "none" }} />
                         </button>
                       </div>
                       {mutualsExpanded && (
-                        <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                          {mutuals.map(m => (
-                            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "0.6rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 8, padding: "0.5rem 0.75rem" }}>
-                              <Avatar author={m} size={30} />
+                        <div style={{ marginTop: "0.25rem", display: "flex", flexDirection: "column" }}>
+                          {mutuals.map((m, i) => (
+                            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: sp.sm, padding: "0.5rem 0", ...rowDivider(i, mutuals.length) }}>
+                              <Avatar author={m} size={36} />
                               <div>
-                                <p style={{ ...display, fontSize: "0.85rem", color: palette.ink, fontWeight: 600 }}>{m.nombre}</p>
-                                {m.username && <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint }}>@{m.username}</p>}
+                                <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700 }}>{m.nombre}</p>
+                                {m.username && <p style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>@{m.username}</p>}
                               </div>
                             </div>
                           ))}
@@ -5627,61 +5750,65 @@ function FriendProfileModal({ friend, user, onClose }) {
                   );
                 })()}
 
-                {/* Sus amigos — 2-column grid */}
+                {/* Sus amigos: filas sin caja; «Agregar» como botón silencioso (una sola acción rellena) */}
                 {friendsOfFriend.length > 0 && (
                   <div>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <p style={{ ...secLabel, marginBottom: 0 }}>Sus amigos ({friendsOfFriend.length})</p>
                       {friendsOfFriend.length > 6 && (
-                        <button
-                          onClick={() => setFriendsExpanded(!friendsExpanded)}
-                          style={{ ...body, fontSize: "0.78rem", color: palette.accent, background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                        >
-                          {friendsExpanded ? "Ver menos ▲" : "Ver todos →"}
+                        <button onClick={() => setFriendsExpanded(!friendsExpanded)} aria-expanded={friendsExpanded} style={quietBtn}>
+                          {friendsExpanded ? "Ver menos" : "Ver todos"}
                         </button>
                       )}
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.45rem" }}>
-                      {(friendsExpanded ? friendsOfFriend : friendsOfFriend.slice(0, 6)).map((fof) => {
-                        const isMyFriend = userFriendIds.has(fof.id);
-                        const isPending = userPendingIds.has(fof.id) || sentToFriendOfFriend.has(fof.id);
-                        return (
-                          <div key={fof.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 10, padding: "0.6rem 0.65rem" }}>
-                            <Avatar author={fof} size={34} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ ...display, fontSize: "0.82rem", color: palette.ink, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fof.nombre}</p>
-                              {fof.username && <p style={{ ...body, fontSize: "0.7rem", color: palette.inkFaint, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{fof.username}</p>}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {(() => {
+                        const list = friendsExpanded ? friendsOfFriend : friendsOfFriend.slice(0, 6);
+                        return list.map((fof, i) => {
+                          const isMyFriend = userFriendIds.has(fof.id);
+                          const isPending = userPendingIds.has(fof.id) || sentToFriendOfFriend.has(fof.id);
+                          return (
+                            <div key={fof.id} style={{ display: "flex", alignItems: "center", gap: sp.sm, padding: "0.5rem 0", ...rowDivider(i, list.length) }}>
+                              <Avatar author={fof} size={40} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fof.nombre}</p>
+                                {fof.username && <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{fof.username}</p>}
+                              </div>
                               {isMyFriend ? (
-                                <span style={{ ...body, fontSize: "0.68rem", color: palette.success }}>✓ Amigos</span>
+                                <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                                  <Check size={14} color={palette.success} aria-hidden /> Amigos
+                                </span>
                               ) : isPending ? (
-                                <span style={{ ...body, fontSize: "0.68rem", color: palette.inkFaint }}>Enviado</span>
+                                <span style={{ ...body, fontSize: "13px", color: palette.inkSoft, flexShrink: 0 }}>Enviada</span>
                               ) : (
                                 <button
                                   onClick={() => sendRequestToFriendOfFriend(fof.id)}
-                                  style={{ ...display, fontSize: "0.7rem", fontWeight: 600, color: palette.bg, backgroundColor: palette.accent, border: "none", borderRadius: "999px", padding: "0.2rem 0.55rem", cursor: "pointer", marginTop: "0.15rem" }}
+                                  aria-label={`Agregar a ${fof.nombre}`}
+                                  className="btn-press"
+                                  style={{ ...body, fontSize: "14px", fontWeight: 600, color: palette.ink, backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}`, borderRadius: "999px", padding: "0 0.9rem", minHeight: 44, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}
                                 >
-                                  Agregar
+                                  <UserPlus size={16} aria-hidden /> Agregar
                                 </button>
                               )}
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 )}
 
-                {/* Currently reading */}
+                {/* Leyendo ahora */}
                 {readingBooks.length > 0 && (
                   <div>
                     <p style={secLabel}>Leyendo ahora</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
                       {readingBooks.map((book, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "0.6rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 8, padding: "0.6rem 0.75rem" }}>
-                          <BookOpen size={14} color={palette.accent} style={{ flexShrink: 0 }} />
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: sp.sm, padding: "0.55rem 0", ...rowDivider(i, readingBooks.length) }}>
+                          <BookOpen size={18} color={palette.ink} style={{ flexShrink: 0 }} aria-hidden />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
-                            <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{book.author}</p>
+                            <p style={{ ...display, fontSize: "15px", fontWeight: 700, color: palette.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+                            <p style={{ ...body, fontSize: "13px", color: palette.inkSoft }}>{book.author}</p>
                           </div>
                         </div>
                       ))}
@@ -5689,31 +5816,25 @@ function FriendProfileModal({ friend, user, onClose }) {
                   </div>
                 )}
 
-                {/* Read books */}
+                {/* Libros leídos: filas con filete; reseña con filete azul acero (mapa del feed) */}
                 <div>
                   <p style={secLabel}>Libros leídos ({readBooks.length})</p>
                   {sortedRead.length === 0 ? (
-                    <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, fontStyle: "italic" }}>Aún no ha marcado libros como leídos.</p>
+                    <p style={{ ...body, fontSize: "15px", color: palette.inkSoft }}>Todavía ningún libro terminado. Ya caerá el primero.</p>
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
                       {sortedRead.map((book, i) => (
-                        <div key={i} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: 8, padding: "0.7rem 0.85rem" }}>
-                          <div style={{ display: "flex", alignItems: "flex-start", gap: "0.6rem" }}>
+                        <div key={i} style={{ padding: "0.7rem 0", ...rowDivider(i, sortedRead.length) }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: sp.sm }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{ ...display, fontSize: "0.9rem", color: palette.ink, fontWeight: 600 }}>{book.title}</p>
-                              <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint, fontStyle: "italic" }}>{book.author}</p>
+                              <p style={{ ...display, fontSize: "15px", color: palette.ink, fontWeight: 700, lineHeight: 1.25 }}>{book.title}</p>
+                              <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: 2 }}>{book.author}</p>
                             </div>
-                            {book.rating > 0 && (
-                              <div style={{ display: "flex", gap: "1px", flexShrink: 0, marginTop: "0.1rem" }}>
-                                {[1, 2, 3, 4, 5].map((s) => (
-                                  <Star key={s} size={10} color={palette.amber} fill={s <= book.rating ? palette.amber : "none"} />
-                                ))}
-                              </div>
-                            )}
+                            {book.rating > 0 && <FriendStars value={book.rating} />}
                           </div>
                           {book.review && (
-                            <p style={{ ...body, fontSize: "0.82rem", color: palette.inkSoft, marginTop: "0.4rem", lineHeight: 1.5, fontStyle: "italic", borderTop: `1px solid ${palette.borderSoft}`, paddingTop: "0.4rem" }}>
-                              "{book.review}"
+                            <p style={{ ...body, fontSize: "14px", color: palette.ink, marginTop: "0.5rem", lineHeight: 1.5, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.65rem" }}>
+                              {book.review}
                             </p>
                           )}
                         </div>
@@ -5728,33 +5849,17 @@ function FriendProfileModal({ friend, user, onClose }) {
                   <AchievementGrid unlockedAchievements={friendAchievements} friendOnly={true} />
                 </div>
 
-                {/* Public quotes */}
+                {/* Frases: tarjeta ciruela con Instrument Serif (mismo mapa que la frase del feed, sema-paleta §6) */}
                 {friendPublicQuotes.length > 0 && (
                   <div>
                     <p style={secLabel}>Frases guardadas ({friendPublicQuotes.length})</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                      {friendPublicQuotes.map(q => {
-                        const moodLabel = MOOD_OPTIONS.find(m => m.key === q.mood)?.label;
-                        return (
-                          <div key={q.id} style={{ backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "10px", padding: "1rem 0.9rem 0.85rem", position: "relative", overflow: "hidden" }}>
-                            <p style={{ ...quoteFont, fontSize: "1.1rem", color: palette.ink, lineHeight: 1.5, paddingLeft: "0.6rem", display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                              {q.text}
-                            </p>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.6rem", paddingLeft: "0.6rem", flexWrap: "wrap" }}>
-                              {q.bookTitle && (
-                                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.72rem", color: palette.inkSoft, fontWeight: 500 }}>
-                                  {q.bookTitle}
-                                </span>
-                              )}
-                              {moodLabel && (
-                                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.68rem", color: palette.accent, backgroundColor: palette.accent + "15", borderRadius: "999px", padding: "0.1rem 0.45rem" }}>
-                                  {moodLabel}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                    {/* Corrección ronda 2: el mismo cuerpo de frase del feed (FeedQuoteBody), separadas con filete */}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {friendPublicQuotes.map((q, i) => (
+                        <div key={q.id} style={{ padding: "0.75rem 0 1rem", ...rowDivider(i, friendPublicQuotes.length) }}>
+                          <FeedQuoteBody quote={q} />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -5915,17 +6020,17 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
         borderBottom: `1px solid ${palette.border}`,
         flexShrink: 0,
       }}>
-        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", padding: "0.4rem", display: "flex", alignItems: "center", flexShrink: 0 }}>
-          <ChevronLeft size={22} color={palette.ink} />
+        <button onClick={onClose} aria-label="Volver" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, width: 44, height: 44, marginLeft: -10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <ChevronLeft size={22} color={palette.ink} aria-hidden />
         </button>
         <div style={{ flex: 1, overflow: "hidden" }}>
           <p style={{ ...display, fontSize: "0.88rem", color: palette.ink, fontWeight: 600, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {cuento.titulo}
           </p>
-          <p style={{ ...body, fontSize: "0.72rem", color: palette.inkFaint, margin: 0 }}>{cuento.autor}</p>
+          <p style={{ ...body, fontSize: "13px", color: palette.inkFaint, margin: 0 }}>{cuento.autor}</p>
         </div>
-        <span style={{ ...body, fontSize: "0.75rem", color: pct >= 95 ? palette.sage : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
-          {pct >= 95 ? "✓ Leído" : `${pct}%`}
+        <span style={{ ...body, fontSize: "13px", color: pct >= 95 ? palette.sage : palette.inkFaint, fontWeight: pct >= 95 ? 700 : 400, flexShrink: 0, transition: "color 0.3s" }}>
+          {pct >= 95 ? "Leído" : `${pct}%`}
         </span>
       </div>
 
@@ -5940,7 +6045,7 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
           {cuento.titulo}
         </h1>
         <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", color: palette.inkFaint, marginBottom: "2.5rem" }}>
-          {cuento.autor} · {cuento.duracion}
+          {cuento.autor}{cuentoDuracion(cuento) ? ` · ${cuentoDuracion(cuento)}` : ""}
         </p>
 
         {cuento.texto.split(/\n\n+/).filter(p => p.trim()).map((para, i) => (
@@ -6756,6 +6861,21 @@ async function attachNotifTargets(notifs) {
   });
 }
 
+// Los likes «en pares» venían de publicaciones de sesión duplicadas (mismo
+// libro y hora, ids distintos): la misma persona daba like a las dos. Se
+// muestra una sola notificación por (tipo, quien, a qué) en 2 minutos.
+function collapseTwinNotifs(notifs) {
+  const out = [];
+  for (const n of notifs) {
+    const t = new Date(n.created_at).getTime();
+    const twin = out.find((o) => o.type === n.type && o.actor?.id === n.actor?.id && (o.target || o.post_id || o.comment_id) === (n.target || n.post_id || n.comment_id)
+      && Math.abs(new Date(o.created_at).getTime() - t) < 2 * 60 * 1000);
+    if (twin) { if (!n.read) twin.read = false; twin.twinIds = [...(twin.twinIds || []), n.id]; continue; }
+    out.push({ ...n });
+  }
+  return out;
+}
+
 function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
   const [isClosing, setIsClosing] = useState(false);
   function handleClose() { if (isClosing) return; setIsClosing(true); setTimeout(() => onClose(), 250); }
@@ -6793,7 +6913,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
         console.error("Error fetching notifications:", error);
         setNotifications([]);
       } else {
-        setNotifications(await attachNotifTargets(data || []));
+        setNotifications(collapseTwinNotifs(await attachNotifTargets(data || [])));
       }
     } catch (err) {
       console.error("Catch error notifications:", err);
@@ -6845,7 +6965,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
                 <div
                   key={notif.id}
                   onClick={async () => {
-                    await supabase.from("notifications").update({ read: true }).eq("id", notif.id);
+                    await supabase.from("notifications").update({ read: true }).in("id", [notif.id, ...(notif.twinIds || [])]);
                     setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
                     onNotifsRead?.();
                     onClose();
@@ -7675,7 +7795,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
     setSaving(true);
     setSaveError("");
     try {
-      await logReadingSession({
+      const logResult = await logReadingSession({
         userId: user.id,
         bookId: selectedBook.id,
         pagesRead: parseInt(pages) || null,
@@ -7687,7 +7807,7 @@ function ReadingLogModal({ user, onClose, onSuccess, onGoToAdd, pagesLoggedToday
       // insertar el reading_log; aquí solo se refleja en la UI.
       gemsEventBus.emit(5);
       gemToastBus.emit(5, "+5 gemas");
-      onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0 });
+      onSuccess?.({ book: selectedBook, pages: parseInt(pages) || 0, postIdPromise: logResult?.postIdPromise, offline: !!logResult?.offline });
     } catch (err) {
       console.error("[reading] Error registrando sesión:", err);
       setSaveError("No se guardó la sesión. Puede ser el internet; otro intento y listo.");
@@ -8040,15 +8160,23 @@ function ShareSessionModal({ user, session, onClose, onShared }) {
       userId: user?.id,
     });
     try {
-      await createFeedPost({
-        userId: user.id,
-        type: "reading_session",
-        bookId: book.id,
-        content: comment.trim() || "",
-        pagesRead: pages,
-        minutesRead: minutes || null,
-        imageUrl: null,
-      });
+      // logReadingSession ya publicó la sesión: aquí solo se completa ese post
+      // (comentario y minutos). Insertar otro era el duplicado del feed.
+      const existingId = await session.postIdPromise;
+      if (existingId) {
+        await updateSessionPost({ postId: existingId, userId: user.id, content: comment.trim(), minutesRead: minutes || null });
+      } else if (!session.offline) {
+        await createFeedPost({
+          userId: user.id,
+          type: "reading_session",
+          bookId: book.id,
+          content: comment.trim() || "",
+          pagesRead: pages,
+          minutesRead: minutes || null,
+          imageUrl: null,
+        });
+      }
+      // Sin conexión: el post de la sesión se crea al sincronizar el log.
       setShared(true);
       onShared?.();
       setTimeout(() => onClose(), 1500);
@@ -8173,61 +8301,107 @@ function getCuentoDelDia() {
   return CUENTOS[base];
 }
 
-// ── Cuento del día hero ────────────────────────────────────────────────────
-function SnacksHero({ onRead }) {
-  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
-  const heroBase = Math.abs(dayOfYear) % CUENTOS.length;
-  const readIds = (() => { try { return new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]')); } catch { return new Set(); } })();
-  let cuento = null;
-  for (let i = 0; i < CUENTOS.length; i++) {
-    const c = CUENTOS[(heroBase + i) % CUENTOS.length];
-    if (!readIds.has(c.id)) { cuento = c; break; }
-  }
-  if (!cuento) cuento = CUENTOS[heroBase];
+// Duración de un cuento: una sola fuente de verdad (`duracion_minutos` de data/cuentos.js; si
+// faltara, el número de `duracion`). La usan el bloque de Social, el modal «¿Qué leemos?», el
+// carrusel «Más cuentos» y el lector (antes el modal decía «5 min» fijo).
+function cuentoMinutos(c) {
+  const n = Number(c?.duracion_minutos);
+  if (n > 0) return n;
+  const m = parseInt(c?.duracion, 10);
+  return m > 0 ? m : null;
+}
+function cuentoDuracion(c) {
+  const n = cuentoMinutos(c);
+  return n ? `${n} min` : "";
+}
 
+// ── Cuento del día hero ────────────────────────────────────────────────────
+// Ronda 2 (2026-11-02): tarjeta destacada con carácter. Contenedor de una acción (borde 2 px de
+// tinta), franja superior con degradado de acento de la paleta extendida (uno por cuento, estable
+// con pickByHash; solo los fríos, para que la franja no se funda con el botón
+// durazno). Sobre el degradado solo van stickers con su propio fondo (bg / firma) y la portada de
+// papel: ningún texto chico toca el degradado (sema-paleta §5). Título, autor y descripción van
+// sobre bg. «Leer ahora» es la única acción rellena de Social (principio 1), con StickerButton.
+function SnacksHero({ onRead }) {
+  const cuento = getCuentoDelDia();
   if (!cuento) return null;
 
-  // Rediseño 2026-11-02: sin caja, sin degradado vino/ámbar ni filete durazno (era caja dentro de
-  // caja y el rótulo durazno sobre blanco daba 2.06:1). Se separa con espacio; los rótulos van en
-  // tinta. «Leer ahora» es la única acción rellena de Social (principio 1).
+  // Solo degradados fríos (corrección ronda 2): los cálidos le restaban fuerza al botón durazno y
+  // coincidían con «Libro terminado» del feed vecino.
+  const FRIOS = ["turquesa-cielo", "cielo-pervinca", "menta-turquesa", "pervinca-orquidea"];
+  const grad = pickByHash(SEMA_GRADIENTES_TERMINADO.filter((g) => FRIOS.includes(g.key)), cuento.id);
+  const minutos = cuentoDuracion(cuento);
+  const inicial = (cuento.titulo || "").replace(/^(El|La|Los|Las|Un|Una)\s+/i, "").trim().charAt(0).toUpperCase();
+  const isDark = palette.bg === PALETTE_DARK.bg;
+  // Ronda 3 (2026-11-02): las dos etiquetas son boletos de papel, sin iconos. Tipografía Bricolage
+  // 800 en mayúsculas con tracking (el eje `wdth` no está cargado; pendiente de León). Formas con
+  // mask-image en index.css («Cuento del día · boletos»). Texto visible intacto para lectores de
+  // pantalla; el talón (fecha corta) es decorativo (aria-hidden). Correcciones ronda 3: el boleto
+  // principal es papel fijo (SEMA_PAPEL, arena + tinta en ambos modos: va sobre la franja, no
+  // sobre bg) y bordes de 2 px. Se probó 14 px: a 390 y a 360 el boleto largo pisa la portada
+  // (medido con getBoundingClientRect), así que se queda en 13 px.
+  const boletoBase = { ...display, fontSize: "13px", fontWeight: 800, lineHeight: 1, textTransform: "uppercase", display: "inline-flex", alignItems: "center", alignSelf: "flex-start", whiteSpace: "nowrap" };
+  // Talón con la fecha corta («02 NOV»). Se arma a mano: con day+month juntos Chromium devuelve
+  // «02-nov» y Safari «02 nov.»; así sale igual en todos, sin punto ni guion.
+  const hoy = new Date();
+  const fechaBoleto = `${String(hoy.getDate()).padStart(2, "0")} ${hoy.toLocaleDateString("es-MX", { month: "short" }).replace(/[^\p{L}]/gu, "")}`.toUpperCase();
+  // Estampilla de minutos: cálido de la paleta extendida (mostaza o limón), estable por cuento. Nunca
+  // los fríos del degradado de la franja ni coral (se funde con el botón durazno).
+  const estampilla = pickByHash(SEMA_EXTENDIDA.filter((c) => ["mostaza", "limon"].includes(c.key)), cuento.id);
+
   return (
-    <section data-tutorial="snacks-hero" aria-labelledby="cuento-dia-titulo" style={{ marginBottom: "2rem" }}>
-      <p style={{ ...body, fontSize: "13px", fontWeight: 700, color: palette.ink, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: 6 }}>
-        <BookOpen size={15} strokeWidth={2} color={palette.ink} aria-hidden /> Cuento del día
-      </p>
-      <h2 id="cuento-dia-titulo" style={{ ...display, fontSize: "24px", fontWeight: 800, color: palette.ink, lineHeight: 1.15, letterSpacing: "-0.02em", marginBottom: "0.25rem" }}>
-        {cuento.titulo}
-      </h2>
-      <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginBottom: "0.5rem" }}>
-        {cuento.autor}
-        <span aria-hidden> · </span>
-        {cuento.duracion || `${cuento.duracion_minutos} min`} de lectura
-        {cuento.generos?.[0] && <><span aria-hidden> · </span><span style={{ textTransform: "lowercase" }}>{cuento.generos[0]}</span></>}
-      </p>
-      <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", color: palette.ink, lineHeight: 1.4, marginBottom: "1rem" }}>
-        {cuento.desc}
-      </p>
-      <button
-        onClick={() => {
-          haptic(HAPTIC.NAV);
-          try {
-            const ids = new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]'));
-            ids.add(cuento.id);
-            localStorage.setItem('folio_read_cuentos', JSON.stringify([...ids]));
-          } catch { /* localStorage no disponible: no marcar como leído no rompe nada */ }
-          onRead(cuento);
-        }}
-        style={{
-          ...display, fontSize: "16px", fontWeight: 700,
-          backgroundColor: palette.accent, color: palette.onAccent,
-          border: "none", borderRadius: 14, minHeight: 52, padding: "0 1.5rem",
-          cursor: "pointer", width: "100%",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-        }}
-        className="btn-press"
-      >
-        Leer ahora <ArrowRight size={18} strokeWidth={2.2} aria-hidden />
-      </button>
+    <section data-tutorial="snacks-hero" aria-labelledby="cuento-dia-titulo" style={{ marginBottom: "2rem", borderRadius: 18, border: `2px solid ${palette.ink}`, overflow: "hidden", backgroundColor: palette.bg }}>
+      {/* Franja de acento: collage de boletos + portada de papel */}
+      <div style={{ position: "relative", height: 150, background: grad.css, borderBottom: `2px solid ${palette.ink}`, padding: "1rem 1rem", display: "flex", flexDirection: "column", gap: "0.7rem" }}>
+        <span className="sema-boleto sema-boleto--cuento" style={{ ...boletoBase, backgroundColor: SEMA_PAPEL.bg, color: SEMA_PAPEL.on, border: `2px solid ${SEMA_PAPEL.on}` }}>
+          <span aria-hidden className="sema-boleto__talon">{fechaBoleto}</span>
+          <span className="sema-boleto__cuerpo">Cuento del día</span>
+        </span>
+        {minutos && (
+          <span className="sema-boleto sema-boleto--minutos" style={{ ...boletoBase, marginLeft: 18, backgroundColor: estampilla.hex, color: estampilla.on, border: `2px solid ${estampilla.on}` }}>
+            {minutos} de lectura
+          </span>
+        )}
+        {/* Portada de papel (SVG/CSS propio, sin imagen): capitular del título en Instrument Serif itálica
+            sobre superficieSuave con textura, filo de tinta y sombra sólida, girada 4°. */}
+        <div aria-hidden className="sema-cuento-portada sema-papel" style={{ position: "absolute", right: 22, top: 18, width: 94, height: 128, borderRadius: 6, backgroundColor: palette.superficieSuave, border: `2px solid ${palette.ink}`, boxShadow: `4px 4px 0 ${isDark ? palette.bg : palette.ink}`, padding: "0.55rem 0.6rem", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+          <svg width="100%" height="10" viewBox="0 0 70 10" preserveAspectRatio="none" style={{ display: "block" }}>
+            <path d="M0 2 H70 M0 8 H44" stroke={palette.ink} strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <span style={{ ...quoteFont, fontStyle: "italic", fontSize: "64px", lineHeight: 0.85, color: palette.ink, paddingLeft: 4 }}>{inicial || "C"}</span>
+          <svg width="100%" height="14" viewBox="0 0 70 14" preserveAspectRatio="none" style={{ display: "block" }}>
+            <path d="M0 3 H58 M0 11 H34" stroke={palette.ink} strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Texto sobre bg */}
+      <div style={{ padding: "1.1rem 1.1rem 1.35rem" }}>
+        <h2 id="cuento-dia-titulo" style={{ ...display, fontSize: "26px", fontWeight: 800, color: palette.ink, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: "0.3rem" }}>
+          {cuento.titulo}
+        </h2>
+        <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginBottom: "0.65rem" }}>
+          {cuento.autor}
+          {cuento.generos?.[0] && <><span aria-hidden> · </span><span style={{ textTransform: "lowercase" }}>{cuento.generos[0]}</span></>}
+        </p>
+        <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "20px", color: palette.ink, lineHeight: 1.35, marginBottom: "1.2rem" }}>
+          {cuento.desc}
+        </p>
+        <StickerButton
+          style={{ width: "calc(100% - 6px)" }}
+          onClick={() => {
+            haptic(HAPTIC.NAV);
+            try {
+              const ids = new Set(JSON.parse(localStorage.getItem('folio_read_cuentos') || '[]'));
+              ids.add(cuento.id);
+              localStorage.setItem('folio_read_cuentos', JSON.stringify([...ids]));
+            } catch { /* localStorage no disponible: no marcar como leído no rompe nada */ }
+            onRead(cuento);
+          }}
+        >
+          Leer ahora
+        </StickerButton>
+      </div>
     </section>
   );
 }
@@ -8271,7 +8445,7 @@ function SnacksCarousel({ onRead }) {
               {c.autor}
             </p>
             <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "auto" }}>
-              {c.duracion || `${c.duracion_minutos} min`}
+              {cuentoDuracion(c)}
             </span>
           </button>
         ))}
@@ -8370,6 +8544,47 @@ function QuotePostCard({ post, userId, liked, likeCount, commentCount, commentsO
   );
 }
 
+// Cuerpo de una frase en el feed (ronda 2): la frase en Instrument Serif grande y en tinta sobre el
+// fondo de la tarjeta; libro en inkSoft; ánimo como sticker lila (onFirma 5.21:1). Sustituye a la
+// tarjeta ciruela de QuotePostCard para que la frase tenga el mismo formato que las demás.
+function FeedQuoteBody({ quote }) {
+  const [expanded, setExpanded] = useState(false);
+  const text = quote?.text || "";
+  const isLong = text.length > 280;
+  const displayText = !expanded && isLong ? text.slice(0, 280) + "…" : text;
+  const moodLabel = MOOD_OPTIONS.find(m => m.key === quote?.mood)?.label?.replace(/^[^\p{L}]+/u, "");
+  return (
+    <>
+      <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "clamp(1.4rem, 5.6vw, 1.7rem)", lineHeight: 1.35, color: palette.ink }}>
+        {displayText}
+      </p>
+      {isLong && (
+        <button
+          onClick={e => { e.stopPropagation(); setExpanded(v => !v); }}
+          aria-expanded={expanded}
+          style={{ ...body, background: "none", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 600, color: palette.ink, textDecoration: "underline", textUnderlineOffset: 3, minHeight: 44, padding: "0 6px", marginLeft: -6, display: "block" }}
+        >
+          {expanded ? "Leer menos" : "Leer más"}
+        </button>
+      )}
+      {(quote?.bookTitle || moodLabel) && (
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem 0.75rem", marginTop: "0.75rem" }}>
+          {quote?.bookTitle && (
+            <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, flex: "1 1 auto", minWidth: 0 }}>
+              — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
+            </p>
+          )}
+          {moodLabel && (
+            <span className="sema-sticker" style={{ ...body, fontSize: "13px", fontWeight: 700, color: palette.onFirma, backgroundColor: palette.firma, borderRadius: 8, padding: "0.2rem 0.6rem" }}>
+              {moodLabel}
+            </span>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 // Botón «Comentarios» del pie de cada publicación (44 px de alto, texto 14 px en inkSoft).
 function CommentsToggle({ open, count, onClick }) {
   return (
@@ -8434,7 +8649,7 @@ function RachaModal({ streak, paused = false, onClose }) {
         <Flame size={44} color={palette.ink} strokeWidth={1.8} style={{ margin: "0 auto" }} className={cur > 7 && !paused ? "fire-pulse" : ""} />
         <p style={{ ...display, fontWeight: 800, fontSize: "3rem", color: palette.ink, lineHeight: 1, marginTop: "0.5rem" }}>{cur}</p>
         <p style={{ ...display, fontSize: "1rem", color: palette.ink, fontWeight: 600 }}>{cur === 1 ? "día de racha" : "días de racha"}{paused ? " · en pausa" : ""}</p>
-        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>{cur > 0 && cur >= best ? "Esto ya es récord." : `Récord: ${best} ${best === 1 ? "día" : "días"}`}</p>
+        <p style={{ ...body, fontSize: "13px", color: palette.inkSoft, marginTop: "0.3rem" }}>{cur === 1 ? "Día uno. Cuenta igual." : cur > 0 && cur >= best ? "Esto ya es récord." : `Récord: ${best} ${best === 1 ? "día" : "días"}`}</p>
         <p style={{ ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.45, marginTop: "1.25rem" }}>{msg}</p>
         <button onClick={onClose} className="btn-press" style={{ marginTop: "1.5rem", width: "100%", minHeight: 48, padding: "0.85rem", borderRadius: 12, border: `1.5px solid ${palette.ink}`, cursor: "pointer", backgroundColor: "transparent", color: palette.ink, ...display, fontWeight: 700, fontSize: "0.95rem" }}>
           Listo
@@ -8469,20 +8684,20 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
               {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{primary.title}</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Continuar</p>
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Continuar</p>
               <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{primary.author}</p>
             </div>
           </button>
         )}
         {cuento && (
-          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1px solid ${palette.border}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+          <button onClick={onCuento} className="btn-press" style={{ width: "100%", textAlign: "left", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
             {/* Ícono suelto, sin cuadro de color (sema-identidad: nada de íconos genéricos en círculos) */}
             <div style={{ width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Feather size={24} color={palette.ink} strokeWidth={1.8} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "13px", color: palette.ink, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Cuento del día · 5 min</p>
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Cuento del día{cuentoDuracion(cuento) ? ` · ${cuentoDuracion(cuento)}` : ""}</p>
               <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{cuento.autor}</p>
             </div>
@@ -8533,8 +8748,9 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const best = streak?.longest_streak || 0;
   const isDarkMode = palette.bg === PALETTE_DARK.bg;
   // Voz del gato (existencialista, sema-voz). Hoy todas las mascotas nuevas son gato.
-  // Prioridad: noche > racha en cero > con racha.
-  const petLine = h >= 21 ? "Ya es tarde. Una página y a dormir."
+  // Prioridad: noche > racha en cero > con racha. Noche desde las 20, igual que el saludo
+  // «Buenas noches» (correcciones ronda 3, 2026-11-02; antes 21).
+  const petLine = h >= 20 ? "Ya es tarde. Una página y a dormir."
     : cur === 0 ? "Nada tiene mucho sentido. Una página, quizá sí."
     : "Sin prisa. Los libros, a diferencia de todo, se quedan.";
   // Racha en pausa: mismo criterio que checkStreakOnLoad (streakService) sobre la fila que
@@ -8593,82 +8809,130 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
 
   // Principio 8: los primeros días solo lo mínimo; "Descubre" aparece con 3+ libros.
   const showDiscover = books.length >= 3;
-  // Único botón relleno (principio 1). Recurso de sticker/zine: borde de tinta y sombra dura
-  // desplazada sin desenfoque, para despegarlo del fondo sin degradado ni textura.
-  const primaryBtn = {
-    width: "100%", minHeight: 64, padding: "1rem 1.25rem", borderRadius: 16, cursor: "pointer",
-    background: palette.accent, color: palette.onAccent,
-    // En oscuro la sombra va en firma (lila): en ink (blanco) leía como marco doble.
-    border: `2px solid ${palette.ink}`, boxShadow: `4px 4px 0 ${isDarkMode ? palette.firma : palette.ink}`,
-    display: "flex", alignItems: "center", justifyContent: "center", gap: "0.6rem",
-    ...display, fontWeight: 800, fontSize: "1.25rem", letterSpacing: "-0.01em",
-  };
+  // Único botón relleno (principio 1): StickerButton (durazno, borde y sombra sólida desplazada
+  // que se hunde al presionar; ver src/components/StickerButton.jsx).
   const quietRow = { width: "100%", minHeight: 44, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: sp.sm };
   const dayWord = (n) => (n === 1 ? "día" : "días");
 
   return (
     <div style={{ padding: `${sp.lg} 1.25rem ${sp.xxl}`, maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: sp.xl }}>
-      {/* Saludo grande en Bricolage; el nombre en su propia línea para que no se parta raro */}
-      <h1 style={{ ...display, fontSize: "32px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", color: palette.ink, overflowWrap: "anywhere" }}>
-        {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
-      </h1>
+      {/* Ronda 3 (2026-11-02, pedido de León): cabecera en DOS columnas. Izquierda: saludo + racha;
+          derecha: el gato grande y suelto (sin sticker detrás). Sustituye a la ronda 2 (h1 a ancho
+          completo y gato de 132 px sobre papel lila). Medidas: el gato mide 300 px de alto en un
+          wrapper de 200 px de ancho (PNG 408 × 612; el cuerpo ocupa ~229 × 149 px con ~26 px
+          transparentes a cada lado y ~36 arriba y abajo). Los márgenes negativos del botón del
+          gato solo se comen esos flancos transparentes: −12 a la izquierda (sobre el hueco de la
+          columna), −2.25rem (36 px) a la derecha = padding lateral (20) + 16 px del flanco, con lo
+          que el cuerpo queda ~9 px dentro del borde y solo asoman los bigotes; <main> ya recorta
+          en X, así que no hay scroll horizontal. −30 arriba y −22 abajo para que las orejas no
+          separen el saludo de la cabecera y las patas apoyen al nivel de la racha. Columna
+          izquierda: 350−152=198 px a 390, 183 a 375 y 168 a 360; la racha baja su mínimo a 150
+          y ocupa toda la columna. */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
+        <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: sp.md }}>
+          {/* Saludo grande en Bricolage; el nombre en su propia línea para que no se parta raro.
+              En la columna angosta «Buenas noches,» se parte por palabra (Buenas / noches, / León). */}
+          <h1 style={{ ...display, fontSize: "32px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", color: palette.ink, overflowWrap: "anywhere" }}>
+            {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
+          </h1>
 
-      {/* Progreso siempre visible: la racha es un sticker lila con textura de papel */}
-      <button
-        onClick={() => setRachaOpen(true)}
-        className="btn-press sema-no-hover sema-papel sema-sticker"
-        aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
-        style={{
-          alignSelf: "flex-start", maxWidth: "100%", minHeight: 44, textAlign: "left", cursor: "pointer",
-          backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
-          // Canto de sticker recortado: filo del color de fondo + línea de tinta (sin desenfoque).
-          border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
-          padding: "0.9rem 1.15rem 1rem", display: "flex", alignItems: "center", gap: sp.md,
-        }}
-      >
-        <Flame size={34} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
-        <div style={{ minWidth: 0 }}>
-          <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>
-            {cur} <span style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: 0 }}>{dayWord(cur)} de racha</span>
+        {/* Progreso siempre visible: la racha es un sticker lila con textura de papel.
+            El número va con la llama arriba y «días de racha» debajo para caber en la columna. */}
+        <button
+          onClick={() => setRachaOpen(true)}
+          className="btn-press sema-no-hover sema-papel sema-sticker"
+          aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
+          style={{
+            width: "100%", minWidth: 150, minHeight: 44, textAlign: "left", cursor: "pointer",
+            // zIndex (correcciones ronda 3): el botón del gato, con sus márgenes negativos, pisaba
+            // los 13 px del borde derecho de la racha. .sema-papel ya la hace position: relative.
+            zIndex: 1,
+            backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
+            // Canto de sticker recortado: filo del color de fondo + línea de tinta (sin desenfoque).
+            border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
+            padding: "0.85rem 0.95rem 0.95rem", display: "block",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Flame size={32} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
+            <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>{cur}</p>
+          </div>
+          <p style={{ ...display, fontSize: "17px", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>
+            {dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}
           </p>
-          {/* «En pausa» en su propia línea: dentro del número de 48 px podía pisar la cifra al saltar de línea */}
-          {streakPaused && (
-            <p style={{ ...display, fontSize: "16px", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>En pausa</p>
-          )}
-          <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.35rem" }}>
+          <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.25rem" }}>
             {cur === 0
               ? "Con 5 minutos arranca."
               : streakPaused
                 ? "No rota. Cualquier día sirve para volver."
-                : cur >= best
-                  ? "Esto ya es récord."
-                  : `Récord: ${best} ${dayWord(best)}`}
+                : cur === 1
+                  ? "Día uno. Cuenta igual." // correcciones ronda 3: «récord» con 1 día sonaba hueco
+                  : cur >= best
+                    ? "Esto ya es récord."
+                    : `Récord: ${best} ${dayWord(best)}`}
           </p>
-        </div>
-      </button>
-
-      {/* La mascota habla pegada al sticker: pequeña, nunca ocupa la pantalla (principio 6).
-          Frase en Bricolage 600 / inkSoft para no competir con los títulos de libro.
-          El sprite de 80 px trae ~26 px de aire a la izquierda: se compensa con margen negativo
-          para que el gato (en claro) o el disco (en oscuro) alineen con el margen de la pantalla.
-          En oscuro, un disco plano lila (firma, igual que el de la barra inferior) recorta al gato negro del fondo. */}
-      {pet && (
-        <button onClick={onOpenPet} aria-label={`${pet.pet_name}: ${petLine}`} className="btn-press sema-no-hover" style={{ ...quietRow, marginTop: `-${sp.md}`, gap: sp.sm }}>
-          <span style={{ flexShrink: 0, position: "relative", display: "inline-flex", width: 80, height: 80, marginLeft: isDarkMode ? -8 : -24 }}>
-            {isDarkMode && (
-              <span aria-hidden style={{ position: "absolute", left: 8, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma }} />
-            )}
-            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={80} showShadow={false} style={{ position: "relative" }} />
-          </span>
-          <p style={{ ...display, fontWeight: 600, fontSize: "17px", lineHeight: 1.3, color: palette.inkSoft, minWidth: 0 }}>{petLine}</p>
         </button>
+        </div>
+
+        {/* El gato grande y suelto, columna derecha (principio 6; León, ronda 3: supera el «gato
+            pequeño» de sema-identidad §5). Sin caja detrás: es un recorte. En oscuro usa
+            /pets/cat-recorte.png (correcciones ronda 3): el mismo cat.png con 24 px de margen y un
+            canto blanco horneado de ~8 px que sigue la silueta, como sticker troquelado, para que
+            el gato negro no se funda con el negro; sustituye a la pila de drop-shadow (halo difuso
+            en los bigotes y 8 filtros por fotograma). En claro sigue cat.png sin contorno.
+            Para que el CUERPO mida y caiga igual en los dos modos, el PNG oscuro se escala con el
+            mismo factor (300/612 = 0.4902 → 323.5 × 223.5) y cada margen negativo crece 24 × 0.49
+            ≈ 12 px (caja alfa medida: cat.png cuerpo en x 53–357 / y 73–540; cat-recorte.png en
+            x 77–381 / y 97–564). La animación (bob y respiración) sigue siendo la de PetDisplay;
+            en prefers-reduced-motion se detiene solo aquí (index.css, bloque «Inicio · gato»). */}
+        {pet && (
+          <button
+            onClick={onOpenPet}
+            aria-label={`Ver a ${pet.pet_name}`}
+            className="btn-press sema-no-hover"
+            style={{
+              flex: "0 0 auto", width: isDarkMode ? 223.5 : 200,
+              marginLeft: isDarkMode ? -24 : -12, marginRight: isDarkMode ? -48 : -36,
+              marginTop: isDarkMode ? -42 : -30, marginBottom: isDarkMode ? -34 : -22,
+              background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}
+          >
+            <PetDisplay
+              petType={pet.pet_type}
+              petName={pet.pet_name}
+              px={isDarkMode ? 323.5 : 300}
+              wPx={isDarkMode ? 223.5 : 200}
+              src={isDarkMode ? "/pets/cat-recorte.png" : undefined}
+              showShadow={false}
+            />
+          </button>
+        )}
+      </div>
+
+      {/* Lo que dice el gato (ronda 3): globo de cómic debajo de la fila, pegado a la derecha,
+          bajo el gato. Mismo globo que «Para ti» (recoCatBubbleStyle: bg, filo de tinta 1.5 px,
+          radio 18). Correcciones ronda 3: en vez de la esquina casi recta (no leía como cola),
+          una COLA triangular SVG de 18 × 10 px apuntando arriba, relleno bg y filo ink, que tapa
+          el filo del globo en su base. Va a 34 px del borde derecho del globo: el gato está
+          anclado a la derecha con ancho fijo, así que ahí caen siempre sus patas delanteras en
+          390, 375 y 360. El globo sube (marginTop −sp.lg) hasta casi tocar las patas y lleva
+          position: relative + zIndex 1 para que el botón del gato (márgenes negativos) no lo pise.
+          Va debajo y no junto a la cabeza porque la columna izquierda ya la llenan el saludo y
+          la racha: ahí un globo no cabe a 360 px sin partirse. */}
+      {pet && (
+        <p style={{ ...recoCatBubbleStyle(), position: "relative", zIndex: 1, alignSelf: "flex-end", maxWidth: "88%", padding: "0.65rem 0.95rem", marginTop: `-${sp.lg}`, marginRight: "0.25rem" }}>
+          <svg aria-hidden width="18" height="11" viewBox="0 0 18 11" style={{ position: "absolute", top: -10, right: 34, display: "block", overflow: "visible" }}>
+            <polygon points="0,11 9,0.8 18,11" fill={palette.bg} />
+            <path d="M0,11 L9,0.8 L18,11" fill="none" stroke={palette.ink} strokeWidth="1.5" strokeLinejoin="round" />
+          </svg>
+          <span className="sr-only">{pet.pet_name} dice: </span>{petLine}
+        </p>
       )}
 
       {/* Única acción principal */}
-      <button onClick={() => setLeerOpen(true)} className="btn-press" style={primaryBtn}>
-        <BookOpen size={26} strokeWidth={2.2} color={palette.onAccent} aria-hidden style={{ flexShrink: 0 }} />
+      <StickerButton size="lg" onClick={() => setLeerOpen(true)} style={{ width: "calc(100% - 6px)" }}>
         Leer ahora
-      </button>
+      </StickerButton>
 
       {readingBooks.length > 0 && (
         <section>
@@ -9040,7 +9304,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   async function handleDeletePost(postId) {
     setDeleting(true);
     try {
-      await deleteFeedPost(postId, user.id);
+      // Si la tarjeta junta gemelos de una sesión duplicada, se borran todos
+      // (si no, el gemelo oculto reaparece en la siguiente carga).
+      const twins = posts.find((p) => p.id === postId)?.duplicateIds || [];
+      for (const id of [postId, ...twins]) await deleteFeedPost(id, user.id);
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       setPostToDelete(null);
     } catch (err) {
@@ -9062,6 +9329,27 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       if (navigator.share) await navigator.share({ title: "Sema, para leer con amistades", text: msg, url: refUrl });
     } catch (e) { /* user cancelled */ }
   }
+
+  // Color de la franja de cada publicación (ronda 2): por publicación, no por autor ni por tipo.
+  // Determinista sobre la lista ordenada de ids (no cambia al recargar) y sin repetir el color de
+  // la publicación anterior. Paleta extendida, texto encima siempre #483A58 (sema-paleta §6/§7).
+  const postIdsKey = posts.map(p => p.id).join("|");
+  // En «Libro terminado» la franja tampoco repite un extremo de su degradado (se fundirían): se
+  // avanza al siguiente color que no sea extremo ni igual al de la publicación anterior o siguiente.
+  const postColors = useMemo(() => {
+    const ids = posts.map(p => p.id);
+    const map = assignSequenceColors(ids);
+    posts.forEach((p, i) => {
+      if (!(p.type === "book_update" && p.action === "finished")) return;
+      const g = pickByHash(SEMA_GRADIENTES_TERMINADO, p.id);
+      const avoid = new Set([g.from, g.to, map[ids[i - 1]]?.hex, map[ids[i + 1]]?.hex]);
+      if (!avoid.has(map[p.id].hex)) return;
+      let k = SEMA_EXTENDIDA.findIndex(c => c.hex === map[p.id].hex);
+      for (let n = 0; n < SEMA_EXTENDIDA.length && avoid.has(SEMA_EXTENDIDA[k].hex); n++) k = (k + 1) % SEMA_EXTENDIDA.length;
+      map[p.id] = SEMA_EXTENDIDA[k];
+    });
+    return map;
+  }, [postIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (feedState === 'loading') return <FeedSkeleton />;
 
@@ -9100,8 +9388,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   // ── Piezas comunes de las publicaciones (rediseño 2026-11-02) ──
   // Tarjeta base neutra: fondo de la app, borde suave, sin sombras de color. El color de cada
   // tipo vive solo en su franja o zona (sema-identidad §2; mapa en sema-paleta §6).
-  // Ronda 2: las publicaciones sin color (texto, sesión sin libro) no llevan tarjeta: van sobre el
-  // fondo, separadas con un filete abajo y espacio (principio 2).
+  // Ronda 2 (punto 7 de León): mismo formato en todas; todas van en tarjeta con su franja superior.
+  // `neutral` queda solo por compatibilidad (ya no se pasa desde renderPost).
   const cardStyle = (post, neutral = false) => ({
     position: "relative", overflow: "hidden",
     backgroundColor: palette.bg,
@@ -9119,14 +9407,20 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     </div>
   );
   // Franja superior del tipo de publicación (texto 14 px en negritas; contraste en la tabla de §6).
-  const isDarkFeed = palette.bg === PALETTE_DARK.bg;
   const band = (bg, color, Icon, label, extra, extraStyle = {}) => (
-    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "10px 16px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
-      <Icon size={17} strokeWidth={2.1} color={color} aria-hidden />
+    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "7px 14px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
+      <Icon size={14} strokeWidth={2.2} color={color} aria-hidden />
       <span>{label}</span>
       {extra}
     </div>
   );
+  // Ronda 2: TODAS las publicaciones llevan la misma franja superior (ícono + etiqueta). El color
+  // sale de la paleta extendida por publicación (postColors); el tipo se distingue por el ícono y la
+  // etiqueta, no por el color. Texto e ícono en el `on` del color (#483A58, ≥ 4.77:1 en los nueve).
+  const postBand = (post, Icon, label, extra) => {
+    const c = postColors[post.id] || { hex: palette.firma, on: palette.onFirma };
+    return band(c.hex, c.on, Icon, label, extra);
+  };
   const postHeader = (post, verb) => {
     const other = post.user_id !== user.id;
     const name = displayAuthorName(post.author?.nombre) || 'Usuario';
@@ -9139,9 +9433,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         ) : <span style={{ minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Avatar author={post.author} size={40} /></span>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, lineHeight: 1.3 }}>
-            {other ? (
-              <button tabIndex={-1} onClick={(e) => { e.stopPropagation(); openAuthor(post); }} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</button>
-            ) : <span style={{ ...display, fontWeight: 700, color: palette.ink }}>{name}</span>}
+            {/* Ronda 2 (accesibilidad): el nombre ya no es botón (medía 20 px de alto); el perfil se abre con el avatar de 44×44 */}
+            <span style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink }}>{name}</span>
             {verb ? <> {verb}</> : null}
           </p>
           <span style={{ ...ts.caption, color: palette.inkSoft }}>{timeAgo(post.created_at)}</span>
@@ -9182,13 +9475,18 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       <ChevronRight size={18} color={palette.inkSoft} aria-hidden style={{ flexShrink: 0 }} />
     </button>
   );
-  // Estrellas Lucide (no ★): blancas sobre el azul acero de la reseña.
+  // Estrellas Lucide (no ★), en el color que se les pase (tinta sobre la franja o sobre el fondo).
   const starsOn = (rating, color) => (
     <span role="img" aria-label={`${rating} de 5 estrellas`} style={{ display: "inline-flex", gap: 2 }}>
       {[1, 2, 3, 4, 5].map(n => <Star key={n} size={14} strokeWidth={1.8} color={color} fill={n <= rating ? color : "transparent"} aria-hidden />)}
     </span>
   );
   const pagesText = (p) => `${p} ${p === 1 ? "página" : "páginas"}`;
+  // La reseña vive en books.review y el post de «terminado» guarda una copia en
+  // content (con trim, a veces sin comillas o editada después): si es la misma
+  // reseña no se repite debajo como texto suelto.
+  const normText = (t) => (t || "").replace(/[«»"“”'‘’]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const sameReview = (a, b) => { const x = normText(a), y = normText(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
 
   // Una publicación del feed según su tipo (mapa de color en sema-paleta §6).
   const renderPost = (post) => {
@@ -9199,18 +9497,19 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             const achDef = isAchievement ? ACHIEVEMENT_DEFS.find(a => post.content?.includes(`"${a.name}"`)) : null;
             const AchIcon = achDef ? (ACHIEVEMENT_ICON_MAP[achDef.key] || Award) : Award;
 
-            // ── Logro: sticker lila (firma) ──
+            // ── Logro: franja «Logro» + sticker lila (firma) con el nombre ──
             if (isAchievement) {
               return (
                 <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
-                  {postHeader(post, "desbloqueó un logro")}
+                  {postBand(post, Award, "Logro")}
+                  {postHeader(post, null)}
                   {/* Ronda 2: el logro es un sticker con su nombre (lila, papel, canto del fondo, filo de tinta y giro), no un ícono en círculo */}
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "1rem 16px 0" }}>
                     <div className="sema-sticker">
                       <div className="achieve-icon-enter sema-papel" style={{ display: "inline-flex", alignItems: "center", gap: 10, backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, borderRadius: 12, padding: "10px 18px 10px 14px" }}>
                         <AchIcon size={26} color={palette.onFirma} strokeWidth={2} aria-hidden />
-                        <span style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.onFirma, letterSpacing: "-0.01em" }}>{achDef ? achDef.name : "Logro"}</span>
+                        <span style={{ ...display, fontSize: "20px", fontWeight: 800, color: palette.onFirma, letterSpacing: "-0.01em" }}>{achDef ? achDef.name : "Logro nuevo"}</span>
                       </div>
                     </div>
                     {/* Sin achDef.desc: viene de achievementsService en 2.ª persona. Solo el nombre del logro. */}
@@ -9221,25 +9520,19 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               );
             }
 
-            // ── Frase: ciruela + Instrument Serif ──
+            // ── Frase (ronda 2): mismo formato que las demás (franja «Frase» + cabecera); la frase en
+            //    Instrument Serif grande, en tinta sobre el fondo. Ya no es tarjeta ciruela. ──
             if (post.type === "quote") {
               return (
-                <QuotePostCard
-                  key={post.id}
-                  post={post}
-                  userId={user.id}
-                  liked={likedPosts.has(post.id)}
-                  likeCount={likeCounts[post.id] || 0}
-                  commentCount={commentCounts[post.id] || 0}
-                  commentsOpen={openComments.has(post.id)}
-                  doubleTapId={doubleTapPost}
-                  highlighted={highlightedPost === post.id}
-                  onLike={(id, isDoubleTap) => { if (isDoubleTap) { handleDoubleTap(id); } else { toggleLike(id); } }}
-                  onToggleComments={toggleComments}
-                  onAuthorClick={(author) => setProfileModalAuthor({ ...(author || {}), name: author?.nombre || 'Usuario' })}
-                >
-                  <div className="comments-enter"><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>
-                </QuotePostCard>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postBand(post, Feather, "Frase")}
+                  {postHeader(post, null)}
+                  <div style={{ padding: "12px 16px 0" }}>
+                    <FeedQuoteBody quote={post.quote} />
+                  </div>
+                  {postFooter(post)}
+                </div>
               );
             }
 
@@ -9250,35 +9543,34 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               devLog('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
               const stats = [sesPages > 0 ? pagesText(sesPages) : null, sesMinutes > 0 ? `${sesMinutes} min` : null].filter(Boolean).join(" · ");
               return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post, !post.book)}>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
-                  {post.book && band(palette.firma, palette.onFirma, BookOpen, "Leyó", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
-                  {postHeader(post, post.book ? null : "leyó")}
-                  <div style={{ padding: "10px 16px 0" }}>
-                    {post.book ? bookRow(post) : stats && (
-                      <p style={{ ...display, fontSize: "24px", fontWeight: 800, color: palette.ink, letterSpacing: "-0.02em" }}>{stats}</p>
-                    )}
-                    {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{post.content}</p>}
-                  </div>
-                  {postFooter(post, !post.book)}
+                  {postBand(post, BookOpen, stats ? "Leyó" : "Leyó un rato", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
+                  {postHeader(post, null)}
+                  {(post.book || post.content) && (
+                    <div style={{ padding: "10px 16px 0" }}>
+                      {post.book && bookRow(post)}
+                      {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: post.book ? "0.75rem" : 0 }}>{post.content}</p>}
+                    </div>
+                  )}
+                  {postFooter(post)}
                 </div>
               );
             }
 
-            // ── Libro terminado: degradado cereza → durazno con la portada al frente ──
+            // ── Libro terminado: franja «Libro terminado» + degradado (uno por publicación, de
+            //    SEMA_GRADIENTES_TERMINADO) con la portada al frente ──
             if (isFinished) {
               const reviewText = post.book?.review || post.content || "";
-              const extraText = post.content && post.content !== reviewText ? post.content : "";
+              const extraText = post.content && !sameReview(post.content, reviewText) ? post.content : "";
               const rating = post.book?.rating || 0;
+              const finishedGradient = pickByHash(SEMA_GRADIENTES_TERMINADO, post.id);
               return (
                 <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
-                  {postHeader(post, "terminó de leer")}
-                  <div style={{ background: SEMA_GRADIENTS.acento, margin: "12px 0 0", padding: "16px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
-                    {/* Sticker: texto chico sobre el fondo de la app, no sobre el degradado (sema-paleta §5) */}
-                    <span className="sema-sticker" style={{ alignSelf: "flex-start", ...body, fontSize: "13px", fontWeight: 700, color: palette.ink, backgroundColor: palette.bg, border: `1.5px solid ${palette.onAccent}`, borderRadius: 8, padding: "0.25rem 0.6rem", display: "inline-flex", alignItems: "center", gap: 5, marginBottom: "0.75rem" }}>
-                      <BookmarkCheck size={15} strokeWidth={2.2} aria-hidden /> Libro terminado
-                    </span>
+                  {postBand(post, BookmarkCheck, "Libro terminado")}
+                  {postHeader(post, null)}
+                  <div style={{ background: finishedGradient.css, margin: "12px 0 0", padding: "20px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
                     {post.book ? (
                       <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} className="sema-focus-onaccent" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 6 }}>
                         <span style={{ position: "relative", display: "block", width: 116, height: 174, borderRadius: 6, overflow: "hidden", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }}>
@@ -9286,24 +9578,25 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                         </span>
                       </button>
                     ) : null}
-                    {/* Título grande en onAccent #483A58: 3.24:1 sobre la cereza y 5.04:1 sobre el durazno (≥ 22 px negritas) */}
+                    {/* Título grande en #483A58 (22 px 800, texto grande): ≥ 4.5:1 en los extremos de todos los
+                        degradados salvo la cereza del original (3.24:1, válido por ser grande). sema-paleta §7 */}
                     {post.book?.title && (
-                      <p style={{ ...display, fontSize: "22px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: palette.onAccent, marginTop: "1rem", maxWidth: "18rem" }}>
+                      <p style={{ ...display, fontSize: "22px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: finishedGradient.on, marginTop: "1rem", maxWidth: "18rem" }}>
                         {post.book.title}
                       </p>
                     )}
                   </div>
                   <div style={{ padding: "12px 16px 0" }}>
                     {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
-                    {/* Reseña (ronda 2): un solo sticker por tarjeta («Libro terminado»). Aquí «Reseña» es texto
-                        de tinta con estrellas y el azul acero queda solo en el filete del texto. */}
+                    {/* Reseña, una sola vez: «Reseña» + estrellas en tinta y la reseña como cita (filete en ink:
+                        la tarjeta ya lleva franja y degradado, no suma un tercer color). Si post.content repite la reseña no se muestra debajo (sameReview). */}
                     {(reviewText || rating > 0) && (
                       <div style={{ marginTop: "0.9rem" }}>
                         <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700 }}>
                           Reseña {rating > 0 && starsOn(rating, palette.ink)}
                         </p>
                         {reviewText && (
-                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
+                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.ink}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
                             «{reviewText}»
                           </p>
                         )}
@@ -9316,14 +9609,17 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               );
             }
 
-            // ── Empezó a leer (superficie suave, sobria) · Reseña suelta (azul acero) · Texto (neutro) ──
+            // ── Empezó a leer · Reseña suelta · Texto: misma franja (color por publicación), distinto ícono y etiqueta ──
             const hasReview = post.type === "book_update" && !isStarted && (post.book?.review || post.book?.rating > 0);
-            const neutral = post.type !== "book_update";
+            const bandOn = postColors[post.id]?.on || palette.onFirma;
             return (
-              <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post, neutral)}>
+              <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                 {heartOverlay(post)}
-                {isStarted && band(isDarkFeed ? "transparent" : palette.superficieSuave, palette.ink, BookOpen, "Empezó a leer", null, isDarkFeed ? { borderBottom: `1px solid ${palette.border}` } : {})}
-                {hasReview && band(palette.complementoFrio, palette.onColor, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, palette.onColor) : null)}
+                {isStarted
+                  ? postBand(post, BookOpen, "Empezó a leer")
+                  : hasReview
+                    ? postBand(post, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, bandOn) : null)
+                    : postBand(post, PenLine, "Nota")}
                 {postHeader(post, null)}
                 <div style={{ padding: "10px 16px 0" }}>
                   {post.type === "book_update" && bookRow(post)}
@@ -9332,7 +9628,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       «{post.book.review}»
                     </p>
                   )}
-                  {post.content && (
+                  {post.content && !(hasReview && sameReview(post.content, post.book?.review)) && (
                     <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
                   )}
                   {post.image_url && (
@@ -9345,7 +9641,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     </button>
                   )}
                 </div>
-                {postFooter(post, neutral)}
+                {postFooter(post)}
               </div>
             );
   };
@@ -9648,7 +9944,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             setShowLogModal(false);
             loadStreakInfo();
             if (result?.pages > 0) {
-              setShareSession({ book: result.book, pages: result.pages, minutes: timerMinutes });
+              setShareSession({ book: result.book, pages: result.pages, minutes: timerMinutes, postIdPromise: result.postIdPromise, offline: result.offline });
               setTimerMinutes(null);
             }
           }}
@@ -12567,9 +12863,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
 function TutorialOverlay({ onDone }) {
   const STEPS = [
     // Voz sema-voz (2026-11-02): corto, sin admiraciones ni tono de coach.
-    { key: 'nav-home',    text: 'Inicio: el cuento del día y lo que estás leyendo', dir: 'above' },
+    { key: 'nav-home',    text: 'Inicio: la racha y lo que estás leyendo',           dir: 'above' },
     { key: 'nav-mascota', text: 'El gato sube de nivel contigo',                   dir: 'above' },
-    { key: 'snacks-hero', text: 'Un cuento de 5 minutos. Una página ya cuenta',    dir: 'below' },
+    { key: 'snacks-hero', text: 'Un cuento corto al día. Cabe en cualquier rato',   dir: 'below' },
     { key: 'gems',        text: 'Las gemas se ganan leyendo',                      dir: 'below' },
     // 2026-11-02: nav-perfil es la foto de perfil de la cabecera; el globo va debajo.
     { key: 'nav-perfil',  text: 'Biblioteca, logros y estadísticas',           dir: 'below' },
