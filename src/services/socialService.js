@@ -294,6 +294,7 @@ async function syncPendingPosts() {
       await createFeedPost(payload);
       synced++;
     } catch (err) {
+      if (err?.code === "23505") { synced++; continue; } // ya existía (p. ej. banner de hito de racha): no reintentar
       console.error("[offline] post pendiente no sincronizado (se reintenta en la próxima reconexión):", err?.message || err);
       remaining.push(post);
     }
