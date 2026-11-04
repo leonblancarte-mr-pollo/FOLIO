@@ -2,6 +2,11 @@ import { StrictMode, Component } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import DetallesDemo from './components/DetallesDemo.jsx'
+
+// Ronda 4 (2026-11-03): catálogo del kit de detalles (src/components/Detalles.jsx) para capturarlo
+// sin tocar las pantallas. Solo en desarrollo y solo con «?detalles=1»; en producción no existe.
+const mostrarKitDetalles = import.meta.env.DEV && location.search.includes('detalles=1');
 
 // Diagnóstico 2026-09-19: confirma qué build corre en el navegador. `build` es la hora REAL en que se compiló
 // (inyectada por vite.config.js); `loadedAt` es solo la hora de carga. `swControlled` = ¿lo sirve un service worker?
@@ -78,7 +83,7 @@ class RootErrorBoundary extends Component {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      {mostrarKitDetalles ? <DetallesDemo /> : <App />}
     </RootErrorBoundary>
   </StrictMode>,
 )

@@ -45,8 +45,15 @@
 //
 // z-index: no hay escala todavía; el mapa real está en AUDIT_SPRINT_REPORT.md §C.
 
+// Tipografía elegida en la ronda 4 (2026-11-03) tras comparar tres combinaciones en Inicio, Social y
+// el boleto del Cuento del día (capturas/ronda4-2026-11-03/{home,social-mock,cuento}-{a,b,c}-antes-*.png):
+//   A Syne + Barlow Condensed · B Unbounded + Space Mono (elegida) · C Archivo + Archivo Narrow.
+// Unbounded (titulares) tiene cuerpo de póster y zine sin perder legibilidad en 15–17 px; Space Mono
+// (boletos y sellos) lee como máquina de boletos y sello fechador. Figtree sigue en el texto de lectura e
+// Instrument Serif en las citas. La API css2 de Google Fonts parte cada familia por unicode-range: el
+// navegador solo descarga el subconjunto latino. display=swap para que el texto no se oculte.
 const FONT_LINK = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
 `;
 
 const PALETTE_LIGHT = {
@@ -287,10 +294,28 @@ const WRAPPED_SLIDE_GRADIENTS = [
   "linear-gradient(160deg, #7A2E2E 0%, #C8924A 60%, #F4EDE0 100%)",
 ];
 
-const FONT_DISPLAY = "'Bricolage Grotesque', system-ui, sans-serif";
-const FONT_UI = "Figtree, system-ui, sans-serif";
-const FONT_QUOTE = "'Instrument Serif', Georgia, serif";
+// Tipografía (ronda 4, 2026-11-03): las familias viven en SEMA_FONTS y se exponen como variables CSS
+// (--sema-font-display / -label / -ui / -quote) al cargar el módulo; los tokens FONT_* leen la variable.
+// Así una prueba de tipografía (scripts/captura-ronda4.mjs --fonts=<set>) solo cambia la variable en el
+// navegador de prueba, sin tocar código. Nadie escribe una familia a mano fuera de este archivo.
+//   display: titulares y nombres (carácter). label: boletos, sellos y etiquetas en mayúsculas (condensada).
+//   ui: texto de lectura e interfaz. quote: citas y frases.
+const SEMA_FONTS = {
+  display: "'Unbounded', system-ui, sans-serif",
+  label: "'Space Mono', ui-monospace, 'Courier New', monospace",
+  ui: "Figtree, system-ui, sans-serif",
+  quote: "'Instrument Serif', Georgia, serif",
+};
+if (typeof document !== "undefined") {
+  const r = document.documentElement.style;
+  Object.entries(SEMA_FONTS).forEach(([k, v]) => r.setProperty(`--sema-font-${k}`, v));
+}
+const FONT_DISPLAY = `var(--sema-font-display, ${SEMA_FONTS.display})`;
+const FONT_LABEL = `var(--sema-font-label, ${SEMA_FONTS.label})`;
+const FONT_UI = `var(--sema-font-ui, ${SEMA_FONTS.ui})`;
+const FONT_QUOTE = `var(--sema-font-quote, ${SEMA_FONTS.quote})`;
 const display = { fontFamily: FONT_DISPLAY };
+const label = { fontFamily: FONT_LABEL };
 const body = { fontFamily: FONT_UI };
 const quote = { fontFamily: FONT_QUOTE };
 
@@ -300,8 +325,10 @@ const sp = { xs: "0.5rem", sm: "0.75rem", md: "1rem", lg: "1.5rem", xl: "2rem", 
 // Escala tipográfica. `caption` y `label` leen el color del tema en cada uso
 // (getter), así siguen al modo oscuro aunque se usen con spread: { ...ts.caption }.
 const ts = {
-  h1: { fontFamily: FONT_DISPLAY, fontSize: "28px", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.02em" },
-  h2: { fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: 600, lineHeight: 1.25, letterSpacing: "-0.01em" },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: "26px", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.01em" },
+  h2: { fontFamily: FONT_DISPLAY, fontSize: "19px", fontWeight: 600, lineHeight: 1.25, letterSpacing: "0" },
+  // Etiquetas de boletos y sellos (ronda 4): Space Mono en mayúsculas con tracking; nunca menos de 12 px.
+  boleto: { fontFamily: FONT_LABEL, fontSize: "12px", fontWeight: 700, lineHeight: 1, letterSpacing: "0.08em", textTransform: "uppercase" },
   h3: { fontFamily: FONT_UI, fontSize: "17px", fontWeight: 600, lineHeight: 1.3 },
   body15: { fontFamily: FONT_UI, fontSize: "15px", fontWeight: 400, lineHeight: 1.55 },
   quote: { fontFamily: FONT_QUOTE, fontSize: "20px", fontWeight: 400, fontStyle: "italic", lineHeight: 1.45 },
@@ -338,5 +365,5 @@ export {
   SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, SEMA_COVER_COMBOS, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
-  display, body, quote, sp, FONT_DISPLAY, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,
+  display, label, body, quote, sp, SEMA_FONTS, FONT_DISPLAY, FONT_LABEL, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,
 };

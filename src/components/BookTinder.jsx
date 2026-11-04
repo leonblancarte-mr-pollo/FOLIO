@@ -12,10 +12,10 @@ import {
 import ReadingStatusModal from "./ReadingStatusModal.jsx";
 import BookCoverImage, { GenericCover } from "./BookCoverImage.jsx";
 import { haptic } from "../haptics.js";
-import { palette, ts } from "../theme.js";
+import { palette, ts, FONT_DISPLAY, FONT_UI } from "../theme.js";
 
-const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
-const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
+const serif = { fontFamily: FONT_DISPLAY };
+const body  = { fontFamily: FONT_UI };
 
 const SWIPE_THRESHOLD = 100;   // px para confirmar el swipe
 const MAX_ROTATION = 16;       // grados
