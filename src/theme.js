@@ -72,6 +72,8 @@ const PALETTE_LIGHT = {
   session: "#5C6B3D", sessionInk: "#5C6B3D", freeze: "#456990",
   firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
   superficieSuave: "#E7D7C1", complementoFrio: "#456990",
+  // Ronda 5: banda de separación entre publicaciones del feed (neutro muy claro; solo fondo, nunca texto encima).
+  separadorFeed: "#F1EFF3",
 };
 const PALETTE_DARK = {
   bg: "#000000", bgSoft: "#000000", bgCard: "#000000",
@@ -89,6 +91,7 @@ const PALETTE_DARK = {
   session: "#7A9B5C", sessionInk: "#7A9B5C", freeze: "#E7D7C1",
   firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
   superficieSuave: "#483A58", complementoFrio: "#456990",
+  separadorFeed: "#141414", // gris casi negro; el texto de las publicaciones (blanco) lo cruza con 18:1
 };
 let palette = { ...PALETTE_LIGHT };
 
@@ -163,6 +166,39 @@ const SEMA_GRADIENTES_TERMINADO = [
   { key: "menta-turquesa",  from: EXT.menta,     to: EXT.turquesa },
   { key: "pervinca-orquidea", from: EXT.pervinca, to: EXT.orquidea },
 ].map((g) => ({ ...g, css: `linear-gradient(135deg, ${g.from} 0%, ${g.to} 100%)`, on: "#483A58" }));
+
+// ── Ronda 5 (2026-11-03) ─────────────────────────────────────────────────────────────────────
+// Colores de la llama del banner de hito de racha. EXCEPCIÓN AUTORIZADA por León a la paleta, SOLO
+// para la ilustración del fuego (amarillo, naranja, rojo); nunca como fondo, texto ni borde de UI.
+const SEMA_LLAMA = { amarillo: "#FFD23F", naranja: "#FF8A1F", rojo: "#E5361C", brasa: "#FFF3B0" };
+
+// Hitos de racha que generan una publicación «racha» en el feed: 3, 7, 10, 14, 21, 30, 50, 60, 75, 90,
+// 100, 150, 200 y de ahí cada 50 días sin tope. Frases en voz de SEMA (corta, con carácter, sin coach,
+// sin segunda persona de marketing, cero culpa). Nivel de la llama: 1 (3–14), 2 (21–100), 3 (150+).
+const RACHA_HITOS_BASE = [3, 7, 10, 14, 21, 30, 50, 60, 75, 90, 100, 150, 200];
+const RACHA_FRASES = {
+  3: "Ya van tres.",
+  7: "Una semana entera.",
+  10: "Diez días. Ya agarró ritmo.",
+  14: "Dos semanas sin soltar el libro.",
+  21: "Eso ya es un hábito.",
+  30: "Un mes. Los libros se enteraron.",
+  50: "Cincuenta días. Qué bonito se ve.",
+  60: "Dos meses de páginas.",
+  75: "Setenta y cinco. Ya es costumbre.",
+  90: "Tres meses. Esto va en serio.",
+  100: "Cien días. Ya eres de la casa.",
+  150: "Ciento cincuenta. Eso es oficio.",
+  200: "Doscientos días. Leyenda de la casa.",
+};
+function esHitoRacha(n) {
+  return RACHA_HITOS_BASE.includes(n) || (n > 200 && n % 50 === 0);
+}
+function fraseHitoRacha(n) {
+  if (RACHA_FRASES[n]) return RACHA_FRASES[n];
+  return n >= 1000 ? `${n} días. Esto ya es historia.` : `${n} días. Medio siglo más de páginas.`;
+}
+function nivelLlama(n) { return n >= 150 ? 3 : n >= 21 ? 2 : 1; }
 
 // Hash estable (FNV-1a) de un id: el mismo post da siempre el mismo color, en cualquier render
 // o recarga.
@@ -363,6 +399,7 @@ function genreColor(genre) {
 export {
   FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS,
   SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors,
+  SEMA_LLAMA, RACHA_HITOS_BASE, RACHA_FRASES, esHitoRacha, fraseHitoRacha, nivelLlama,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, SEMA_COVER_COMBOS, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
   display, label, body, quote, sp, SEMA_FONTS, FONT_DISPLAY, FONT_LABEL, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,

@@ -85,6 +85,7 @@ import { EmptyState } from "./components/EmptyState.jsx";
 import StickerButton from "./components/StickerButton.jsx";
 // Kit de detalles (ronda 4, 2026-11-03): cinta y sello en Social, boleto en Explorar, nota a mano en Inicio.
 import { CintaAdhesiva, SelloTinta, Boleto, NotaMano } from "./components/Detalles.jsx";
+import { RachaHitoCartel } from "./components/RachaHito.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
 import { FONT_LINK, FONT_UI, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, display, label, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
 // Ronda 2: paleta extendida (sema-paleta §7): franja por publicación, «Libro terminado», perfil de amigo.
@@ -711,6 +712,30 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
   );
 }
 
+// Ronda 5: borde rasgado de «Libro terminado». Polígono de clip-path con el canto superior e inferior
+// irregulares (amplitud en px), determinista por id de publicación (mismo post, misma rasgadura).
+function tornClipPath(seed, steps = 26, amp = 9) {
+  let h = stableHash(seed) || 1;
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0; h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0; return (h >>> 0) / 4294967296; };
+  const top = [], bot = [];
+  for (let k = 0; k <= steps; k++) top.push(`${((k / steps) * 100).toFixed(1)}% ${(rnd() * amp).toFixed(1)}px`);
+  for (let k = steps; k >= 0; k--) bot.push(`${((k / steps) * 100).toFixed(1)}% calc(100% - ${(rnd() * amp).toFixed(1)}px)`);
+  return `polygon(${[...top, ...bot].join(", ")})`;
+}
+
+// Ronda 5: globo de papel del gato. Recorte con las CUATRO orillas irregulares (amplitud en px),
+// determinista por semilla. Sin borde pintado: el papel (arena/ciruela) + textura de cartón lo separa del fondo.
+function tornBoxClip(seed, amp = 3, nx = 14, ny = 5) {
+  let h = stableHash(seed) || 1;
+  const rnd = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0; h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0; return (h >>> 0) / 4294967296; };
+  const pts = [];
+  for (let k = 0; k <= nx; k++) pts.push(`${((k / nx) * 100).toFixed(1)}% ${(rnd() * amp).toFixed(1)}px`);
+  for (let k = 1; k <= ny; k++) pts.push(`calc(100% - ${(rnd() * amp).toFixed(1)}px) ${((k / ny) * 100).toFixed(1)}%`);
+  for (let k = nx; k >= 0; k--) pts.push(`${((k / nx) * 100).toFixed(1)}% calc(100% - ${(rnd() * amp).toFixed(1)}px)`);
+  for (let k = ny - 1; k >= 1; k--) pts.push(`${(rnd() * amp).toFixed(1)}px ${((k / ny) * 100).toFixed(1)}%`);
+  return `polygon(${pts.join(", ")})`;
+}
+
 function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }) {
   // Ronda 2 (2026-11-02): papel rasgado de una sola pieza (ver .sema-nav-rasgado en index.css).
   // Activa: ícono y etiqueta en tinta con trazo y peso mayores + cinta lila de 24×6 px girada −3°
@@ -742,10 +767,13 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
             className="flex-1 flex flex-col items-center justify-center sema-nav-item"
             style={{ backgroundColor: "transparent", border: "none", cursor: "pointer", minHeight: 56, padding: 0 }}
           >
-            <div className={active ? undefined : "sema-nav-pill"} style={{
+            {/* Ronda 5: la activa lleva un cuadrito redondeado de lila semitranslúcido detrás del ícono y la etiqueta
+                (como en la referencia); ya no hay cintita. --nav-sel = lila al 55 % (claro) o 40 % (oscuro). */}
+            <div className={active ? "sema-nav-sel" : "sema-nav-pill"} style={{
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              padding: "4px 12px",
-              borderRadius: "12px",
+              padding: active ? "6px 14px" : "6px 14px",
+              borderRadius: "14px",
+              "--nav-sel": `color-mix(in srgb, ${palette.firma} ${isLight ? 55 : 40}%, transparent)`,
             }}>
               <span style={{ position: "relative", display: "inline-flex" }}>
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} color={tint} />
@@ -756,13 +784,6 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
                 )}
               </span>
               <span style={{ ...display, fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
-              {/* Marca activa tipo cinta (ronda 2 de correcciones): tira 24×6, radio 1, girada −3°. */}
-              <span aria-hidden="true" style={{
-                width: 24, height: 6, borderRadius: 1,
-                transform: "rotate(-3deg)",
-                backgroundColor: active ? palette.firma : "transparent",
-                boxShadow: active && isLight ? `0 0 0 1.5px ${palette.ink}` : "none",
-              }} />
             </div>
           </button>
         );
@@ -6898,6 +6919,7 @@ function describePostTarget(post, book) {
   }
   if (post.type === "reading_session") return "tu sesión de lectura";
   if (post.type === "achievement") return "tu logro";
+  if (post.type === "racha") return "tu hito de racha";
   return null;
 }
 async function attachNotifTargets(notifs) {
@@ -8672,7 +8694,7 @@ function CommentsToggle({ open, count, onClick }) {
 // ============ HOME (dashboard personalizado) ============
 // Barra de progreso reutilizable por libro (% leído; degradado cereza→durazno mientras avanza,
 // salvia al terminar; sema-paleta §5)
-function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
+function ProgressBarBook({ current = 0, total = 0, height = 10, faltan = false }) {
   const has = total > 0;
   const pct = has ? Math.min(100, Math.round((current / total) * 100)) : 0;
   // Sin total no hay barra vacía: el avance se dice con el número grande (principio 4).
@@ -8690,7 +8712,7 @@ function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
         {/* Filete de tinta al frente del relleno: el extremo durazno da 2.06:1 contra la pista blanca */}
         <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", background: pct >= 100 ? palette.sage : SEMA_GRADIENTS.acento, borderRight: pct < 100 ? `1.5px solid ${palette.ink}` : "none", boxSizing: "border-box", transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
       </div>
-      <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {current} {current === 1 ? "página leída" : "páginas leídas"}</p>
+      <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {faltan ? (total - current <= 0 ? "No falta nada" : `${total - current === 1 ? "Te falta" : "Te faltan"} ${total - current} ${total - current === 1 ? "página" : "páginas"}`) : `${current} ${current === 1 ? "página leída" : "páginas leídas"}`}</p>
     </div>
   );
 }
@@ -8912,17 +8934,6 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
     if (readingBooks.length === 1) openRead(readingBooks[0]);
     else setLeerOpen(true);
   }
-  // Nota a mano junto al progreso (ronda 4): solo con total conocido y con datos reales. Cero culpa:
-  // cuenta lo que falta como dato, y cuando falta poco, lo celebra.
-  const notaFaltan = (current, total) => {
-    if (!(total > 0)) return null;
-    const faltan = total - current;
-    if (faltan <= 0) return "No falta nada. Eso ya es terminar."; // ronda 2: esta rama solo sale con 0 por leer
-    const n = `${faltan} ${faltan === 1 ? "página" : "páginas"}`;
-    const verbo = faltan === 1 ? "Te falta" : "Te faltan";
-    return faltan <= 20 ? `${verbo} ${n}. Hoy se acaba.` : `${verbo} ${n}`;
-  };
-
   return (
     <div style={{ padding: `${sp.lg} 1.25rem ${sp.xxl}`, maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: sp.xl }}>
       {/* Ronda 3 (2026-11-02, pedido de León): cabecera en DOS columnas. Izquierda: saludo + racha;
@@ -8937,6 +8948,21 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           separen el saludo de la cabecera y las patas apoyen al nivel de la racha. Columna
           izquierda: 350−152=198 px a 390, 183 a 375 y 168 a 360; la racha baja su mínimo a 150
           y ocupa toda la columna. */}
+      {/* Frase del gato (ronda 5): ARRIBA, en un globo de papel (recorte de orillas irregulares + textura de cartón
+          de la misma familia que el boleto y la barra), pegado a la derecha, con la colita hacia abajo apuntando a la
+          cabeza del gato. El globo vive fuera de la fila de dos columnas: así a 360 px el saludo y la racha conservan su
+          ancho. La cabeza del gato queda a ~64 px del borde derecho del contenido (PNG de 200 px, margen derecho -36),
+          de ahí `right: 53px` de la colita. Texto en ink sobre superficieSuave: 7.36 (claro) / 10.39 (oscuro). */}
+      {pet && (
+        <div style={{ position: "relative", alignSelf: "flex-end", maxWidth: "min(100%, 236px)", marginBottom: `calc(-1 * ${sp.xl} + 16px)`, zIndex: 1 }}>
+          <div className="sema-globo sema-carton" style={{ backgroundColor: palette.superficieSuave, color: palette.ink, clipPath: tornBoxClip(pet.pet_name || "gato") }}>
+            <span className="sr-only">{pet.pet_name} dice: </span>{petLine}
+          </div>
+          <svg aria-hidden width="24" height="17" viewBox="0 0 24 17" style={{ position: "absolute", bottom: -14, right: 53, display: "block", overflow: "visible" }}>
+            <path d="M1.5 0 C 6 3, 10 9, 13 16 C 15 10, 19 4, 23 0 Z" fill={palette.superficieSuave} />
+          </svg>
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
         <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: sp.md }}>
           {/* Saludo grande en display (Unbounded desde la ronda 4: es ancha, así que baja de 32 a 28 px
@@ -8955,9 +8981,12 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
             pausa) y ocupa el lugar de la línea secundaria para no decirlo dos veces. Sin cinta.
             Sigue siendo el mismo botón de 44+ px que abre RachaModal; z-index 1 para que el gato
             (márgenes negativos) no pise su borde derecho. Colores por variables desde palette. */}
+        {/* Ronda 5: la cinta adhesiva va FUERA del botón (la máscara del boleto recorta lo que sale), en la esquina superior izquierda. Textura de cartón. */}
+        <div style={{ position: "relative" }}>
+        <CintaAdhesiva color="superficie" angulo={-7} width={64} style={{ left: -8, top: -9, "--kd-angulo": "-34deg", zIndex: 2 }} />
         <button
           onClick={() => setRachaOpen(true)}
-          className="sema-r4-racha sema-no-hover sema-papel sema-focus-onfirma"
+          className="sema-r4-racha sema-no-hover sema-carton sema-focus-onfirma"
           aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}${isRecord ? ", récord personal" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
           style={{ "--r4-bg": palette.firma, "--r4-ink": palette.onFirma }}
         >
@@ -8970,9 +8999,12 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
               {dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}
             </span>
             {isRecord ? (
-              <span style={{ display: "block", marginTop: "0.6rem", lineHeight: 1 }}>
-                <SelloTinta size="sm" angulo={-8} style={{ "--kd-ink": palette.onFirma }}>Récord personal</SelloTinta>
-              </span>
+              <>
+                <span style={{ ...body, display: "block", fontSize: "13px", fontWeight: 500, lineHeight: 1.3, color: palette.onFirma, marginTop: "0.3rem" }}>Esto ya es récord.</span>
+                <span style={{ display: "block", marginTop: "0.5rem", lineHeight: 1 }}>
+                  <SelloTinta size="sm" angulo={-8} style={{ "--kd-ink": palette.onFirma }}>Récord personal</SelloTinta>
+                </span>
+              </>
             ) : (
               <span style={{ ...body, display: "block", fontSize: "13px", fontWeight: 500, lineHeight: 1.3, color: palette.onFirma, marginTop: "0.3rem" }}>
                 {cur === 0
@@ -8989,6 +9021,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
             <span className="sema-r4-racha__etiqueta" style={ts.boleto}>Racha</span>
           </span>
         </button>
+        </div>
         </div>
 
         {/* El gato grande y suelto, columna derecha (principio 6; León, ronda 3: supera el «gato
@@ -9026,32 +9059,14 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         )}
       </div>
 
-      {/* Lo que dice el gato (ronda 3): globo de cómic debajo de la fila, pegado a la derecha,
-          bajo el gato. Mismo globo que «Para ti» (recoCatBubbleStyle: bg, filo de tinta 1.5 px,
-          radio 18). Correcciones ronda 3: en vez de la esquina casi recta (no leía como cola),
-          una COLA triangular SVG de 18 × 10 px apuntando arriba, relleno bg y filo ink, que tapa
-          el filo del globo en su base. Va a 34 px del borde derecho del globo: el gato está
-          anclado a la derecha con ancho fijo, así que ahí caen siempre sus patas delanteras en
-          390, 375 y 360. El globo sube (marginTop −sp.lg) hasta casi tocar las patas y lleva
-          position: relative + zIndex 1 para que el botón del gato (márgenes negativos) no lo pise.
-          Va debajo y no junto a la cabeza porque la columna izquierda ya la llenan el saludo y
-          la racha: ahí un globo no cabe a 360 px sin partirse. */}
-      {pet && (
-        <p style={{ ...recoCatBubbleStyle(), position: "relative", zIndex: 1, alignSelf: "flex-end", maxWidth: "88%", padding: "0.65rem 0.95rem", marginTop: `-${sp.lg}`, marginRight: "0.25rem" }}>
-          <svg aria-hidden width="18" height="11" viewBox="0 0 18 11" style={{ position: "absolute", top: -10, right: 34, display: "block", overflow: "visible" }}>
-            <polygon points="0,11 9,0.8 18,11" fill={palette.bg} />
-            <path d="M0,11 L9,0.8 L18,11" fill="none" stroke={palette.ink} strokeWidth="1.5" strokeLinejoin="round" />
-          </svg>
-          <span className="sr-only">{pet.pet_name} dice: </span>{petLine}
-        </p>
-      )}
-
       {/* Única acción principal (principio 1). Ronda 4: el botón lleva a donde dice. Con un libro en
           curso, «Retomar lectura» abre directo el registro de páginas de ese libro; con varios, el
           modal «¿Cuál retomamos?». Sin libro en curso, «Empezar a leer» abre «¿Por dónde empezamos?»
           (Cuento del día o buscar un libro en Explorar). Antes: siempre «Leer ahora» → «¿Qué leemos?».
           El StickerButton no cambia de estilo. */}
-      <StickerButton size="lg" onClick={onPrimary} aria-label={primaryAria} style={{ width: "calc(100% - 6px)" }}>
+      {/* Ronda 5: tres variantes del botón (sticker, doble contorno, boleto). La aplicada es «doble» (ver StickerButton.jsx);
+          en desarrollo, el script de capturas puede forzar otra con window.__SEMA_BOTON__ (no se guarda nada). */}
+      <StickerButton size="lg" variant={(import.meta.env.DEV && typeof window !== "undefined" && window.__SEMA_BOTON__) || "doble"} onClick={onPrimary} aria-label={primaryAria} style={{ width: "calc(100% - 14px)", alignSelf: "center" }}>
         {primaryText}
       </StickerButton>
 
@@ -9061,7 +9076,6 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           <div style={{ display: "flex", flexDirection: "column", gap: sp.lg }}>
             {readingBooks.slice(0, 3).map((b) => {
               const total = b.totalPages || filledPages[b.id] || 0;
-              const nota = notaFaltan(bookProgress[b.id] || 0, total);
               return (
               <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-no-hover" style={{ ...quietRow, alignItems: "center", gap: sp.md }}>
                 {/* Portada a la izquierda: BookCoverImage si hay URL; sin URL, el título como lomo sobre superficie */}
@@ -9073,10 +9087,8 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...display, fontSize: "18px", fontWeight: 700, lineHeight: 1.2, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{b.title}</p>
                   <p style={{ ...ts.caption, marginBottom: sp.xs }}>{b.author}</p>
-                  <ProgressBarBook current={bookProgress[b.id] || 0} total={total} />
-                  {/* Nota a mano (kit, ronda 4) con la flecha apuntando al porcentaje; no es botón, va dentro de la fila. */}
-                  {/* Recta (ronda 2): una sola pieza girada por pantalla, y esa es el boleto de la racha. */}
-                  {nota && <NotaMano angulo={0} flecha="arriba" style={{ marginTop: "0.35rem" }}>{nota}</NotaMano>}
+                  {/* Ronda 5: versión limpia, una sola línea («84% · Te faltan 27 páginas») en la tipografía de antes de la ronda 4. Sin flecha ni letra de mano. */}
+                  <ProgressBarBook current={bookProgress[b.id] || 0} total={total} faltan />
                 </div>
               </button>
               );
@@ -9552,7 +9564,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   // izquierdo de 3 px en tinta durante 1.5 s, ya no un anillo de tarjeta.
   const cardStyle = (post) => ({
     backgroundColor: palette.bg,
-    borderBottomColor: palette.borderSoft,
+    borderBottomColor: palette.separadorFeed,
     boxShadow: highlightedPost === post.id ? `inset 3px 0 0 ${palette.ink}` : "none",
     transition: "box-shadow 200ms ease",
     cursor: "default",
@@ -9707,6 +9719,23 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             const achDef = isAchievement ? ACHIEVEMENT_DEFS.find(a => post.content?.includes(`"${a.name}"`)) : null;
             const AchIcon = achDef ? (ACHIEVEMENT_ICON_MAP[achDef.key] || Award) : Award;
 
+            // ── Hito de racha (ronda 5): cartel de ancho completo, SIN franja de tipo (se ve distinto a todo lo
+            //    demás). Mismo encabezado con menú de tres puntos y mismo pie con me gusta y comentarios. ──
+            if (post.type === "racha") {
+              let dias = 0;
+              try { dias = Number(JSON.parse(post.content || "{}").dias) || 0; } catch { dias = 0; }
+              if (dias > 0) {
+                return (
+                  <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                    {heartOverlay(post)}
+                    {postHeader(post, "llegó a un hito")}
+                    <div style={{ marginTop: 10 }}><RachaHitoCartel dias={dias} /></div>
+                    {postFooter(post)}
+                  </div>
+                );
+              }
+            }
+
             // ── Logro: franja «Logro» + sticker lila (firma) con el nombre ──
             if (isAchievement) {
               return (
@@ -9775,53 +9804,50 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               const extraText = post.content && !sameReview(post.content, reviewText) ? post.content : "";
               const rating = post.book?.rating || 0;
               const finishedGradient = pickByHash(SEMA_GRADIENTES_TERMINADO, post.id);
+              // Ronda 5 (2026-11-03): momento de celebración, el post con más decoración. Fondo de degradado
+              // (determinista por post) sobre un PAPEL ARRANCADO: bordes superior e inferior rasgados (clip-path
+              // generado por post), textura de cartón (.sema-carton), portada girada con sombra sólida, reseña
+              // como recorte de papel con cinta (una sola vez) y sello rotado «Ya se fue». La reseña de hasta 100
+              // letras va como NotaMano (Instrument Serif con subrayado a mano); más larga, como cita en Instrument
+              // Serif. Texto e ilustración sobre el degradado: solo el título grande en #483A58 (≥ 19 px negritas);
+              // todo lo demás va sobre el papel (arena/ciruela: 7.36 / 10.39). Sin fecha: el tiempo ya está en la cabecera.
+              const giro = [-1.2, -0.6, 0.7, 1.2][stableHash(post.id) % 4];
+              const reseñaCorta = reviewText && reviewText.length <= 100;
               return (
                 <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
                   {postBand(post, BookmarkCheck, "Libro terminado")}
                   {postHeader(post, null)}
-                  <div style={{ background: finishedGradient.css, margin: "12px 0 0", padding: "20px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
-                    {post.book ? (
-                      <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} className="sema-focus-onaccent" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 6 }}>
-                        <span style={{ position: "relative", display: "block", width: 116, height: 174, borderRadius: 6, overflow: "hidden", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }}>
-                          <BookCoverImage coverUrl={post.book.cover_url} title={post.book.title} author={post.book.author} compact alt="" />
-                        </span>
-                      </button>
-                    ) : null}
-                    {/* Título grande en #483A58 (22 px 800, texto grande): ≥ 4.5:1 en los extremos de todos los
-                        degradados salvo la cereza del original (3.24:1, válido por ser grande). sema-paleta §7 */}
+                  <div className="sema-terminado sema-carton" style={{ background: finishedGradient.css, clipPath: tornClipPath(post.id) }}>
+                    <div className="sema-terminado__fila">
+                      {post.book ? (
+                        <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} className="sema-terminado__portada sema-focus-onaccent">
+                          <span style={{ position: "relative", display: "block", width: "100%", aspectRatio: "2 / 3", borderRadius: 4, overflow: "hidden", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }}>
+                            <BookCoverImage coverUrl={post.book.cover_url} title={post.book.title} author={post.book.author} compact alt="" />
+                          </span>
+                        </button>
+                      ) : null}
+                      <div className="sema-terminado__recorte" style={{ "--kd-giro": `${giro}deg` }}>
+                        <CintaAdhesiva color="firma" angulo={-4} position="top-center" width={72} />
+                        <div className="sema-papel sema-terminado__papel" style={{ backgroundColor: palette.superficieSuave }}>
+                          {rating > 0 && <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700, marginBottom: reviewText ? "0.4rem" : 0 }}>Reseña {starsOn(rating, palette.ink)}</p>}
+                          {reviewText && (reseñaCorta
+                            ? <NotaMano angulo={0} style={{ fontSize: "19px" }}>{reviewText}</NotaMano>
+                            : <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "18px", lineHeight: 1.35, color: palette.ink }}>«{reviewText}»</p>)}
+                          <SelloTinta angulo={-8} size="sm" sobre="superficie" className="sema-terminado__sello">Ya se fue</SelloTinta>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Título grande en #483A58 (22 px 800, texto grande): ≥ 4.5:1 en los extremos de todos los degradados
+                        salvo la cereza del original (3.24:1, válido por ser grande). sema-paleta §7 */}
                     {post.book?.title && (
-                      <p style={{ ...display, fontSize: "22px", fontWeight: 800, lineHeight: 1.15, letterSpacing: "-0.01em", color: finishedGradient.on, marginTop: "1rem", maxWidth: "18rem" }}>
+                      <p style={{ ...display, fontSize: "20px", fontWeight: 800, lineHeight: 1.2, letterSpacing: "-0.01em", color: finishedGradient.on, marginTop: "1.1rem", textAlign: "center", overflowWrap: "anywhere" }}>
                         {post.book.title}
                       </p>
                     )}
                   </div>
-                  <div className="sema-post__pad" style={{ paddingTop: 12 }}>
+                  <div className="sema-post__pad" style={{ paddingTop: 10 }}>
                     {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
-                    {/* Reseña, una sola vez (sameReview), como recorte de papel pegado con cinta (detalle 2 de 2, ronda 4):
-                        bloque superficieSuave con textura .sema-papel y giro leve determinista por publicación; la cinta
-                        adhesiva va fuera del bloque con textura (que recorta por overflow). Texto en ink sobre
-                        superficieSuave: 7.36 en claro, 10.39 en oscuro. */}
-                    {(reviewText || rating > 0) && (
-                      <div className="sema-post__recorte" style={{ "--kd-giro": `${[-1, -0.5, 0.6, 1][stableHash(post.id) % 4]}deg` }}>
-                        <CintaAdhesiva color="firma" angulo={-4} position="top-center" />
-                        {/* Detalle 1 de 2 (correcciones ronda 4): sello FECHADOR con la fecha real del post («03 NOV»),
-                            en la esquina del recorte de papel (arena / ciruela), no sobre el degradado: ahí la tinta pasa
-                            en los dos modos (7.36 / 10.39) y no repite «terminado». aria-hidden: la hora ya está en la
-                            cabecera («hace 3h»). Sin reseña ni calificación no hay recorte y tampoco sello. */}
-                        <SelloTinta angulo={-8} size="sm" aria-hidden className="sema-post__sello-fecha">{fechaSello(post.created_at)}</SelloTinta>
-                        <div className="sema-papel sema-post__recorte-papel" style={{ backgroundColor: palette.superficieSuave }}>
-                          <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700, paddingRight: 96 }}>
-                            Reseña {rating > 0 && starsOn(rating, palette.ink)}
-                          </p>
-                          {reviewText && (
-                            <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, marginTop: "0.5rem" }}>
-                              «{reviewText}»
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
                     {extraText && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{extraText}</p>}
                   </div>
                   {postFooter(post)}

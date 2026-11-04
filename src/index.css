@@ -999,7 +999,8 @@ button:not(:disabled):not(.sema-no-hover):active,
    padding lateral vive en cada bloque (.sema-post__pad): 16 px en móvil, 24 px en ≥ 640 px para
    alinear con el saludo y la racha. Colores solo por variables --sema-* (sin hex). */
 .sema-feed-lista { display: flex; flex-direction: column; margin-left: -1rem; margin-right: -1rem; }
-.sema-post { position: relative; overflow: hidden; padding-bottom: 6px; border-bottom: 1px solid var(--sema-border-soft); }
+/* Ronda 5: la línea fina pasa a ser una BANDA de 10 px a todo el ancho en el token separadorFeed (gris neutro muy claro; casi negro en oscuro). Sin borde ni caja extra. */
+.sema-post { position: relative; overflow: hidden; padding-bottom: 6px; border-bottom: 10px solid var(--sema-separador-feed); }
 .sema-post:last-child { border-bottom: none; }
 .sema-post__pad { padding-left: 16px; padding-right: 16px; }
 /* Imagen de una nota: a sangre y sin radio en móvil (compensa el padding del cuerpo). */
@@ -1167,3 +1168,295 @@ button:not(:disabled):not(.sema-no-hover):active,
 .sema-post-menu__item:hover, .sema-post-menu__item:focus-visible { background-color: var(--sema-superficie-suave); color: var(--sema-ink); outline-offset: -3px; }
 /* Sello fechador de «Libro terminado»: esquina superior derecha del recorte de papel. */
 .sema-post__sello-fecha { position: absolute; top: 10px; right: 12px; z-index: 2; }
+
+/* ═══ Ronda 5 · cartón (textura compartida) ═══════════════════════════════════════════════════
+   Misma familia de textura para el boleto de la racha, el globo del gato, la barra inferior y el
+   papel arrancado de «Libro terminado»: cartón arrugado, visible pero sutil. Es .sema-papel con más
+   relieve (surfaceScale 6, frecuencia 0.026) y un segundo pase de pliegues finos. Solo multiplica
+   (oscurece pliegues); no cambia el valor del color de fondo en lo plano. */
+.sema-carton { position: relative; isolation: isolate; }
+.sema-carton > * { position: relative; z-index: 1; }
+.sema-carton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  mix-blend-mode: multiply;
+  opacity: 0.72;
+}
+
+/* ═══ Ronda 5 · Mascota (PetHub) ═══════════════════════════════════════════════════════════════
+   Escena: sticker lila con filo de tinta + gato + sombra en el piso. Tres capas independientes
+   (.sema-pet-sticker, .sema-pet-gato, .sema-pet-piso) para animarlas por separado en otra ronda;
+   hoy NADA se anima (se apaga el bob y la respiración de PetDisplay solo aquí).
+   Colores por variables que pone PetHub desde palette; aquí no hay hex. */
+.sema-focus-ink:focus-visible { outline: 3px solid var(--sema-ink) !important; outline-offset: 2px; }
+.sema-pet-escena {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  height: 340px;
+  flex: 0 0 auto;
+  margin-top: 0.5rem;
+}
+.sema-pet-sticker {
+  position: absolute;
+  left: 4%; right: 4%; top: 34px; bottom: 26px;
+  background-color: var(--pet-sticker);
+  border: 3px solid var(--pet-ink);
+  border-radius: 30px 38px 28px 40px;
+  transform: rotate(-2.5deg);
+  transform-origin: center bottom;
+}
+.sema-pet-gato {
+  position: absolute;
+  left: 0; right: 0; bottom: 14px;
+  display: flex;
+  justify-content: center;
+  transform-origin: center bottom;
+}
+.sema-pet-gato .pet-sprite-wrap,
+.sema-pet-gato .pet-sprite-img { animation: none !important; }
+.sema-pet-piso {
+  position: absolute;
+  left: 50%; bottom: 8px;
+  width: 62%; height: 14px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background-color: var(--pet-piso);
+  opacity: 0.22;
+  filter: blur(5px);
+  transform-origin: center;
+}
+/* Tarjetas de papel: mismo lenguaje que los boletos (arena/ciruela, filo de tinta de 2 px, dentado
+   en los lados cortos). Sin íconos. El sello «Muy pronto» es la única pieza girada de cada tarjeta. */
+.sema-pet-carta {
+  --kd-diente: 3.5px;
+  --kd-paso: 9px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 88px;
+  padding: 12px 16px 14px;
+  border: 2px solid var(--sema-ink);
+  border-radius: 2px;
+  background-color: var(--sema-superficie-suave);
+  color: var(--sema-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  -webkit-mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-pet-carta--ancha { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 64px; }
+.sema-pet-carta:focus-visible { outline-offset: -5px !important; }
+@media (max-width: 379px) {
+  .sema-pet-carta { padding: 12px 12px 14px; }
+}
+
+/* ═══ Ronda 5 · hito de racha (RachaHito.jsx) ═══════════════════════════════════════════════════
+   Cartel a todo el ancho: fondo propio (--hito-bg, extendida), filos de tinta arriba y abajo, puntos de
+   media tinta muy tenues y textura de cartón (.sema-carton). Texto siempre en --hito-ink (#483A58).
+   La llama parpadea con tres capas desfasadas; con prefers-reduced-motion se queda quieta. */
+.sema-hito {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 26px 20px 28px;
+  background-color: var(--hito-bg);
+  color: var(--hito-ink);
+  border-top: 3px solid var(--hito-ink);
+  border-bottom: 3px solid var(--hito-ink);
+  overflow: hidden;
+}
+.sema-hito::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--hito-ink) 1.3px, transparent 1.7px);
+  background-size: 14px 14px;
+  opacity: 0.1;
+}
+.sema-hito__llama { margin-bottom: 4px; }
+.sema-hito__num {
+  font-size: 112px;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--hito-ink);
+}
+.sema-hito[data-largo="3"] .sema-hito__num { font-size: 92px; }
+.sema-hito[data-largo="4"] .sema-hito__num { font-size: 72px; }
+.sema-hito__label {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hito-ink);
+}
+.sema-hito__frase {
+  margin-top: 10px;
+  font-style: italic;
+  font-size: 28px;
+  line-height: 1.15;
+  max-width: 17rem;
+  color: var(--hito-ink);
+}
+.sema-llama__capa { transform-box: fill-box; transform-origin: 50% 100%; animation: sema-llama-parpadeo 2.6s ease-in-out infinite alternate; }
+.sema-llama__capa--med { animation-duration: 2.1s; }
+.sema-llama__capa--nuc { animation-duration: 1.7s; }
+.sema-llama__brasa { animation: sema-llama-brasa 2.8s ease-in-out infinite alternate; }
+.sema-llama__brasa--b { animation-delay: -0.9s; }
+.sema-llama__brasa--c { animation-delay: -1.8s; }
+@keyframes sema-llama-parpadeo {
+  from { transform: scale(1, 1) skewX(0deg); }
+  to   { transform: scale(0.97, 1.06) skewX(-2.5deg); }
+}
+@keyframes sema-llama-brasa {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-5px); opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sema-llama__capa, .sema-llama__brasa { animation: none !important; }
+}
+
+/* ═══ Ronda 5 · Libro terminado (papel arrancado) ═══════════════════════════════════════════════
+   Fondo de degradado (inline, por publicación) con el canto superior e inferior rasgados (clip-path
+   inline generado por tornClipPath) y textura de cartón. Portada a la izquierda girada +3° con
+   sombra sólida; a la derecha, la reseña como recorte de papel pegado con cinta, y el sello «Ya se
+   fue» DENTRO del papel (ahí la tinta pasa 7.36 / 10.39; sobre el degradado no pasaría en la cereza). */
+.sema-terminado { position: relative; margin-top: 10px; padding: 30px 16px 30px; }
+.sema-terminado__fila { display: flex; align-items: flex-start; gap: 16px; }
+.sema-terminado__portada { flex: 0 0 108px; width: 108px; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 4px; transform: rotate(3deg); margin: 4px 4px 8px 2px; }
+.sema-terminado__recorte { position: relative; flex: 1 1 0; min-width: 0; margin-top: 12px; transform: rotate(var(--kd-giro, -0.6deg)); transform-origin: center; }
+.sema-terminado__papel { padding: 16px 14px 46px; border-radius: 2px; position: relative; }
+.sema-terminado__sello { position: absolute; right: 10px; bottom: 10px; z-index: 2; }
+@media (max-width: 379px) {
+  .sema-terminado { padding-left: 12px; padding-right: 12px; }
+  .sema-terminado__fila { gap: 12px; }
+  .sema-terminado__portada { flex-basis: 96px; width: 96px; }
+}
+@media (min-width: 640px) {
+  .sema-terminado { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ═══ Ronda 5 · botón principal: variantes de StickerButton ═══════════════════════════════════════
+   Mismos colores (durazno + #483A58). «sticker» es la base de arriba. «doble» = la de la referencia de
+   ChatGPT: borde de tinta de 3 px, segundo contorno separado por un aro del color del fondo, losa de tinta
+   debajo y un reflejo ancho redondeado. «boleto» = billete plano con dentado en los lados y perforado
+   antes de la flecha. En oscuro la tinta de los contornos es blanca (--sb-anillo). El texto #483A58
+   sobre el durazno (≥ 5.04:1 en claro, 5.85:1 en oscuro) no cambia: el degradado no baja de accent. */
+.sema-sticker-btn--doble {
+  border: 3px solid var(--sb-anillo);
+  border-radius: 20px;
+  background: linear-gradient(175deg, color-mix(in srgb, var(--sb-bg) 64%, white) 0%, var(--sb-bg) 78%);
+  box-shadow: 0 0 0 3px var(--sb-canto), 0 0 0 5px var(--sb-anillo), 0 6px 0 5px var(--sb-anillo);
+}
+.sema-sticker-btn--doble::before { display: none; }
+.sema-sticker-btn--doble::after {
+  top: 7px; left: 14px; width: 34%; height: 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-brillo) 58%, transparent);
+  transform: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sema-sticker-btn--doble:hover { transform: translate(0, -1px); box-shadow: 0 0 0 3px var(--sb-canto), 0 0 0 5px var(--sb-anillo), 0 7px 0 5px var(--sb-anillo); }
+}
+.sema-sticker-btn--doble:active { transform: translate(0, 5px); box-shadow: 0 0 0 3px var(--sb-canto), 0 0 0 5px var(--sb-anillo), 0 1px 0 5px var(--sb-anillo); }
+.sema-sticker-btn--doble:focus-visible { outline-offset: 13px !important; }
+
+.sema-sticker-btn--boleto {
+  --sb-diente: 4px;
+  --sb-paso: 10px;
+  border: 2px solid var(--sb-anillo);
+  border-radius: 3px;
+  background: var(--sb-bg);
+  box-shadow: none;
+  justify-content: flex-start;
+  padding-left: 1.1rem;
+  padding-right: 4.6rem;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px));
+  -webkit-mask-size: var(--sb-paso) var(--sb-paso), calc(100% - 2 * var(--sb-paso) + 1px) 100%, var(--sb-paso) var(--sb-paso);
+  mask-size: var(--sb-paso) var(--sb-paso), calc(100% - 2 * var(--sb-paso) + 1px) 100%, var(--sb-paso) var(--sb-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-sticker-btn--boleto .sema-sticker-btn__texto { flex: 1 1 auto; text-align: center; }
+.sema-sticker-btn--boleto::after { display: none; }
+.sema-sticker-btn--boleto::before,
+.sema-sticker-btn--boleto:hover::before,
+.sema-sticker-btn--boleto:focus-visible::before {
+  display: block !important;
+  animation: none !important;
+  content: "";
+  position: absolute;
+  top: 9px; bottom: 9px; left: auto; right: 3.9rem;
+  width: 0; height: auto;
+  background: none;
+  border-left: 2px dashed var(--sb-ink);
+  opacity: 0.75;
+  transform: none;
+}
+.sema-sticker-btn--boleto .sema-sticker-btn__flecha { position: absolute; right: 0.95rem; top: 50%; transform: translateY(-50%); margin-left: 0; }
+.sema-sticker-btn--boleto:hover { transform: none; box-shadow: none; }
+.sema-sticker-btn--boleto:active { transform: translate(0, 2px); box-shadow: none; }
+.sema-sticker-btn--boleto:focus-visible { outline-offset: -6px !important; }
+
+/* ═══ Ronda 5 · globo del gato (Inicio) ═══════════════════════════════════════════════════════════
+   Globo de papel: color y recorte irregular inline desde App.jsx; textura de cartón (.sema-carton). */
+.sema-globo {
+  padding: 12px 18px 15px;
+  font-family: var(--sema-font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* ═══ Ronda 5 · barra inferior ═════════════════════════════════════════════════════════════════════
+   La pestaña activa se marca con un cuadrito de esquinas redondeadas en lila semitranslúcido detrás del
+   ícono y la etiqueta (sin la cintita). Cuánto lila: 55 % en claro (ink sobre el resultado ≈ 6:1) y 40 %
+   en oscuro (blanco sobre el resultado ≈ 5:1); lo fija BottomNav en --nav-sel. El borde rasgado se
+   conserva; la textura pasa a la de cartón de la racha y el globo (misma familia). */
+.sema-nav-sel { background-color: var(--nav-sel); }
+.sema-nav-rasgado::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  opacity: 0.55;
+}
+
+/* .sema-papel / .sema-carton ponen position: relative a todos los hijos directos; eso rompía el span
+   .sr-only (position: absolute) y el texto para lectores de pantalla se veía. */
+.sema-papel > .sr-only, .sema-carton > .sr-only { position: absolute; }
+/* El cartel de hito es un bloque grande y liso: su cartón va más tenue que el del boleto o el globo. */
+.sema-hito.sema-carton::after { opacity: 0.42; }
