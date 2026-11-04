@@ -1910,6 +1910,17 @@ function BookDetailModal({ book, onClose, onUpdate, onDelete, userId, onSaveQuot
 // tocar su lógica: se monta arriba, en el tab "Para ti", y si falla o no
 // hay datos suficientes simplemente no renderiza nada — el quiz sigue
 // funcionando exactamente igual debajo.
+// Forma corta de las razones fijas de api/recommendations.js para que quepan en el boleto de 130 px
+// sin perder sentido («SEGÚN TUS G…» no se lee). Cualquier otra razón se muestra tal cual y, si no
+// cabe, el CSS la recorta con ellipsis; la frase completa siempre va en title/aria-label.
+const RECO_REASON_CORTA = {
+  "según tus géneros favoritos": "Tus géneros",
+  "libros mejor valorados del catálogo": "Mejor valorado",
+};
+function recoReasonCorta(reason) {
+  return RECO_REASON_CORTA[String(reason).trim().toLowerCase()] || reason;
+}
+
 function CollaborativeRecommendations({ user, onAdd }) {
   const [items, setItems] = useState(null); // null = cargando, [] = sin resultado
   const [personalized, setPersonalized] = useState(false);
@@ -1985,6 +1996,13 @@ function CollaborativeRecommendations({ user, onAdd }) {
               <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: "2px 0 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.author}
               </p>
+              {/* Etiqueta de papel (ronda 4) con la razón real del backend, tal cual; si no cabe en 130 px
+                  se recorta con ellipsis y la frase completa va en title/aria-label. Sin reason, sin etiqueta. */}
+              {item.reason && (
+                <Boleto color="papel" perforado="ninguno" angulo={-2} size="sm" className="sema-r4-boleto-carrusel" title={item.reason} aria-label={item.reason}>
+                  {recoReasonCorta(item.reason)}
+                </Boleto>
+              )}
               {/* Botón silencioso (la única acción rellena de la pestaña es la del quiz): 44 px, sin durazno como texto */}
               <button
                 onClick={() => handleAdd(item)}
@@ -2395,6 +2413,19 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     const rowAuthor = { ...body, fontSize: "14px", color: palette.inkSoft, margin: "0.15rem 0 0" };
     const rowReason = { ...body, fontSize: "15px", color: palette.ink, lineHeight: 1.5, margin: "0.45rem 0 0" };
     const coverBox = { position: "relative", width: 64, height: 92, borderRadius: 6, overflow: "hidden", flexShrink: 0 };
+    // Etiqueta de papel (ronda 4): UN boleto por libro con un dato real, nunca inventado; si no hay
+    // dato o no cabe en 28 caracteres, no se pinta. En «De tu biblioteca» es el estado del libro;
+    // en «Para descubrir», el género de la sugerencia (que sale de la línea de autor para no repetirlo)
+    // o, si no viene, la respuesta de ánimo que motivó la lista. La razón larga sigue debajo.
+    const etiquetaMax = 28;
+    const etiquetaEstado = (status) => (status === "reading" ? "Ya empezado" : status === "wish" ? "En Quiero leer" : "");
+    const etiquetaAnimo = recoLabel("mood", answers.mood);
+    const etiquetaSugerencia = (s) => {
+      const g = (s.genre || "").trim();
+      if (g && `Género · ${g}`.length <= etiquetaMax) return `Género · ${g}`;
+      return etiquetaAnimo && etiquetaAnimo.length <= etiquetaMax ? etiquetaAnimo : "";
+    };
+    const boletoRow = (texto) => texto ? <Boleto color="papel" perforado="ninguno" angulo={-2} size="sm" className="sema-r4-boleto-row">{texto}</Boleto> : null;
 
     resultsBlock = (
       <>
@@ -2423,6 +2454,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={rowTitle}>{r.book.title}</p>
                       <p style={rowAuthor}>{r.book.author}</p>
+                      {boletoRow(etiquetaEstado(r.book.status))}
                       <p style={rowReason}>{r.reason}</p>
                     </div>
                   </button>
@@ -2445,7 +2477,8 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={rowTitle}>{s.title}</p>
-                      <p style={rowAuthor}>{s.author}{s.genre && <> · {s.genre}</>}</p>
+                      <p style={rowAuthor}>{s.author}{s.genre && !etiquetaSugerencia(s).startsWith("Género") && <> · {s.genre}</>}</p>
+                      {boletoRow(etiquetaSugerencia(s))}
                       {/* Una sola línea de contenido por libro: la razón. La sinopsis se guarda en el libro al agregarlo. */}
                       <p style={rowReason}>{s.reason}</p>
                       <button
@@ -10809,8 +10842,10 @@ function QuotesView({ user, books }) {
   );
 }
 
-function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme }) {
+function PerfilWrapper({ user, onUserUpdate, books, onSelectBook, setTab, onLogout, isOnline = true, theme, setTheme, onSubChange }) {
   const [sub, setSub] = useState("perfil");
+  // MainApp necesita saber la subpestaña para esconder el botón «+» en «Mi perfil» (ronda 4).
+  useEffect(() => { onSubChange?.(sub); }, [sub, onSubChange]);
   const TABS = [
     { id: "perfil", label: "Mi perfil" },
     { id: "libros", label: "Mis libros" },
@@ -11916,6 +11951,31 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   const [petStreak, setPetStreak] = useState(null);
   const [tutorialActive, setTutorialActive] = useState(() => showTutorial && !localStorage.getItem('folio_firstLoginTutorial'));
   const [showFabMenu, setShowFabMenu] = useState(false);
+  // Botón «+» (ronda 4): se esconde al bajar y vuelve al subir o al quedarse quieto 800 ms, para no
+  // tapar el final del feed ni los números de «Mi biblioteca». Sigue en el DOM (aria-hidden mientras).
+  const [fabVisible, setFabVisible] = useState(true);
+  const [perfilSub, setPerfilSub] = useState("perfil");
+  // El «+» no va en Perfil › «Mi perfil» (ahí viven Editar perfil, Privacidad, Apariencia y Cerrar
+  // sesión); sí en Mis libros, Mis frases y Resumen. Al cambiar de pestaña vuelve a verse.
+  const fabShown = fabVisible && !(tab === "perfil" && perfilSub === "perfil");
+  useEffect(() => { setFabVisible(true); }, [tab]);
+  useEffect(() => {
+    let lastY = window.scrollY, ticking = false, idle = null;
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastY;
+        if (Math.abs(delta) >= 8) { setFabVisible(delta < 0 || y <= 0); lastY = y; }
+        clearTimeout(idle);
+        idle = setTimeout(() => setFabVisible(true), 800);
+        ticking = false;
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); clearTimeout(idle); };
+  }, []);
   const [showSaveQuote, setShowSaveQuote] = useState(false);
   const [defaultQuoteBookId, setDefaultQuoteBookId] = useState(null);
 
@@ -12654,7 +12714,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}
-        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} /></div>}
+        {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSubChange={setPerfilSub} /></div>}
       </main>
       <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
       {/* FAB flotante para agregar. La barra inferior lleva Inicio, Explorar, Mascota y Social
@@ -12663,7 +12723,9 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         <button
           onClick={() => setShowFabMenu(true)}
           aria-label="Agregar"
-          className="btn-press"
+          aria-hidden={!fabShown}
+          tabIndex={fabShown ? 0 : -1}
+          className={`btn-press sema-r4-fab${fabShown ? "" : " sema-r4-fab--oculto"}`}
           style={{
             position: "fixed", right: 18, zIndex: 35,
             bottom: "calc(env(safe-area-inset-bottom) + 80px)",
