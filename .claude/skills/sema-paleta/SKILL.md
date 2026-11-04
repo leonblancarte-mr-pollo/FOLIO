@@ -188,6 +188,7 @@ Reglas:
 | **`acentoCalido`** *(nuevo)* | `#F79F79` | `#F79F79` | Celebraciones, gemas, segundo sticker |
 | **`superficieSuave`** *(nuevo)* | `#E7D7C1` | `#483A58` | Boletos, tarjetas que deban separarse del fondo, barra inferior (con su canto rasgado). Texto encima: `ink` (activa) e `inkSoft` (inactivas: 4.90 en claro, 7.36 en oscuro) |
 | **`complementoFrio`** *(nuevo)* | `#456990` | `#456990` | Enlaces, estados informativos, íconos secundarios, reseñas (en oscuro solo en elementos grandes) |
+| **`separadorFeed`** *(ronda 5, 2026-11-03)* | `#F1EFF3` | `#141414` | Banda de 10 px a todo el ancho entre publicaciones del feed (borde inferior de `.sema-post`). Gris neutro muy claro en claro, gris casi negro en oscuro. **Solo fondo**: nunca lleva texto encima ni sirve de borde de controles. Autorizado por León. El texto de las publicaciones nunca queda sobre la banda: blanco/negro de la app encima, 10.39 / 21 |
 | **`SEMA_GRADIENTS.acento`** *(2026-11-02, fuera de `palette`)* | cereza → durazno | igual | Tarjetas destacadas y barras de progreso (§5) |
 | **`SEMA_GRADIENTS.frio`** *(2026-11-02, fuera de `palette`)* | lila → azul acero | igual | Barras y marcos, sin texto encima (§5) |
 
@@ -198,3 +199,12 @@ Reglas:
 - **`/paleta` no los rediseña.** Solo los lista en su reporte.
 - **Cada `/redisena` los cambia** cuando toca la pantalla que los usa, con valores de esta skill.
 - **Los degradados viejos (vino → ámbar, etc.) se reemplazan** por color plano o por uno de los dos de §5. No se inventan degradados nuevos.
+
+## 8. Ronda 5 (2026-11-03): separador del feed, colores de la llama y fondos del cartel de racha
+
+- **`separadorFeed`** (token de `palette`, `--sema-separador-feed`): `#F1EFF3` en claro, `#141414` en oscuro (autorizado por León). Una banda de 10 px a todo el ancho entre publicaciones; sin bordes ni cajas extra. Antes era una línea fina `borderSoft`.
+- **Colores de la llama — EXCEPCIÓN AUTORIZADA por León, solo para la ilustración del fuego del banner de hito de racha** (`SEMA_LLAMA` en `theme.js`): amarillo `#FFD23F`, naranja `#FF8A1F`, rojo `#E5361C` y brasa/halo `#FFF3B0`. Nunca como fondo, texto, borde de UI, ícono suelto ni en otra ilustración. La llama lleva contorno de tinta `#483A58` (palette.onFirma) para leerse sobre cualquier fondo del cartel. Es decoración, no lleva texto.
+- **Fondo del cartel de racha** (paleta extendida, texto siempre `#483A58`, igual en claro y oscuro): nivel 1 (3–14 días) cielo 5.40:1; nivel 2 (21–100) orquídea 5.03:1; nivel 3 (150+) chicle 4.88:1. Todos pasan AA; el número, la etiqueta y la frase miden ≥ 14 px.
+- **Textura de cartón** (`.sema-carton`): la misma en boleto de la racha, globo del gato, barra inferior, papel arrancado de «Libro terminado» y cartel de racha. Solo multiplica (oscurece pliegues); no cambia el valor del color, pero en las zonas con texto chico se vuelve a medir (barra inferior: inactiva `inkSoft` sobre arena).
+- **Barra inferior, pestaña activa:** cuadrito de esquinas redondeadas en lila `firma` al 55 % (claro) o 40 % (oscuro) sobre `superficieSuave`. Texto e ícono: ink sobre ese lila, ≈ 6:1 en claro; blanco, ≈ 5:1 en oscuro. Ya no hay cinta lila debajo.
+- **Botón principal (StickerButton):** tres variantes con los mismos colores (durazno + `#483A58`, 5.04 / 5.85): `sticker`, `doble` (aplicada), `boleto`.
