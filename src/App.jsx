@@ -8695,8 +8695,12 @@ function RachaModal({ streak, paused = false, onClose }) {
   );
 }
 
-// Modal "Leer ahora" — una sola decisión: continuar libro o cuento del día
-function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }) {
+// Modal del botón principal de Inicio (ronda 4, 2026-11-03). Dos modos, según lo que diga el botón:
+//  · "retomar": hay VARIOS libros en curso → «¿Cuál retomamos?» (con uno solo el botón abre el
+//    registro directo y este modal no aparece).
+//  · "empezar": no hay libro en curso → «¿Por dónde empezamos?»: Cuento del día + «Buscar un libro»
+//    (Explorar). Antes era siempre «¿Qué leemos?» con continuar / cuento.
+function LeerAhoraModal({ booksReading = [], cuento, modo = "retomar", onRead, onCuento, onExplorar, onClose }) {
   const primary = booksReading[0] || null;
   const rest = booksReading.slice(1);
   const panelRef = useRef(null);
@@ -8712,16 +8716,16 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
         <button onClick={onClose} aria-label="Cerrar" className="sema-no-hover" style={{ position: "absolute", top: 8, right: 8, width: 44, height: 44, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <X size={22} color={palette.ink} strokeWidth={2} />
         </button>
-        <h2 id="leer-ahora-titulo" style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center", padding: "0 2.5rem" }}>¿Qué leemos?</h2>
+        <h2 id="leer-ahora-titulo" style={{ ...display, fontWeight: 700, fontSize: "1.2rem", color: palette.ink, marginBottom: "1.1rem", textAlign: "center", padding: "0 2.5rem" }}>{modo === "empezar" ? "¿Por dónde empezamos?" : "¿Cuál retomamos?"}</h2>
         {primary && (
           <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
             {/* Sin caja dentro de caja: portada o lomo con el título sobre superficie (como en Inicio) */}
             <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.25rem 0.2rem" }}>
-              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{primary.title}</span>}
+              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden style={{ ...body, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{primary.title}</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Continuar</p>
-              <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Retomar</p>
+              <p style={{ ...display, fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{primary.title}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{primary.author}</p>
             </div>
           </button>
@@ -8734,8 +8738,20 @@ function LeerAhoraModal({ booksReading = [], cuento, onRead, onCuento, onClose }
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Cuento del día{cuentoDuracion(cuento) ? ` · ${cuentoDuracion(cuento)}` : ""}</p>
-              <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
+              <p style={{ ...display, fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cuento.titulo}</p>
               <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>{cuento.autor}</p>
+            </div>
+          </button>
+        )}
+        {modo === "empezar" && (
+          <button onClick={onExplorar} className="btn-press" style={{ width: "100%", textAlign: "left", marginTop: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
+            <div style={{ width: 44, height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Search size={24} color={palette.ink} strokeWidth={1.8} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Explorar</p>
+              <p style={{ ...display, fontWeight: 700, fontSize: "1rem", color: palette.ink, lineHeight: 1.15 }}>Buscar un libro</p>
+              <p style={{ ...body, fontSize: "0.78rem", color: palette.inkFaint }}>Por título, autor o lo que se antoje.</p>
             </div>
           </button>
         )}
@@ -8849,6 +8865,29 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   // que se hunde al presionar; ver src/components/StickerButton.jsx).
   const quietRow = { width: "100%", minHeight: 44, textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: sp.sm };
   const dayWord = (n) => (n === 1 ? "día" : "días");
+  // Récord real (ronda 4): con 1 día no es récord («Día uno. Cuenta igual.») y en pausa tampoco se sella.
+  const isRecord = cur > 1 && cur >= best && !streakPaused;
+  // Botón principal contextual (ronda 4): lleva a donde dice. Un libro en curso → registro directo
+  // de ese libro; varios → «¿Cuál retomamos?»; ninguno → «¿Por dónde empezamos?».
+  const hasReading = readingBooks.length > 0;
+  const primaryText = hasReading ? "Retomar lectura" : "Empezar a leer";
+  const primaryAria = readingBooks.length === 1
+    ? `Retomar lectura: ${readingBooks[0].title}. Registrar páginas`
+    : hasReading ? "Retomar lectura. Elegir cuál de los libros en curso" : "Empezar a leer. Cuento del día o buscar un libro";
+  function onPrimary() {
+    if (readingBooks.length === 1) openRead(readingBooks[0]);
+    else setLeerOpen(true);
+  }
+  // Nota a mano junto al progreso (ronda 4): solo con total conocido y con datos reales. Cero culpa:
+  // cuenta lo que falta como dato, y cuando falta poco, lo celebra.
+  const notaFaltan = (current, total) => {
+    if (!(total > 0)) return null;
+    const faltan = total - current;
+    if (faltan <= 0) return "Última página. Eso ya es terminar.";
+    const n = `${faltan} ${faltan === 1 ? "página" : "páginas"}`;
+    const verbo = faltan === 1 ? "Te falta" : "Te faltan";
+    return faltan <= 20 ? `${verbo} ${n}. Hoy se acaba.` : `${verbo} ${n}`;
+  };
 
   return (
     <div style={{ padding: `${sp.lg} 1.25rem ${sp.xxl}`, maxWidth: "42rem", margin: "0 auto", display: "flex", flexDirection: "column", gap: sp.xl }}>
@@ -8866,47 +8905,55 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           y ocupa toda la columna. */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
         <div style={{ flex: "1 1 auto", minWidth: 0, display: "flex", flexDirection: "column", gap: sp.md }}>
-          {/* Saludo grande en Bricolage; el nombre en su propia línea para que no se parta raro.
+          {/* Saludo grande en display (Unbounded desde la ronda 4: es ancha, así que baja de 32 a 28 px
+              y el tracking de −0.03em a −0.01em); el nombre en su propia línea para que no se parta raro.
               En la columna angosta «Buenas noches,» se parte por palabra (Buenas / noches, / León). */}
-          <h1 style={{ ...display, fontSize: "32px", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", color: palette.ink, overflowWrap: "anywhere" }}>
+          <h1 style={{ ...display, fontSize: "28px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.ink, overflowWrap: "anywhere" }}>
             {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
           </h1>
 
-        {/* Progreso siempre visible: la racha es un sticker lila con textura de papel.
-            El número va con la llama arriba y «días de racha» debajo para caber en la columna. */}
+        {/* Progreso siempre visible (principio 4). Ronda 4 (2026-11-03): la racha es un BOLETO de
+            papel lila con dentado en los dos lados cortos (.sema-r4-racha en index.css: misma receta
+            de máscara que el Boleto del kit, que es un span de una línea y no sirve de contenedor),
+            giro de −2° y talón derecho con «RACHA» en Space Mono vertical. Sustituye al sticker con
+            canto bg + anillo ink de la ronda 3. Dos detalles y nada más: el boleto (perforado + papel)
+            y el sello «Récord personal», que solo aparece con récord real (cur > 1, ≥ best y sin
+            pausa) y ocupa el lugar de la línea secundaria para no decirlo dos veces. Sin cinta.
+            Sigue siendo el mismo botón de 44+ px que abre RachaModal; z-index 1 para que el gato
+            (márgenes negativos) no pise su borde derecho. Colores por variables desde palette. */}
         <button
           onClick={() => setRachaOpen(true)}
-          className="btn-press sema-no-hover sema-papel sema-sticker"
-          aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
-          style={{
-            width: "100%", minWidth: 150, minHeight: 44, textAlign: "left", cursor: "pointer",
-            // zIndex (correcciones ronda 3): el botón del gato, con sus márgenes negativos, pisaba
-            // los 13 px del borde derecho de la racha. .sema-papel ya la hace position: relative.
-            zIndex: 1,
-            backgroundColor: palette.firma, color: palette.onFirma, borderRadius: 14,
-            // Canto de sticker recortado: filo del color de fondo + línea de tinta (sin desenfoque).
-            border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`,
-            padding: "0.85rem 0.95rem 0.95rem", display: "block",
-          }}
+          className="sema-r4-racha sema-no-hover sema-papel sema-focus-onfirma"
+          aria-label={cur > 0 ? `${cur} ${dayWord(cur)} de racha${streakPaused ? ", en pausa" : ""}${isRecord ? ", récord personal" : ""}. Ver detalle` : "Racha en cero. Ver detalle"}
+          style={{ "--r4-bg": palette.firma, "--r4-ink": palette.onFirma }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Flame size={32} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
-            <p style={{ ...display, fontWeight: 800, fontSize: "3rem", lineHeight: 0.95, letterSpacing: "-0.03em", color: palette.onFirma }}>{cur}</p>
-          </div>
-          <p style={{ ...display, fontSize: "17px", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>
-            {dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}
-          </p>
-          <p style={{ ...body, fontSize: "13px", fontWeight: 500, color: palette.onFirma, marginTop: "0.25rem" }}>
-            {cur === 0
-              ? "Con 5 minutos arranca."
-              : streakPaused
-                ? "No rota. Cualquier día sirve para volver."
-                : cur === 1
-                  ? "Día uno. Cuenta igual." // correcciones ronda 3: «récord» con 1 día sonaba hueco
-                  : cur >= best
-                    ? "Esto ya es récord."
-                    : `Récord: ${best} ${dayWord(best)}`}
-          </p>
+          <span className="sema-r4-racha__cuerpo">
+            <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+              <Flame size={28} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
+              <span style={{ ...display, fontWeight: 800, fontSize: "2.4rem", lineHeight: 1, letterSpacing: "-0.01em", color: palette.onFirma }}>{cur}</span>
+            </span>
+            <span style={{ ...display, display: "block", fontSize: "15px", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>
+              {dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}
+            </span>
+            {isRecord ? (
+              <span style={{ display: "block", marginTop: "0.6rem", lineHeight: 1 }}>
+                <SelloTinta size="sm" angulo={-8} style={{ "--kd-ink": palette.onFirma }}>Récord personal</SelloTinta>
+              </span>
+            ) : (
+              <span style={{ ...body, display: "block", fontSize: "13px", fontWeight: 500, lineHeight: 1.3, color: palette.onFirma, marginTop: "0.3rem" }}>
+                {cur === 0
+                  ? "Con 5 minutos arranca."
+                  : streakPaused
+                    ? "No rota. Cualquier día sirve para volver."
+                    : cur === 1
+                      ? "Día uno. Cuenta igual." // correcciones ronda 3: «récord» con 1 día sonaba hueco
+                      : `Récord: ${best} ${dayWord(best)}`}
+              </span>
+            )}
+          </span>
+          <span aria-hidden className="sema-r4-racha__talon">
+            <span className="sema-r4-racha__etiqueta" style={ts.boleto}>Racha</span>
+          </span>
         </button>
         </div>
 
@@ -8965,30 +9012,40 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         </p>
       )}
 
-      {/* Única acción principal */}
-      <StickerButton size="lg" onClick={() => setLeerOpen(true)} style={{ width: "calc(100% - 6px)" }}>
-        Leer ahora
+      {/* Única acción principal (principio 1). Ronda 4: el botón lleva a donde dice. Con un libro en
+          curso, «Retomar lectura» abre directo el registro de páginas de ese libro; con varios, el
+          modal «¿Cuál retomamos?». Sin libro en curso, «Empezar a leer» abre «¿Por dónde empezamos?»
+          (Cuento del día o buscar un libro en Explorar). Antes: siempre «Leer ahora» → «¿Qué leemos?».
+          El StickerButton no cambia de estilo. */}
+      <StickerButton size="lg" onClick={onPrimary} aria-label={primaryAria} style={{ width: "calc(100% - 6px)" }}>
+        {primaryText}
       </StickerButton>
 
       {readingBooks.length > 0 && (
         <section>
           <h2 style={{ ...ts.h2, color: palette.ink, marginBottom: sp.md }}>Seguir leyendo</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: sp.lg }}>
-            {readingBooks.slice(0, 3).map((b) => (
+            {readingBooks.slice(0, 3).map((b) => {
+              const total = b.totalPages || filledPages[b.id] || 0;
+              const nota = notaFaltan(bookProgress[b.id] || 0, total);
+              return (
               <button key={b.id} onClick={() => openRead(b)} className="btn-press sema-no-hover" style={{ ...quietRow, alignItems: "center", gap: sp.md }}>
                 {/* Portada a la izquierda: BookCoverImage si hay URL; sin URL, el título como lomo sobre superficie */}
                 <div style={{ position: "relative", width: 60, height: 90, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.4rem 0.3rem" }}>
                   {b.coverUrl
                     ? <BookCoverImage coverUrl={b.coverUrl} title={b.title} author={b.author} alt="" compact />
-                    : <span aria-hidden lang="es" style={{ ...display, fontSize: "12px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.02em", color: palette.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "normal", wordBreak: "normal", hyphens: "none" }}>{b.title}</span>}
+                    : <span aria-hidden lang="es" style={{ ...body, fontSize: "12px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "normal", wordBreak: "normal", hyphens: "none" }}>{b.title}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...display, fontSize: "18px", fontWeight: 700, lineHeight: 1.2, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{b.title}</p>
                   <p style={{ ...ts.caption, marginBottom: sp.xs }}>{b.author}</p>
-                  <ProgressBarBook current={bookProgress[b.id] || 0} total={b.totalPages || filledPages[b.id] || 0} />
+                  <ProgressBarBook current={bookProgress[b.id] || 0} total={total} />
+                  {/* Nota a mano (kit, ronda 4) con la flecha apuntando al porcentaje; no es botón, va dentro de la fila. */}
+                  {nota && <NotaMano angulo={-2} flecha="arriba" style={{ marginTop: "0.35rem" }}>{nota}</NotaMano>}
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -9023,8 +9080,10 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         <LeerAhoraModal
           booksReading={readingBooks}
           cuento={cuento}
+          modo={hasReading ? "retomar" : "empezar"}
           onRead={openRead}
           onCuento={openCuento}
+          onExplorar={() => { setLeerOpen(false); setTab("explorar"); }}
           onClose={() => setLeerOpen(false)}
         />
       )}

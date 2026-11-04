@@ -1012,3 +1012,87 @@ button:not(:disabled):not(.sema-no-hover):active,
   .sema-feed-lista__cuento { padding: 1.25rem 1.5rem 0.25rem; }
 }
 
+/* ═══ Ronda 4 · Inicio ═══════════════════════════════════════════════════════════════════════
+   Racha como boleto (2026-11-03). Botón lila con dentado en los dos lados cortos: misma receta de
+   máscara que .sema-kd-boleto--lados (el Boleto del kit es un span de una línea y no sirve de
+   contenedor). Colores por variables que pone HomeView desde palette.firma / palette.onFirma; aquí
+   solo var(--…), currentColor y black/transparent de máscara (recortan, no pintan). Giro estático de
+   −2°; al presionar se encoge sin perder el giro. La textura la da .sema-papel (multiply), recortada
+   por la misma máscara. El foco va por dentro (outline-offset negativo) porque la máscara recorta
+   todo lo que pinte el elemento, también el contorno. */
+.sema-r4-racha {
+  --r4-diente: 3.5px;
+  --r4-paso: 9px;
+  --r4-corte: 26px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 150px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background-color: var(--r4-bg);
+  color: var(--r4-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transform: rotate(-2deg);
+  transform-origin: left center;
+  transition: transform 120ms ease-out;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  -webkit-mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-r4-racha:active { transform: rotate(-2deg) scale(0.97); }
+.sema-r4-racha:focus-visible { outline-offset: -4px !important; }
+.sema-r4-racha__cuerpo {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.75rem 0.5rem 0.85rem 1rem;
+}
+/* Talón: línea de corte punteada en currentColor y etiqueta vertical (Space Mono, ts.boleto) pegada
+   arriba, para que el sello de récord, si asoma, tenga libre la parte baja. */
+.sema-r4-racha__talon {
+  position: relative;
+  flex: 0 0 var(--r4-corte);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 0.85rem;
+}
+.sema-r4-racha__talon::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 0;
+  border-left: 2px dashed currentColor;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.sema-r4-racha__etiqueta {
+  display: block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sema-r4-racha { transition: none; }
+}
+
