@@ -765,6 +765,7 @@ button:not(:disabled):not(.sema-no-hover):active,
   .sema-boleto__cuerpo { padding-right: 0.5rem; padding-left: 0.5rem; }
   .sema-boleto--minutos { padding-left: 0.75rem; padding-right: 0.75rem; }
 }
+
 /* ═══ Ronda 4 · kit de detalles (Detalles.jsx) ═══════════════════════════════════════════════
    Cinta adhesiva, sello de tinta, boleto y nota a mano (2026-11-03). Los colores los pone cada
    componente en variables --kd-* desde palette / SEMA_EXTENDIDA / SEMA_PAPEL: aquí solo hay
@@ -804,16 +805,18 @@ button:not(:disabled):not(.sema-no-hover):active,
   opacity: 0.5;
 }
 
-/* Sello de goma: doble filo (borde 2 px + anillo interior de 1 px a 2 px) y una ligera falta de tinta
-   por mask-image: ruido fractal cuyo alfa queda casi siempre en 1 (feColorMatrix a = 1.9 − 1.6·ruido) y
-   solo baja en manchas chicas; el texto se lee entero. Space Mono 700 mayúsculas, tracking 0.08em. */
+/* Sello de goma: doble filo (filo de 2 px en ::before + anillo interior de 1 px a 2 px en ::after) y
+   falta de tinta por mask-image con ruido fractal. Correcciones de la ronda 4 (accesibilidad): la
+   falta de tinta FUERTE (alfa = 1.9 − 1.6·ruido, manchas hasta ~0.3) va solo en los dos filos, que son
+   decorativos; el texto lleva la máscara SUAVE (alfa = 1.35 − 0.4·ruido, nunca < 0.95), así conserva
+   su contraste y el sello sigue viéndose estampado. Space Mono 700 mayúsculas, tracking 0.08em. El
+   padding incluye los 2 px del filo (antes era borde): el tamaño total no cambia. */
 .sema-kd-sello {
   position: relative;
   display: inline-block;
   color: var(--kd-ink);
-  border: 2px solid var(--kd-ink);
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: 8px 12px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.08em;
@@ -821,22 +824,31 @@ button:not(:disabled):not(.sema-no-hover):active,
   white-space: nowrap;
   transform: rotate(var(--kd-angulo, -8deg));
   transform-origin: center;
+}
+.sema-kd-sello::before,
+.sema-kd-sello::after {
+  content: "";
+  position: absolute;
+  border-style: solid;
+  border-color: var(--kd-ink);
+  pointer-events: none;
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
   -webkit-mask-size: 160px 160px; mask-size: 160px 160px;
   -webkit-mask-repeat: repeat; mask-repeat: repeat;
 }
-.sema-kd-sello::before {
-  content: "";
-  position: absolute;
-  inset: 2px;
-  border: 1px solid var(--kd-ink);
-  border-radius: 2px;
-  pointer-events: none;
-}
+.sema-kd-sello::before { inset: 0; border-width: 2px; border-radius: 4px; }
+.sema-kd-sello::after { inset: 4px; border-width: 1px; border-radius: 2px; }
 .sema-kd-sello--md { font-size: 13px; }
-.sema-kd-sello--sm { font-size: 12px; padding: 5px 8px; }
-.sema-kd-sello__texto { position: relative; }
+.sema-kd-sello--sm { font-size: 12px; padding: 7px 10px; }
+.sema-kd-sello__texto {
+  position: relative;
+  display: inline-block;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.4 1.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.4 1.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  -webkit-mask-size: 160px 160px; mask-size: 160px 160px;
+  -webkit-mask-repeat: repeat; mask-repeat: repeat;
+}
 
 /* Boleto de papel: cuerpo + talón opcional, borde 2 px en el color del texto, textura .sema-papel.
    Las formas salen de mask-image (como .sema-boleto--cuento / --minutos): la muesca deja ver el
@@ -971,16 +983,14 @@ button:not(:disabled):not(.sema-no-hover):active,
   margin: 0.45rem 0 0.1rem;
   max-width: 100%;
 }
-/* Boleto en el carrusel de 130 px: una línea, con ellipsis; la frase completa va en title. */
+/* Boleto en el carrusel de 130 px: solo si la forma corta cabe (sin ellipsis; la razón completa va en sr-only). */
 .sema-r4-boleto-carrusel {
   margin: 0 0 0.55rem;
   max-width: 100%;
 }
-.sema-r4-boleto-carrusel .sema-kd-boleto__cuerpo {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Boleto único junto al título de la sección cuando todas las razones son iguales. */
+.sema-r4-boleto-seccion {
+  margin: 0;
 }
 
 /* ═══ Ronda 4 · Social (feed a todo el ancho, 2026-11-03) ═══════════════════════════════════════
@@ -1096,3 +1106,64 @@ button:not(:disabled):not(.sema-no-hover):active,
   .sema-r4-racha { transition: none; }
 }
 
+/* ═══ Ronda 4 · Inicio · ronda 2 (correcciones) ═══
+   Tamaños del número y de «días de racha» del boleto salen de aquí (antes inline) para poder
+   apretarlos a ≤ 379 px: número 2.4rem → 2rem, «días de racha» 15 → 14 px, talón 26 → 22 px,
+   padding del cuerpo menor y el sello de récord con tracking 0.02em y padding 5×6, de modo que
+   quepa en el cuerpo sin cruzar la línea de corte (Space Mono: 15 × 7.44 + 12 + 4 ≈ 128 px
+   contra ~129 px de cuerpo a 360). */
+.sema-r4-racha__num { font-size: 2.4rem; }
+.sema-r4-racha__dias { font-size: 15px; }
+@media (max-width: 379px) {
+  .sema-r4-racha { --r4-corte: 22px; }
+  .sema-r4-racha__cuerpo { padding: 0.7rem 0.25rem 0.8rem 0.75rem; }
+  .sema-r4-racha__num { font-size: 2rem; }
+  .sema-r4-racha__dias { font-size: 14px; }
+  .sema-r4-racha .sema-kd-sello { letter-spacing: 0.02em; padding: 5px 6px; }
+}
+
+/* ═══ Ronda 4 · Social · correcciones (2026-11-03) ═══════════════════════════════════════════════
+   Racha lila de Social como boleto perforado RECTO: misma máscara de dentado lateral y talón que
+   .sema-r4-racha de Inicio (copiada, no reutilizada: aquí es un div con botones dentro y no gira).
+   Colores por --r4-bg / --r4-ink que pone DailyReadingBanner desde palette.firma / onFirma. */
+.sema-post-racha {
+  --r4-diente: 3.5px;
+  --r4-paso: 9px;
+  --r4-corte: 26px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 1.5rem;
+  border-radius: 2px;
+  background-color: var(--r4-bg);
+  color: var(--r4-ink);
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  -webkit-mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-post-racha__cuerpo { flex: 1 1 auto; min-width: 0; padding: 12px 10px 12px 16px; }
+.sema-post-racha__talon { position: relative; flex: 0 0 var(--r4-corte); display: flex; justify-content: center; align-items: flex-start; padding-top: 0.85rem; }
+.sema-post-racha__talon::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 0; border-left: 2px dashed currentColor; opacity: 0.8; pointer-events: none; }
+.sema-post-racha__etiqueta { display: block; writing-mode: vertical-rl; transform: rotate(180deg); }
+/* Menú de tres puntos: fondo y color en CSS (no inline) para que hover y foco visible manden; el anillo
+   de foco va por dentro porque el menú recorta (overflow hidden). «Borrar publicación» en danger solo en
+   reposo: resaltado pasa a ink (danger sobre superficieSuave daba 4.27 / 3.18). */
+.sema-post-menu__item { background: transparent; color: var(--sema-ink); }
+.sema-post-menu__item--peligro { color: var(--sema-danger); }
+.sema-post-menu__item:hover, .sema-post-menu__item:focus-visible { background-color: var(--sema-superficie-suave); color: var(--sema-ink); outline-offset: -3px; }
+/* Sello fechador de «Libro terminado»: esquina superior derecha del recorte de papel. */
+.sema-post__sello-fecha { position: absolute; top: 10px; right: 12px; z-index: 2; }

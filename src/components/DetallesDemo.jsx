@@ -37,7 +37,8 @@ function Bloque({ isDark, fondo, tinta, titulo, nota, cinta, sellos, boletos }) 
       <TarjetaConCinta cinta={cinta} fondo={fondo} tinta={tinta}>
         <p style={{ ...ts.quote, fontSize: 18, margin: 0, color: tinta }}>Lo leí en dos tardes y todavía no sé si Meursault me cae bien o me da miedo.</p>
         <div style={{ marginTop: "0.75rem", display: "flex", justifyContent: "flex-end" }}>
-          <SelloTinta angulo={-6}>Libro terminado</SelloTinta>
+          {/* Regla de giro: en esta tarjeta la pieza girada es la cinta; el sello va recto. */}
+          <SelloTinta angulo={0} sobre={fondo === palette.bg ? "bg" : "superficie"}>Libro terminado</SelloTinta>
         </div>
       </TarjetaConCinta>
 
@@ -52,7 +53,7 @@ function Bloque({ isDark, fondo, tinta, titulo, nota, cinta, sellos, boletos }) 
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ ...display, fontSize: 30, fontWeight: 700, lineHeight: 1, color: tinta }}>12</div>
-          <NotaMano flecha="izquierda" angulo={2}>días seguidos, no pasa nada si mañana no</NotaMano>
+          <NotaMano flecha="izquierda" angulo={2}>días seguidos, no pasa nada si mañana no hay</NotaMano>
         </div>
       </Fila>
       <NotaMano angulo={-1}>sin flecha, solo la raya</NotaMano>
@@ -79,16 +80,17 @@ export default function DetallesDemo() {
         fondo={palette.bg}
         tinta={palette.ink}
         titulo="Sobre el fondo"
-        nota={isDark ? "Sello: tinta (default), firma y éxito pasan sobre negro; frío no (3.68)." : "Sello: tinta (default), frío y éxito pasan sobre blanco; firma no (1.99)."}
+        nota={isDark ? "Sello: tinta (default), firma y éxito pasan sobre negro; «frío» cae solo a tinta." : "Sello: tinta (default), frío y éxito pasan sobre blanco; «firma» cae solo a tinta."}
         cinta={<CintaAdhesiva color="superficie" angulo={-4} position="top-left" />}
         sellos={<>
           <SelloTinta>Récord personal</SelloTinta>
           <SelloTinta size="sm" angulo={5}>Nº 1 del mes</SelloTinta>
-          {isDark ? <SelloTinta color="firma" angulo={-4}>Racha viva</SelloTinta> : <SelloTinta color="frio" angulo={-4}>Reseñado</SelloTinta>}
+          <SelloTinta color="firma" angulo={-4}>Racha viva</SelloTinta>
+          <SelloTinta color="frio" angulo={-4}>Reseñado</SelloTinta>
           <SelloTinta color="exito" angulo={3}>Leído</SelloTinta>
         </>}
         boletos={<>
-          <Boleto color="superficie" talon="03 NOV">Cuento del día</Boleto>
+          <Boleto color="superficie" talon="03 NOV" srText="Cuento del día del 3 de noviembre">Cuento del día</Boleto>
           <Boleto color="firma" talon="12 días" talonAncho={70} angulo={2}>Racha</Boleto>
           <Boleto color="cielo" perforado="lados" angulo={-2}>14 min de lectura</Boleto>
           <Boleto color="mostaza" perforado="ninguno" angulo={1} size="sm">Logro</Boleto>
@@ -101,11 +103,13 @@ export default function DetallesDemo() {
           fondo={palette.superficieSuave}
           tinta={palette.ink}
           titulo="Sobre superficie suave"
-          nota="Sello solo en tinta (frío y éxito no alcanzan a 13 px sobre arena)."
+          nota="Sello: con sobre=«superficie», frío y éxito caen a tinta (no alcanzan a 13 px sobre arena); firma pasa solo en oscuro."
           cinta={<CintaAdhesiva color="firma" angulo={3} position="top-right" />}
           sellos={<>
-            <SelloTinta>Récord personal</SelloTinta>
-            <SelloTinta size="sm" angulo={6}>Nº 1 del mes</SelloTinta>
+            <SelloTinta sobre="superficie">Récord personal</SelloTinta>
+            <SelloTinta sobre="superficie" size="sm" angulo={6}>Nº 1 del mes</SelloTinta>
+            <SelloTinta sobre="superficie" color="exito" angulo={-3}>Leído</SelloTinta>
+            <SelloTinta sobre="superficie" color="firma" angulo={2}>Racha viva</SelloTinta>
           </>}
           boletos={<>
             <Boleto color="firma" talon="03 NOV">Cuento del día</Boleto>
@@ -119,11 +123,12 @@ export default function DetallesDemo() {
           fondo={mostaza.hex}
           tinta={mostaza.on}
           titulo="Sobre mostaza (extendida)"
-          nota="Texto encima siempre en el «on» del color; sello en tinta; boleto de papel fijo (SEMA_PAPEL)."
+          nota="Texto encima siempre en el «on» del color; con sobre=«color» todo sello cae a tinta; boleto de papel fijo (SEMA_PAPEL)."
           cinta={<CintaAdhesiva color="papel" angulo={-2} position="top-center" width={96} />}
           sellos={<>
-            <SelloTinta>Récord personal</SelloTinta>
-            <SelloTinta size="sm" angulo={4}>Nº 1 del mes</SelloTinta>
+            <SelloTinta sobre="color">Récord personal</SelloTinta>
+            <SelloTinta sobre="color" size="sm" angulo={4}>Nº 1 del mes</SelloTinta>
+            <SelloTinta sobre="color" color="exito" angulo={-3}>Leído</SelloTinta>
           </>}
           boletos={<>
             <Boleto color="papel" talon="03 NOV">Cuento del día</Boleto>

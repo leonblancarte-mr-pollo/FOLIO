@@ -13,6 +13,8 @@ import { palette, PALETTE_DARK, SEMA_EXTENDIDA, SEMA_PAPEL, label, quote as quot
 // Tipografía: `label` (Space Mono) en boletos y sellos, nunca menos de 12 px; `quote`
 // (Instrument Serif itálica) en la nota a mano. Nada se anima: con prefers-reduced-motion no hay
 // nada que apagar y el giro estático se mantiene. Giros acotados a [−8°, 8°].
+// REGLA DE GIRO (ronda 2 de correcciones): UNA SOLA pieza girada por tarjeta o publicación; las
+// demás van con `angulo={0}`. Tres cosas torcidas en una tarjeta leen como descuido, no como collage.
 //
 //   import { CintaAdhesiva, SelloTinta, Boleto, NotaMano } from "./components/Detalles.jsx";
 
@@ -59,12 +61,21 @@ export function CintaAdhesiva({ color = "superficie", angulo = -4, position = "t
 //   ciruela oscura; sobre blanco da 1.99); "frio" (azul acero: SOLO en claro sobre bg; sobre negro
 //   3.68 y sobre arena 4.05, no alcanza a 12–13 px); "exito" (verde: sobre bg en ambos modos; sobre
 //   arena solo grande). Sobre un bloque de la extendida se usa "tinta" (texto encima siempre #483A58 vía token).
+// CAÍDA AUTOMÁTICA A "tinta" (correcciones ronda 4): el componente lee el modo (`palette.bg`) y la prop
+//   opcional `sobre` ("bg" default | "superficie" | "color") y, si el color pedido no pasa 4.5:1 ahí,
+//   pinta en `ink`: "firma" en claro → tinta; "frio" en oscuro o fuera de bg → tinta; "exito" fuera de
+//   bg → tinta; cualquier color sobre "color" (extendida, degradado) → tinta. Así nadie puede pedir un
+//   sello ilegible por error. Quien lo ponga sobre arena/ciruela pasa `sobre="superficie"`.
+// La falta de tinta va fuerte solo en los filos; en el texto el alfa nunca baja de 0.95 (index.css).
 // El texto queda legible por lectores de pantalla; `aria-label` lo sustituye si hace falta (role="img").
-export function SelloTinta({ color = "tinta", angulo = -8, size = "md", children, className = "", style, ...rest }) {
-  const tinta = color === "firma" ? palette.firma
+export function SelloTinta({ color = "tinta", sobre = "bg", angulo = -8, size = "md", children, className = "", style, ...rest }) {
+  const dark = isDarkKit();
+  const pasa = sobre === "bg" && (color === "frio" ? !dark : color === "exito")
+    || color === "firma" && dark && sobre !== "color";
+  const tinta = !pasa ? palette.ink
+    : color === "firma" ? palette.firma
     : color === "frio" ? palette.complementoFrio
-    : color === "exito" ? palette.success
-    : palette.ink;
+    : palette.success;
   return (
     <span
       {...rest}
@@ -85,7 +96,11 @@ export function SelloTinta({ color = "tinta", angulo = -8, size = "md", children
 //   "superficie" (arena/ciruela según modo) o clave de SEMA_EXTENDIDA. Texto y borde siempre en el `on`.
 // perforado: "arriba-abajo" (muescas en la línea de corte; necesita `talon`), "lados" (dentado en los
 //   lados cortos) o "ninguno". `talonAncho` (px, default 62) fija el ancho del talón: «03 NOV» a 13 px.
-export function Boleto({ color = "papel", talon, perforado = "arriba-abajo", angulo = -2, papel = true, talonAncho = 62, size = "md", children, className = "", style, ...rest }) {
+// Accesibilidad: el talón es DECORATIVO (aria-hidden) porque el dato suele estar ya en la tarjeta. Si no
+//   lo está, quien use `talon` lo repite para lectores de pantalla: con `srText` (pinta un span
+//   `sr-only` dentro del boleto, p. ej. srText="Cuento del día del 3 de noviembre") o con un
+//   `aria-label` en el boleto. El cuerpo (`children`) sí es texto normal.
+export function Boleto({ color = "papel", talon, perforado = "arriba-abajo", angulo = -2, papel = true, talonAncho = 62, size = "md", srText, children, className = "", style, ...rest }) {
   const c = colorKit(color);
   const conTalon = talon != null && talon !== "";
   const modo = perforado === "lados" ? "lados" : perforado === "arriba-abajo" && conTalon ? "corte" : "liso";
@@ -95,6 +110,7 @@ export function Boleto({ color = "papel", talon, perforado = "arriba-abajo", ang
       className={`sema-kd-boleto sema-kd-boleto--${modo} ${papel ? "sema-papel" : ""} ${className}`.trim()}
       style={{ ...label, fontSize: size === "sm" ? "12px" : "13px", "--kd-bg": c.bg, "--kd-ink": c.on, "--kd-corte": `${talonAncho}px`, "--kd-angulo": `${clampAngulo(angulo)}deg`, ...style }}
     >
+      {srText && <span className="sr-only">{srText}</span>}
       {conTalon && <span aria-hidden className="sema-kd-boleto__talon">{talon}</span>}
       <span className="sema-kd-boleto__cuerpo">{children}</span>
     </span>

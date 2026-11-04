@@ -592,12 +592,13 @@ function SubTabBar({ tabs, active, onChange }) {
           onClick={() => onChange(t.id)}
           className={active === t.id ? undefined : "sema-tab"}
           style={{
-            ...display,
+            // Ronda 4: pestañas en Figtree (Unbounded es ancha y «Resumen» se cortaba a 390); display solo ≥ 15 px.
+            ...body,
             // Ronda 2 de Perfil: 0.7rem a los lados para que las 4 pestañas de Perfil quepan a 390 px (antes «Resumen» se cortaba).
             padding: "0.6rem 0.7rem",
             minHeight: 44,
-            fontSize: "0.88rem",
-            fontWeight: active === t.id ? 600 : 400,
+            fontSize: "0.92rem",
+            fontWeight: active === t.id ? 700 : 500,
             color: palette.ink,
             backgroundColor: "transparent",
             border: "none",
@@ -1977,17 +1978,38 @@ function CollaborativeRecommendations({ user, onAdd }) {
 
   if (items.length === 0) return null;
 
+  // Razones reales del backend: si todas coinciden, un boleto junto al título; si cambian, uno por tarjeta.
+  const razones = new Set(items.map((it) => (it.reason || "").trim()).filter(Boolean));
+  const razonPorLibro = razones.size > 1;
+  // Boleto con texto corto visible (aria-hidden) y la razón completa para lectores de pantalla (sr-only).
+  // En la tarjeta de 130 px solo cabe una forma corta (≤ 14 caracteres); si no cabe, no se pinta.
+  const boletoRazon = (reason, className) => {
+    if (!reason) return null;
+    const corta = recoReasonCorta(reason);
+    if (className === "sema-r4-boleto-carrusel" && corta.length > 14) return null;
+    return (
+      <Boleto color="papel" perforado="ninguno" angulo={-2} size="sm" className={className}>
+        <span aria-hidden>{corta}</span>
+        <span className="sr-only">{reason}</span>
+      </Boleto>
+    );
+  };
+
   return (
     <div className="px-4 sm:px-6 pt-2 pb-1 max-w-4xl mx-auto">
-      <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, marginBottom: "0.7rem" }}>
-        {personalized ? "Recomendado para ti" : "Los mejor valorados"}
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "0.7rem" }}>
+        <p style={{ ...display, fontSize: "1.15rem", color: palette.ink, margin: 0 }}>
+          {personalized ? "Recomendado para ti" : "Los mejor valorados"}
+        </p>
+        {/* Una sola razón para toda la lista: un solo boleto junto al título, no tres iguales seguidos. */}
+        {!razonPorLibro && razones.size === 1 && boletoRazon([...razones][0], "sema-r4-boleto-seccion")}
+      </div>
       <div className="scrollbar-hide" style={{ display: "flex", gap: "0.9rem", overflowX: "auto", paddingBottom: "0.4rem" }}>
         {items.map((item) => {
           const added = addedIds.has(item.bookId);
           return (
             <div key={item.bookId} style={{ width: 130, flexShrink: 0 }}>
-              <div style={{ position: "relative", width: 130, height: 180, borderRadius: 10, overflow: "hidden", boxShadow: "0 4px 14px rgba(0,0,0,0.14)" }}>
+              <div style={{ position: "relative", width: 130, height: 180, borderRadius: 10, overflow: "hidden", boxShadow: `3px 3px 0 ${palette.ink}` }}>
                 <BookCoverImage coverUrl={item.coverUrl} title={item.title} author={item.author} genres={item.genres} compact={false} />
               </div>
               <p style={{ ...display, fontSize: "0.85rem", fontWeight: 700, color: palette.ink, marginTop: "0.4rem", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
@@ -1996,13 +2018,10 @@ function CollaborativeRecommendations({ user, onAdd }) {
               <p style={{ ...body, fontSize: "0.75rem", color: palette.inkFaint, margin: "2px 0 6px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {item.author}
               </p>
-              {/* Etiqueta de papel (ronda 4) con la razón real del backend, tal cual; si no cabe en 130 px
-                  se recorta con ellipsis y la frase completa va en title/aria-label. Sin reason, sin etiqueta. */}
-              {item.reason && (
-                <Boleto color="papel" perforado="ninguno" angulo={-2} size="sm" className="sema-r4-boleto-carrusel" title={item.reason} aria-label={item.reason}>
-                  {recoReasonCorta(item.reason)}
-                </Boleto>
-              )}
+              {/* Etiqueta de papel (ronda 4) solo cuando la razón cambia por libro (si todas son iguales va
+                  una sola junto al título de la sección). Texto corto visible + sr-only con la razón completa;
+                  sin ellipsis: si la forma corta no cabe en 130 px, no se pinta. */}
+              {razonPorLibro && boletoRazon(item.reason, "sema-r4-boleto-carrusel")}
               {/* Botón silencioso (la única acción rellena de la pestaña es la del quiz): 44 px, sin durazno como texto */}
               <button
                 onClick={() => handleAdd(item)}
@@ -2094,6 +2113,16 @@ function recoErrorLine(e) {
 }
 
 // Texto visible de una respuesta guardada (el valor sigue siendo el de la IA).
+// Etiqueta de papel de «Para descubrir» cuando la sugerencia no trae género (ronda 4, ronda 2 de copy):
+// describe el libro a partir de la respuesta real de ánimo, sin repetir la respuesta literal.
+const RECO_ANIMO_ETIQUETA = {
+  "Contemplativo, reflexivo": "Para pensar",
+  "Aventurero, con ganas de acción": "Para la acción",
+  "Melancólico, introspectivo": "Para días bajitos",
+  "Curioso, con ganas de aprender": "Para curiosear",
+  "Ligero, divertido": "Algo ligero",
+  "Intenso, profundo": "Algo intenso",
+};
 function recoLabel(key, value) {
   const q = RECO_QUIZ_STEPS.find((s) => s.key === key);
   return q?.options.find((o) => o.value === value)?.label || value;
@@ -2419,7 +2448,9 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
     // o, si no viene, la respuesta de ánimo que motivó la lista. La razón larga sigue debajo.
     const etiquetaMax = 28;
     const etiquetaEstado = (status) => (status === "reading" ? "Ya empezado" : status === "wish" ? "En Quiero leer" : "");
-    const etiquetaAnimo = recoLabel("mood", answers.mood);
+    // La etiqueta describe el libro, no diagnostica al lector (copy, ronda 2): mapa por la respuesta real
+    // de ánimo (claves = `value` de RECO_QUIZ_STEPS.mood); sin respuesta conocida, sin etiqueta.
+    const etiquetaAnimo = RECO_ANIMO_ETIQUETA[answers.mood] || "";
     const etiquetaSugerencia = (s) => {
       const g = (s.genre || "").trim();
       if (g && `Género · ${g}`.length <= etiquetaMax) return `Género · ${g}`;
@@ -3747,10 +3778,11 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
     boxSizing: "border-box",
   };
   const labelStyle = {
-    ...display,
-    fontSize: "0.78rem",
+    // Ronda 4: etiquetas del formulario «Editar perfil» en Figtree 13 px 600 (display solo en textos ≥ 15 px).
+    ...body,
+    fontSize: "13px",
     color: palette.inkFaint,
-    fontWeight: 500,
+    fontWeight: 600,
     marginBottom: "0.3rem",
     display: "block",
   };
@@ -4221,7 +4253,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               }}
             >
               <span style={{ display: "flex", alignItems: "center", gap: "0.6rem", minWidth: 0 }}>
-                <span style={{ ...display, fontSize: "26px", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.05, color: palette.onAccent, textAlign: "left" }}>
+                <span style={{ ...display, fontSize: "22px", fontWeight: 800, letterSpacing: "-0.01em", lineHeight: 1.05, color: palette.onAccent, textAlign: "left", whiteSpace: "nowrap" }}>
                   Wrapped {year}
                 </span>
               </span>
@@ -7701,31 +7733,34 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
   // Ronda 2: más compacto (en Social lo primero es la gente) y la barra dice qué mide.
   return (
     <>
+    {/* Ronda 4, correcciones (2026-11-03): mismo boleto perforado que la racha de Inicio (.sema-post-racha
+        en index.css copia la máscara de dentado lateral y el talón «RACHA»), pero RECTO porque lleva
+        botones dentro, y el número grande va en una línea con «día(s) de racha» en 15 px debajo. La fila
+        copo + «+ Páginas» no se parte: va en su propio grupo con nowrap y, si no cabe a 360, baja entera
+        debajo del número (flexWrap). Texto en onFirma sobre lila (5.21:1). */}
     <div
       onClick={hasLoggedToday ? undefined : onLog}
-      className="streak-banner-enter sema-papel"
-      style={{
-        borderRadius: 16,
-        backgroundColor: palette.firma,
-        // Canto de sticker recortado: filo del fondo + línea de tinta (igual que Inicio).
-        border: `3px solid ${palette.bg}`,
-        boxShadow: `0 0 0 1.5px ${palette.ink}`,
-        margin: "0 2px 1.5rem",
-        cursor: hasLoggedToday ? "default" : "pointer",
-      }}
+      className="streak-banner-enter sema-papel sema-post-racha"
+      style={{ "--r4-bg": palette.firma, "--r4-ink": palette.onFirma, cursor: hasLoggedToday ? "default" : "pointer" }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", padding: "12px 12px 8px 14px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: 1 }}>
+      <div className="sema-post-racha__cuerpo">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: "1 1 auto" }}>
           <Flame size={26} color={palette.onFirma} strokeWidth={2} className={days > 7 ? "fire-pulse" : ""} style={{ flexShrink: 0 }} aria-hidden />
-          <p style={{ ...display, fontWeight: 800, fontSize: hasStreak ? "30px" : "19px", lineHeight: 1, letterSpacing: hasStreak ? "-0.03em" : "-0.01em", color: palette.onFirma, minWidth: 0 }}>
-            {hasStreak
-              ? <>{days} <span style={{ fontSize: "16px", fontWeight: 700, letterSpacing: 0 }}>{dayWord} de racha</span></>
-              : hasLoggedToday ? "Hoy ya hubo lectura" : "¿Hubo lectura hoy?"}
-          </p>
+          {hasStreak ? (
+            <p style={{ color: palette.onFirma, minWidth: 0 }}>
+              <span style={{ ...display, display: "block", fontWeight: 800, fontSize: "30px", lineHeight: 1, letterSpacing: "-0.01em" }}>{days}</span>
+              <span style={{ ...display, display: "block", fontWeight: 700, fontSize: "15px", lineHeight: 1.2, marginTop: "0.2rem" }}>{dayWord} de racha</span>
+            </p>
+          ) : (
+            <p style={{ ...display, fontWeight: 800, fontSize: "19px", lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.onFirma, minWidth: 0 }}>
+              {hasLoggedToday ? "Hoy ya hubo lectura" : "¿Hubo lectura hoy?"}
+            </p>
+          )}
         </div>
 
-        {/* Congelar + páginas en la misma fila. Botones silenciosos: la acción rellena de Social es «Leer ahora». */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+        {/* Congelar + páginas en un grupo que no se parte. Botones silenciosos: la acción rellena de Social es «Leer ahora». */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, marginLeft: "auto", whiteSpace: "nowrap" }}>
           {canFreeze && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowFreezeModal(true); }}
@@ -7749,7 +7784,7 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
 
       {/* Progreso del día siempre visible (principio 4): durazno con borde de tinta mientras avanza,
           éxito al llegar a la meta (antes era tinta llena y no se distinguía 5/20 de 99/20). */}
-      <div style={{ padding: "0 14px 12px" }}>
+      <div style={{ padding: "10px 0 0" }}>
         <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.onFirma, marginBottom: 6, lineHeight: 1.2 }}>
           {goalReached
             ? `${pagesLoggedToday} ${pagesWord} hoy · meta del día cumplida`
@@ -7761,6 +7796,10 @@ function DailyReadingBanner({ streak, hasLoggedToday, pagesLoggedToday, onLog, o
           {pct > 0 && <div style={{ height: "100%", width: `${pct}%`, backgroundColor: goalReached ? palette.success : palette.accent, borderRight: goalReached ? "none" : `1.5px solid ${palette.onFirma}`, boxSizing: "border-box", transition: "width 600ms ease-out" }} />}
         </div>
       </div>
+      </div>
+      <span aria-hidden className="sema-post-racha__talon">
+        <span className="sema-post-racha__etiqueta" style={ts.boleto}>Racha</span>
+      </span>
     </div>
 
     {/* Freeze modal */}
@@ -8381,9 +8420,8 @@ function SnacksHero({ onRead }) {
   // «02-nov» y Safari «02 nov.»; así sale igual en todos, sin punto ni guion.
   const hoy = new Date();
   const fechaBoleto = `${String(hoy.getDate()).padStart(2, "0")} ${hoy.toLocaleDateString("es-MX", { month: "short" }).replace(/[^\p{L}]/gu, "")}`.toUpperCase();
-  // Estampilla de minutos: cálido de la paleta extendida (mostaza o limón), estable por cuento. Nunca
-  // los fríos del degradado de la franja ni coral (se funde con el botón durazno).
-  const estampilla = pickByHash(SEMA_EXTENDIDA.filter((c) => ["mostaza", "limon"].includes(c.key)), cuento.id);
+  // Ronda 4, correcciones: la estampilla «15 MIN DE LECTURA» se quitó (máximo dos detalles por tarjeta:
+  // boleto con fecha + portada girada); los minutos van al final de la línea del autor. Pendiente de León.
 
   return (
     <section data-tutorial="snacks-hero" aria-labelledby="cuento-dia-titulo" style={{ marginBottom: "2rem", borderRadius: 18, border: `2px solid ${palette.ink}`, overflow: "hidden", backgroundColor: palette.bg }}>
@@ -8393,11 +8431,6 @@ function SnacksHero({ onRead }) {
           <span aria-hidden className="sema-boleto__talon">{fechaBoleto}</span>
           <span className="sema-boleto__cuerpo">Cuento del día</span>
         </span>
-        {minutos && (
-          <span className="sema-boleto sema-boleto--minutos" style={{ ...boletoBase, marginLeft: 18, backgroundColor: estampilla.hex, color: estampilla.on, border: `2px solid ${estampilla.on}` }}>
-            {minutos} de lectura
-          </span>
-        )}
         {/* Portada de papel (SVG/CSS propio, sin imagen): capitular del título en Instrument Serif itálica
             sobre superficieSuave con textura, filo de tinta y sombra sólida, girada 4°. */}
         <div aria-hidden className="sema-cuento-portada sema-papel" style={{ position: "absolute", right: 22, top: 18, width: 94, height: 128, borderRadius: 6, backgroundColor: palette.superficieSuave, border: `2px solid ${palette.ink}`, boxShadow: `4px 4px 0 ${isDark ? palette.bg : palette.ink}`, padding: "0.55rem 0.6rem", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
@@ -8419,6 +8452,7 @@ function SnacksHero({ onRead }) {
         <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, marginBottom: "0.65rem" }}>
           {cuento.autor}
           {cuento.generos?.[0] && <><span aria-hidden> · </span><span style={{ textTransform: "lowercase" }}>{cuento.generos[0]}</span></>}
+          {minutos && <><span aria-hidden> · </span>{minutos}</>}
         </p>
         <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "20px", color: palette.ink, lineHeight: 1.35, marginBottom: "1.2rem" }}>
           {cuento.desc}
@@ -8474,7 +8508,7 @@ function SnacksCarousel({ onRead }) {
             }}
             className="btn-press"
           >
-            <p style={{ ...display, fontSize: "16px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
+            <p style={{ ...display, fontSize: "15px", fontWeight: 700, color: palette.ink, lineHeight: 1.2, margin: 0 }}>
               {c.titulo}
             </p>
             <p style={{ ...body, fontSize: "13px", color: palette.ink, margin: 0 }}>
@@ -8656,7 +8690,7 @@ function ProgressBarBook({ current = 0, total = 0, height = 10 }) {
         {/* Filete de tinta al frente del relleno: el extremo durazno da 2.06:1 contra la pista blanca */}
         <div style={{ width: `${Math.max(pct, 3)}%`, height: "100%", background: pct >= 100 ? palette.sage : SEMA_GRADIENTS.acento, borderRight: pct < 100 ? `1.5px solid ${palette.ink}` : "none", boxSizing: "border-box", transition: "width 500ms cubic-bezier(0.23,1,0.32,1)" }} />
       </div>
-      <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {current} de {total} páginas</p>
+      <p style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.ink, marginTop: "0.4rem" }}>{pct}% · {current} {current === 1 ? "página leída" : "páginas leídas"}</p>
     </div>
   );
 }
@@ -8721,7 +8755,7 @@ function LeerAhoraModal({ booksReading = [], cuento, modo = "retomar", onRead, o
           <button onClick={() => onRead(primary)} className="btn-press" style={{ width: "100%", textAlign: "left", marginBottom: "0.7rem", padding: "1rem", borderRadius: 14, cursor: "pointer", border: `1.5px solid ${palette.ink}`, backgroundColor: "transparent", display: "flex", alignItems: "center", gap: "0.85rem" }}>
             {/* Sin caja dentro de caja: portada o lomo con el título sobre superficie (como en Inicio) */}
             <div style={{ width: 44, height: 64, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.25rem 0.2rem" }}>
-              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden style={{ ...body, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{primary.title}</span>}
+              {primary.coverUrl ? <img src={primary.coverUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span aria-hidden lang="es" style={{ ...body, fontSize: "12px", fontWeight: 800, lineHeight: 1.05, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere", hyphens: "auto" }}>{primary.title}</span>}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, fontWeight: 700 }}>Retomar</p>
@@ -8883,7 +8917,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
   const notaFaltan = (current, total) => {
     if (!(total > 0)) return null;
     const faltan = total - current;
-    if (faltan <= 0) return "Última página. Eso ya es terminar.";
+    if (faltan <= 0) return "No falta nada. Eso ya es terminar."; // ronda 2: esta rama solo sale con 0 por leer
     const n = `${faltan} ${faltan === 1 ? "página" : "páginas"}`;
     const verbo = faltan === 1 ? "Te falta" : "Te faltan";
     return faltan <= 20 ? `${verbo} ${n}. Hoy se acaba.` : `${verbo} ${n}`;
@@ -8908,7 +8942,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           {/* Saludo grande en display (Unbounded desde la ronda 4: es ancha, así que baja de 32 a 28 px
               y el tracking de −0.03em a −0.01em); el nombre en su propia línea para que no se parta raro.
               En la columna angosta «Buenas noches,» se parte por palabra (Buenas / noches, / León). */}
-          <h1 style={{ ...display, fontSize: "28px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.ink, overflowWrap: "anywhere" }}>
+          <h1 style={{ ...display, fontSize: "26px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.ink, overflowWrap: "anywhere" }}>
             {firstName ? <>{timeOfDay.text},<br />{firstName}</> : `${timeOfDay.text}.`}
           </h1>
 
@@ -8930,9 +8964,9 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
           <span className="sema-r4-racha__cuerpo">
             <span style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
               <Flame size={28} strokeWidth={2} color={palette.onFirma} className={cur > 7 && !streakPaused ? "fire-pulse" : ""} style={{ flexShrink: 0 }} />
-              <span style={{ ...display, fontWeight: 800, fontSize: "2.4rem", lineHeight: 1, letterSpacing: "-0.01em", color: palette.onFirma }}>{cur}</span>
+              <span className="sema-r4-racha__num" style={{ ...display, fontWeight: 800, lineHeight: 1, letterSpacing: "-0.01em", color: palette.onFirma }}>{cur}</span>
             </span>
-            <span style={{ ...display, display: "block", fontSize: "15px", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>
+            <span className="sema-r4-racha__dias" style={{ ...display, display: "block", fontWeight: 700, lineHeight: 1.2, color: palette.onFirma, marginTop: "0.3rem" }}>
               {dayWord(cur)} de racha{streakPaused ? " · en pausa" : ""}
             </span>
             {isRecord ? (
@@ -9034,14 +9068,15 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
                 <div style={{ position: "relative", width: 60, height: 90, borderRadius: 6, overflow: "hidden", flexShrink: 0, backgroundColor: palette.superficieSuave, display: "flex", alignItems: "flex-end", padding: "0.4rem 0.3rem" }}>
                   {b.coverUrl
                     ? <BookCoverImage coverUrl={b.coverUrl} title={b.title} author={b.author} alt="" compact />
-                    : <span aria-hidden lang="es" style={{ ...body, fontSize: "12px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "normal", wordBreak: "normal", hyphens: "none" }}>{b.title}</span>}
+                    : <span aria-hidden lang="es" style={{ ...body, fontSize: "12px", fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.01em", color: palette.ink, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere", hyphens: "auto" }}>{b.title}</span>}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ ...display, fontSize: "18px", fontWeight: 700, lineHeight: 1.2, color: palette.ink, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{b.title}</p>
                   <p style={{ ...ts.caption, marginBottom: sp.xs }}>{b.author}</p>
                   <ProgressBarBook current={bookProgress[b.id] || 0} total={total} />
                   {/* Nota a mano (kit, ronda 4) con la flecha apuntando al porcentaje; no es botón, va dentro de la fila. */}
-                  {nota && <NotaMano angulo={-2} flecha="arriba" style={{ marginTop: "0.35rem" }}>{nota}</NotaMano>}
+                  {/* Recta (ronda 2): una sola pieza girada por pantalla, y esa es el boleto de la racha. */}
+                  {nota && <NotaMano angulo={0} flecha="arriba" style={{ marginTop: "0.35rem" }}>{nota}</NotaMano>}
                 </div>
               </button>
               );
@@ -9146,12 +9181,31 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [deleting, setDeleting] = useState(false);
   // Ronda 4: menú de tres puntos de una publicación (id abierto). Se cierra con Escape y con clic fuera.
   const [postMenu, setPostMenu] = useState(null);
+  // Ronda 2 de correcciones: al cerrar (Escape, velo u opción) el foco vuelve al botón «Opciones de la
+  // publicación» (ref por publicación); si el foco se va solo (Tab fuera del menú), se cierra sin robarlo.
+  const postMenuBtnRefs = useRef({});
+  const closePostMenu = (restoreFocus = true) => {
+    const id = postMenu;
+    setPostMenu(null);
+    if (restoreFocus && id) requestAnimationFrame(() => postMenuBtnRefs.current[id]?.focus());
+  };
   useEffect(() => {
     if (!postMenu) return;
-    const onKey = (e) => { if (e.key === "Escape") setPostMenu(null); };
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); closePostMenu(); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [postMenu]);
+  const onPostMenuKey = (e) => {
+    const items = [...e.currentTarget.querySelectorAll('[role="menuitem"]')];
+    if (!items.length) return;
+    const i = items.indexOf(document.activeElement);
+    let next = null;
+    if (e.key === "ArrowDown") next = items[(i + 1) % items.length];
+    else if (e.key === "ArrowUp") next = items[(i - 1 + items.length) % items.length];
+    else if (e.key === "Home") next = items[0];
+    else if (e.key === "End") next = items[items.length - 1];
+    if (next) { e.preventDefault(); e.stopPropagation(); next.focus(); }
+  };
   // La racha ya llegó (para que el confeti de meta no se dispare con la carga inicial).
   const [streakLoaded, setStreakLoaded] = useState(false);
 
@@ -9511,7 +9565,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   );
   // Franja superior del tipo de publicación (texto 14 px en negritas; contraste en la tabla de §6).
   const band = (bg, color, Icon, label, extra, extraStyle = {}) => (
-    <div className="sema-post__pad" style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 8, paddingBottom: 8, ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
+    <div className="sema-post__pad" style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 5, paddingBottom: 5, ...body, fontSize: "13px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
       <Icon size={14} strokeWidth={2.2} color={color} aria-hidden />
       <span>{label}</span>
       {extra}
@@ -9554,11 +9608,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     const own = post.user_id === user.id;
     if (!own && !post.book) return null;
     const open = postMenu === post.id;
-    const item = { ...body, width: "100%", minHeight: 44, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", background: "none", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, textAlign: "left", whiteSpace: "nowrap" };
+    // Sin background ni color inline: viven en CSS (.sema-post-menu__item) para que hover y foco visible manden.
+    const item = { ...body, width: "100%", minHeight: 44, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, textAlign: "left", whiteSpace: "nowrap" };
     return (
       <div style={{ position: "relative", flexShrink: 0, marginRight: -8 }}>
         <button
-          onClick={(e) => { e.stopPropagation(); setPostMenu(open ? null : post.id); }}
+          ref={(el) => { postMenuBtnRefs.current[post.id] = el; }}
+          onClick={(e) => { e.stopPropagation(); if (open) closePostMenu(); else setPostMenu(post.id); }}
           aria-label="Opciones de la publicación"
           aria-haspopup="menu"
           aria-expanded={open}
@@ -9568,15 +9624,23 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         </button>
         {open && (
           <>
-            <div onClick={(e) => { e.stopPropagation(); setPostMenu(null); }} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 900 }} />
-            <div role="menu" aria-label="Opciones de la publicación" className="popover-anim sema-post-menu" onClick={(e) => e.stopPropagation()} style={{ backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}` }}>
+            <div onClick={(e) => { e.stopPropagation(); closePostMenu(); }} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 900 }} />
+            <div
+              role="menu"
+              aria-label="Opciones de la publicación"
+              className="popover-anim sema-post-menu"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={onPostMenuKey}
+              onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setPostMenu(null); }}
+              style={{ backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}` }}
+            >
               {post.book && (
-                <button role="menuitem" autoFocus className="sema-post-menu__item" onClick={() => { setPostMenu(null); setPreviewPost(post); }} style={{ ...item, color: palette.ink }}>
+                <button role="menuitem" autoFocus className="sema-post-menu__item" onClick={() => { closePostMenu(); setPreviewPost(post); }} style={item}>
                   <BookOpen size={17} strokeWidth={2} aria-hidden /> Ver libro
                 </button>
               )}
               {own && (
-                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item" onClick={() => { setPostMenu(null); setPostToDelete(post.id); }} style={{ ...item, color: palette.danger }}>
+                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item sema-post-menu__item--peligro" onClick={() => { closePostMenu(); setPostToDelete(post.id); }} style={item}>
                   <Trash2 size={17} strokeWidth={2} aria-hidden /> Borrar publicación
                 </button>
               )}
@@ -9622,6 +9686,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     </span>
   );
   const pagesText = (p) => `${p} ${p === 1 ? "página" : "páginas"}`;
+  // Fecha corta del sello fechador («03 NOV»): mismo armado que el talón del Cuento del día.
+  const fechaSello = (iso) => {
+    const d = iso ? new Date(iso) : new Date();
+    if (Number.isNaN(d.getTime())) return "";
+    return `${String(d.getDate()).padStart(2, "0")} ${d.toLocaleDateString("es-MX", { month: "short" }).replace(/[^\p{L}]/gu, "")}`.toUpperCase();
+  };
   // La reseña vive en books.review y el post de «terminado» guarda una copia en
   // content (con trim, a veces sin comillas o editada después): si es la misma
   // reseña no se repite debajo como texto suelto.
@@ -9711,10 +9781,6 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {postBand(post, BookmarkCheck, "Libro terminado")}
                   {postHeader(post, null)}
                   <div style={{ background: finishedGradient.css, margin: "12px 0 0", padding: "20px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
-                    {/* Detalle 1 de 2 (ronda 4): sello de tinta «Terminado» en la esquina del degradado, solo en este
-                        tipo. La tinta es el `on` del degradado (#483A58 por token), no palette.ink: en oscuro la tinta
-                        es blanca y sobre estos colores no pasa (sema-paleta §7). */}
-                    <SelloTinta angulo={-8} size="sm" aria-hidden style={{ position: "absolute", top: 12, right: 12, "--kd-ink": finishedGradient.on }}>Terminado</SelloTinta>
                     {post.book ? (
                       <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} className="sema-focus-onaccent" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 6 }}>
                         <span style={{ position: "relative", display: "block", width: 116, height: 174, borderRadius: 6, overflow: "hidden", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }}>
@@ -9739,8 +9805,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     {(reviewText || rating > 0) && (
                       <div className="sema-post__recorte" style={{ "--kd-giro": `${[-1, -0.5, 0.6, 1][stableHash(post.id) % 4]}deg` }}>
                         <CintaAdhesiva color="firma" angulo={-4} position="top-center" />
+                        {/* Detalle 1 de 2 (correcciones ronda 4): sello FECHADOR con la fecha real del post («03 NOV»),
+                            en la esquina del recorte de papel (arena / ciruela), no sobre el degradado: ahí la tinta pasa
+                            en los dos modos (7.36 / 10.39) y no repite «terminado». aria-hidden: la hora ya está en la
+                            cabecera («hace 3h»). Sin reseña ni calificación no hay recorte y tampoco sello. */}
+                        <SelloTinta angulo={-8} size="sm" aria-hidden className="sema-post__sello-fecha">{fechaSello(post.created_at)}</SelloTinta>
                         <div className="sema-papel sema-post__recorte-papel" style={{ backgroundColor: palette.superficieSuave }}>
-                          <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700 }}>
+                          <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700, paddingRight: 96 }}>
                             Reseña {rating > 0 && starsOn(rating, palette.ink)}
                           </p>
                           {reviewText && (
@@ -12075,23 +12146,26 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   // sesión); sí en Mis libros, Mis frases y Resumen. Al cambiar de pestaña vuelve a verse.
   const fabShown = fabVisible && !(tab === "perfil" && perfilSub === "perfil");
   useEffect(() => { setFabVisible(true); }, [tab]);
+  // Vuelve solo al subir, al llegar al tope o al fondo (ya no por inactividad: tapaba texto en reposo).
   useEffect(() => {
-    let lastY = window.scrollY, ticking = false, idle = null;
+    let lastY = window.scrollY, ticking = false;
     const onScroll = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         const y = window.scrollY;
         const delta = y - lastY;
-        if (Math.abs(delta) >= 8) { setFabVisible(delta < 0 || y <= 0); lastY = y; }
-        clearTimeout(idle);
-        idle = setTimeout(() => setFabVisible(true), 800);
+        const enElFondo = y + window.innerHeight >= document.documentElement.scrollHeight - 2;
+        if (Math.abs(delta) >= 8) { setFabVisible(delta < 0 || y <= 0 || enElFondo); lastY = y; }
         ticking = false;
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => { window.removeEventListener("scroll", onScroll); clearTimeout(idle); };
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  // Si el «+» se esconde con el foco encima, lo suelta (accesibilidad, ronda 2).
+  const fabRef = useRef(null);
+  useEffect(() => { if (!fabShown && fabRef.current && document.activeElement === fabRef.current) fabRef.current.blur(); }, [fabShown]);
   const [showSaveQuote, setShowSaveQuote] = useState(false);
   const [defaultQuoteBookId, setDefaultQuoteBookId] = useState(null);
 
@@ -12837,6 +12911,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           (sin centro fijo desde 2026-11-02); Perfil se abre desde la foto de la cabecera. */}
       {!petHubOpen && (
         <button
+          ref={fabRef}
           onClick={() => setShowFabMenu(true)}
           aria-label="Agregar"
           aria-hidden={!fabShown}
