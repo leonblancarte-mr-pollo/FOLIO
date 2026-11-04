@@ -26,7 +26,11 @@ import { palette, PALETTE_DARK, display } from "../theme.js";
 //
 //   <StickerButton onClick={...}>Leer ahora</StickerButton>
 //
-// Props: arrow (flecha a mano al final, por defecto true), leadingIcon (Lucide al inicio),
+// Ronda 5 (2026-11-03): tres variantes visuales, mismo componente y mismos colores (durazno + #483A58):
+//   variant="sticker" (la de la ronda 3: canto troquelado + sombra sólida desplazada),
+//   variant="doble"   (doble contorno de tinta + losa inferior + reflejo ancho: la de la referencia de ChatGPT) ← la aplicada en Inicio,
+//   variant="boleto"  (billete durazno plano con dentado en los lados y perforado antes de la flecha).
+// Props: variant, arrow (flecha a mano al final, por defecto true), leadingIcon (Lucide al inicio),
 // size "lg" (Inicio, 64 px) | "md" (tarjetas, 56 px), fullWidth (por defecto true).
 
 // Flecha dibujada a mano: el asta ondula un poco y la punta no es simétrica, como trazo de plumón.
@@ -50,14 +54,14 @@ function FlechaMano({ size = 26 }) {
   );
 }
 
-function StickerButton({ children, arrow = true, leadingIcon: Lead, size = "md", fullWidth = true, className = "", style, ...rest }) {
+function StickerButton({ children, arrow = true, leadingIcon: Lead, size = "md", fullWidth = true, variant = "sticker", className = "", style, ...rest }) {
   const isDark = palette.bg === PALETTE_DARK.bg;
   const lg = size === "lg";
   return (
     <button
       type="button"
       {...rest}
-      className={`sema-sticker-btn sema-no-hover ${className}`.trim()}
+      className={`sema-sticker-btn sema-sticker-btn--${variant} sema-no-hover ${className}`.trim()}
       style={{
         "--sb-bg": palette.accent,
         "--sb-ink": palette.onAccent,

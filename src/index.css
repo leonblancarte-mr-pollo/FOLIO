@@ -765,3 +765,701 @@ button:not(:disabled):not(.sema-no-hover):active,
   .sema-boleto__cuerpo { padding-right: 0.5rem; padding-left: 0.5rem; }
   .sema-boleto--minutos { padding-left: 0.75rem; padding-right: 0.75rem; }
 }
+
+/* ═══ Ronda 4 · kit de detalles (Detalles.jsx) ═══════════════════════════════════════════════
+   Cinta adhesiva, sello de tinta, boleto y nota a mano (2026-11-03). Los colores los pone cada
+   componente en variables --kd-* desde palette / SEMA_EXTENDIDA / SEMA_PAPEL: aquí solo hay
+   var(--…), currentColor y black/transparent de máscara (recortan, no pintan). Nada se anima:
+   el giro es estático y con prefers-reduced-motion no hay nada que apagar. Giros en [-8°, 8°]. */
+
+/* Cinta «scotch»: semitransparente, con la textura de .sema-papel en multiply, un brillo tenue y
+   los dos cantos cortos dentados (clip-path). Absoluta sobre el borde superior del padre
+   (position: relative), medio dentro y medio fuera. Solo decoración (aria-hidden). */
+.sema-kd-cinta {
+  position: absolute;
+  top: -10px;
+  height: 24px;
+  z-index: 2;
+  pointer-events: none;
+  isolation: isolate;
+  background-color: var(--kd-bg);
+  background-image: linear-gradient(90deg, transparent 8%, color-mix(in srgb, var(--kd-luz) 26%, transparent) 34%, transparent 58%);
+  opacity: 0.78;
+  transform: translateX(var(--kd-x, 0%)) rotate(var(--kd-angulo, -4deg));
+  transform-origin: center;
+  clip-path: polygon(
+    0 0, 100% 0,
+    calc(100% - 3px) 3.5px, 100% 7.5px, calc(100% - 2.5px) 11px, 100% 15px, calc(100% - 3.5px) 19px, 100% 24px,
+    0 100%,
+    3px 20.5px, 0 16.5px, 3.5px 12.5px, 0 8.5px, 2.5px 4.5px
+  );
+}
+.sema-kd-cinta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='4' seed='11'/%3E%3CfeDiffuseLighting surfaceScale='4' diffuseConstant='1.18'%3E%3CfeDistantLight azimuth='225' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+/* Sello de goma: doble filo (filo de 2 px en ::before + anillo interior de 1 px a 2 px en ::after) y
+   falta de tinta por mask-image con ruido fractal. Correcciones de la ronda 4 (accesibilidad): la
+   falta de tinta FUERTE (alfa = 1.9 − 1.6·ruido, manchas hasta ~0.3) va solo en los dos filos, que son
+   decorativos; el texto lleva la máscara SUAVE (alfa = 1.35 − 0.4·ruido, nunca < 0.95), así conserva
+   su contraste y el sello sigue viéndose estampado. Space Mono 700 mayúsculas, tracking 0.08em. El
+   padding incluye los 2 px del filo (antes era borde): el tamaño total no cambia. */
+.sema-kd-sello {
+  position: relative;
+  display: inline-block;
+  color: var(--kd-ink);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(var(--kd-angulo, -8deg));
+  transform-origin: center;
+}
+.sema-kd-sello::before,
+.sema-kd-sello::after {
+  content: "";
+  position: absolute;
+  border-style: solid;
+  border-color: var(--kd-ink);
+  pointer-events: none;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  -webkit-mask-size: 160px 160px; mask-size: 160px 160px;
+  -webkit-mask-repeat: repeat; mask-repeat: repeat;
+}
+.sema-kd-sello::before { inset: 0; border-width: 2px; border-radius: 4px; }
+.sema-kd-sello::after { inset: 4px; border-width: 1px; border-radius: 2px; }
+.sema-kd-sello--md { font-size: 13px; }
+.sema-kd-sello--sm { font-size: 12px; padding: 7px 10px; }
+.sema-kd-sello__texto {
+  position: relative;
+  display: inline-block;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.4 1.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.4 1.35'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  -webkit-mask-size: 160px 160px; mask-size: 160px 160px;
+  -webkit-mask-repeat: repeat; mask-repeat: repeat;
+}
+
+/* Boleto de papel: cuerpo + talón opcional, borde 2 px en el color del texto, textura .sema-papel.
+   Las formas salen de mask-image (como .sema-boleto--cuento / --minutos): la muesca deja ver el
+   fondo real sin pintar nada encima. --kd-corte es el ancho fijo del talón. */
+.sema-kd-boleto {
+  --kd-muesca: 5px;
+  --kd-diente: 3.5px;
+  --kd-paso: 9px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  vertical-align: middle;
+  white-space: nowrap;
+  background-color: var(--kd-bg);
+  color: var(--kd-ink);
+  border: 2px solid var(--kd-ink);
+  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(var(--kd-angulo, -2deg));
+  transform-origin: left center;
+}
+.sema-kd-boleto__talon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--kd-corte) - 2px);
+  align-self: stretch;
+  padding: 0.5rem 0;
+  letter-spacing: 0.06em;
+}
+.sema-kd-boleto__cuerpo { padding: 0.5rem 0.75rem; }
+/* Con talón: muescas semicirculares arriba y abajo sobre la línea de corte (dos capas de máscara,
+   cada una media altura, traslapadas 1 px para no dejar costura al girar) y perforado dashed. */
+.sema-kd-boleto--corte {
+  -webkit-mask-image:
+    radial-gradient(circle at var(--kd-corte) 0, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px)),
+    radial-gradient(circle at var(--kd-corte) 100%, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px));
+  mask-image:
+    radial-gradient(circle at var(--kd-corte) 0, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px)),
+    radial-gradient(circle at var(--kd-corte) 100%, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px));
+  -webkit-mask-size: 100% calc(50% + 1px); mask-size: 100% calc(50% + 1px);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: top, bottom; mask-position: top, bottom;
+}
+.sema-kd-boleto--corte::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--kd-corte) - 3px);
+  top: calc(var(--kd-muesca) + 1px);
+  bottom: calc(var(--kd-muesca) + 1px);
+  width: 0;
+  border-left: 2px dashed currentColor;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 1;
+}
+/* Dentado en los dos lados cortos (bites repetidos) con una capa central lisa. */
+.sema-kd-boleto--lados {
+  border-radius: 2px;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  -webkit-mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-kd-boleto--lados .sema-kd-boleto__cuerpo { padding: 0.5rem 0.9rem; }
+
+/* Nota a mano: Instrument Serif itálica 18 px, sin caja, con subrayado ondulado (SVG en currentColor)
+   y flecha opcional dibujada a mano. */
+.sema-kd-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--kd-ink);
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.25;
+  transform: rotate(var(--kd-angulo, -2deg));
+  transform-origin: left center;
+}
+.sema-kd-nota--arriba { flex-direction: column; align-items: flex-start; gap: 2px; }
+.sema-kd-nota__texto { position: relative; display: inline-block; padding-bottom: 6px; }
+.sema-kd-nota__raya {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 6px;
+  overflow: visible;
+  display: block;
+}
+.sema-kd-nota__flecha { flex-shrink: 0; display: block; }
+.sema-kd-nota__flecha--arriba { margin-left: 10px; }
+
+/* En 360–379 px se aprieta el tracking de boletos y sellos; el texto sigue en 12–13 px. */
+@media (max-width: 379px) {
+  .sema-kd-boleto, .sema-kd-sello { letter-spacing: 0.04em; }
+  .sema-kd-boleto__talon { letter-spacing: 0.02em; }
+  .sema-kd-boleto__cuerpo { padding-left: 0.55rem; padding-right: 0.55rem; }
+}
+
+/* ═══ Ronda 4 · Explorar y botón + ═══════════════════════════════════════════════════════════
+   Botón «+» flotante: se esconde al bajar (translateY + opacity, 180 ms) y vuelve al subir o al
+   quedarse quieto; con prefers-reduced-motion el cambio es instantáneo. Etiquetas de papel
+   (Boleto del kit) en las recomendaciones de «Para ti»: una por libro, texto real, 12 px. */
+.sema-r4-fab {
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+.sema-r4-fab--oculto {
+  transform: translateY(28px);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sema-r4-fab { transition: none; }
+}
+/* Boleto en una fila de resultados: debajo del autor, antes de la razón. */
+.sema-r4-boleto-row {
+  margin: 0.45rem 0 0.1rem;
+  max-width: 100%;
+}
+/* Boleto en el carrusel de 130 px: solo si la forma corta cabe (sin ellipsis; la razón completa va en sr-only). */
+.sema-r4-boleto-carrusel {
+  margin: 0 0 0.55rem;
+  max-width: 100%;
+}
+/* Boleto único junto al título de la sección cuando todas las razones son iguales. */
+.sema-r4-boleto-seccion {
+  margin: 0;
+}
+
+/* ═══ Ronda 4 · Social (feed a todo el ancho, 2026-11-03) ═══════════════════════════════════════
+   Las publicaciones salen del padding del contenedor (px-4 / sm:px-6) y van de borde a borde, sin
+   borde ni radio, separadas por UNA línea fina borderSoft (arena en claro, ciruela en oscuro). El
+   padding lateral vive en cada bloque (.sema-post__pad): 16 px en móvil, 24 px en ≥ 640 px para
+   alinear con el saludo y la racha. Colores solo por variables --sema-* (sin hex). */
+.sema-feed-lista { display: flex; flex-direction: column; margin-left: -1rem; margin-right: -1rem; }
+/* Ronda 5: la línea fina pasa a ser una BANDA de 10 px a todo el ancho en el token separadorFeed (gris neutro muy claro; casi negro en oscuro). Sin borde ni caja extra. */
+.sema-post { position: relative; overflow: hidden; padding-bottom: 6px; border-bottom: 10px solid var(--sema-separador-feed); }
+.sema-post:last-child { border-bottom: none; }
+.sema-post__pad { padding-left: 16px; padding-right: 16px; }
+/* Imagen de una nota: a sangre y sin radio en móvil (compensa el padding del cuerpo). */
+.sema-post__img { width: calc(100% + 32px); margin-left: -16px; border-radius: 0; }
+.sema-post__img img { border-radius: 0; }
+/* El Cuento del día va entre publicaciones y recupera el padding del contenedor. */
+.sema-feed-lista__cuento { padding: 1.25rem 1rem 0.25rem; }
+/* Menú de tres puntos: anclado bajo el botón, a la derecha del encabezado. */
+.sema-post-menu { position: absolute; top: 46px; right: 0; z-index: 901; min-width: 220px; border-radius: 12px; padding: 4px 0; overflow: hidden; }
+.sema-post-menu__item:hover, .sema-post-menu__item:focus-visible { background-color: var(--sema-superficie-suave); }
+/* Reseña de «Libro terminado» como recorte de papel pegado con cinta: giro leve (−1°…1°, por
+   publicación) y textura .sema-papel en el bloque interior, que recorta; la cinta queda fuera de él. */
+.sema-post__recorte { position: relative; margin: 1.1rem 4px 0; transform: rotate(var(--kd-giro, -0.6deg)); transform-origin: center; }
+.sema-post__recorte-papel { padding: 18px 16px 14px; border-radius: 2px; }
+@media (min-width: 640px) {
+  .sema-feed-lista { margin-left: -1.5rem; margin-right: -1.5rem; }
+  .sema-post__pad { padding-left: 24px; padding-right: 24px; }
+  .sema-post__img { width: 100%; margin-left: 0; border-radius: 12px; }
+  .sema-post__img img { border-radius: 12px; }
+  .sema-feed-lista__cuento { padding: 1.25rem 1.5rem 0.25rem; }
+}
+
+/* ═══ Ronda 4 · Inicio ═══════════════════════════════════════════════════════════════════════
+   Racha como boleto (2026-11-03). Botón lila con dentado en los dos lados cortos: misma receta de
+   máscara que .sema-kd-boleto--lados (el Boleto del kit es un span de una línea y no sirve de
+   contenedor). Colores por variables que pone HomeView desde palette.firma / palette.onFirma; aquí
+   solo var(--…), currentColor y black/transparent de máscara (recortan, no pintan). Giro estático de
+   −2°; al presionar se encoge sin perder el giro. La textura la da .sema-papel (multiply), recortada
+   por la misma máscara. El foco va por dentro (outline-offset negativo) porque la máscara recorta
+   todo lo que pinte el elemento, también el contorno. */
+.sema-r4-racha {
+  --r4-diente: 3.5px;
+  --r4-paso: 9px;
+  --r4-corte: 26px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 150px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background-color: var(--r4-bg);
+  color: var(--r4-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transform: rotate(-2deg);
+  transform-origin: left center;
+  transition: transform 120ms ease-out;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  -webkit-mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-r4-racha:active { transform: rotate(-2deg) scale(0.97); }
+.sema-r4-racha:focus-visible { outline-offset: -4px !important; }
+.sema-r4-racha__cuerpo {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.75rem 0.5rem 0.85rem 1rem;
+}
+/* Talón: línea de corte punteada en currentColor y etiqueta vertical (Space Mono, ts.boleto) pegada
+   arriba, para que el sello de récord, si asoma, tenga libre la parte baja. */
+.sema-r4-racha__talon {
+  position: relative;
+  flex: 0 0 var(--r4-corte);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 0.85rem;
+}
+.sema-r4-racha__talon::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 0;
+  border-left: 2px dashed currentColor;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.sema-r4-racha__etiqueta {
+  display: block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sema-r4-racha { transition: none; }
+}
+
+/* ═══ Ronda 4 · Inicio · ronda 2 (correcciones) ═══
+   Tamaños del número y de «días de racha» del boleto salen de aquí (antes inline) para poder
+   apretarlos a ≤ 379 px: número 2.4rem → 2rem, «días de racha» 15 → 14 px, talón 26 → 22 px,
+   padding del cuerpo menor y el sello de récord con tracking 0.02em y padding 5×6, de modo que
+   quepa en el cuerpo sin cruzar la línea de corte (Space Mono: 15 × 7.44 + 12 + 4 ≈ 128 px
+   contra ~129 px de cuerpo a 360). */
+.sema-r4-racha__num { font-size: 2.4rem; }
+.sema-r4-racha__dias { font-size: 15px; }
+@media (max-width: 379px) {
+  .sema-r4-racha { --r4-corte: 22px; }
+  .sema-r4-racha__cuerpo { padding: 0.7rem 0.25rem 0.8rem 0.75rem; }
+  .sema-r4-racha__num { font-size: 2rem; }
+  .sema-r4-racha__dias { font-size: 14px; }
+  .sema-r4-racha .sema-kd-sello { letter-spacing: 0.02em; padding: 5px 6px; }
+}
+
+/* ═══ Ronda 4 · Social · correcciones (2026-11-03) ═══════════════════════════════════════════════
+   Racha lila de Social como boleto perforado RECTO: misma máscara de dentado lateral y talón que
+   .sema-r4-racha de Inicio (copiada, no reutilizada: aquí es un div con botones dentro y no gira).
+   Colores por --r4-bg / --r4-ink que pone DailyReadingBanner desde palette.firma / onFirma. */
+.sema-post-racha {
+  --r4-diente: 3.5px;
+  --r4-paso: 9px;
+  --r4-corte: 26px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 1.5rem;
+  border-radius: 2px;
+  background-color: var(--r4-bg);
+  color: var(--r4-ink);
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--r4-diente), black calc(var(--r4-diente) + 0.75px));
+  -webkit-mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  mask-size: var(--r4-paso) var(--r4-paso), calc(100% - 2 * var(--r4-paso) + 1px) 100%, var(--r4-paso) var(--r4-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-post-racha__cuerpo { flex: 1 1 auto; min-width: 0; padding: 12px 10px 12px 16px; }
+.sema-post-racha__talon { position: relative; flex: 0 0 var(--r4-corte); display: flex; justify-content: center; align-items: flex-start; padding-top: 0.85rem; }
+.sema-post-racha__talon::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px; width: 0; border-left: 2px dashed currentColor; opacity: 0.8; pointer-events: none; }
+.sema-post-racha__etiqueta { display: block; writing-mode: vertical-rl; transform: rotate(180deg); }
+/* Menú de tres puntos: fondo y color en CSS (no inline) para que hover y foco visible manden; el anillo
+   de foco va por dentro porque el menú recorta (overflow hidden). «Borrar publicación» en danger solo en
+   reposo: resaltado pasa a ink (danger sobre superficieSuave daba 4.27 / 3.18). */
+.sema-post-menu__item { background: transparent; color: var(--sema-ink); }
+.sema-post-menu__item--peligro { color: var(--sema-danger); }
+.sema-post-menu__item:hover, .sema-post-menu__item:focus-visible { background-color: var(--sema-superficie-suave); color: var(--sema-ink); outline-offset: -3px; }
+/* Sello fechador de «Libro terminado»: esquina superior derecha del recorte de papel. */
+.sema-post__sello-fecha { position: absolute; top: 10px; right: 12px; z-index: 2; }
+
+/* ═══ Ronda 5 · cartón (textura compartida) ═══════════════════════════════════════════════════
+   Misma familia de textura para el boleto de la racha, el globo del gato, la barra inferior y el
+   papel arrancado de «Libro terminado»: cartón arrugado, visible pero sutil. Es .sema-papel con más
+   relieve (surfaceScale 6, frecuencia 0.026) y un segundo pase de pliegues finos. Solo multiplica
+   (oscurece pliegues); no cambia el valor del color de fondo en lo plano. */
+.sema-carton { position: relative; isolation: isolate; }
+.sema-carton > * { position: relative; z-index: 1; }
+.sema-carton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+/* ═══ Ronda 5 · Mascota (PetHub) ═══════════════════════════════════════════════════════════════
+   Escena: sticker lila con filo de tinta + gato + sombra en el piso. Tres capas independientes
+   (.sema-pet-sticker, .sema-pet-gato, .sema-pet-piso) para animarlas por separado en otra ronda;
+   hoy NADA se anima (se apaga el bob y la respiración de PetDisplay solo aquí).
+   Colores por variables que pone PetHub desde palette; aquí no hay hex. */
+.sema-focus-ink:focus-visible { outline: 3px solid var(--sema-ink) !important; outline-offset: 2px; }
+.sema-pet-escena {
+  position: relative;
+  width: 100%;
+  max-width: 300px;
+  height: 340px;
+  flex: 0 0 auto;
+  margin-top: 0.5rem;
+}
+.sema-pet-sticker {
+  position: absolute;
+  left: 4%; right: 4%; top: 34px; bottom: 26px;
+  background-color: var(--pet-sticker);
+  border: 3px solid var(--pet-ink);
+  border-radius: 30px 38px 28px 40px;
+  transform: rotate(-2.5deg);
+  transform-origin: center bottom;
+}
+.sema-pet-gato {
+  position: absolute;
+  left: 0; right: 0; bottom: 14px;
+  display: flex;
+  justify-content: center;
+  transform-origin: center bottom;
+}
+.sema-pet-gato .pet-sprite-wrap,
+.sema-pet-gato .pet-sprite-img { animation: none !important; }
+.sema-pet-piso {
+  position: absolute;
+  left: 50%; bottom: 8px;
+  width: 62%; height: 14px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background-color: var(--pet-piso);
+  opacity: 0.22;
+  filter: blur(5px);
+  transform-origin: center;
+}
+/* Tarjetas de papel: mismo lenguaje que los boletos (arena/ciruela, filo de tinta de 2 px, dentado
+   en los lados cortos). Sin íconos. El sello «Muy pronto» es la única pieza girada de cada tarjeta. */
+.sema-pet-carta {
+  --kd-diente: 3.5px;
+  --kd-paso: 9px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 88px;
+  padding: 12px 16px 14px;
+  border: 2px solid var(--sema-ink);
+  border-radius: 2px;
+  background-color: var(--sema-superficie-suave);
+  color: var(--sema-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  -webkit-mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-pet-carta--ancha { grid-column: 1 / -1; flex-direction: row; align-items: center; min-height: 64px; }
+.sema-pet-carta:focus-visible { outline-offset: -5px !important; }
+@media (max-width: 379px) {
+  .sema-pet-carta { padding: 12px 12px 14px; }
+}
+
+/* ═══ Ronda 5 · hito de racha (RachaHito.jsx) ═══════════════════════════════════════════════════
+   Cartel a todo el ancho: fondo propio (--hito-bg, extendida), filos de tinta arriba y abajo, puntos de
+   media tinta muy tenues y textura de cartón (.sema-carton). Texto siempre en --hito-ink (#483A58).
+   La llama parpadea con tres capas desfasadas; con prefers-reduced-motion se queda quieta. */
+.sema-hito {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 26px 20px 28px;
+  background-color: var(--hito-bg);
+  color: var(--hito-ink);
+  border-top: 2px solid var(--hito-ink);
+  border-bottom: 2px solid var(--hito-ink);
+  overflow: hidden;
+}
+.sema-hito::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(var(--hito-ink) 1.3px, transparent 1.7px);
+  background-size: 14px 14px;
+  opacity: 0.1;
+}
+.sema-hito__llama { margin-bottom: 4px; }
+.sema-hito__num {
+  font-size: 112px;
+  font-weight: 800;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  color: var(--hito-ink);
+}
+.sema-hito[data-largo="3"] .sema-hito__num { font-size: 92px; }
+.sema-hito[data-largo="4"] .sema-hito__num { font-size: 72px; }
+.sema-hito__label {
+  margin-top: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hito-ink);
+}
+.sema-hito__frase {
+  margin-top: 10px;
+  font-style: italic;
+  font-size: 28px;
+  line-height: 1.15;
+  max-width: 17rem;
+  color: var(--hito-ink);
+}
+.sema-llama__capa { transform-box: fill-box; transform-origin: 50% 100%; animation: sema-llama-parpadeo 2.6s ease-in-out infinite alternate; }
+.sema-llama__capa--med { animation-duration: 2.1s; }
+.sema-llama__capa--nuc { animation-duration: 1.7s; }
+.sema-llama__brasa { animation: sema-llama-brasa 2.8s ease-in-out infinite alternate; }
+.sema-llama__brasa--b { animation-delay: -0.9s; }
+.sema-llama__brasa--c { animation-delay: -1.8s; }
+@keyframes sema-llama-parpadeo {
+  from { transform: scale(1, 1) skewX(0deg); }
+  to   { transform: scale(0.97, 1.06) skewX(-2.5deg); }
+}
+@keyframes sema-llama-brasa {
+  from { transform: translateY(0); opacity: 1; }
+  to   { transform: translateY(-5px); opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sema-llama__capa, .sema-llama__brasa { animation: none !important; }
+}
+
+/* ═══ Ronda 5 · Libro terminado (papel arrancado) ═══════════════════════════════════════════════
+   Fondo de degradado (inline, por publicación) con el canto superior e inferior rasgados (clip-path
+   inline generado por tornClipPath) y textura de cartón. Portada a la izquierda girada +3° con
+   sombra sólida; a la derecha, la reseña como recorte de papel pegado con cinta, y el sello «Ya se
+   fue» DENTRO del papel (ahí la tinta pasa 7.36 / 10.39; sobre el degradado no pasaría en la cereza). */
+.sema-terminado { position: relative; margin-top: 10px; padding: 30px 16px 30px; }
+.sema-terminado__fila { display: flex; align-items: flex-start; gap: 16px; }
+.sema-terminado__portada { flex: 0 0 108px; width: 108px; background: none; border: 0; padding: 0; cursor: pointer; border-radius: 4px; transform: rotate(3deg); margin: 4px 4px 8px 2px; }
+.sema-terminado__recorte { position: relative; flex: 1 1 0; min-width: 0; margin-top: 12px; transform: rotate(var(--kd-giro, -0.6deg)); transform-origin: center; }
+.sema-terminado__papel { padding: 16px 14px 46px; border-radius: 2px; position: relative; }
+.sema-terminado__sello { position: absolute; right: 10px; bottom: 10px; z-index: 2; }
+@media (max-width: 379px) {
+  .sema-terminado { padding-left: 12px; padding-right: 12px; }
+  .sema-terminado__fila { gap: 12px; }
+  .sema-terminado__portada { flex-basis: 96px; width: 96px; }
+}
+@media (min-width: 640px) {
+  .sema-terminado { padding-left: 24px; padding-right: 24px; }
+}
+
+/* ═══ Ronda 5 · botón principal: variantes de StickerButton ═══════════════════════════════════════
+   Mismos colores (durazno + #483A58). «sticker» es la base de arriba. «doble» = la de la referencia de
+   ChatGPT: borde de tinta de 3 px, segundo contorno separado por un aro del color del fondo, losa de tinta
+   debajo y un reflejo ancho redondeado. «boleto» = billete plano con dentado en los lados y perforado
+   antes de la flecha. En oscuro la tinta de los contornos es blanca (--sb-anillo). El texto #483A58
+   sobre el durazno (≥ 5.04:1 en claro, 5.85:1 en oscuro) no cambia: el degradado no baja de accent. */
+.sema-sticker-btn--doble {
+  border: 3px solid var(--sb-anillo);
+  border-radius: 20px;
+  background: linear-gradient(175deg, color-mix(in srgb, var(--sb-bg) 64%, white) 0%, var(--sb-bg) 78%);
+  box-shadow: 0 0 0 3px var(--sb-canto), 0 0 0 5px var(--sb-anillo), 0 6px 0 5px var(--sb-anillo);
+}
+.sema-sticker-btn--doble::before { display: none; }
+.sema-sticker-btn--doble::after {
+  top: 7px; left: 14px; width: 34%; height: 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--sb-brillo) 58%, transparent);
+  transform: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .sema-sticker-btn--doble:hover { transform: translate(0, -1px); box-shadow: 0 0 0 3px var(--sb-canto), 0 0 0 5px var(--sb-anillo), 0 7px 0 5px var(--sb-anillo); }
+}
+.sema-sticker-btn--doble:active { transform: translate(0, 5px); box-shadow: 0 0 0 3px var(--sb-canto), 0 0 0 5px var(--sb-anillo), 0 1px 0 5px var(--sb-anillo); }
+.sema-sticker-btn--doble:focus-visible { outline-offset: 13px !important; }
+
+.sema-sticker-btn--boleto {
+  --sb-diente: 4px;
+  --sb-paso: 10px;
+  border: 2px solid var(--sb-anillo);
+  border-radius: 3px;
+  background: var(--sb-bg);
+  box-shadow: none;
+  justify-content: flex-start;
+  padding-left: 1.1rem;
+  padding-right: 4.6rem;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--sb-diente), black calc(var(--sb-diente) + 0.75px));
+  -webkit-mask-size: var(--sb-paso) var(--sb-paso), calc(100% - 2 * var(--sb-paso) + 1px) 100%, var(--sb-paso) var(--sb-paso);
+  mask-size: var(--sb-paso) var(--sb-paso), calc(100% - 2 * var(--sb-paso) + 1px) 100%, var(--sb-paso) var(--sb-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-sticker-btn--boleto .sema-sticker-btn__texto { flex: 1 1 auto; text-align: center; }
+.sema-sticker-btn--boleto::after { display: none; }
+.sema-sticker-btn--boleto::before,
+.sema-sticker-btn--boleto:hover::before,
+.sema-sticker-btn--boleto:focus-visible::before {
+  display: block !important;
+  animation: none !important;
+  content: "";
+  position: absolute;
+  top: 9px; bottom: 9px; left: auto; right: 3.9rem;
+  width: 0; height: auto;
+  background: none;
+  border-left: 2px dashed var(--sb-ink);
+  opacity: 0.75;
+  transform: none;
+}
+.sema-sticker-btn--boleto .sema-sticker-btn__flecha { position: absolute; right: 0.95rem; top: 50%; transform: translateY(-50%); margin-left: 0; }
+.sema-sticker-btn--boleto:hover { transform: none; box-shadow: none; }
+.sema-sticker-btn--boleto:active { transform: translate(0, 2px); box-shadow: none; }
+.sema-sticker-btn--boleto:focus-visible { outline-offset: -6px !important; }
+
+/* ═══ Ronda 5 · globo del gato (Inicio) ═══════════════════════════════════════════════════════════
+   Globo de papel: color y recorte irregular inline desde App.jsx; textura de cartón (.sema-carton). */
+.sema-globo {
+  padding: 12px 18px 15px;
+  font-family: var(--sema-font-ui);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* ═══ Ronda 5 · barra inferior ═════════════════════════════════════════════════════════════════════
+   La pestaña activa se marca con un cuadrito de esquinas redondeadas en lila semitranslúcido detrás del
+   ícono y la etiqueta (sin la cintita). Cuánto lila: 55 % en claro (ink sobre el resultado ≈ 6:1) y 40 %
+   en oscuro (blanco sobre el resultado ≈ 5:1); lo fija BottomNav en --nav-sel. El borde rasgado se
+   conserva; la textura pasa a la de cartón de la racha y el globo (misma familia). */
+.sema-nav-sel { background-color: var(--nav-sel); }
+.sema-nav-rasgado::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
+  opacity: 0.35;
+}
+
+/* .sema-papel / .sema-carton ponen position: relative a todos los hijos directos; eso rompía el span
+   .sr-only (position: absolute) y el texto para lectores de pantalla se veía. */
+.sema-papel > .sr-only, .sema-carton > .sr-only { position: absolute; }
+/* El cartel de hito es un bloque grande y liso: su cartón va más tenue que el del boleto o el globo. */
+.sema-hito.sema-carton::after { opacity: 0.34; }
+.sema-hito--n3.sema-carton::after { opacity: 0.28; }
+/* Libro terminado: el título grande cruza el degradado; textura más tenue para que el pliegue no baje de 3:1 (cereza). */
+.sema-terminado.sema-carton::after { opacity: 0.4; }

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Bookmark, BookOpen, Eye, CheckCircle } from "lucide-react";
 import BookCoverImage from "./BookCoverImage.jsx";
-import { palette } from "../theme.js";
-const serif = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" };
-const body  = { fontFamily: "Figtree, system-ui, sans-serif" };
+import { palette, FONT_DISPLAY, FONT_UI } from "../theme.js";
+const serif = { fontFamily: FONT_DISPLAY };
+const body  = { fontFamily: FONT_UI };
 
 // 2026-11-02: sin colores por estado (STATUS_COLORS sigue intacto para el resto de la app). La fila
 // activa se marca con contorno de tinta y palomita; el texto siempre es ink / inkSoft.

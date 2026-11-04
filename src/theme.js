@@ -45,8 +45,15 @@
 //
 // z-index: no hay escala todavía; el mapa real está en AUDIT_SPRINT_REPORT.md §C.
 
+// Tipografía elegida en la ronda 4 (2026-11-03) tras comparar tres combinaciones en Inicio, Social y
+// el boleto del Cuento del día (capturas/ronda4-2026-11-03/{home,social-mock,cuento}-{a,b,c}-antes-*.png):
+//   A Syne + Barlow Condensed · B Unbounded + Space Mono (elegida) · C Archivo + Archivo Narrow.
+// Unbounded (titulares) tiene cuerpo de póster y zine sin perder legibilidad en 15–17 px; Space Mono
+// (boletos y sellos) lee como máquina de boletos y sello fechador. Figtree sigue en el texto de lectura e
+// Instrument Serif en las citas. La API css2 de Google Fonts parte cada familia por unicode-range: el
+// navegador solo descarga el subconjunto latino. display=swap para que el texto no se oculte.
 const FONT_LINK = `
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Figtree:ital,wght@0,300..900;1,300..900&family=Instrument+Serif:ital@0;1&display=swap');
 `;
 
 const PALETTE_LIGHT = {
@@ -65,6 +72,8 @@ const PALETTE_LIGHT = {
   session: "#5C6B3D", sessionInk: "#5C6B3D", freeze: "#456990",
   firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
   superficieSuave: "#E7D7C1", complementoFrio: "#456990",
+  // Ronda 5: banda de separación entre publicaciones del feed (neutro muy claro; solo fondo, nunca texto encima).
+  separadorFeed: "#F1EFF3",
 };
 const PALETTE_DARK = {
   bg: "#000000", bgSoft: "#000000", bgCard: "#000000",
@@ -82,6 +91,7 @@ const PALETTE_DARK = {
   session: "#7A9B5C", sessionInk: "#7A9B5C", freeze: "#E7D7C1",
   firma: "#BBADFF", onFirma: "#483A58", acentoCalido: "#F79F79",
   superficieSuave: "#483A58", complementoFrio: "#456990",
+  separadorFeed: "#141414", // gris casi negro; el texto de las publicaciones (blanco) lo cruza con 18:1
 };
 let palette = { ...PALETTE_LIGHT };
 
@@ -156,6 +166,39 @@ const SEMA_GRADIENTES_TERMINADO = [
   { key: "menta-turquesa",  from: EXT.menta,     to: EXT.turquesa },
   { key: "pervinca-orquidea", from: EXT.pervinca, to: EXT.orquidea },
 ].map((g) => ({ ...g, css: `linear-gradient(135deg, ${g.from} 0%, ${g.to} 100%)`, on: "#483A58" }));
+
+// ── Ronda 5 (2026-11-03) ─────────────────────────────────────────────────────────────────────
+// Colores de la llama del banner de hito de racha. EXCEPCIÓN AUTORIZADA por León a la paleta, SOLO
+// para la ilustración del fuego (amarillo, naranja, rojo); nunca como fondo, texto ni borde de UI.
+const SEMA_LLAMA = { amarillo: "#FFD23F", naranja: "#FF8A1F", rojo: "#E5361C", brasa: "#FFF3B0" };
+
+// Hitos de racha que generan una publicación «racha» en el feed: 3, 7, 10, 14, 21, 30, 50, 60, 75, 90,
+// 100, 150, 200 y de ahí cada 50 días sin tope. Frases en voz de SEMA (corta, con carácter, sin coach,
+// sin segunda persona de marketing, cero culpa). Nivel de la llama: 1 (3–14), 2 (21–100), 3 (150+).
+const RACHA_HITOS_BASE = [3, 7, 10, 14, 21, 30, 50, 60, 75, 90, 100, 150, 200];
+const RACHA_FRASES = {
+  3: "Ya van tres.",
+  7: "Una semana entera.",
+  10: "Diez días. Ya agarró ritmo.",
+  14: "Dos semanas sin soltar el libro.",
+  21: "Eso ya es un hábito.",
+  30: "Un mes. Los libros se enteraron.",
+  50: "Cincuenta días. Qué bonito se ve.",
+  60: "Dos meses de páginas.",
+  75: "Setenta y cinco. Ya es costumbre.",
+  90: "Tres meses. Esto va en serio.",
+  100: "Cien días. Ya eres de la casa.",
+  150: "Ciento cincuenta. Eso es oficio.",
+  200: "Doscientos días. Leyenda de la casa.",
+};
+function esHitoRacha(n) {
+  return RACHA_HITOS_BASE.includes(n) || (n > 200 && n % 50 === 0);
+}
+function fraseHitoRacha(n) {
+  if (RACHA_FRASES[n]) return RACHA_FRASES[n];
+  return n >= 1000 ? `${n} días. Esto ya es historia.` : `${n} días. Medio siglo más de páginas.`;
+}
+function nivelLlama(n) { return n >= 150 ? 3 : n >= 21 ? 2 : 1; }
 
 // Hash estable (FNV-1a) de un id: el mismo post da siempre el mismo color, en cualquier render
 // o recarga.
@@ -287,10 +330,28 @@ const WRAPPED_SLIDE_GRADIENTS = [
   "linear-gradient(160deg, #7A2E2E 0%, #C8924A 60%, #F4EDE0 100%)",
 ];
 
-const FONT_DISPLAY = "'Bricolage Grotesque', system-ui, sans-serif";
-const FONT_UI = "Figtree, system-ui, sans-serif";
-const FONT_QUOTE = "'Instrument Serif', Georgia, serif";
+// Tipografía (ronda 4, 2026-11-03): las familias viven en SEMA_FONTS y se exponen como variables CSS
+// (--sema-font-display / -label / -ui / -quote) al cargar el módulo; los tokens FONT_* leen la variable.
+// Así una prueba de tipografía (scripts/captura-ronda4.mjs --fonts=<set>) solo cambia la variable en el
+// navegador de prueba, sin tocar código. Nadie escribe una familia a mano fuera de este archivo.
+//   display: titulares y nombres (carácter). label: boletos, sellos y etiquetas en mayúsculas (condensada).
+//   ui: texto de lectura e interfaz. quote: citas y frases.
+const SEMA_FONTS = {
+  display: "'Unbounded', system-ui, sans-serif",
+  label: "'Space Mono', ui-monospace, 'Courier New', monospace",
+  ui: "Figtree, system-ui, sans-serif",
+  quote: "'Instrument Serif', Georgia, serif",
+};
+if (typeof document !== "undefined") {
+  const r = document.documentElement.style;
+  Object.entries(SEMA_FONTS).forEach(([k, v]) => r.setProperty(`--sema-font-${k}`, v));
+}
+const FONT_DISPLAY = `var(--sema-font-display, ${SEMA_FONTS.display})`;
+const FONT_LABEL = `var(--sema-font-label, ${SEMA_FONTS.label})`;
+const FONT_UI = `var(--sema-font-ui, ${SEMA_FONTS.ui})`;
+const FONT_QUOTE = `var(--sema-font-quote, ${SEMA_FONTS.quote})`;
 const display = { fontFamily: FONT_DISPLAY };
+const label = { fontFamily: FONT_LABEL };
 const body = { fontFamily: FONT_UI };
 const quote = { fontFamily: FONT_QUOTE };
 
@@ -300,8 +361,10 @@ const sp = { xs: "0.5rem", sm: "0.75rem", md: "1rem", lg: "1.5rem", xl: "2rem", 
 // Escala tipográfica. `caption` y `label` leen el color del tema en cada uso
 // (getter), así siguen al modo oscuro aunque se usen con spread: { ...ts.caption }.
 const ts = {
-  h1: { fontFamily: FONT_DISPLAY, fontSize: "28px", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.02em" },
-  h2: { fontFamily: FONT_DISPLAY, fontSize: "20px", fontWeight: 600, lineHeight: 1.25, letterSpacing: "-0.01em" },
+  h1: { fontFamily: FONT_DISPLAY, fontSize: "26px", fontWeight: 700, lineHeight: 1.15, letterSpacing: "-0.01em" },
+  h2: { fontFamily: FONT_DISPLAY, fontSize: "19px", fontWeight: 600, lineHeight: 1.25, letterSpacing: "0" },
+  // Etiquetas de boletos y sellos (ronda 4): Space Mono en mayúsculas con tracking; nunca menos de 12 px.
+  boleto: { fontFamily: FONT_LABEL, fontSize: "12px", fontWeight: 700, lineHeight: 1, letterSpacing: "0.08em", textTransform: "uppercase" },
   h3: { fontFamily: FONT_UI, fontSize: "17px", fontWeight: 600, lineHeight: 1.3 },
   body15: { fontFamily: FONT_UI, fontSize: "15px", fontWeight: 400, lineHeight: 1.55 },
   quote: { fontFamily: FONT_QUOTE, fontSize: "20px", fontWeight: 400, fontStyle: "italic", lineHeight: 1.45 },
@@ -336,7 +399,8 @@ function genreColor(genre) {
 export {
   FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS,
   SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors,
+  SEMA_LLAMA, RACHA_HITOS_BASE, RACHA_FRASES, esHitoRacha, fraseHitoRacha, nivelLlama,
   AVATAR_COLORS, getAvatarColor, COVER_PALETTES, SEMA_COVER_COMBOS, HEATMAP_COLORS, STREAK_PHASES, FRIEND_STREAK_GRADIENT,
   WRAPPED_SLIDE_GRADIENTS, QUOTE_POSTER_GRADIENTS,
-  display, body, quote, sp, FONT_DISPLAY, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,
+  display, label, body, quote, sp, SEMA_FONTS, FONT_DISPLAY, FONT_LABEL, FONT_UI, FONT_QUOTE, ts, genrePillStyle, genreColor,
 };
