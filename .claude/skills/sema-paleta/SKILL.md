@@ -109,8 +109,9 @@ Las barras de progreso con degradado llevan borde de 1.5 px en `ink` (como la pi
 | Reseña suelta (`book_update` con reseña o calificación) | `MessageCircle` | «Reseña» + estrellas en `#483A58` | Libro en línea y la reseña como cita (filete `complementoFrio`) |
 | Frase (`quote`) | `Feather` | «Frase» | La frase en Instrument Serif itálica grande, en `ink` sobre `bg`; libro en `inkSoft`; ánimo como sticker `firma` + `onFirma`. **Ya no es tarjeta ciruela** |
 | Logro | `Award` | «Logro» | Sticker `firma` con papel, canto `bg`, filo `ink` y giro, con el nombre del logro (`onFirma` 20 px 800, 5.21:1) |
-| Texto | `PenLine` | «Publicó» | Texto e imagen |
+| Texto | `PenLine` | «Nota» (el código dice «Nota» desde la ronda 2; la skill decía «Publicó» y se corrige en la ronda 4) | Texto e imagen |
 
+- **Ronda 4 (2026-11-03): ya no hay tarjeta.** La franja es una cinta de borde a borde (padding 5 px, 13 px 700), la publicación no lleva borde ni radio y se separa de la siguiente con una línea de 1 px en `borderSoft`. El resto del mapa sigue igual.
 - En «Libro terminado», si el color asignado a la franja es un extremo de su degradado (o el de la publicación vecina), se avanza al siguiente color de la lista para que franja y degradado no se fundan.
 - Los acentos de siempre no cambian dentro del cuerpo: filete azul acero de la reseña, sticker lila del ánimo y del logro.
 

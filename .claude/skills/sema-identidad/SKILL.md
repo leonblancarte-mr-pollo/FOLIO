@@ -53,6 +53,12 @@ Nunca se usan como fondo grande.
   - Nunca como fondo de pantalla completa ni con imágenes pesadas.
 - **Cabecera «Sema»** con mayúscula inicial en el texto del logo (decisión de León del 2026-11-02; es un cambio de marca pendiente del logo final).
 - **Foto de perfil en la cabecera**, que abre Perfil. Por eso Perfil ya no va en la barra inferior.
+- **Kit de detalles** (`src/components/Detalles.jsx`, ronda 4 del 2026-11-03): `CintaAdhesiva`, `SelloTinta`, `Boleto` y `NotaMano`. Regla de la ronda: **máximo dos detalles decorativos por tarjeta o publicación; un solo protagonista visual por pantalla; nunca sacrificar legibilidad por textura; la imperfección es visual (giro leve, textura), no de consistencia (alineaciones, tamaños y áreas táctiles iguales). Una sola pieza girada por tarjeta; las demás a 0°.** Cuándo usar cada uno:
+  - *Cinta adhesiva:* «recorte pegado» sobre el borde superior de una tarjeta (reseña de Libro terminado). Siempre decorativa (`aria-hidden`), nunca sobre texto ni controles.
+  - *Sello de tinta:* un momento que merece sello, una vez por pantalla («RÉCORD PERSONAL», sello fechador de Libro terminado). Nunca como etiqueta de tipo ni en listas.
+  - *Boleto:* etiquetas de tipo o de momento, cortas y en mayúsculas (racha de Inicio, Cuento del día, razón de una recomendación). Nunca dos boletos iguales seguidos.
+  - *Nota a mano:* anotación corta junto a un dato real («Te faltan 783 páginas»). Sin caja; nunca como título ni sobre degradados.
+- **Feed a todo el ancho** (ronda 4): las publicaciones van de borde a borde sin tarjeta, borde ni radio, separadas por una línea fina; cinta de color del tipo a todo el ancho (color por publicación, paleta extendida); encabezado con avatar, nombre, hora y menú de tres puntos; contenido y acciones sin cajas.
 
 ## 6. Rechazado
 
@@ -64,13 +70,22 @@ Nunca se usan como fondo grande.
 - Morado saturado sobre azul tinta.
 - Cualquier cosa que parezca biblioteca seria.
 
-## 7. Tipografía
+## 7. Tipografía (ronda 4, 2026-11-03)
 
-| Uso | Fuente |
-|---|---|
-| Títulos | **Bricolage Grotesque** |
-| Interfaz | **Figtree** |
-| Citas | **Instrument Serif** |
+| Uso | Fuente | Token de `theme.js` |
+|---|---|---|
+| Titulares, nombres y cifras grandes (≥ 15 px) | **Unbounded** | `display` / `FONT_DISPLAY` |
+| Boletos, sellos y etiquetas en mayúsculas (12–13 px, tracking 0.06–0.1em) | **Space Mono** | `label` / `FONT_LABEL` / `ts.boleto` |
+| Texto de lectura, interfaz, etiquetas de formulario, pestañas y chips | **Figtree** | `body` / `FONT_UI` |
+| Citas y notas a mano | **Instrument Serif** | `quoteFont` / `FONT_QUOTE` |
+
+Decidida el 2026-11-03 tras comparar tres combinaciones en Inicio, Social y el boleto del Cuento del día (`capturas/ronda4-2026-11-03/{home,social-mock,cuento}-{a,b,c}-antes-*.png`): A Syne + Barlow Condensed (el «1» de Syne es un muñón y lee a marca de moda), **B Unbounded + Space Mono (elegida)**, C Archivo + Archivo Narrow (casi igual a Bricolage). Sustituye a Bricolage Grotesque (títulos). **Pendiente de la aprobación final de León con captura.**
+
+Reglas:
+- Las familias viven solo en `SEMA_FONTS` de `theme.js`, expuestas como variables CSS `--sema-font-*`. **Nunca se escribe una familia a mano** en un componente.
+- Unbounded es ancha: solo en textos de 15 px o más; `letterSpacing` nunca por debajo de −0.01em; revisar que los títulos largos quepan a 360 px.
+- Space Mono **solo** en boletos, sellos y etiquetas del kit; si se escapa a la interfaz, la pareja Unbounded + Space Mono se ve de plantilla.
+- Subconjunto latino por `unicode-range` de Google Fonts y `display=swap`.
 
 **Nada de textos de 8 a 11 px.**
 
