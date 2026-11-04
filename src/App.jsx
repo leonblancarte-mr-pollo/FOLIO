@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Trash2,
+  MoreHorizontal,
   Pencil,
   Check,
   Search,
@@ -82,8 +83,10 @@ import { DeleteAccountModal } from "./components/DeleteAccountModal.jsx";
 import { TruequeMain } from "./components/trueque/TruequeMain.jsx";
 import { EmptyState } from "./components/EmptyState.jsx";
 import StickerButton from "./components/StickerButton.jsx";
+// Kit de detalles (ronda 4, 2026-11-03): cinta y sello en Social, boleto en Explorar, nota a mano en Inicio.
+import { CintaAdhesiva, SelloTinta, Boleto, NotaMano } from "./components/Detalles.jsx";
 import { Skeleton, SkeletonGroup, SkeletonList, SkeletonCardGrid, SkeletonBubbles } from "./components/Skeleton.jsx";
-import { FONT_LINK, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, display, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
+import { FONT_LINK, FONT_UI, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteCssVars, BRAND, SEMA_GRADIENTS, SOCIAL_COLORS, STATUS_COLORS, getAvatarColor, COVER_PALETTES, HEATMAP_COLORS, FRIEND_STREAK_GRADIENT, WRAPPED_SLIDE_GRADIENTS, display, label, body, quote as quoteFont, sp, ts, genrePillStyle, genreColor } from "./theme.js";
 // Ronda 2: paleta extendida (sema-paleta §7): franja por publicación, «Libro terminado», perfil de amigo.
 import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
@@ -365,7 +368,7 @@ function BookCoverPlaceholder({ title = "", author = "", width = 56, height = 80
         height,
         backgroundColor: p.bg,
         color: p.fg,
-        fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+        ...display,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -623,7 +626,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
         <span
           aria-label="Sema"
           style={{
-            fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+            ...display,
             fontWeight: 800,
             fontSize: "1.6rem",
             lineHeight: 1,
@@ -692,7 +695,7 @@ function AppHeader({ tab, setTab, pendingCount, unreadMessages, unreadNotifs, on
                 <span style={{ position: "relative", display: "inline-flex" }}>
                   <Icon size={13} strokeWidth={active ? 2.5 : 2} />
                   {badge > 0 && (
-                    <span style={{ position: "absolute", top: -8, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif" }}>
+                    <span style={{ position: "absolute", top: -8, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", ...body }}>
                       {badge > 9 ? "9+" : badge}
                     </span>
                   )}
@@ -746,12 +749,12 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
               <span style={{ position: "relative", display: "inline-flex" }}>
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} color={tint} />
                 {badge > 0 && (
-                  <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", fontFamily: "Figtree, system-ui, sans-serif", boxShadow: isLight ? "none" : `0 0 0 2px ${palette.bg}` }}>
+                  <span style={{ position: "absolute", top: -7, right: -10, backgroundColor: palette.badge, color: palette.onColor, borderRadius: "999px", fontSize: "12px", fontWeight: 700, lineHeight: 1, minWidth: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px", ...body, boxShadow: isLight ? "none" : `0 0 0 2px ${palette.bg}` }}>
                     {badge > 9 ? "9+" : badge}
                   </span>
                 )}
               </span>
-              <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
+              <span style={{ ...display, fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
               {/* Marca activa tipo cinta (ronda 2 de correcciones): tira 24×6, radio 1, girada −3°. */}
               <span aria-hidden="true" style={{
                 width: 24, height: 6, borderRadius: 1,
@@ -1035,7 +1038,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
               </button>
             ))}
           </div>
-          <button onClick={handleSave} style={{ width: "100%", padding: "0.85rem", borderRadius: "999px", backgroundColor: palette.ink, color: palette.bg, border: "none", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "15px", fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={handleSave} style={{ width: "100%", padding: "0.85rem", borderRadius: "999px", backgroundColor: palette.ink, color: palette.bg, border: "none", ...display, fontSize: "15px", fontWeight: 600, cursor: "pointer" }}>
             Guardar libro
           </button>
           <button onClick={() => setSelectedBook(null)} style={{ width: "100%", marginTop: "0.65rem", padding: "0.6rem", background: "none", border: "none", color: palette.inkFaint, fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px", cursor: "pointer" }}>
@@ -1064,7 +1067,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Busca por título, autor o ISBN..."
-            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", fontFamily: "Figtree, system-ui, sans-serif", fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
+            style={{ width: "100%", padding: "0.65rem 2.2rem 0.65rem 2.2rem", backgroundColor: palette.bgSoft, border: `1px solid ${palette.borderSoft}`, borderRadius: "12px", ...body, fontSize: "16px", color: palette.ink, outline: "none", boxSizing: "border-box" }}
           />
           {query && (
             <button onClick={() => setQuery("")} style={{ position: "absolute", right: "0.75rem", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "0.1rem", display: "flex" }}>
@@ -1124,7 +1127,7 @@ function SearchBookModal({ isOpen, onClose, onSelect }) {
                       <BookCoverPlaceholder title={book.title} author={book.author} width={50} height={75} />
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
+                      <p style={{ ...body, fontSize: "15px", fontWeight: 600, color: palette.ink, marginBottom: "0.2rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{book.title}</p>
                       <p style={{ ...ts.caption, marginBottom: book.year ? "0.15rem" : 0 }}>{book.author}</p>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", marginTop: "0.15rem", flexWrap: "wrap" }}>
                         {book.year && <span style={{ fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "11px", color: palette.inkFaint }}>{book.year}</span>}
@@ -3789,7 +3792,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
               {profile.avatarUrl ? (
                 <img src={profile.avatarUrl} alt="Foto de perfil" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", display: "block" }} />
               ) : (
-                <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), ...avatarEdge(), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 92, height: 92, borderRadius: "50%", backgroundColor: getAvatarColor(user.id || user.name), ...avatarEdge(), color: palette.onColor, ...display, fontSize: "2rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   {initials}
                 </div>
               )}
@@ -3933,7 +3936,7 @@ function ProfileView({ user, onUserUpdate, books, onSelectBook, onLogout, theme 
             <button
               onClick={async () => { const ok = await handleSave(); if (ok) setTimeout(() => setEditModalOpen(false), 800); }}
               disabled={saving}
-              style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : palette.onAccent, border: "none", borderRadius: "12px", fontSize: "1rem", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
+              style={{ width: "100%", marginTop: "1.25rem", padding: "0.85rem", backgroundColor: saving ? palette.bgSoft : palette.accent, color: saving ? palette.inkFaint : palette.onAccent, border: "none", borderRadius: "12px", fontSize: "1rem", ...display, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}
             >
               {saving ? "Guardando…" : "Guardar cambios"}
             </button>
@@ -4467,7 +4470,7 @@ function ChatView({ user, friend, onBack, onMessagesRead }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+              ...display,
               fontSize: "1rem",
               fontWeight: 600,
               flexShrink: 0,
@@ -4761,7 +4764,7 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
         {avatarUrl ? (
           <img src={avatarUrl} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", border: `3px solid ${color}` }} />
         ) : (
-          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: color, color: palette.onColor, display: "flex", alignItems: "center", justifyContent: "center", ...display, fontWeight: 700, fontSize: "1rem" }}>{initials}</div>
         )}
         <span style={{ ...display, fontSize: "0.82rem", fontWeight: 600, color: palette.ink }}>{name}</span>
       </div>
@@ -4883,8 +4886,8 @@ function CompareProfilesView({ user, friend, friendBooks, onClose }) {
                 const p = pt(i, 1.42);
                 return (
                   <text key={i} x={p.x} y={p.y} textAnchor="middle" dominantBaseline="middle">
-                    <tspan x={p.x} dy="-6" fontSize="9" fill={palette.inkSoft} fontFamily="Figtree, sans-serif">{name}</tspan>
-                    <tspan x={p.x} dy="12" fontSize="7.5" fill={palette.amber} fontFamily="Figtree, sans-serif">({uDisp} vs {fDisp})</tspan>
+                    <tspan x={p.x} dy="-6" fontSize="9" fill={palette.inkSoft} fontFamily={FONT_UI}>{name}</tspan>
+                    <tspan x={p.x} dy="12" fontSize="7.5" fill={palette.amber} fontFamily={FONT_UI}>({uDisp} vs {fDisp})</tspan>
                   </text>
                 );
               })}
@@ -5173,7 +5176,7 @@ function LiteraryCompatibility({ userBooks, friendBooks, userStreak, friendStrea
   const shortFriend = (friendName || "").split(" ")[0] || friendName;
   const chip = (bg, color) => ({ ...body, fontSize: "13px", fontWeight: 600, backgroundColor: bg, color, borderRadius: "999px", padding: "4px 12px" });
   const groupLabel = { ...body, fontSize: "13px", color: palette.inkSoft, marginBottom: "0.35rem" };
-  const vennNum = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 28, fontWeight: 800 };
+  const vennNum = { ...display, fontSize: 28, fontWeight: 800 };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: sp.md }}>
@@ -5488,7 +5491,7 @@ function FriendProfileModal({ friend, user, onClose }) {
             {friend.avatar_url ? (
               <img src={friend.avatar_url} alt="" style={{ width: 76, height: 76, borderRadius: "50%", objectFit: "cover", display: "block" }} />
             ) : (
-              <div style={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onColor, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.5rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 76, height: 76, borderRadius: "50%", backgroundColor: getAvatarColor(friend.id || friendName), color: palette.onColor, ...display, fontSize: "1.5rem", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {initials}
               </div>
             )}
@@ -6041,15 +6044,15 @@ function ReaderView({ cuento, user, onClose, onAddToLibrary }) {
 
       {/* Story content */}
       <div ref={containerRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", padding: "2rem 1.5rem 5rem", WebkitOverflowScrolling: "touch" }}>
-        <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "1.7rem", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.25 }}>
+        <h1 style={{ ...quoteFont, fontSize: "1.7rem", fontStyle: "italic", color: palette.ink, marginBottom: "0.3rem", lineHeight: 1.25 }}>
           {cuento.titulo}
         </h1>
-        <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", color: palette.inkFaint, marginBottom: "2.5rem" }}>
+        <p style={{ ...body, fontSize: "0.9rem", color: palette.inkFaint, marginBottom: "2.5rem" }}>
           {cuento.autor}{cuentoDuracion(cuento) ? ` · ${cuentoDuracion(cuento)}` : ""}
         </p>
 
         {cuento.texto.split(/\n\n+/).filter(p => p.trim()).map((para, i) => (
-          <p key={i} style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "21px", lineHeight: 1.85, color: palette.ink, marginBottom: "1.3rem", textAlign: "left" }}>
+          <p key={i} style={{ ...quoteFont, fontSize: "21px", lineHeight: 1.85, color: palette.ink, marginBottom: "1.3rem", textAlign: "left" }}>
             {para.trim()}
           </p>
         ))}
@@ -6445,7 +6448,7 @@ function FriendsView({ user, onPendingChange, onMessagesRead, isOnline = true })
           height: size,
           backgroundColor: getAvatarColor(profile.id || profile.nombre), ...avatarEdge(),
           color: palette.onColor,
-          fontFamily: "'Bricolage Grotesque', system-ui, sans-serif",
+          ...display,
           fontSize: size * 0.35,
           fontWeight: 600,
         }}
@@ -6775,7 +6778,7 @@ function AmigosSheet({ user, onClose, onPendingChange, onMessagesRead }) {
         style={{ position: "absolute", top: 0, right: 0, bottom: 0, width: "min(440px, 100%)", backgroundColor: palette.bg, overflowY: "auto", boxShadow: "-8px 0 30px rgba(0,0,0,0.25)", animation: "slideInRight 280ms cubic-bezier(0.32,0.72,0,1)", paddingTop: "env(safe-area-inset-top)" }}
       >
         <div style={{ position: "sticky", top: 0, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0.9rem 1rem", borderBottom: `1px solid ${palette.borderSoft}`, backgroundColor: palette.bg + "F5", backdropFilter: "blur(8px)" }}>
-          <h2 style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.2rem", color: palette.ink }}>Amigos</h2>
+          <h2 style={{ ...display, fontWeight: 700, fontSize: "1.2rem", color: palette.ink }}>Amigos</h2>
           <button onClick={onClose} aria-label="Cerrar" className="btn-press" style={{ background: "none", border: "none", cursor: "pointer", padding: 6, display: "flex" }}>
             <X size={22} color={palette.inkSoft} />
           </button>
@@ -6936,7 +6939,7 @@ function NotificationsSheet({ user, onClose, onNotifsRead, onNavigate }) {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, height: "65vh", backgroundColor: palette.bgCard, borderRadius: "20px 20px 0 0", zIndex: 1001, display: "flex", flexDirection: "column", animation: isClosing ? "slideDown 250ms cubic-bezier(0.4, 0, 1, 1) forwards" : "slideUp 320ms cubic-bezier(0.32, 0.72, 0, 1)", boxShadow: "0 -8px 40px rgba(0,0,0,0.18)" }}>
         <div style={{ width: 40, height: 4, backgroundColor: palette.border, borderRadius: 2, margin: "12px auto 0", flexShrink: 0 }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px 12px", flexShrink: 0 }}>
-          <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 20, fontWeight: 700, color: palette.ink }}>Notificaciones</span>
+          <span style={{ ...display, fontSize: 20, fontWeight: 700, color: palette.ink }}>Notificaciones</span>
           {notifications.length > 0 && (
             <button
               onClick={async () => {
@@ -7325,7 +7328,7 @@ function LikeButton({ postId, count, liked, onToggle, size = 18 }) {
           style={{ position: "absolute", opacity: liked ? 1 : 0, transition: "opacity 120ms ease" }}
         />
       </span>
-      {count > 0 && <span style={{ fontSize: size <= 14 ? "13px" : "14px", color: palette.inkSoft, fontFamily: "Figtree, system-ui, sans-serif", lineHeight: 1 }}>{count}</span>}
+      {count > 0 && <span style={{ fontSize: size <= 14 ? "13px" : "14px", color: palette.inkSoft, ...body, lineHeight: 1 }}>{count}</span>}
     </button>
   );
 }
@@ -8026,7 +8029,7 @@ function FiveMinutesModal({ books, onClose, onGoToLog }) {
                     {b.coverUrl ? (
                       <img src={b.coverUrl} alt="" style={{ width: 48, height: 70, objectFit: "cover", borderRadius: 4, flexShrink: 0, boxShadow: "0 2px 8px rgba(42,31,26,0.18)" }} />
                     ) : (
-                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
+                      <div style={{ width: 48, height: 70, borderRadius: 4, backgroundColor: palette.accent, display: "flex", alignItems: "center", justifyContent: "center", color: palette.onAccent, ...display, fontSize: 20, fontWeight: 700, flexShrink: 0 }}>
                         {(b.title || "?")[0]}
                       </div>
                     )}
@@ -8047,7 +8050,7 @@ function FiveMinutesModal({ books, onClose, onGoToLog }) {
                 {selectedBook.coverUrl ? (
                   <img src={selectedBook.coverUrl} alt="" style={coverStyle} />
                 ) : (
-                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: palette.onAccent, fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: 36, fontWeight: 700 }}>
+                  <div style={{ ...coverStyle, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: palette.accent, color: palette.onAccent, ...display, fontSize: 36, fontWeight: 700 }}>
                     {(selectedBook.title || "?")[0]}
                   </div>
                 )}
@@ -8340,7 +8343,7 @@ function SnacksHero({ onRead }) {
   // principal es papel fijo (SEMA_PAPEL, arena + tinta en ambos modos: va sobre la franja, no
   // sobre bg) y bordes de 2 px. Se probó 14 px: a 390 y a 360 el boleto largo pisa la portada
   // (medido con getBoundingClientRect), así que se queda en 13 px.
-  const boletoBase = { ...display, fontSize: "13px", fontWeight: 800, lineHeight: 1, textTransform: "uppercase", display: "inline-flex", alignItems: "center", alignSelf: "flex-start", whiteSpace: "nowrap" };
+  const boletoBase = { ...label, fontSize: "13px", fontWeight: 800, lineHeight: 1, textTransform: "uppercase", display: "inline-flex", alignItems: "center", alignSelf: "flex-start", whiteSpace: "nowrap" };
   // Talón con la fecha corta («02 NOV»). Se arma a mano: con day+month juntos Chromium devuelve
   // «02-nov» y Safari «02 nov.»; así sale igual en todos, sin punto ni guion.
   const hoy = new Date();
@@ -10075,7 +10078,7 @@ function RatingDistribution({ books }) {
   return (
     <div style={{ marginTop: "1.5rem", backgroundColor: palette.bgCard, border: `1px solid ${palette.borderSoft}`, borderRadius: "14px", padding: "1rem 1.1rem" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
-        <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.82rem", fontWeight: 600, color: palette.inkSoft }}>Calificaciones</span>
+        <span style={{ ...display, fontSize: "0.82rem", fontWeight: 600, color: palette.inkSoft }}>Calificaciones</span>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "0.78rem", fontWeight: 700, color: palette.amber }}>{avg} ★ promedio</span>
       </div>
       {[5, 4, 3, 2, 1].map(star => (
@@ -10384,18 +10387,18 @@ function QuoteShareCard({ quote, cardRef }) {
     <div ref={cardRef} style={{ width: "320px", background: BRAND.gradientShareCard, borderRadius: "20px", padding: "2.5rem 2rem 1.75rem", position: "relative", overflow: "hidden", display: "flex", flexDirection: "column", gap: "1rem", minHeight: "380px" }}>
       <div style={{ position: "absolute", top: -60, right: -50, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.08)", pointerEvents: "none" }} />
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 120, height: 120, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
-      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>SEMA</p>
-      <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: "1.45rem", lineHeight: 1.4, color: BRAND.ink, margin: 0, flex: 1 }}>
+      <p style={{ ...display, fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.5)", textTransform: "uppercase", margin: 0 }}>SEMA</p>
+      <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "1.45rem", lineHeight: 1.4, color: BRAND.ink, margin: 0, flex: 1 }}>
         {(quote.text || "").length > 220 ? (quote.text || "").slice(0, 220) + "…" : quote.text}
       </p>
       {quote.bookTitle && (
         <div style={{ borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem" }}>
-          <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.85rem", color: "rgba(42,31,26,0.6)", margin: 0 }}>
+          <p style={{ ...body, fontSize: "0.85rem", color: "rgba(42,31,26,0.6)", margin: 0 }}>
             — {quote.bookTitle}{quote.bookAuthor ? ` · ${quote.bookAuthor}` : ""}
           </p>
         </div>
       )}
-      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.65rem", color: "rgba(42,31,26,0.4)", letterSpacing: "0.06em", margin: 0 }}>
+      <p style={{ ...body, fontSize: "0.65rem", color: "rgba(42,31,26,0.4)", letterSpacing: "0.06em", margin: 0 }}>
         folio-final.vercel.app
       </p>
     </div>
@@ -10445,7 +10448,7 @@ function QuoteShareModal({ quote, onClose }) {
             {generating ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Share2 size={16} />}
             {shared ? "¡Listo!" : generating ? "Generando..." : "Compartir imagen"}
           </button>
-          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onColor, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", fontFamily: "'Bricolage Grotesque', system-ui, sans-serif" }}>
+          <button onClick={onClose} style={{ fontSize: "0.95rem", fontWeight: 500, backgroundColor: "rgba(255,255,255,0.14)", color: palette.onColor, border: "1px solid rgba(255,255,255,0.28)", borderRadius: "10px", padding: "0.75rem 1.25rem", cursor: "pointer", ...display }}>
             Cerrar
           </button>
         </div>
@@ -10894,7 +10897,7 @@ function GemToast({ amount, label, id, onDismiss }) {
         whiteSpace: "nowrap",
       }}>
         <img src="/gema.png" alt="" style={{ width: 22, height: 22, objectFit: "contain", flexShrink: 0 }} />
-        <span style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1.05rem", color: palette.onAccent, lineHeight: 1, letterSpacing: "-0.01em" }}>
+        <span style={{ ...display, fontWeight: 700, fontSize: "1.05rem", color: palette.onAccent, lineHeight: 1, letterSpacing: "-0.01em" }}>
           {label || `+${amount} gemas`} ✨
         </span>
       </div>
@@ -11032,8 +11035,8 @@ function WrappedStoryExperience({ wrap, onClose }) {
 
   function SlideContent() {
     const textShadow = "0 2px 12px rgba(0,0,0,0.4)";
-    const big = { fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 900, color: BRAND.cream, textShadow, lineHeight: 1 };
-    const sub = { fontFamily: "Figtree, system-ui, sans-serif", color: "rgba(245,237,224,0.75)", lineHeight: 1.45 };
+    const big = { ...display, fontWeight: 900, color: BRAND.cream, textShadow, lineHeight: 1 };
+    const sub = { ...body, color: "rgba(245,237,224,0.75)", lineHeight: 1.45 };
 
     if (slide.type === "intro") return (
       <div style={{ textAlign: "center" }}>
@@ -11136,7 +11139,7 @@ function WrappedStoryExperience({ wrap, onClose }) {
         </p>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", maxWidth: 260, margin: "0 auto" }}>
           <ShareButton wrap={wrap} setPaused={setPaused} slideRef={slideRef} />
-          <button onClick={onClose} style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", color: "rgba(245,237,224,0.6)", background: "none", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ ...body, fontSize: "0.9rem", color: "rgba(245,237,224,0.6)", background: "none", border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer" }}>
             Cerrar
           </button>
         </div>
@@ -11186,10 +11189,10 @@ function WrappedStoryExperience({ wrap, onClose }) {
 
     return (
       <>
-        <button onClick={handleShare} style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontWeight: 700, fontSize: "1rem", backgroundColor: BRAND.cream, color: BRAND.wine, border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
+        <button onClick={handleShare} style={{ ...display, fontWeight: 700, fontSize: "1rem", backgroundColor: BRAND.cream, color: BRAND.wine, border: "none", borderRadius: 12, padding: "0.85rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.45rem" }}>
           <Share2 size={17} />{shared ? "¡compartido!" : "compartir wrapped"}
         </button>
-        <button onClick={handleDownload} disabled={sharing} style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: BRAND.cream, border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
+        <button onClick={handleDownload} disabled={sharing} style={{ ...body, fontSize: "0.9rem", backgroundColor: "rgba(245,237,224,0.12)", color: BRAND.cream, border: "1px solid rgba(245,237,224,0.25)", borderRadius: 10, padding: "0.65rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>
           {sharing ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Download size={14} />}
           guardar imagen
         </button>
@@ -11270,7 +11273,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       <div style={{ position: "absolute", bottom: -40, left: -40, width: 130, height: 130, borderRadius: "50%", background: "rgba(0,0,0,0.08)", pointerEvents: "none" }} />
 
       {/* Logo */}
-      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>SEMA</p>
+      <p style={{ ...display, fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.35em", color: "rgba(42,31,26,0.55)", textTransform: "uppercase", alignSelf: "flex-start", margin: 0 }}>SEMA</p>
 
       {/* Book cover */}
       <div style={{ position: "relative", marginTop: "0.25rem", marginBottom: "0.25rem" }}>
@@ -11283,15 +11286,15 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       </div>
 
       {/* Caption */}
-      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.72rem", color: "rgba(42,31,26,0.55)", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>Terminé de leer</p>
+      <p style={{ ...body, fontSize: "0.72rem", color: "rgba(42,31,26,0.55)", letterSpacing: "0.12em", textTransform: "uppercase", margin: 0 }}>Terminé de leer</p>
 
       {/* Title */}
-      <p style={{ fontFamily: "'Bricolage Grotesque', system-ui, sans-serif", fontSize: "1.3rem", fontWeight: 800, color: BRAND.ink, textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
+      <p style={{ ...display, fontSize: "1.3rem", fontWeight: 800, color: BRAND.ink, textAlign: "center", lineHeight: 1.2, margin: 0, maxWidth: "90%" }}>
         {book.title}
       </p>
 
       {/* Author */}
-      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.88rem", color: "rgba(42,31,26,0.65)", margin: 0 }}>
+      <p style={{ ...body, fontSize: "0.88rem", color: "rgba(42,31,26,0.65)", margin: 0 }}>
         de {book.author}
       </p>
 
@@ -11306,7 +11309,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
 
       {/* Review snippet */}
       {reviewSnippet && (
-        <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", fontSize: "0.84rem", color: "rgba(42,31,26,0.6)", textAlign: "center", lineHeight: 1.5, maxWidth: "88%", margin: "0.1rem 0" }}>
+        <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "0.84rem", color: "rgba(42,31,26,0.6)", textAlign: "center", lineHeight: 1.5, maxWidth: "88%", margin: "0.1rem 0" }}>
           "{reviewSnippet}"
         </p>
       )}
@@ -11315,14 +11318,14 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       <div style={{ width: "100%", borderTop: "1px solid rgba(42,31,26,0.15)", paddingTop: "0.75rem", marginTop: "0.2rem", display: "flex", flexDirection: "column", gap: "0.3rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
           <BookOpen size={13} color={BRAND.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-          <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
+          <p style={{ ...body, fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
             Libro #{booksThisYear} de {year}
           </p>
         </div>
         {streak?.current_streak > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
             <Flame size={13} color={BRAND.ink} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-            <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
+            <p style={{ ...body, fontSize: "0.83rem", color: BRAND.ink, margin: 0 }}>
               {streak.current_streak} {streak.current_streak === 1 ? "día" : "días"} de racha
             </p>
           </div>
@@ -11330,7 +11333,7 @@ function BookShareCard({ book, rating, review, streak, booksThisYear, cardRef })
       </div>
 
       {/* CTA */}
-      <p style={{ fontFamily: "Figtree, system-ui, sans-serif", fontSize: "0.67rem", color: "rgba(42,31,26,0.42)", letterSpacing: "0.06em", marginTop: "0.15rem" }}>
+      <p style={{ ...body, fontSize: "0.67rem", color: "rgba(42,31,26,0.42)", letterSpacing: "0.06em", marginTop: "0.15rem" }}>
         folio-final.vercel.app
       </p>
     </div>

@@ -765,3 +765,189 @@ button:not(:disabled):not(.sema-no-hover):active,
   .sema-boleto__cuerpo { padding-right: 0.5rem; padding-left: 0.5rem; }
   .sema-boleto--minutos { padding-left: 0.75rem; padding-right: 0.75rem; }
 }
+/* ═══ Ronda 4 · kit de detalles (Detalles.jsx) ═══════════════════════════════════════════════
+   Cinta adhesiva, sello de tinta, boleto y nota a mano (2026-11-03). Los colores los pone cada
+   componente en variables --kd-* desde palette / SEMA_EXTENDIDA / SEMA_PAPEL: aquí solo hay
+   var(--…), currentColor y black/transparent de máscara (recortan, no pintan). Nada se anima:
+   el giro es estático y con prefers-reduced-motion no hay nada que apagar. Giros en [-8°, 8°]. */
+
+/* Cinta «scotch»: semitransparente, con la textura de .sema-papel en multiply, un brillo tenue y
+   los dos cantos cortos dentados (clip-path). Absoluta sobre el borde superior del padre
+   (position: relative), medio dentro y medio fuera. Solo decoración (aria-hidden). */
+.sema-kd-cinta {
+  position: absolute;
+  top: -10px;
+  height: 24px;
+  z-index: 2;
+  pointer-events: none;
+  isolation: isolate;
+  background-color: var(--kd-bg);
+  background-image: linear-gradient(90deg, transparent 8%, color-mix(in srgb, var(--kd-luz) 26%, transparent) 34%, transparent 58%);
+  opacity: 0.78;
+  transform: translateX(var(--kd-x, 0%)) rotate(var(--kd-angulo, -4deg));
+  transform-origin: center;
+  clip-path: polygon(
+    0 0, 100% 0,
+    calc(100% - 3px) 3.5px, 100% 7.5px, calc(100% - 2.5px) 11px, 100% 15px, calc(100% - 3.5px) 19px, 100% 24px,
+    0 100%,
+    3px 20.5px, 0 16.5px, 3.5px 12.5px, 0 8.5px, 2.5px 4.5px
+  );
+}
+.sema-kd-cinta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.018' numOctaves='4' seed='11'/%3E%3CfeDiffuseLighting surfaceScale='4' diffuseConstant='1.18'%3E%3CfeDistantLight azimuth='225' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+}
+
+/* Sello de goma: doble filo (borde 2 px + anillo interior de 1 px a 2 px) y una ligera falta de tinta
+   por mask-image: ruido fractal cuyo alfa queda casi siempre en 1 (feColorMatrix a = 1.9 − 1.6·ruido) y
+   solo baja en manchas chicas; el texto se lee entero. Space Mono 700 mayúsculas, tracking 0.08em. */
+.sema-kd-sello {
+  position: relative;
+  display: inline-block;
+  color: var(--kd-ink);
+  border: 2px solid var(--kd-ink);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transform: rotate(var(--kd-angulo, -8deg));
+  transform-origin: center;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.07' numOctaves='3' seed='5'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -1.6 1.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23t)'/%3E%3C/svg%3E");
+  -webkit-mask-size: 160px 160px; mask-size: 160px 160px;
+  -webkit-mask-repeat: repeat; mask-repeat: repeat;
+}
+.sema-kd-sello::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid var(--kd-ink);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.sema-kd-sello--md { font-size: 13px; }
+.sema-kd-sello--sm { font-size: 12px; padding: 5px 8px; }
+.sema-kd-sello__texto { position: relative; }
+
+/* Boleto de papel: cuerpo + talón opcional, borde 2 px en el color del texto, textura .sema-papel.
+   Las formas salen de mask-image (como .sema-boleto--cuento / --minutos): la muesca deja ver el
+   fondo real sin pintar nada encima. --kd-corte es el ancho fijo del talón. */
+.sema-kd-boleto {
+  --kd-muesca: 5px;
+  --kd-diente: 3.5px;
+  --kd-paso: 9px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  vertical-align: middle;
+  white-space: nowrap;
+  background-color: var(--kd-bg);
+  color: var(--kd-ink);
+  border: 2px solid var(--kd-ink);
+  border-radius: 4px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(var(--kd-angulo, -2deg));
+  transform-origin: left center;
+}
+.sema-kd-boleto__talon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--kd-corte) - 2px);
+  align-self: stretch;
+  padding: 0.5rem 0;
+  letter-spacing: 0.06em;
+}
+.sema-kd-boleto__cuerpo { padding: 0.5rem 0.75rem; }
+/* Con talón: muescas semicirculares arriba y abajo sobre la línea de corte (dos capas de máscara,
+   cada una media altura, traslapadas 1 px para no dejar costura al girar) y perforado dashed. */
+.sema-kd-boleto--corte {
+  -webkit-mask-image:
+    radial-gradient(circle at var(--kd-corte) 0, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px)),
+    radial-gradient(circle at var(--kd-corte) 100%, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px));
+  mask-image:
+    radial-gradient(circle at var(--kd-corte) 0, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px)),
+    radial-gradient(circle at var(--kd-corte) 100%, transparent var(--kd-muesca), black calc(var(--kd-muesca) + 0.75px));
+  -webkit-mask-size: 100% calc(50% + 1px); mask-size: 100% calc(50% + 1px);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: top, bottom; mask-position: top, bottom;
+}
+.sema-kd-boleto--corte::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--kd-corte) - 3px);
+  top: calc(var(--kd-muesca) + 1px);
+  bottom: calc(var(--kd-muesca) + 1px);
+  width: 0;
+  border-left: 2px dashed currentColor;
+  opacity: 0.8;
+  pointer-events: none;
+  z-index: 1;
+}
+/* Dentado en los dos lados cortos (bites repetidos) con una capa central lisa. */
+.sema-kd-boleto--lados {
+  border-radius: 2px;
+  -webkit-mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  mask-image:
+    radial-gradient(circle at 0 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px)),
+    linear-gradient(black, black),
+    radial-gradient(circle at 100% 50%, transparent var(--kd-diente), black calc(var(--kd-diente) + 0.75px));
+  -webkit-mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  mask-size: var(--kd-paso) var(--kd-paso), calc(100% - 2 * var(--kd-paso) + 1px) 100%, var(--kd-paso) var(--kd-paso);
+  -webkit-mask-position: left center, center, right center;
+  mask-position: left center, center, right center;
+  -webkit-mask-repeat: repeat-y, no-repeat, repeat-y;
+  mask-repeat: repeat-y, no-repeat, repeat-y;
+}
+.sema-kd-boleto--lados .sema-kd-boleto__cuerpo { padding: 0.5rem 0.9rem; }
+
+/* Nota a mano: Instrument Serif itálica 18 px, sin caja, con subrayado ondulado (SVG en currentColor)
+   y flecha opcional dibujada a mano. */
+.sema-kd-nota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--kd-ink);
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1.25;
+  transform: rotate(var(--kd-angulo, -2deg));
+  transform-origin: left center;
+}
+.sema-kd-nota--arriba { flex-direction: column; align-items: flex-start; gap: 2px; }
+.sema-kd-nota__texto { position: relative; display: inline-block; padding-bottom: 6px; }
+.sema-kd-nota__raya {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 6px;
+  overflow: visible;
+  display: block;
+}
+.sema-kd-nota__flecha { flex-shrink: 0; display: block; }
+.sema-kd-nota__flecha--arriba { margin-left: 10px; }
+
+/* En 360–379 px se aprieta el tracking de boletos y sellos; el texto sigue en 12–13 px. */
+@media (max-width: 379px) {
+  .sema-kd-boleto, .sema-kd-sello { letter-spacing: 0.04em; }
+  .sema-kd-boleto__talon { letter-spacing: 0.02em; }
+  .sema-kd-boleto__cuerpo { padding-left: 0.55rem; padding-right: 0.55rem; }
+}
+
