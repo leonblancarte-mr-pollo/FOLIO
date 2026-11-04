@@ -9085,6 +9085,14 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [showNotifPrompt, setShowNotifPrompt] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  // Ronda 4: menú de tres puntos de una publicación (id abierto). Se cierra con Escape y con clic fuera.
+  const [postMenu, setPostMenu] = useState(null);
+  useEffect(() => {
+    if (!postMenu) return;
+    const onKey = (e) => { if (e.key === "Escape") setPostMenu(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [postMenu]);
   // La racha ya llegó (para que el confeti de meta no se dispare con la carga inicial).
   const [streakLoaded, setStreakLoaded] = useState(false);
 
@@ -9426,13 +9434,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   // tipo vive solo en su franja o zona (sema-identidad §2; mapa en sema-paleta §6).
   // Ronda 2 (punto 7 de León): mismo formato en todas; todas van en tarjeta con su franja superior.
   // `neutral` queda solo por compatibilidad (ya no se pasa desde renderPost).
-  const cardStyle = (post, neutral = false) => ({
-    position: "relative", overflow: "hidden",
+  // Ronda 4 (2026-11-03): la publicación va a todo el ancho, sin borde ni radio (clase .sema-post:
+  // línea fina borderSoft debajo). El resaltado al llegar desde una notificación es un filete
+  // izquierdo de 3 px en tinta durante 1.5 s, ya no un anillo de tarjeta.
+  const cardStyle = (post) => ({
     backgroundColor: palette.bg,
-    border: neutral ? "none" : `1px solid ${palette.border}`,
-    borderBottom: `1px solid ${palette.border}`,
-    borderRadius: neutral ? 0 : 16,
-    boxShadow: highlightedPost === post.id ? `0 0 0 2px ${palette.ink}` : "none",
+    borderBottomColor: palette.borderSoft,
+    boxShadow: highlightedPost === post.id ? `inset 3px 0 0 ${palette.ink}` : "none",
     transition: "box-shadow 200ms ease",
     cursor: "default",
   });
@@ -9444,7 +9452,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   );
   // Franja superior del tipo de publicación (texto 14 px en negritas; contraste en la tabla de §6).
   const band = (bg, color, Icon, label, extra, extraStyle = {}) => (
-    <div style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "7px 14px", ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
+    <div className="sema-post__pad" style={{ backgroundColor: bg, color, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 8, paddingBottom: 8, ...body, fontSize: "14px", fontWeight: 700, lineHeight: 1.3, ...extraStyle }}>
       <Icon size={14} strokeWidth={2.2} color={color} aria-hidden />
       <span>{label}</span>
       {extra}
@@ -9461,7 +9469,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
     const other = post.user_id !== user.id;
     const name = displayAuthorName(post.author?.nombre) || 'Usuario';
     return (
-      <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", padding: "12px 8px 0 12px" }}>
+      <div className="sema-post__pad" style={{ display: "flex", gap: "0.6rem", alignItems: "center", paddingTop: 10 }}>
         {other ? (
           <button onClick={(e) => { e.stopPropagation(); openAuthor(post); }} aria-label={`Ver perfil de ${name}`} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", flexShrink: 0, minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Avatar author={post.author} size={40} />
@@ -9475,21 +9483,58 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           </p>
           <span style={{ ...ts.caption, color: palette.inkSoft }}>{timeAgo(post.created_at)}</span>
         </div>
-        {post.user_id === user.id && (
-          <button onClick={(e) => { e.stopPropagation(); setPostToDelete(post.id); }} aria-label="Borrar publicación" title="Borrar" style={{ width: 44, height: 44, flexShrink: 0, color: palette.inkSoft, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Trash2 size={16} strokeWidth={2} />
-          </button>
+        {postMenuButton(post)}
+      </div>
+    );
+  };
+  // Ronda 4: menú de tres puntos (44×44) anclado a la derecha del encabezado. Solo aparece si hay
+  // algo que ofrecer: «Ver libro» (si hay libro) y «Borrar publicación» (solo propia). El bote de
+  // basura ya no va suelto en el encabezado. Cierra con Escape (efecto arriba), clic fuera (velo)
+  // y al elegir una opción; el foco entra al primer elemento.
+  const postMenuButton = (post) => {
+    const own = post.user_id === user.id;
+    if (!own && !post.book) return null;
+    const open = postMenu === post.id;
+    const item = { ...body, width: "100%", minHeight: 44, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", background: "none", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, textAlign: "left", whiteSpace: "nowrap" };
+    return (
+      <div style={{ position: "relative", flexShrink: 0, marginRight: -8 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); setPostMenu(open ? null : post.id); }}
+          aria-label="Opciones de la publicación"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          style={{ width: 44, height: 44, color: palette.inkSoft, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 999 }}
+        >
+          <MoreHorizontal size={20} strokeWidth={2} aria-hidden />
+        </button>
+        {open && (
+          <>
+            <div onClick={(e) => { e.stopPropagation(); setPostMenu(null); }} aria-hidden style={{ position: "fixed", inset: 0, zIndex: 900 }} />
+            <div role="menu" aria-label="Opciones de la publicación" className="popover-anim sema-post-menu" onClick={(e) => e.stopPropagation()} style={{ backgroundColor: palette.bg, border: `1.5px solid ${palette.ink}` }}>
+              {post.book && (
+                <button role="menuitem" autoFocus className="sema-post-menu__item" onClick={() => { setPostMenu(null); setPreviewPost(post); }} style={{ ...item, color: palette.ink }}>
+                  <BookOpen size={17} strokeWidth={2} aria-hidden /> Ver libro
+                </button>
+              )}
+              {own && (
+                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item" onClick={() => { setPostMenu(null); setPostToDelete(post.id); }} style={{ ...item, color: palette.danger }}>
+                  <Trash2 size={17} strokeWidth={2} aria-hidden /> Borrar publicación
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     );
   };
   const postFooter = (post, neutral = false) => (
     <>
-      <div style={{ borderTop: neutral ? "none" : `1px solid ${palette.borderSoft}`, marginTop: neutral ? 4 : 12, padding: "0 8px", display: "flex", alignItems: "center", gap: "0.25rem" }}>
+      {/* Ronda 4: solo la fila de botones, sin línea ni caja propia; mismo padding lateral que el cuerpo (los botones llevan 8 px internos) */}
+      <div className="sema-post__pad" style={{ marginTop: 6, paddingBottom: 2, display: "flex", alignItems: "center", gap: "0.25rem", marginLeft: -8 }}>
         <LikeButton postId={post.id} count={likeCounts[post.id] || 0} liked={likedPosts.has(post.id)} onToggle={toggleLike} size={18} />
         <CommentsToggle open={openComments.has(post.id)} count={commentCounts[post.id]} onClick={(e) => { e.stopPropagation(); toggleComments(post.id); }} />
       </div>
-      {openComments.has(post.id) && <div className="comments-enter" style={{ padding: "0 16px 12px" }}><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
+      {openComments.has(post.id) && <div className="comments-enter sema-post__pad" style={{ paddingBottom: 12 }}><PostComments postId={post.id} user={user} onCountChange={handleCommentCountChange} postOwnerId={post.user_id} /></div>}
     </>
   );
   // Libro en línea (sin caja: portada + título; toda la fila abre la ficha).
@@ -9536,12 +9581,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             // ── Logro: franja «Logro» + sticker lila (firma) con el nombre ──
             if (isAchievement) {
               return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
                   {postBand(post, Award, "Logro")}
                   {postHeader(post, null)}
                   {/* Ronda 2: el logro es un sticker con su nombre (lila, papel, canto del fondo, filo de tinta y giro), no un ícono en círculo */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "1rem 16px 0" }}>
+                  <div className="sema-post__pad" style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", paddingTop: "1rem" }}>
                     <div className="sema-sticker">
                       <div className="achieve-icon-enter sema-papel" style={{ display: "inline-flex", alignItems: "center", gap: 10, backgroundColor: palette.firma, border: `3px solid ${palette.bg}`, boxShadow: `0 0 0 1.5px ${palette.ink}`, borderRadius: 12, padding: "10px 18px 10px 14px" }}>
                         <AchIcon size={26} color={palette.onFirma} strokeWidth={2} aria-hidden />
@@ -9560,11 +9605,11 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             //    Instrument Serif grande, en tinta sobre el fondo. Ya no es tarjeta ciruela. ──
             if (post.type === "quote") {
               return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
                   {postBand(post, Feather, "Frase")}
                   {postHeader(post, null)}
-                  <div style={{ padding: "12px 16px 0" }}>
+                  <div className="sema-post__pad" style={{ paddingTop: 12 }}>
                     <FeedQuoteBody quote={post.quote} />
                   </div>
                   {postFooter(post)}
@@ -9579,12 +9624,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               devLog('Post reading_session:', { id: post.id, pages_read: post.pages_read, minutes_read: post.minutes_read });
               const stats = [sesPages > 0 ? pagesText(sesPages) : null, sesMinutes > 0 ? `${sesMinutes} min` : null].filter(Boolean).join(" · ");
               return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
                   {postBand(post, BookOpen, stats ? "Leyó" : "Leyó un rato", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
                   {postHeader(post, null)}
                   {(post.book || post.content) && (
-                    <div style={{ padding: "10px 16px 0" }}>
+                    <div className="sema-post__pad" style={{ paddingTop: 10 }}>
                       {post.book && bookRow(post)}
                       {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: post.book ? "0.75rem" : 0 }}>{post.content}</p>}
                     </div>
@@ -9602,11 +9647,15 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               const rating = post.book?.rating || 0;
               const finishedGradient = pickByHash(SEMA_GRADIENTES_TERMINADO, post.id);
               return (
-                <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                   {heartOverlay(post)}
                   {postBand(post, BookmarkCheck, "Libro terminado")}
                   {postHeader(post, null)}
                   <div style={{ background: finishedGradient.css, margin: "12px 0 0", padding: "20px 16px 20px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", position: "relative" }}>
+                    {/* Detalle 1 de 2 (ronda 4): sello de tinta «Terminado» en la esquina del degradado, solo en este
+                        tipo. La tinta es el `on` del degradado (#483A58 por token), no palette.ink: en oscuro la tinta
+                        es blanca y sobre estos colores no pasa (sema-paleta §7). */}
+                    <SelloTinta angulo={-8} size="sm" aria-hidden style={{ position: "absolute", top: 12, right: 12, "--kd-ink": finishedGradient.on }}>Terminado</SelloTinta>
                     {post.book ? (
                       <button onClick={(e) => { e.stopPropagation(); setPreviewPost(post); }} aria-label={`Ver detalles de ${post.book.title}`} className="sema-focus-onaccent" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", borderRadius: 6 }}>
                         <span style={{ position: "relative", display: "block", width: 116, height: 174, borderRadius: 6, overflow: "hidden", border: `2px solid ${palette.onAccent}`, boxShadow: `5px 5px 0 ${palette.onAccent}` }}>
@@ -9622,20 +9671,25 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       </p>
                     )}
                   </div>
-                  <div style={{ padding: "12px 16px 0" }}>
+                  <div className="sema-post__pad" style={{ paddingTop: 12 }}>
                     {post.book?.author && <p style={{ ...body, fontSize: "15px", color: palette.inkSoft, textAlign: "center" }}>{post.book.author}</p>}
-                    {/* Reseña, una sola vez: «Reseña» + estrellas en tinta y la reseña como cita (filete en ink:
-                        la tarjeta ya lleva franja y degradado, no suma un tercer color). Si post.content repite la reseña no se muestra debajo (sameReview). */}
+                    {/* Reseña, una sola vez (sameReview), como recorte de papel pegado con cinta (detalle 2 de 2, ronda 4):
+                        bloque superficieSuave con textura .sema-papel y giro leve determinista por publicación; la cinta
+                        adhesiva va fuera del bloque con textura (que recorta por overflow). Texto en ink sobre
+                        superficieSuave: 7.36 en claro, 10.39 en oscuro. */}
                     {(reviewText || rating > 0) && (
-                      <div style={{ marginTop: "0.9rem" }}>
-                        <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700 }}>
-                          Reseña {rating > 0 && starsOn(rating, palette.ink)}
-                        </p>
-                        {reviewText && (
-                          <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.ink}`, paddingLeft: "0.8rem", marginTop: "0.6rem" }}>
-                            «{reviewText}»
+                      <div className="sema-post__recorte" style={{ "--kd-giro": `${[-1, -0.5, 0.6, 1][stableHash(post.id) % 4]}deg` }}>
+                        <CintaAdhesiva color="firma" angulo={-4} position="top-center" />
+                        <div className="sema-papel sema-post__recorte-papel" style={{ backgroundColor: palette.superficieSuave }}>
+                          <p style={{ display: "flex", alignItems: "center", gap: 8, color: palette.ink, ...body, fontSize: "14px", fontWeight: 700 }}>
+                            Reseña {rating > 0 && starsOn(rating, palette.ink)}
                           </p>
-                        )}
+                          {reviewText && (
+                            <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, marginTop: "0.5rem" }}>
+                              «{reviewText}»
+                            </p>
+                          )}
+                        </div>
                       </div>
                     )}
                     {extraText && <p style={{ ...ts.body15, color: palette.ink, marginTop: "0.75rem" }}>{extraText}</p>}
@@ -9649,7 +9703,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             const hasReview = post.type === "book_update" && !isStarted && (post.book?.review || post.book?.rating > 0);
             const bandOn = postColors[post.id]?.on || palette.onFirma;
             return (
-              <div key={post.id} id={`post-${post.id}`} className="feed-post-item" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+              <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
                 {heartOverlay(post)}
                 {isStarted
                   ? postBand(post, BookOpen, "Empezó a leer")
@@ -9657,7 +9711,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     ? postBand(post, MessageCircle, "Reseña", post.book?.rating > 0 ? starsOn(post.book.rating, bandOn) : null)
                     : postBand(post, PenLine, "Nota")}
                 {postHeader(post, null)}
-                <div style={{ padding: "10px 16px 0" }}>
+                <div className="sema-post__pad" style={{ paddingTop: 10 }}>
                   {post.type === "book_update" && bookRow(post)}
                   {hasReview && post.book?.review && (
                     <p style={{ ...quoteFont, fontStyle: "italic", fontSize: "19px", lineHeight: 1.4, color: palette.ink, borderLeft: `3px solid ${palette.complementoFrio}`, paddingLeft: "0.8rem", marginTop: "0.75rem" }}>
@@ -9671,9 +9725,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                     <button
                       onClick={(e) => { e.stopPropagation(); setLightboxImage(post.image_url); }}
                       aria-label="Ver imagen completa"
-                      style={{ display: "block", width: "100%", border: "none", padding: 0, cursor: "pointer", marginTop: "0.75rem", borderRadius: 12, overflow: "hidden" }}
+                      className="sema-post__img"
+                      style={{ display: "block", border: "none", padding: 0, cursor: "pointer", marginTop: "0.75rem", overflow: "hidden" }}
                     >
-                      <img src={post.image_url} alt="" style={{ width: "100%", display: "block", borderRadius: 12 }} />
+                      <img src={post.image_url} alt="" style={{ width: "100%", display: "block" }} />
                     </button>
                   )}
                 </div>
@@ -9830,8 +9885,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
       {readingBooks.length > 0 && (
         <button
           onClick={() => setShowTimerModal(true)}
-          className="btn-press sema-composer-fab"
-          style={{ minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "transparent", border: `1px solid ${palette.border}`, borderRadius: 14, padding: "0 16px", cursor: "pointer", marginBottom: "0.75rem" }}
+          className="btn-press"
+          style={{ width: "100%", minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "transparent", border: `1px solid ${palette.border}`, borderRadius: 14, padding: "0 16px", cursor: "pointer", marginBottom: "0.75rem" }}
         >
           <span style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
             <Timer size={19} color={palette.ink} strokeWidth={2} aria-hidden />
@@ -9841,13 +9896,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
         </button>
       )}
 
-      {/* Crear publicación. En móvil deja libre la columna del «+» flotante (sema-composer-fab). */}
+      {/* Crear publicación, a todo el ancho (ronda 4: el «+» flotante se oculta al hacer scroll y ya no hay que esquivarlo). */}
       <div style={{ marginBottom: "2rem" }}>
         {!showNewPost ? (
           <button
             onClick={() => setShowNewPost(true)}
-            className="sema-composer-fab btn-press"
-            style={{ minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", borderRadius: 14, backgroundColor: "transparent", border: `1px solid ${palette.inkSoft}`, textAlign: "left", cursor: "pointer" }}
+            className="btn-press"
+            style={{ width: "100%", minHeight: 52, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", borderRadius: 14, backgroundColor: "transparent", border: `1px solid ${palette.inkSoft}`, textAlign: "left", cursor: "pointer" }}
           >
             <PenLine size={17} color={palette.inkSoft} strokeWidth={1.9} style={{ flexShrink: 0 }} aria-hidden />
             <span style={{ ...ts.body15, color: palette.inkSoft }}>¿Qué estás leyendo?</span>
@@ -9939,10 +9994,12 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
           style={{ paddingTop: "1.5rem" }}
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", animation: "feedFadeIn 200ms ease-out" }}>
+        <div className="sema-feed-lista" style={{ animation: "feedFadeIn 200ms ease-out" }}>
+          {/* Ronda 4: las publicaciones salen del padding del contenedor (.sema-feed-lista, margen negativo) y
+              van de borde a borde separadas por una línea fina; el Cuento del día recupera su padding. */}
           {posts.slice(0, 2).map(renderPost)}
           {/* Cuento del día después de las dos primeras publicaciones: al entrar se ve primero a la gente */}
-          <div key="cuento-del-dia" style={{ padding: "0.5rem 0 0" }}><SnacksHero onRead={setActiveReader} /></div>
+          <div key="cuento-del-dia" className="sema-feed-lista__cuento"><SnacksHero onRead={setActiveReader} /></div>
           {posts.slice(2).map(renderPost)}
         </div>
       )}

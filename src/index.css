@@ -983,3 +983,32 @@ button:not(:disabled):not(.sema-no-hover):active,
   text-overflow: ellipsis;
 }
 
+/* ═══ Ronda 4 · Social (feed a todo el ancho, 2026-11-03) ═══════════════════════════════════════
+   Las publicaciones salen del padding del contenedor (px-4 / sm:px-6) y van de borde a borde, sin
+   borde ni radio, separadas por UNA línea fina borderSoft (arena en claro, ciruela en oscuro). El
+   padding lateral vive en cada bloque (.sema-post__pad): 16 px en móvil, 24 px en ≥ 640 px para
+   alinear con el saludo y la racha. Colores solo por variables --sema-* (sin hex). */
+.sema-feed-lista { display: flex; flex-direction: column; margin-left: -1rem; margin-right: -1rem; }
+.sema-post { position: relative; overflow: hidden; padding-bottom: 6px; border-bottom: 1px solid var(--sema-border-soft); }
+.sema-post:last-child { border-bottom: none; }
+.sema-post__pad { padding-left: 16px; padding-right: 16px; }
+/* Imagen de una nota: a sangre y sin radio en móvil (compensa el padding del cuerpo). */
+.sema-post__img { width: calc(100% + 32px); margin-left: -16px; border-radius: 0; }
+.sema-post__img img { border-radius: 0; }
+/* El Cuento del día va entre publicaciones y recupera el padding del contenedor. */
+.sema-feed-lista__cuento { padding: 1.25rem 1rem 0.25rem; }
+/* Menú de tres puntos: anclado bajo el botón, a la derecha del encabezado. */
+.sema-post-menu { position: absolute; top: 46px; right: 0; z-index: 901; min-width: 220px; border-radius: 12px; padding: 4px 0; overflow: hidden; }
+.sema-post-menu__item:hover, .sema-post-menu__item:focus-visible { background-color: var(--sema-superficie-suave); }
+/* Reseña de «Libro terminado» como recorte de papel pegado con cinta: giro leve (−1°…1°, por
+   publicación) y textura .sema-papel en el bloque interior, que recorta; la cinta queda fuera de él. */
+.sema-post__recorte { position: relative; margin: 1.1rem 4px 0; transform: rotate(var(--kd-giro, -0.6deg)); transform-origin: center; }
+.sema-post__recorte-papel { padding: 18px 16px 14px; border-radius: 2px; }
+@media (min-width: 640px) {
+  .sema-feed-lista { margin-left: -1.5rem; margin-right: -1.5rem; }
+  .sema-post__pad { padding-left: 24px; padding-right: 24px; }
+  .sema-post__img { width: 100%; margin-left: 0; border-radius: 12px; }
+  .sema-post__img img { border-radius: 12px; }
+  .sema-feed-lista__cuento { padding: 1.25rem 1.5rem 0.25rem; }
+}
+
