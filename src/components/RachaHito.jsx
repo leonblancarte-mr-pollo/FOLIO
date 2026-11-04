@@ -38,7 +38,6 @@ export function LlamaRacha({ nivel = 1 }) {
   const w = nivel >= 3 ? 188 : nivel === 2 ? 148 : 100;
   return (
     <svg aria-hidden className={`sema-llama sema-llama--n${nivel}`} width={w} height={Math.round(w * (150 / 160))} viewBox="0 0 160 150" fill="none" style={{ display: "block", overflow: "visible" }}>
-      {nivel >= 3 && <circle cx="80" cy="84" r="70" fill={SEMA_LLAMA.brasa} opacity="0.55" />}
       {nivel >= 2 && <Lengua x={2} y={52} s={0.62} retraso={-0.4} tinta={tinta} />}
       {nivel >= 2 && <Lengua x={96} y={56} s={0.58} retraso={-1.1} tinta={tinta} />}
       {nivel >= 3 && <Lengua x={-22} y={78} s={0.42} retraso={-0.9} tinta={tinta} />}

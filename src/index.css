@@ -1183,10 +1183,10 @@ button:not(:disabled):not(.sema-no-hover):active,
   z-index: 0;
   border-radius: inherit;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
   background-size: 220px 220px;
   mix-blend-mode: multiply;
-  opacity: 0.72;
+  opacity: 0.5;
 }
 
 /* ═══ Ronda 5 · Mascota (PetHub) ═══════════════════════════════════════════════════════════════
@@ -1285,8 +1285,8 @@ button:not(:disabled):not(.sema-no-hover):active,
   padding: 26px 20px 28px;
   background-color: var(--hito-bg);
   color: var(--hito-ink);
-  border-top: 3px solid var(--hito-ink);
-  border-bottom: 3px solid var(--hito-ink);
+  border-top: 2px solid var(--hito-ink);
+  border-bottom: 2px solid var(--hito-ink);
   overflow: hidden;
 }
 .sema-hito::before {
@@ -1450,13 +1450,16 @@ button:not(:disabled):not(.sema-no-hover):active,
    conserva; la textura pasa a la de cartón de la racha y el globo (misma familia). */
 .sema-nav-sel { background-color: var(--nav-sel); }
 .sema-nav-rasgado::after {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.026 0.034' numOctaves='5' seed='7' stitchTiles='stitch'/%3E%3CfeDiffuseLighting surfaceScale='6' diffuseConstant='1.2'%3E%3CfeDistantLight azimuth='215' elevation='55'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23c)'/%3E%3C/svg%3E");
   background-size: 220px 220px;
-  opacity: 0.55;
+  opacity: 0.35;
 }
 
 /* .sema-papel / .sema-carton ponen position: relative a todos los hijos directos; eso rompía el span
    .sr-only (position: absolute) y el texto para lectores de pantalla se veía. */
 .sema-papel > .sr-only, .sema-carton > .sr-only { position: absolute; }
 /* El cartel de hito es un bloque grande y liso: su cartón va más tenue que el del boleto o el globo. */
-.sema-hito.sema-carton::after { opacity: 0.42; }
+.sema-hito.sema-carton::after { opacity: 0.34; }
+.sema-hito--n3.sema-carton::after { opacity: 0.28; }
+/* Libro terminado: el título grande cruza el degradado; textura más tenue para que el pliegue no baje de 3:1 (cereza). */
+.sema-terminado.sema-carton::after { opacity: 0.4; }

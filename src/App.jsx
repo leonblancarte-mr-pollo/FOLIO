@@ -773,7 +773,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
               display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
               padding: active ? "6px 14px" : "6px 14px",
               borderRadius: "14px",
-              "--nav-sel": `color-mix(in srgb, ${palette.firma} ${isLight ? 55 : 40}%, transparent)`,
+              "--nav-sel": `color-mix(in srgb, ${palette.firma} ${isLight ? 75 : 40}%, transparent)`,
             }}>
               <span style={{ position: "relative", display: "inline-flex" }}>
                 <Icon size={22} strokeWidth={active ? 2.4 : 1.8} color={tint} />
@@ -783,7 +783,7 @@ function BottomNav({ tab, setTab, pendingCount, unreadMessages, pet, onOpenPet }
                   </span>
                 )}
               </span>
-              <span style={{ ...display, fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
+              <span style={{ ...body, fontSize: "12px", fontWeight: active ? 800 : 600, lineHeight: 1, color: tint }}>{t.label}</span>
             </div>
           </button>
         );
@@ -8983,7 +8983,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
             (márgenes negativos) no pise su borde derecho. Colores por variables desde palette. */}
         {/* Ronda 5: la cinta adhesiva va FUERA del botón (la máscara del boleto recorta lo que sale), en la esquina superior izquierda. Textura de cartón. */}
         <div style={{ position: "relative" }}>
-        <CintaAdhesiva color="superficie" angulo={-7} width={64} style={{ left: -8, top: -9, "--kd-angulo": "-34deg", zIndex: 2 }} />
+        <CintaAdhesiva color="superficie" angulo={-7} width={64} style={{ left: "46%", right: "auto", top: -14, "--kd-angulo": "0deg", zIndex: 2 }} />
         <button
           onClick={() => setRachaOpen(true)}
           className="sema-r4-racha sema-no-hover sema-carton sema-focus-onfirma"
@@ -9000,7 +9000,7 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
             </span>
             {isRecord ? (
               <>
-                <span style={{ ...body, display: "block", fontSize: "13px", fontWeight: 500, lineHeight: 1.3, color: palette.onFirma, marginTop: "0.3rem" }}>Esto ya es récord.</span>
+                <span style={{ ...body, display: "block", fontSize: "14px", fontWeight: 600, lineHeight: 1.3, color: palette.onFirma, marginTop: "0.3rem" }}>Esto ya es récord.</span>
                 <span style={{ display: "block", marginTop: "0.5rem", lineHeight: 1 }}>
                   <SelloTinta size="sm" angulo={-8} style={{ "--kd-ink": palette.onFirma }}>Récord personal</SelloTinta>
                 </span>

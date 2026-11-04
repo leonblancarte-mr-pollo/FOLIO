@@ -124,12 +124,14 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
           {cartas.map((c) => (
             <button key={c.id} onClick={() => showFlash(c.aviso)} className="btn-press sema-pet-carta sema-papel sema-focus-ink">
               <span style={{ ...display, fontWeight: 800, fontSize: "16px", color: palette.ink, lineHeight: 1.15 }}>{c.titulo}</span>
-              <SelloTinta size="sm" sobre="superficie" angulo={-6} className="sema-pet-carta__sello">Muy pronto</SelloTinta>
+              {c.id === cartas[0].id
+                ? <SelloTinta size="sm" sobre="superficie" angulo={-6} className="sema-pet-carta__sello">Muy pronto</SelloTinta>
+                : <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft }}>Muy pronto</span>}
             </button>
           ))}
           <button onClick={() => showFlash("Galería: muy pronto.")} className="btn-press sema-pet-carta sema-pet-carta--ancha sema-papel sema-focus-ink">
             <span style={{ ...display, fontWeight: 800, fontSize: "16px", color: palette.ink, lineHeight: 1.15 }}>Ver galería</span>
-            <SelloTinta size="sm" sobre="superficie" angulo={-6} className="sema-pet-carta__sello">Muy pronto</SelloTinta>
+            <span style={{ ...body, fontSize: "13px", fontWeight: 600, color: palette.inkSoft }}>Muy pronto</span>
           </button>
         </div>
       </div>
