@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { petImageSrc } from "../services/petService.js";
+import { Mascota } from "./Mascota.jsx";
 import { palette, BRAND, display } from "../theme.js";
 
 function PetLevelUpToast({ petName, level, petType, id, onDismiss }) {
@@ -18,7 +18,7 @@ function PetLevelUpToast({ petName, level, petType, id, onDismiss }) {
         background: BRAND.gradient, borderRadius: 999,
         boxShadow: "0 8px 28px rgba(122,46,46,0.5), 0 2px 6px rgba(0,0,0,0.2)", whiteSpace: "nowrap",
       }}>
-        <img src={petImageSrc(petType)} alt="" style={{ width: 34, height: 34, objectFit: "contain", flexShrink: 0 }} />
+        <Mascota mascota={petType} tamaño={34} style={{ flexShrink: 0 }} />
         <span style={{ ...display, fontWeight: 700, fontSize: "1.02rem", color: palette.onColor, lineHeight: 1.1, letterSpacing: "-0.01em" }}>
           ¡{petName || "Tu compañero"} subió a nivel {level}! 🎉
         </span>

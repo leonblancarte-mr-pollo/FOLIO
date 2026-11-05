@@ -10,6 +10,7 @@ import {
   DAILY_LIMIT,
 } from "../services/recommendationService.js";
 import ReadingStatusModal from "./ReadingStatusModal.jsx";
+import { Mascota } from "../pets/Mascota.jsx";
 import BookCoverImage, { GenericCover } from "./BookCoverImage.jsx";
 import { haptic } from "../haptics.js";
 import { palette, ts, FONT_DISPLAY, FONT_UI } from "../theme.js";
@@ -112,7 +113,7 @@ function CatEmpty({ title, line, children }) {
         width: 96, height: 96, borderRadius: "50%", backgroundColor: palette.firma,
         margin: "0 auto 1rem", display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        <img src="/pets/cat.png" alt="" width={72} height={72} style={{ display: "block", objectFit: "contain" }} />
+        <Mascota tamaño={74} canto={palette.bg} />
       </div>
       <h3 style={{ ...serif, fontSize: "1.15rem", fontWeight: 700, color: palette.ink, margin: "0 0 0.5rem" }}>
         {title}

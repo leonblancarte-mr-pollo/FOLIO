@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { palette, BRAND, body, display, FONT_LINK } from "../theme.js";
 import { PET_TYPES, createPet } from "../services/petService.js";
-import { PetDisplay } from "./PetDisplay.jsx";
+import { Mascota } from "./Mascota.jsx";
 
 function PetOnboarding({ user, onComplete }) {
   const [naming, setNaming] = useState(false);
@@ -52,7 +52,7 @@ function PetOnboarding({ user, onComplete }) {
           backgroundColor: palette.bgCard, border: `1.5px solid ${palette.accent}55`,
           borderRadius: 20, padding: "1.75rem 1.25rem 1.5rem", boxShadow: "0 10px 36px rgba(122,46,46,0.14)",
         }}>
-          <PetDisplay petType="gato" petName={info.title} size="large" />
+          <Mascota mascota="gato" tamaño={170} alt={info.title} />
           <p style={{ ...display, fontWeight: 700, fontSize: "1.35rem", color: palette.ink, marginTop: "1rem", lineHeight: 1.1 }}>
             {info.title}
           </p>

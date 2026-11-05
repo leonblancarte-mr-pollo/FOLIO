@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { User, X, Pencil } from "lucide-react";
 import { palette, PALETTE_DARK, SEMA_GRADIENTS, body, display, FONT_LINK } from "../theme.js";
 import { petXpForLevel, PET_MAX_LEVEL } from "../services/petService.js";
-import { PetDisplay } from "./PetDisplay.jsx";
+import { Mascota, useEstadoMascota } from "./Mascota.jsx";
 import { Boleto, SelloTinta } from "../components/Detalles.jsx";
 
 // Panel de la mascota (ronda 5, 2026-11-03). Rediseño con la identidad nueva:
@@ -14,15 +14,17 @@ import { Boleto, SelloTinta } from "../components/Detalles.jsx";
 //  · Tienda, Mis objetos y Ver galería: tarjetas de papel (mismo lenguaje que los boletos), sin íconos,
 //    con sello «MUY PRONTO» mientras no funcionen. Su comportamiento no cambia (aviso corto).
 // ESTRUCTURA LISTA PARA ANIMAR (la animación es otra ronda): .sema-pet-escena › .sema-pet-sticker,
-// .sema-pet-gato (envuelve al PetDisplay, que ya tiene bob y respiración) y .sema-pet-piso (sombra).
+// .sema-pet-gato (envuelve a la Mascota Lottie desde 2026-11-05) y .sema-pet-piso (sombra).
 // Cada capa es un elemento propio con su transform-origin, para animarlas por separado.
-function PetHub({ pet, onClose, onGoToProfile, onRename }) {
+function PetHub({ pet, rachaEnPausa = false, onClose, onGoToProfile, onRename }) {
   const [editing, setEditing] = useState(false);
   const [nameDraft, setNameDraft] = useState(pet?.pet_name || "Mi compañero");
   const [savingName, setSavingName] = useState(false);
   const [flash, setFlash] = useState(null);
 
   useEffect(() => { setNameDraft(pet?.pet_name || "Mi compañero"); }, [pet?.pet_name]);
+  // Mascota Lottie (2026-11-05): mismo criterio de estado que Inicio (ver Mascota.jsx).
+  const mascota = useEstadoMascota({ rachaEnPausa });
 
   if (!pet) return null;
   const isDark = palette.bg === PALETTE_DARK.bg;
@@ -74,7 +76,7 @@ function PetHub({ pet, onClose, onGoToProfile, onRename }) {
         <div className="sema-pet-escena" style={{ "--pet-sticker": palette.firma, "--pet-ink": palette.ink, "--pet-piso": palette.ink }}>
           <div aria-hidden className="sema-pet-sticker sema-papel" />
           <div className="sema-pet-gato">
-            <PetDisplay petType={pet.pet_type} petName={pet.pet_name} px={isDark && isCat ? 356 : 330} wPx={isDark && isCat ? 246 : 220} src={isDark && isCat ? "/pets/cat-recorte.png" : undefined} showShadow={false} />
+            <Mascota mascota={pet.pet_type} estado={mascota.estado} onFin={mascota.onFin} tamaño={260} canto={palette.bg} alt={pet.pet_name || "Mascota"} respaldo={isDark && isCat ? "/pets/cat-recorte.png" : undefined} />
           </div>
           <div aria-hidden className="sema-pet-piso" />
         </div>

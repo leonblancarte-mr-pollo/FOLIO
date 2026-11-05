@@ -72,7 +72,7 @@ import { playBookFinished, playReadingSession } from "./sounds.js";
 import { haptic, HAPTIC } from "./haptics.js";
 import BookTinder from "./components/BookTinder.jsx";
 import BookCoverImage from "./components/BookCoverImage.jsx";
-import { PetDisplay } from "./pets/PetDisplay.jsx";
+import { Mascota, useEstadoMascota, rachaEnPausaDe } from "./pets/Mascota.jsx";
 import { PetOnboarding } from "./pets/PetOnboarding.jsx";
 import { PetLevelUpToast } from "./pets/PetLevelUpToast.jsx";
 import { PetHub } from "./pets/PetHub.jsx";
@@ -2157,7 +2157,8 @@ function RecoCatAvatar({ hidden = false }) {
       backgroundColor: hidden ? "transparent" : palette.firma,
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
-      {!hidden && <img src="/pets/cat.png" alt="" width={28} height={28} style={{ display: "block", objectFit: "contain" }} />}
+      {/* Mascota Lottie (2026-11-05), quieta: un avatar por globo, no se anima en cada uno. */}
+      {!hidden && <Mascota tamaño={28} pausa canto={palette.bg} />}
     </div>
   );
 }
@@ -5700,7 +5701,7 @@ function FriendProfileModal({ friend, user, onClose }) {
                             {isDark && (
                               <span aria-hidden style={{ position: "absolute", left: 4, top: 4, width: 72, height: 72, borderRadius: "50%", backgroundColor: palette.firma }} />
                             )}
-                            <PetDisplay petType={friendPet.pet_type} petName={friendPet.pet_name} px={80} showShadow={false} style={{ position: "relative" }} />
+                            <span style={{ position: "relative", display: "flex", width: 80, height: 80, alignItems: "flex-end", justifyContent: "center" }}><Mascota mascota={friendPet.pet_type} tamaño={76} canto={isDark ? palette.bg : undefined} /></span>
                           </span>
                           <p style={{ ...display, fontWeight: 700, fontSize: "15px", color: palette.ink, lineHeight: 1.15, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
                             {friendPet.pet_name || "Su mascota"}
@@ -8870,6 +8871,9 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
     const freezeProtected = diff === 2 && streak.streak_freeze_used_at === localDateStr(y);
     return diff > 1 && !freezeProtected;
   })();
+  // Mascota Lottie (2026-11-05): dormido con racha en pausa o de noche, café en la primera visita del
+  // día, celebrando al subir de nivel o llegar a un hito de racha, leyendo en lo demás (ver Mascota.jsx).
+  const mascota = useEstadoMascota({ rachaEnPausa: streakPaused, racha: streak ? cur : null });
 
   useEffect(() => {
     if (!isOnline) return;
@@ -9025,35 +9029,32 @@ function HomeView({ user, books = [], pet, streak, setTab, onOpenPet, onSelectBo
         </div>
 
         {/* El gato grande y suelto, columna derecha (principio 6; León, ronda 3: supera el «gato
-            pequeño» de sema-identidad §5). Sin caja detrás: es un recorte. En oscuro usa
-            /pets/cat-recorte.png (correcciones ronda 3): el mismo cat.png con 24 px de margen y un
-            canto blanco horneado de ~8 px que sigue la silueta, como sticker troquelado, para que
-            el gato negro no se funda con el negro; sustituye a la pila de drop-shadow (halo difuso
-            en los bigotes y 8 filtros por fotograma). En claro sigue cat.png sin contorno.
-            Para que el CUERPO mida y caiga igual en los dos modos, el PNG oscuro se escala con el
-            mismo factor (300/612 = 0.4902 → 323.5 × 223.5) y cada margen negativo crece 24 × 0.49
-            ≈ 12 px (caja alfa medida: cat.png cuerpo en x 53–357 / y 73–540; cat-recorte.png en
-            x 77–381 / y 97–564). La animación (bob y respiración) sigue siendo la de PetDisplay;
-            en prefers-reduced-motion se detiene solo aquí (index.css, bloque «Inicio · gato»). */}
+            pequeño» de sema-identidad §5). Sin caja detrás: es un recorte.
+            Mascota Lottie (2026-11-05): sustituye a cat.png / cat-recorte.png. El lienzo de «leyendo»
+            (399 × 540) casi no tiene margen transparente, así que ya no hacen falta los márgenes
+            negativos grandes del PNG: a 240 px de alto el cuerpo mide lo mismo que antes (~230 px).
+            El contorno lila se lee igual en claro y en oscuro, por eso ya no hay variante oscura; el
+            PNG de antes queda solo como respaldo si el JSON no carga. `canto` (color de fondo): «dormido»
+            es más ancho y su cabeza cae sobre la tarjeta lila de racha, donde el contorno lila se perdía. Los estados más grandes
+            (celebrando, dormido) desbordan hacia arriba sin mover la columna. prefers-reduced-motion
+            lo pausa el propio componente. */}
         {pet && (
           <button
             onClick={onOpenPet}
             aria-label={`Ver a ${pet.pet_name}`}
             className="btn-press sema-no-hover"
             style={{
-              flex: "0 0 auto", width: isDarkMode ? 223.5 : 200,
-              marginLeft: isDarkMode ? -24 : -12, marginRight: isDarkMode ? -48 : -36,
-              marginTop: isDarkMode ? -42 : -30, marginBottom: isDarkMode ? -34 : -22,
+              flex: "0 0 auto", marginLeft: -4, marginRight: -14, marginTop: -8, marginBottom: 0,
               background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "flex-end", justifyContent: "center",
             }}
           >
-            <PetDisplay
-              petType={pet.pet_type}
-              petName={pet.pet_name}
-              px={isDarkMode ? 323.5 : 300}
-              wPx={isDarkMode ? 223.5 : 200}
-              src={isDarkMode ? "/pets/cat-recorte.png" : undefined}
-              showShadow={false}
+            <Mascota
+              mascota={pet.pet_type}
+              estado={mascota.estado}
+              onFin={mascota.onFin}
+              tamaño={240}
+              canto={palette.bg}
+              respaldo={isDarkMode ? "/pets/cat-recorte.png" : undefined}
             />
           </button>
         )}
@@ -13057,6 +13058,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
       {petHubOpen && pet && (
         <PetHub
           pet={pet}
+          rachaEnPausa={rachaEnPausaDe(petStreak)}
           onClose={() => setPetHubOpen(false)}
           onGoToProfile={() => { setPetHubOpen(false); setTab("perfil"); }}
           onRename={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }}
