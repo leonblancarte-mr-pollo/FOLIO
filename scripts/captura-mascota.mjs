@@ -15,9 +15,16 @@ const EMAIL = process.env.SEMA_TEST_EMAIL, PASSWORD = process.env.SEMA_TEST_PASS
 const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
-  locale: "es-MX", timezoneId: "America/Mexico_City",
+  locale: "es-MX", timezoneId: "America/Mexico_City", serviceWorkers: "block", // sin SW: sus peticiones no pasan por page.route
 });
 const page = await context.newPage();
+// Preview protegida de Vercel: con `vc env run -- node scripts/captura-mascota.mjs …` se añade la cabecera
+// de Trusted Sources SOLO a las peticiones del origen del despliegue (nunca a Supabase). El token no se imprime.
+if (process.env.VERCEL_OIDC_TOKEN && !BASE.includes("localhost")) {
+  const origen = new URL(BASE).origin;
+  await page.route((url) => url.origin === origen, (route) =>
+    route.continue({ headers: { ...route.request().headers(), "x-vercel-trusted-oidc-idp-token": process.env.VERCEL_OIDC_TOKEN } }));
+}
 const errores = [];
 const mascotaReq = [];
 page.on("console", (m) => { if (m.type() === "error" || /\[mascota\]/.test(m.text())) errores.push(`${m.type()}: ${m.text()}`); });
