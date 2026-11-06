@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, Component } from "react";
+import { useState, useEffect, useRef, useMemo, Component, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
@@ -63,7 +63,13 @@ import {
   RefreshCw,
   ArrowRight,
   AlertCircle,
+  Scissors,
 } from "lucide-react";
+// Collages (2026-11-06): la pestaña y el editor se cargan aparte (chunk propio); la celebración y el
+// cuerpo de la publicación son chicos y van en el bundle principal.
+const CollagesView = lazy(() => import("./components/collage/CollagesView.jsx"));
+import { CollageCelebracion } from "./components/collage/CollageCelebracion.jsx";
+import { CollagePostBody } from "./components/collage/CollagePostBody.jsx";
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
 import confetti from "canvas-confetti";
@@ -558,6 +564,8 @@ const NAV_ITEMS = [
   { id: "home", label: "Inicio", icon: Home },
   { id: "explorar", label: "Explorar", icon: Compass },
   { id: "mascota", label: "Mascota", icon: PawPrint },
+  // Collages (2026-11-06): pestaña propia entre Mascota y Social. La barra queda en 5 (Trueque ya estaba fuera).
+  { id: "collage", label: "Collage", icon: Scissors },
   { id: "social", label: "Social", icon: MessageCircle },
   // Trueque queda FUERA del lanzamiento (decisión del 16 oct 2026): no aparece en
   // la barra inferior ni en las pastillas de escritorio. Su código, componentes
@@ -6915,6 +6923,7 @@ function describePostTarget(post, book) {
     try {
       const parsed = JSON.parse(post.content);
       if (parsed?.__folio_type === "quote" && parsed.text) return `la frase «${snippet(parsed.text)}»`;
+      if (parsed?.__folio_type === "collage") return "tu collage";
     } catch { /* texto normal */ }
     return `«${snippet(post.content)}»`;
   }
@@ -9760,6 +9769,19 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               );
             }
 
+            // ── Collage (2026-11-06): franja «Collage» + la imagen congelada (con tarjeta de frase/reseña si la trae). ──
+            if (post.type === "collage") {
+              return (
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postBand(post, Scissors, post.collage?.encima?.tipo === "resena" ? "Collage con reseña" : post.collage?.encima?.tipo === "frase" ? "Collage con frase" : "Collage")}
+                  {postHeader(post, null)}
+                  <CollagePostBody post={post} />
+                  {postFooter(post)}
+                </div>
+              );
+            }
+
             // ── Frase (ronda 2): mismo formato que las demás (franja «Frase» + cabecera); la frase en
             //    Instrument Serif grande, en tinta sobre el fondo. Ya no es tarjeta ciruela. ──
             if (post.type === "quote") {
@@ -12169,9 +12191,11 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   // tapar el final del feed ni los números de «Mi biblioteca». Sigue en el DOM (aria-hidden mientras).
   const [fabVisible, setFabVisible] = useState(true);
   const [perfilSub, setPerfilSub] = useState("perfil");
+  const [collageNuevo, setCollageNuevo] = useState(false);
   // El «+» no va en Perfil › «Mi perfil» (ahí viven Editar perfil, Privacidad, Apariencia y Cerrar
   // sesión); sí en Mis libros, Mis frases y Resumen. Al cambiar de pestaña vuelve a verse.
-  const fabShown = fabVisible && !(tab === "perfil" && perfilSub === "perfil");
+  // Collages (2026-11-06): tampoco en la pestaña Collage (su acción principal es «Nuevo collage»).
+  const fabShown = fabVisible && !(tab === "perfil" && perfilSub === "perfil") && tab !== "collage";
   useEffect(() => { setFabVisible(true); }, [tab]);
   // Vuelve solo al subir, al llegar al tope o al fondo (ya no por inactividad: tapaba texto en reposo).
   useEffect(() => {
@@ -12928,6 +12952,13 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} pendingCount={pendingCount} /></div>}
+        {loaded && tab === "collage" && (
+          <div className="tab-view-enter">
+            <Suspense fallback={<div role="status" aria-label="Cargando Collages" style={{ minHeight: "40vh" }} />}>
+              <CollagesView user={user} books={books} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} abrirNuevo={collageNuevo} onAbrirNuevoHecho={() => setCollageNuevo(false)} />
+            </Suspense>
+          </div>
+        )}
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}
@@ -13064,6 +13095,8 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           onRename={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }}
         />
       )}
+      {/* Collages (2026-11-06): celebración cuando sale un set nuevo (racha o compra), vía collageBus. */}
+      <CollageCelebracion onUsar={() => { setTab("collage"); setCollageNuevo(true); }} />
       {petToastQueue.length > 0 && (
         <PetLevelUpToast
           key={petToastQueue[0].id}

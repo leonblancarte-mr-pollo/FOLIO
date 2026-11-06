@@ -49,6 +49,16 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
+            // Collages (2026-11-06): stickers y papeles (WebP de public/collage/). No se precachean
+            // (~3.7 MB); se guardan al usarlos por primera vez y sirven offline después.
+            urlPattern: /\/collage\/.+\.webp$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'collage-v1',
+              expiration: { maxEntries: 200, maxAgeSeconds: 90 * 24 * 60 * 60 },
+            },
+          },
+          {
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
             options: {
