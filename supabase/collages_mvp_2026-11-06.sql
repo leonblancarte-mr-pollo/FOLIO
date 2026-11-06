@@ -11,6 +11,11 @@
 --   · collages                documentos editables (JSON de capas) + vista previa.
 --   · RPCs: collage_mi_estado(), collage_streak_roll(), buy_collage_set(text).
 --
+-- Seguridad (revisado 2026-11-06): solo CREA objetos nuevos (6 tablas, 7 funciones, 2 triggers sobre la tabla
+-- nueva `collages`, políticas y permisos de esas tablas). No hace ALTER, UPDATE, DELETE ni DROP sobre tablas,
+-- columnas, funciones o datos existentes. Las únicas escrituras a tablas que ya existen (user_gems, reward_ledger)
+-- ocurren DENTRO de buy_collage_set cuando un usuario compra un set, igual que spend_gems.
+--
 -- Cómo se corre: a mano en el SQL Editor de Supabase, completo, de arriba abajo. Es idempotente
 -- (se puede volver a correr). Sin BEGIN/COMMIT. Requiere sprint1_server_authority.sql (reward_ledger,
 -- user_gems), timezone_fix.sql (fecha México) y trueque_schema.sql (users.is_premium = Sema Plus).
@@ -79,12 +84,20 @@ CREATE INDEX IF NOT EXISTS collages_user_idx ON public.collages (user_id, update
 
 -- --------------------------------------------------------------------------- CATÁLOGO (espejo del JSON)
 INSERT INTO public.collage_sets (id, nombre, obtencion, precio, activo) VALUES
-  ('papeles',  'Papeles',          'inicial', NULL, true),
-  ('botanico', 'Botánico',         'inicial', NULL, true),
-  ('psico',    'Psicodélico',      'racha',   NULL, true),
-  ('sello',    'Sellos de planta', 'gemas',   60,   true)
+  ('papeles',    'Papeles',          'inicial', NULL, true),
+  ('tinta',      'Tinta',            'inicial', NULL, true),
+  ('trance',     'Trance',           'racha',   NULL, true),
+  ('tercer-ojo', 'Tercer ojo',       'racha',   NULL, true),
+  ('olimpo',     'Olimpo',           'racha',   NULL, true),
+  ('bodegon',    'Bodegón',          'racha',   NULL, true),
+  ('botanico',   'Botánico',         'gemas',   100,  true),
+  ('sello',      'Sellos de planta', 'gemas',   100,  true)
 ON CONFLICT (id) DO UPDATE
   SET nombre = EXCLUDED.nombre, obtencion = EXCLUDED.obtencion, precio = EXCLUDED.precio, activo = EXCLUDED.activo;
+-- Un set que se quita del catálogo NO se borra (alguien puede tenerlo en su inventario): solo deja de salir en
+-- tiradas y de venderse. Solo toca collage_sets, la tabla que crea este mismo archivo.
+UPDATE public.collage_sets SET activo = false
+ WHERE activo AND id NOT IN ('papeles', 'tinta', 'trance', 'tercer-ojo', 'olimpo', 'bodegon', 'botanico', 'sello');
 
 INSERT INTO public.collage_config (key, value) VALUES
   ('probabilidad_inicial', 0.30),   -- recompensas.probabilidadInicial

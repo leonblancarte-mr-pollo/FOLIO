@@ -7,7 +7,7 @@ import { palette, display, body, label as labelFont, SEMA_EXTENDIDA } from "../.
 import { SelloTinta } from "../Detalles.jsx";
 import { haptic, HAPTIC } from "../../haptics.js";
 import { collageBus } from "../../services/collageService.js";
-import { getSet, getObjeto, objetosDeSet } from "../../services/collageCatalog.js";
+import { getSet, getSets, getObjeto, objetosDeSet } from "../../services/collageCatalog.js";
 import { CollageHoja, BotonHoja } from "./CollageHoja.jsx";
 
 const ORIGEN = { racha: "Premio de la racha de hoy", gemas: "Comprado con gemas", plus: "De Sema Plus" };
@@ -24,7 +24,7 @@ export function CollageCelebracion({ onUsar }) {
   // Solo en desarrollo: ?collage=premio muestra la celebración con el primer set de racha (capturas y pruebas).
   useEffect(() => {
     if (!import.meta.env.DEV || new URLSearchParams(window.location.search).get("collage") !== "premio") return;
-    const t = setTimeout(() => collageBus.emit({ tipo: "premio", setId: "psico", origen: "racha" }), 1500);
+    const t = setTimeout(() => collageBus.emit({ tipo: "premio", setId: getSets().find((s) => s.obtencion?.tipo === "racha")?.id, origen: "racha" }), 1500);
     return () => clearTimeout(t);
   }, []);
   if (!premio) return null;

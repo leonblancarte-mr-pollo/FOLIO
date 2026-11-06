@@ -132,8 +132,8 @@ export default function CollagesView({ user, books, gemBalance, onGemsChanged, a
 
       {tope && (
         <CollageHoja titulo={`Ya hay ${limite} collages guardados`} onClose={() => setTope(false)}>
-          <p style={{ ...body, fontSize: "16px", lineHeight: 1.5, color: palette.ink, margin: "0 0 6px" }}>Para guardar otro, hay que borrar uno. Se borra desde los tres puntos.</p>
-          <p style={{ ...body, fontSize: "15px", lineHeight: 1.5, color: palette.inkSoft, margin: "0 0 18px" }}>Sema Plus quitará el tope. Todavía no sale.</p>
+          <p style={{ ...body, fontSize: "16px", lineHeight: 1.5, color: palette.ink, margin: "0 0 6px" }}>Borra uno de tus collages para crear otro. Se borra desde los tres puntos.</p>
+          <p style={{ ...body, fontSize: "15px", lineHeight: 1.5, color: palette.inkSoft, margin: "0 0 18px" }}>Collages ilimitados en Sema Plus (próximamente).</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <BotonHoja data-autofocus onClick={() => setTope(false)}>Entendido</BotonHoja>
             <BotonHoja secundario onClick={() => { setTope(false); setEditor({ collage: null }); }}>Armar uno sin guardarlo</BotonHoja>

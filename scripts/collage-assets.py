@@ -44,17 +44,23 @@ def recortar_transparencia(img):
 
 # ---------------------------------------------------------------- stickers
 def stickers():
-    if not os.path.isdir(FUENTE):
-        print(f"[stickers] no existe {FUENTE}; se omite", file=sys.stderr)
+    # PNG en stickersMVP1/ y también sueltos en assets-fuentes/stickers/ (sets nuevos, p. ej. tinta-*.png).
+    carpetas = [FUENTE, os.path.dirname(FUENTE)]
+    archivos = {}
+    for c in carpetas:
+        if os.path.isdir(c):
+            for nombre in os.listdir(c):
+                if nombre.lower().endswith(".png"):
+                    archivos.setdefault(nombre, os.path.join(c, nombre))
+    if not archivos:
+        print(f"[stickers] no hay PNG en {carpetas}; se omite", file=sys.stderr)
         return
     d = asegurar(os.path.join(DEST, "stickers"))
     dmin = asegurar(os.path.join(d, "min"))
     n = 0
-    for nombre in sorted(os.listdir(FUENTE)):
-        if not nombre.lower().endswith(".png"):
-            continue
+    for nombre in sorted(archivos):
         sid = os.path.splitext(nombre)[0]
-        img = Image.open(os.path.join(FUENTE, nombre)).convert("RGBA")
+        img = Image.open(archivos[nombre]).convert("RGBA")
         img = recortar_transparencia(img)
         ajustar(img, 720).save(os.path.join(d, sid + ".webp"), "WEBP", quality=82, method=6)
         ajustar(img, 200).save(os.path.join(dmin, sid + ".webp"), "WEBP", quality=78, method=6)

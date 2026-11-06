@@ -529,8 +529,8 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
 
       {hoja === "tope" && (
         <CollageHoja titulo={`Ya hay ${estado?.limite ?? 5} collages guardados`} onClose={() => setHoja(null)}>
-          <p style={{ ...body, fontSize: "16px", lineHeight: 1.5, color: palette.ink, margin: "0 0 6px" }}>Para guardar este, hay que borrar uno de Mis collages.</p>
-          <p style={{ ...body, fontSize: "15px", lineHeight: 1.5, color: palette.inkSoft, margin: "0 0 18px" }}>Sema Plus quitará el tope. Todavía no sale.</p>
+          <p style={{ ...body, fontSize: "16px", lineHeight: 1.5, color: palette.ink, margin: "0 0 6px" }}>Borra uno de tus collages para guardar este.</p>
+          <p style={{ ...body, fontSize: "15px", lineHeight: 1.5, color: palette.inkSoft, margin: "0 0 18px" }}>Collages ilimitados en Sema Plus (próximamente).</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <BotonHoja data-autofocus onClick={() => { setHoja(null); onVerCollages?.(); }}>Ver mis collages</BotonHoja>
             <BotonHoja secundario onClick={() => setHoja(null)}>Seguir editando</BotonHoja>

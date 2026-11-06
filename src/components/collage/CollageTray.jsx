@@ -1,6 +1,7 @@
 // Bandeja inferior del editor de Collages (2026-11-06). Tres pestañas: Stickers, Papeles y fondos, Mis frases.
 // Tocar algo lo agrega al centro del lienzo (o cambia el fondo). Un set bloqueado muestra UNA pieza de
 // muestra, opaca y con candado; al tocarla, el editor abre la hoja con cómo se obtiene.
+import { useState } from "react";
 import { Lock, Check } from "lucide-react";
 import { palette, display, body, label as labelFont, quote as quoteFont } from "../../theme.js";
 import { getSets, getObjeto, objetosDeSet, setDesbloqueado, COLORES_FONDO } from "../../services/collageCatalog.js";
@@ -65,6 +66,10 @@ function Titulo({ children, extra }) {
 }
 
 function Pieza({ objeto, onClick, bloqueado, etiqueta }) {
+  // Si el archivo todavía no existe (p. ej. un set dado de alta en el catálogo antes de convertir sus PNG), la
+  // pieza no aparece en vez de verse rota.
+  const [falta, setFalta] = useState(false);
+  if (falta) return null;
   return (
     <button
       onClick={onClick}
@@ -72,7 +77,7 @@ function Pieza({ objeto, onClick, bloqueado, etiqueta }) {
       className="sema-collage-pieza"
       style={{ position: "relative", aspectRatio: "1", minHeight: 44, background: "none", border: "none", borderRadius: 12, padding: 6, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
     >
-      <img src={objeto.miniatura} alt="" loading="lazy" draggable={false} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", opacity: bloqueado ? 0.45 : 1, filter: bloqueado ? "grayscale(0.5)" : "none", pointerEvents: "none" }} />
+      <img src={objeto.miniatura} alt="" loading="lazy" draggable={false} onError={() => setFalta(true)} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", opacity: bloqueado ? 0.45 : 1, filter: bloqueado ? "grayscale(0.5)" : "none", pointerEvents: "none" }} />
       {bloqueado && (
         <span aria-hidden style={{ position: "absolute", right: 2, bottom: 2, width: 26, height: 26, borderRadius: "50%", backgroundColor: palette.ink, boxShadow: `0 0 0 2px ${palette.bg}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Lock size={14} color={palette.bg} strokeWidth={2.6} />

@@ -65,14 +65,18 @@ for (const modo of modoArg === "ambos" ? ["claro", "oscuro"] : [modoArg]) {
   await page.getByRole("button", { name: "Nuevo collage" }).click(); await settle(1200);
   await shot("02-editor-bandeja-stickers");
 
-  // Tres stickers + fondo de papel.
+  // Tres piezas del kit inicial (tinta si ya hay WebP; si no, papeles) + fondo de papel.
   const tab = (n) => page.getByRole("tab", { name: n });
-  for (const nombre of ["Peonía", "Luna", "Margaritas"]) {
-    if (!(await page.locator("#collage-bandeja").count())) await tab("Stickers").click();
+  const tinta = await page.locator("#collage-bandeja").getByRole("button", { name: "Luna", exact: true }).count();
+  const piezas = tinta ? [["Stickers", "Luna"], ["Stickers", "Hongo"], ["Stickers", "Escarabajo"]] : [["Papeles y fondos", "Papel rasgado"], ["Papeles y fondos", "Kraft rasgado"], ["Papeles y fondos", "Cartón arrugado roto"]];
+  for (const [t, nombre] of piezas) {
+    if (!(await page.locator("#collage-bandeja").count())) await tab(t).click();
+    else if ((await tab(t).getAttribute("aria-expanded")) !== "true") await tab(t).click();
+    await page.waitForTimeout(250);
     await page.locator("#collage-bandeja").getByRole("button", { name: nombre, exact: true }).click();
     await page.waitForTimeout(500);
   }
-  ok("agregar 3 stickers", (await page.locator("[data-capa]").count()) === 3);
+  ok("agregar 3 piezas", (await page.locator("[data-capa]").count()) === 3);
   await tab("Papeles y fondos").click(); await page.waitForTimeout(400);
   await shot("03-bandeja-papeles");
   await page.getByRole("button", { name: "Fondo Kraft" }).click(); await page.waitForTimeout(300);
@@ -151,7 +155,7 @@ for (const modo of modoArg === "ambos" ? ["claro", "oscuro"] : [modoArg]) {
   await page.locator("#collage-bandeja").evaluate((el) => { el.scrollTop = el.scrollHeight; });
   await page.waitForTimeout(300);
   await shot("08-bandeja-bloqueados");
-  await page.getByRole("button", { name: /Psicodélico, bloqueado/ }).click(); await page.waitForTimeout(400);
+  await page.getByRole("button", { name: /Trance, bloqueado/ }).click(); await page.waitForTimeout(400);
   await shot("09-hoja-set-racha");
   await page.keyboard.press("Escape"); await page.waitForTimeout(300);
   await page.getByRole("button", { name: /Sellos de planta, bloqueado/ }).click(); await page.waitForTimeout(400);

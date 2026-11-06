@@ -35,22 +35,59 @@
       "muestra": "pieza-kraft"
     },
     {
-      "id": "botanico",
-      "nombre": "Botánico",
-      "descripcion": "Flores, conchas y soles de grabado.",
+      "id": "tinta",
+      "nombre": "Tinta",
+      "descripcion": "Bichos, lunas y ojos a pura tinta.",
       "obtencion": {
         "tipo": "inicial"
       },
-      "muestra": "botanico-peonia"
+      "muestra": "tinta-luna"
     },
     {
-      "id": "psico",
-      "nombre": "Psicodélico",
-      "descripcion": "Ojos, espirales, hongos y planetas.",
+      "id": "trance",
+      "nombre": "Trance",
+      "descripcion": "Espirales y ondas que marean bonito.",
+      "obtencion": {
+        "tipo": "racha"
+      },
+      "muestra": "psico-espiral-roja"
+    },
+    {
+      "id": "tercer-ojo",
+      "nombre": "Tercer ojo",
+      "descripcion": "Ojos, serpientes y hongos que todo lo ven.",
       "obtencion": {
         "tipo": "racha"
       },
       "muestra": "psico-ojo-radiante"
+    },
+    {
+      "id": "olimpo",
+      "nombre": "Olimpo",
+      "descripcion": "Dioses de yeso, planetas y estrellas.",
+      "obtencion": {
+        "tipo": "racha"
+      },
+      "muestra": "psico-busto"
+    },
+    {
+      "id": "bodegon",
+      "nombre": "Bodegón",
+      "descripcion": "Cerezas, teléfono y cosas de abuela.",
+      "obtencion": {
+        "tipo": "racha"
+      },
+      "muestra": "psico-cerezas"
+    },
+    {
+      "id": "botanico",
+      "nombre": "Botánico",
+      "descripcion": "Flores, conchas y soles de grabado.",
+      "obtencion": {
+        "tipo": "gemas",
+        "precio": 100
+      },
+      "muestra": "botanico-peonia"
     },
     {
       "id": "sello",
@@ -58,12 +95,57 @@
       "descripcion": "Plantas de interior en tinta.",
       "obtencion": {
         "tipo": "gemas",
-        "precio": 60
+        "precio": 100
       },
       "muestra": "sello-monstera"
     }
   ],
   "objetos": [
+    {
+      "id": "tinta-hongo",
+      "nombre": "Hongo",
+      "set": "tinta",
+      "categoria": "sticker",
+      "estilo": "tinta negra",
+      "archivo": "/collage/stickers/tinta-hongo.webp",
+      "miniatura": "/collage/stickers/min/tinta-hongo.webp"
+    },
+    {
+      "id": "tinta-luna",
+      "nombre": "Luna",
+      "set": "tinta",
+      "categoria": "sticker",
+      "estilo": "tinta negra",
+      "archivo": "/collage/stickers/tinta-luna.webp",
+      "miniatura": "/collage/stickers/min/tinta-luna.webp"
+    },
+    {
+      "id": "tinta-ojo",
+      "nombre": "Ojo",
+      "set": "tinta",
+      "categoria": "sticker",
+      "estilo": "tinta negra",
+      "archivo": "/collage/stickers/tinta-ojo.webp",
+      "miniatura": "/collage/stickers/min/tinta-ojo.webp"
+    },
+    {
+      "id": "tinta-escarabajo",
+      "nombre": "Escarabajo",
+      "set": "tinta",
+      "categoria": "sticker",
+      "estilo": "tinta negra",
+      "archivo": "/collage/stickers/tinta-escarabajo.webp",
+      "miniatura": "/collage/stickers/min/tinta-escarabajo.webp"
+    },
+    {
+      "id": "tinta-espiral",
+      "nombre": "Espiral",
+      "set": "tinta",
+      "categoria": "sticker",
+      "estilo": "tinta negra",
+      "archivo": "/collage/stickers/tinta-espiral.webp",
+      "miniatura": "/collage/stickers/min/tinta-espiral.webp"
+    },
     {
       "id": "botanico-arbol",
       "nombre": "Árbol",
@@ -157,7 +239,7 @@
     {
       "id": "psico-arcoiris",
       "nombre": "Arcoíris",
-      "set": "psico",
+      "set": "olimpo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-arcoiris.webp",
@@ -166,7 +248,7 @@
     {
       "id": "psico-bandera-cuadros",
       "nombre": "Bandera de cuadros",
-      "set": "psico",
+      "set": "trance",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-bandera-cuadros.webp",
@@ -175,7 +257,7 @@
     {
       "id": "psico-busto",
       "nombre": "Busto",
-      "set": "psico",
+      "set": "olimpo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-busto.webp",
@@ -184,7 +266,7 @@
     {
       "id": "psico-caracol",
       "nombre": "Caracol",
-      "set": "psico",
+      "set": "bodegon",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-caracol.webp",
@@ -193,7 +275,7 @@
     {
       "id": "psico-cerezas",
       "nombre": "Cerezas",
-      "set": "psico",
+      "set": "bodegon",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-cerezas.webp",
@@ -202,7 +284,7 @@
     {
       "id": "psico-columna",
       "nombre": "Columna",
-      "set": "psico",
+      "set": "olimpo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-columna.webp",
@@ -211,7 +293,7 @@
     {
       "id": "psico-esfera-ondas",
       "nombre": "Esfera de ondas",
-      "set": "psico",
+      "set": "trance",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-esfera-ondas.webp",
@@ -220,7 +302,7 @@
     {
       "id": "psico-espiral-roja",
       "nombre": "Espiral roja",
-      "set": "psico",
+      "set": "trance",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-espiral-roja.webp",
@@ -229,7 +311,7 @@
     {
       "id": "psico-espiral",
       "nombre": "Espiral",
-      "set": "psico",
+      "set": "trance",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-espiral.webp",
@@ -238,7 +320,7 @@
     {
       "id": "psico-estrella-4-puntas",
       "nombre": "Estrella de cuatro puntas",
-      "set": "psico",
+      "set": "tercer-ojo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-estrella-4-puntas.webp",
@@ -247,7 +329,7 @@
     {
       "id": "psico-estrella-fugaz",
       "nombre": "Estrella fugaz",
-      "set": "psico",
+      "set": "olimpo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-estrella-fugaz.webp",
@@ -256,7 +338,7 @@
     {
       "id": "psico-estrellas",
       "nombre": "Estrellas",
-      "set": "psico",
+      "set": "olimpo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-estrellas.webp",
@@ -265,7 +347,7 @@
     {
       "id": "psico-flor-ondas",
       "nombre": "Flor de ondas",
-      "set": "psico",
+      "set": "trance",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-flor-ondas.webp",
@@ -274,7 +356,7 @@
     {
       "id": "psico-hongo",
       "nombre": "Hongo",
-      "set": "psico",
+      "set": "tercer-ojo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-hongo.webp",
@@ -283,7 +365,7 @@
     {
       "id": "psico-lirio",
       "nombre": "Lirio",
-      "set": "psico",
+      "set": "bodegon",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-lirio.webp",
@@ -292,7 +374,7 @@
     {
       "id": "psico-mano-ojo",
       "nombre": "Mano con ojo",
-      "set": "psico",
+      "set": "tercer-ojo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-mano-ojo.webp",
@@ -301,7 +383,7 @@
     {
       "id": "psico-mariposa",
       "nombre": "Mariposa",
-      "set": "psico",
+      "set": "bodegon",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-mariposa.webp",
@@ -310,7 +392,7 @@
     {
       "id": "psico-ojo-radiante",
       "nombre": "Ojo radiante",
-      "set": "psico",
+      "set": "tercer-ojo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-ojo-radiante.webp",
@@ -319,7 +401,7 @@
     {
       "id": "psico-ojo",
       "nombre": "Ojo",
-      "set": "psico",
+      "set": "tercer-ojo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-ojo.webp",
@@ -328,7 +410,7 @@
     {
       "id": "psico-rama",
       "nombre": "Rama",
-      "set": "psico",
+      "set": "bodegon",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-rama.webp",
@@ -337,7 +419,7 @@
     {
       "id": "psico-saturno",
       "nombre": "Saturno",
-      "set": "psico",
+      "set": "olimpo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-saturno.webp",
@@ -346,7 +428,7 @@
     {
       "id": "psico-serpiente",
       "nombre": "Serpiente",
-      "set": "psico",
+      "set": "tercer-ojo",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-serpiente.webp",
@@ -355,7 +437,7 @@
     {
       "id": "psico-sol-espiral",
       "nombre": "Sol en espiral",
-      "set": "psico",
+      "set": "trance",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-sol-espiral.webp",
@@ -364,7 +446,7 @@
     {
       "id": "psico-telefono",
       "nombre": "Teléfono",
-      "set": "psico",
+      "set": "bodegon",
       "categoria": "sticker",
       "estilo": "psicodélico setentero",
       "archivo": "/collage/stickers/psico-telefono.webp",

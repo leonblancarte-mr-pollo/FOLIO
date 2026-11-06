@@ -73,6 +73,8 @@
   **Revisión:** crítico, accesibilidad y copy (una ronda; sus pendientes en §XII.30).
   **Capturas y prueba de gestos con toques reales (24/24):** `scripts/captura-collage.mjs` → `capturas/collage/`.
 
+- 2026-11-06 — Ajustes al catálogo de Collages (rama `collages-mvp`). **Kit inicial:** Tinta + Papeles. Set nuevo `tinta` (5 stickers: hongo, luna, ojo, escarabajo, espiral) dado de alta en el catálogo y en el SQL; sus PNG todavía no están en la máquina: al copiarlos a `assets-fuentes/stickers/` (o `stickersMVP1/`), `python scripts/collage-assets.py` los convierte a WebP + miniatura. Mientras falten, la bandeja no muestra piezas rotas (`Pieza` se oculta si el archivo no carga). **Racha:** `psico` se parte en 4 sets de 6 por afinidad visual: Trance (espirales y op-art), Tercer ojo (ojos, serpiente, hongo, estrella), Olimpo (busto, columna, Saturno, estrellas, arcoíris) y Bodegón (cerezas, teléfono, caracol, lirio, rama, mariposa). Los IDs y archivos de los stickers no cambian (`psico-*`); solo su `set`. **Gemas:** Botánico pasa de inicial a gemas; Botánico y Sellos de planta cuestan 100. **Aviso de tope:** «Borra uno de tus collages para crear otro.» / «Collages ilimitados en Sema Plus (próximamente).» (en el editor: «…para guardar este.»). **SQL revisado:** solo crea objetos nuevos; se agregó un `UPDATE` que desactiva (no borra) sets que salgan del catálogo, únicamente en `collage_sets`, la tabla nueva del mismo archivo.
+
 ---
 
 ## I. VISIÓN GENERAL
@@ -660,8 +662,8 @@ Lienzo creativo tipo Pinterest Shuffles dentro del universo de lectura: stickers
   "recompensas": { "probabilidadInicial": 0.30, "incrementoPorFallo": 0, "maxSinPremio": 5 },
   "limites": { "collagesSinPlus": 5, "collagesPlus": null },
   "lienzo": { "ancho": 1080, "formatos": { "historia": { "alto": 1920 }, "cuadrado": { "alto": 1080 } }, "formatoInicial": "historia" },
-  "sets": [ { "id": "psico", "nombre": "Psicodélico", "descripcion": "…", "obtencion": { "tipo": "racha" }, "muestra": "psico-ojo-radiante" } ],
-  "objetos": [ { "id": "psico-ojo", "nombre": "Ojo", "set": "psico", "categoria": "sticker", "estilo": "psicodélico setentero",
+  "sets": [ { "id": "tercer-ojo", "nombre": "Tercer ojo", "descripcion": "…", "obtencion": { "tipo": "racha" }, "muestra": "psico-ojo-radiante" } ],
+  "objetos": [ { "id": "psico-ojo", "nombre": "Ojo", "set": "tercer-ojo", "categoria": "sticker", "estilo": "psicodélico setentero",
                  "archivo": "/collage/stickers/psico-ojo.webp", "miniatura": "/collage/stickers/min/psico-ojo.webp" } ],
   "coloresFondo": [ { "id": "lila", "nombre": "Lila", "hex": "#BBADFF" } ],
   "estilosFrase": [ { "id": "revista", "fondo": "#FFFFFF", "tinta": "#111111", "fuente": "quote", "tamano": 64, "borde": "rasgado", "credito": "label" } ]
@@ -669,7 +671,7 @@ Lienzo creativo tipo Pinterest Shuffles dentro del universo de lectura: stickers
 ```
 - `categoria`: `sticker`, `textura` (pieza suelta) o `fondo`.
 - `obtencion.tipo`: `inicial` (de todos), `racha` (premio variable), `gemas` (con `precio`) o `plus` (Sema Plus). **Cada objeto hereda la obtención de su set**; si un objeto declara su propia `obtencion`, manda la suya. `collageCatalog.js` la resuelve al cargar.
-- Sets actuales: `papeles` (texturas propias, inicial), `botanico` (10, inicial), `psico` (24, racha), `sello` (5, gemas, 60). Para mover un set: cambiar su `obtencion` en el JSON **y** su fila en el bloque CATÁLOGO del SQL (el servidor valida con `collage_sets`).
+- Sets actuales (2026-11-06, ajuste): **inicial** `papeles` (texturas propias) y `tinta` (5; PNG pendientes); **racha** `trance`, `tercer-ojo`, `olimpo`, `bodegon` (6 cada uno, los 24 stickers `psico-*` agrupados por afinidad visual); **gemas** `botanico` (10) y `sello` (5), 100 gemas cada uno. Para mover un set: cambiar su `obtencion` en el JSON **y** su fila en el bloque CATÁLOGO del SQL (el servidor valida con `collage_sets`).
 - Los colores de `coloresFondo` y `estilosFrase` son **contenido** del collage (como una foto): no siguen al tema claro/oscuro. Fondos lisos solo blanco, negro, arena y tinta (sin pasteles de pantalla completa, sema-identidad §6); los vivos quedan en recortes de frase y piezas.
 
 **Inventario.** Permanente por usuario: un set desbloqueado se usa sin límite y nunca se consume. En servidor, `user_collage_inventory (user_id, set_id, origen, unlocked_at)`; los sets `inicial` no se guardan (son de todos) y los `plus` se abren con `users.is_premium`. La UI recibe `estado = { modo, plus, sets: Set, fallosSeguidos, limite, usados }` de `getEstadoCollage`.
@@ -691,7 +693,7 @@ Lienzo creativo tipo Pinterest Shuffles dentro del universo de lectura: stickers
     { id, tipo: "objeto", ref, src, x, y, w, h, s, r },
     { id, tipo: "frase", frase: { texto, libro, autor, quoteId }, estilo, x, y, w, h, s, r } ] }
 ```
-Unidades lógicas de 1080 de ancho; `x, y` = centro, `w, h` = tamaño base, `s` = escala, `r` = grados. Cada capa guarda `src` además de `ref` y la frase guarda su texto: si el catálogo cambia o se borra la frase, el collage se sigue viendo igual. Tabla `collages (id, user_id, titulo, formato, doc, preview, created_at, updated_at)`: privada (RLS todo propio), `preview` = JPEG chico en data URL (~270 px) para la cuadrícula (la «imagen exportada» del collage guardado; no hace falta bucket nuevo). Tope: trigger `collages_limit` (5 sin Plus, `collage_config.limite_sin_plus`) que lanza `COLLAGE_LIMIT`; la UI muestra «Ya hay 5 collages guardados» con «Ver mis collages» / «Armar uno sin guardarlo».
+Unidades lógicas de 1080 de ancho; `x, y` = centro, `w, h` = tamaño base, `s` = escala, `r` = grados. Cada capa guarda `src` además de `ref` y la frase guarda su texto: si el catálogo cambia o se borra la frase, el collage se sigue viendo igual. Tabla `collages (id, user_id, titulo, formato, doc, preview, created_at, updated_at)`: privada (RLS todo propio), `preview` = JPEG chico en data URL (~270 px) para la cuadrícula (la «imagen exportada» del collage guardado; no hace falta bucket nuevo). Tope: trigger `collages_limit` (5 sin Plus, `collage_config.limite_sin_plus`) que lanza `COLLAGE_LIMIT`; la UI muestra «Ya hay 5 collages guardados», «Borra uno de tus collages para crear otro.» y «Collages ilimitados en Sema Plus (próximamente).», con «Ver mis collages» / «Armar uno sin guardarlo».
 
 **Editor.**
 - Lienzo 9:16 por defecto y 1:1 (selector arriba; al cambiar se conservan las posiciones respecto al centro).
@@ -1296,15 +1298,17 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 
 30. **Collages MVP (2026-11-06) — pendientes y decisiones para León** (rama `collages-mvp`; nada fusionado ni desplegado).
     - **Correr `supabase/collages_mvp_2026-11-06.sql`** en el SQL Editor antes de desplegar el cliente. Hasta entonces todo funciona en modo local (por navegador) y la compra con gemas está apagada. Lo guardado en modo local no se migra al servidor.
-    - **Con un solo set de racha (`psico`), el premio se acaba en cuanto sale** (en promedio al tercer registro). Propuesta: partir `psico` en 3 o 4 sets de 6 a 8 stickers (solo editar `set` de cada objeto y agregar los sets al JSON y al bloque CATÁLOGO del SQL).
-    - **Precio del set `sello`:** 60 gemas, decisión propia (≈ 12 sesiones de lectura o un libro terminado). Confirmar.
-    - **Mención de Sema Plus** en el aviso de tope y en la hoja de sets `plus` («Sema Plus quitará el tope. Todavía no sale.»): decidir si se queda o se quita mientras Plus no exista.
+    - **PNG del set `tinta` pendientes** (`tinta-hongo`, `-luna`, `-ojo`, `-escarabajo`, `-espiral`): no estaban en la máquina. Copiarlos a `assets-fuentes/stickers/` y correr `python scripts/collage-assets.py`; luego commit de `public/collage/stickers/tinta-*.webp` y `min/`. Sin ellos, el kit inicial solo trae Papeles y la bandeja muestra el título «Tinta» sin piezas.
+    - ~~Un solo set de racha~~ → resuelto: 4 sets de 6 (Trance, Tercer ojo, Olimpo, Bodegón). Con 30 % y red de seguridad, los 4 salen en ~13 registros en promedio. Las agrupaciones y nombres son decisión propia: revisar en la bandeja.
+    - ~~Precio de `sello`~~ → 100 gemas, igual que Botánico (decisión de León, 2026-11-06).
+    - ~~Mención de Sema Plus en el tope~~ → texto de León: «Collages ilimitados en Sema Plus (próximamente).»
     - **Capturas a revisar** en `capturas/collage/2026-11-06-*` (editor, bandeja, modo capas, bote, sets bloqueados, hoja Listo, celebración, feed).
     - **Sin probar en un celular real:** gestos probados con toques simulados por CDP en Chromium (24 de 24 pasan, claro y oscuro); falta iPhone/Safari (vibración no existe en iOS; el modo capas se ve por el temblor y el halo).
     - **Publicar y compartir no se probaron contra producción** (el script bloquea escrituras para no ensuciar la base): la subida a `post-images` usa el mismo nombre plano `<user>_…` que `compressAndUploadPostImage`; si las policies del bucket (no versionadas) piden otro formato, ajustar `publicarCollage`.
     - **Vista previa como data URL en `collages.preview`** (≤ 400 KB por CHECK): suficiente para 5 collages; si se quita el tope (Plus), mover a un bucket privado.
     - **Racha offline:** las sesiones que se sincronizan después (`syncPendingLogs`) también tiran, pero solo si el día del servidor sigue siendo el del registro.
-    - **Celebración en desarrollo:** `?collage=premio` (solo con `import.meta.env.DEV`).
+    - **Celebración en desarrollo:** `?collage=premio` (solo con `import.meta.env.DEV`; muestra el primer set de racha del catálogo).
+    - **El SQL es seguro para producción** (revisado 2026-11-06): solo crea tablas, funciones, triggers y permisos nuevos; ningún ALTER/UPDATE/DELETE/DROP sobre lo existente.
     - **De la revisión (crítico, accesibilidad, copy) quedó sin hacer:** el set Botánico se ve «boho / Etsy» según el crítico (mandala, nudos, luna y sol con cara) y propone abrir con piezas urbanas (boletos, cinta, sellos): decisión de León sobre los stickers; flechas con tabindex itinerante en pestañas y grupos de opciones (hoy funcionan con Tab); borde del lienzo 1.5 px `ink` en lugar de sombra (hecho) pero el contraste del filo sobre fondo negro en oscuro es el de la tinta blanca; mover una pieza a un punto con un toque (solo arrastre o flechas).
     - **Marca «Sema» en lo exportado:** decisión propia para que las historias digan de dónde salen. Confirmar si se queda.
     - **Fondos lisos vivos quitados** (lila, durazno, mostaza, menta, cielo): decisión propia por sema-identidad §6. Si León los quiere, se regresan en `coloresFondo` del JSON.
