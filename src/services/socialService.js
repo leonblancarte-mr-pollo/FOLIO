@@ -114,6 +114,7 @@ async function fetchFeed(userId) {
   return posts.map((p) => {
     let type = p.type;
     let quote = null;
+    let collage = null;
 
     // Detect quote posts embedded in "text" type (avoids DB type constraints)
     if (p.content) {
@@ -122,6 +123,10 @@ async function fetchFeed(userId) {
         if (parsed.__folio_type === "quote") {
           type = "quote";
           quote = parsed;
+        } else if (parsed.__folio_type === "collage") {
+          // Collages (2026-11-06): publicación propia guardada como "text" + JSON (sin tocar posts.type).
+          type = "collage";
+          collage = parsed;
         }
       } catch { /* not JSON, regular text post */ }
     }
@@ -132,6 +137,7 @@ async function fetchFeed(userId) {
       book: p.book_id ? bookMap[p.book_id] : null,
       author: authorMap[p.user_id] || { nombre: "Usuario", username: "" },
       quote,
+      collage,
     };
   });
 }

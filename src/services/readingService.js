@@ -4,6 +4,7 @@ import { localDateStr } from "./streakService.js";
 import { addPetXP } from "./petService.js";
 import { createFeedPost } from "./socialService.js";
 import { esHitoRacha } from "../theme.js";
+import { tirarPremioRacha } from "./collageService.js";
 
 // ============ SESIONES DE LECTURA ============
 function newClientUuid() {
@@ -49,8 +50,13 @@ async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId })
   const { data: streakRow, error: streakErr } = await supabase.rpc("update_streak");
   if (streakErr) console.error("[streak] update_streak falló:", streakErr.message);
   // Ronda 5: si la racha acaba de llegar a un hito, se publica el banner (una sola vez por hito).
-  else publishStreakMilestone(userId, Array.isArray(streakRow) ? streakRow[0] : streakRow)
-    .catch((err) => console.error("[streak] no se pudo publicar el hito de racha:", err?.message || err));
+  else {
+    publishStreakMilestone(userId, Array.isArray(streakRow) ? streakRow[0] : streakRow)
+      .catch((err) => console.error("[streak] no se pudo publicar el hito de racha:", err?.message || err));
+    // Collages (2026-11-06): cada día que se registra la racha hay una tirada por un set nuevo
+    // (RPC collage_streak_roll, idempotente por día). Si gana, collageBus abre la celebración. Nunca lanza.
+    tirarPremioRacha(userId);
+  }
 
   // Pet XP por páginas leídas: +2 XP por cada 10 páginas
   const pagesXp = Math.floor((pagesRead || 0) / 10) * 2;
