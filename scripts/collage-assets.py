@@ -2,8 +2,11 @@
 """
 Collages (2026-11-06): prepara los assets públicos de la función Collages.
 
-1. Convierte los stickers fuente (PNG transparentes de ~1000 px en
-   assets-fuentes/stickers/stickersMVP1/) a WebP optimizado:
+1. Convierte los stickers fuente (PNG transparentes de ~1000 px) a WebP optimizado. Hay UNA CARPETA POR SET en
+   assets-fuentes/stickers/<set>/ (botanico, psico, sello, tinta, poe, tarot, musica…): un set nuevo solo
+   requiere crear su carpeta con los PNG y volver a correr el script (y darlo de alta en el catálogo y el SQL).
+   Nunca se convierte nada dentro de una subcarpeta `revisar-marcas/` (marcas registradas) ni lo de EXCLUIR.
+   Salida:
      public/collage/stickers/<id>.webp       (lado mayor 720 px, para el lienzo y la exportación 1080)
      public/collage/stickers/min/<id>.webp   (lado mayor 200 px, para la bandeja)
 2. Genera el set propio de texturas (papel, cartón arrugado, kraft, cuaderno):
@@ -11,7 +14,9 @@ Collages (2026-11-06): prepara los assets públicos de la función Collages.
      public/collage/texturas/pieza-<id>.webp     (pieza suelta con orillas rasgadas y transparencia)
      public/collage/texturas/min/*.webp          (miniaturas de la bandeja)
 
-Uso (desde la raíz del repo):  python scripts/collage-assets.py
+Uso (desde la raíz del repo):  python scripts/collage-assets.py            (stickers de todos los sets + texturas)
+                               python scripts/collage-assets.py stickers   (solo stickers, sin regenerar texturas)
+                               python scripts/collage-assets.py carton     (solo esa textura)
 Requiere Pillow con soporte WebP y numpy. Es determinista (semillas fijas): correrlo dos veces da los mismos archivos.
 """
 import os
@@ -20,7 +25,11 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FUENTE = os.path.join(RAIZ, "assets-fuentes", "stickers", "stickersMVP1")
+FUENTE = os.path.join(RAIZ, "assets-fuentes", "stickers")
+# Subcarpetas que jamás entran a la app (marcas registradas, en cualquier set).
+CARPETAS_IGNORADAS = {"revisar-marcas"}
+# Stickers excluidos por contenido (desnudos) aunque estén en la carpeta de su set. Si ya existían, se borran de public/.
+EXCLUIR = {"tarot-la-estrella", "tarot-los-enamorados", "tarot-el-mundo"}
 DEST = os.path.join(RAIZ, "public", "collage")
 
 
@@ -44,28 +53,35 @@ def recortar_transparencia(img):
 
 # ---------------------------------------------------------------- stickers
 def stickers():
-    # PNG en stickersMVP1/ y también sueltos en assets-fuentes/stickers/ (sets nuevos, p. ej. tinta-*.png).
-    carpetas = [FUENTE, os.path.dirname(FUENTE)]
-    archivos = {}
-    for c in carpetas:
-        if os.path.isdir(c):
-            for nombre in os.listdir(c):
-                if nombre.lower().endswith(".png"):
-                    archivos.setdefault(nombre, os.path.join(c, nombre))
-    if not archivos:
-        print(f"[stickers] no hay PNG en {carpetas}; se omite", file=sys.stderr)
+    """Una carpeta por set: assets-fuentes/stickers/<set>/*.png → public/collage/stickers/<id>.webp (+ min/)."""
+    if not os.path.isdir(FUENTE):
+        print(f"[stickers] no existe {FUENTE}; se omite", file=sys.stderr)
         return
     d = asegurar(os.path.join(DEST, "stickers"))
     dmin = asegurar(os.path.join(d, "min"))
-    n = 0
-    for nombre in sorted(archivos):
-        sid = os.path.splitext(nombre)[0]
-        img = Image.open(archivos[nombre]).convert("RGBA")
-        img = recortar_transparencia(img)
-        ajustar(img, 720).save(os.path.join(d, sid + ".webp"), "WEBP", quality=82, method=6)
-        ajustar(img, 200).save(os.path.join(dmin, sid + ".webp"), "WEBP", quality=78, method=6)
-        n += 1
-    print(f"[stickers] {n} convertidos")
+    por_set = {}
+    for carpeta in sorted(os.listdir(FUENTE)):
+        ruta = os.path.join(FUENTE, carpeta)
+        if not os.path.isdir(ruta) or carpeta in CARPETAS_IGNORADAS:
+            continue
+        # Solo los PNG directos de la carpeta del set: las subcarpetas (p. ej. revisar-marcas/) no se recorren.
+        for nombre in sorted(os.listdir(ruta)):
+            sid, ext = os.path.splitext(nombre)
+            if ext.lower() != ".png" or not os.path.isfile(os.path.join(ruta, nombre)):
+                continue
+            if sid in EXCLUIR:
+                for viejo in (os.path.join(d, sid + ".webp"), os.path.join(dmin, sid + ".webp")):
+                    if os.path.exists(viejo):
+                        os.remove(viejo)
+                continue
+            img = recortar_transparencia(Image.open(os.path.join(ruta, nombre)).convert("RGBA"))
+            ajustar(img, 720).save(os.path.join(d, sid + ".webp"), "WEBP", quality=82, method=6)
+            ajustar(img, 200).save(os.path.join(dmin, sid + ".webp"), "WEBP", quality=78, method=6)
+            por_set[carpeta] = por_set.get(carpeta, 0) + 1
+    vacias = [c for c in sorted(os.listdir(FUENTE)) if os.path.isdir(os.path.join(FUENTE, c)) and c not in CARPETAS_IGNORADAS and c not in por_set]
+    print(f"[stickers] {sum(por_set.values())} convertidos: " + ", ".join(f"{k} {v}" for k, v in por_set.items()))
+    if vacias:
+        print(f"[stickers] carpetas sin PNG (pendientes): {', '.join(vacias)}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------- ruido
@@ -221,8 +237,9 @@ def texturas(solo=None):
 
 
 if __name__ == "__main__":
-    # Sin argumentos: todo. Con argumentos: solo esas texturas (p. ej. «python scripts/collage-assets.py carton»).
+    # Sin argumentos: todo. «stickers»: solo los stickers. Otros argumentos: solo esas texturas («carton»).
     solo = sys.argv[1:]
-    if not solo:
+    if not solo or "stickers" in solo:
         stickers()
-    texturas(solo)
+    if solo != ["stickers"]:
+        texturas([x for x in solo if x != "stickers"])

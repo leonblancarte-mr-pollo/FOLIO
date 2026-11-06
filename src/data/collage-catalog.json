@@ -80,6 +80,15 @@
       "muestra": "psico-cerezas"
     },
     {
+      "id": "poe",
+      "nombre": "Nevermore",
+      "descripcion": "Cuervos, gatos negros y un corazón que no se calla.",
+      "obtencion": {
+        "tipo": "racha"
+      },
+      "muestra": "poe-cuervo"
+    },
+    {
       "id": "botanico",
       "nombre": "Botánico",
       "descripcion": "Flores, conchas y soles de grabado.",
@@ -98,6 +107,26 @@
         "precio": 100
       },
       "muestra": "sello-monstera"
+    },
+    {
+      "id": "tarot",
+      "nombre": "Arcanos",
+      "descripcion": "Cartas para leer el futuro, o para fingir que sí.",
+      "obtencion": {
+        "tipo": "gemas",
+        "precio": 100
+      },
+      "muestra": "tarot-la-luna"
+    },
+    {
+      "id": "musica",
+      "nombre": "Lado B",
+      "descripcion": "Viniles, casetes y bocinas a todo volumen.",
+      "obtencion": {
+        "tipo": "gemas",
+        "precio": 100
+      },
+      "muestra": "musica-casete"
     }
   ],
   "objetos": [
@@ -496,6 +525,339 @@
       "estilo": "sello de tinta",
       "archivo": "/collage/stickers/sello-planta-aire.webp",
       "miniatura": "/collage/stickers/min/sello-planta-aire.webp"
+    },
+    {
+      "id": "poe-cuervo",
+      "nombre": "Cuervo",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-cuervo.webp",
+      "miniatura": "/collage/stickers/min/poe-cuervo.webp"
+    },
+    {
+      "id": "poe-gato-negro",
+      "nombre": "Gato negro",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-gato-negro.webp",
+      "miniatura": "/collage/stickers/min/poe-gato-negro.webp"
+    },
+    {
+      "id": "poe-corazon",
+      "nombre": "Corazón delator",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-corazon.webp",
+      "miniatura": "/collage/stickers/min/poe-corazon.webp"
+    },
+    {
+      "id": "poe-calavera",
+      "nombre": "Calavera",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-calavera.webp",
+      "miniatura": "/collage/stickers/min/poe-calavera.webp"
+    },
+    {
+      "id": "poe-mascara-roja",
+      "nombre": "Máscara roja",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-mascara-roja.webp",
+      "miniatura": "/collage/stickers/min/poe-mascara-roja.webp"
+    },
+    {
+      "id": "poe-ojo-buitre",
+      "nombre": "Ojo de buitre",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-ojo-buitre.webp",
+      "miniatura": "/collage/stickers/min/poe-ojo-buitre.webp"
+    },
+    {
+      "id": "poe-pendulo",
+      "nombre": "Péndulo",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-pendulo.webp",
+      "miniatura": "/collage/stickers/min/poe-pendulo.webp"
+    },
+    {
+      "id": "poe-reloj",
+      "nombre": "Reloj",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-reloj.webp",
+      "miniatura": "/collage/stickers/min/poe-reloj.webp"
+    },
+    {
+      "id": "poe-barril",
+      "nombre": "Amontillado",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-barril.webp",
+      "miniatura": "/collage/stickers/min/poe-barril.webp"
+    },
+    {
+      "id": "poe-muro",
+      "nombre": "Muro",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-muro.webp",
+      "miniatura": "/collage/stickers/min/poe-muro.webp"
+    },
+    {
+      "id": "poe-pluma-tintero",
+      "nombre": "Pluma y tintero",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-pluma-tintero.webp",
+      "miniatura": "/collage/stickers/min/poe-pluma-tintero.webp"
+    },
+    {
+      "id": "poe-vela",
+      "nombre": "Vela",
+      "set": "poe",
+      "categoria": "sticker",
+      "estilo": "grabado gótico",
+      "archivo": "/collage/stickers/poe-vela.webp",
+      "miniatura": "/collage/stickers/min/poe-vela.webp"
+    },
+    {
+      "id": "tarot-la-luna",
+      "nombre": "La Luna",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-la-luna.webp",
+      "miniatura": "/collage/stickers/min/tarot-la-luna.webp"
+    },
+    {
+      "id": "tarot-el-sol",
+      "nombre": "El Sol",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-el-sol.webp",
+      "miniatura": "/collage/stickers/min/tarot-el-sol.webp"
+    },
+    {
+      "id": "tarot-la-torre",
+      "nombre": "La Torre",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-la-torre.webp",
+      "miniatura": "/collage/stickers/min/tarot-la-torre.webp"
+    },
+    {
+      "id": "tarot-la-muerte",
+      "nombre": "La Muerte",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-la-muerte.webp",
+      "miniatura": "/collage/stickers/min/tarot-la-muerte.webp"
+    },
+    {
+      "id": "tarot-el-loco",
+      "nombre": "El Loco",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-el-loco.webp",
+      "miniatura": "/collage/stickers/min/tarot-el-loco.webp"
+    },
+    {
+      "id": "tarot-el-mago",
+      "nombre": "El Mago",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-el-mago.webp",
+      "miniatura": "/collage/stickers/min/tarot-el-mago.webp"
+    },
+    {
+      "id": "tarot-la-sacerdotisa",
+      "nombre": "La Sacerdotisa",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-la-sacerdotisa.webp",
+      "miniatura": "/collage/stickers/min/tarot-la-sacerdotisa.webp"
+    },
+    {
+      "id": "tarot-el-ermitano",
+      "nombre": "El Ermitaño",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-el-ermitano.webp",
+      "miniatura": "/collage/stickers/min/tarot-el-ermitano.webp"
+    },
+    {
+      "id": "tarot-la-rueda",
+      "nombre": "La Rueda de la Fortuna",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-la-rueda.webp",
+      "miniatura": "/collage/stickers/min/tarot-la-rueda.webp"
+    },
+    {
+      "id": "tarot-el-destino",
+      "nombre": "El Destino",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-el-destino.webp",
+      "miniatura": "/collage/stickers/min/tarot-el-destino.webp"
+    },
+    {
+      "id": "tarot-el-todo",
+      "nombre": "El Todo",
+      "set": "tarot",
+      "categoria": "sticker",
+      "estilo": "carta de tarot",
+      "archivo": "/collage/stickers/tarot-el-todo.webp",
+      "miniatura": "/collage/stickers/min/tarot-el-todo.webp"
+    },
+    {
+      "id": "musica-vinil",
+      "nombre": "Vinil",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-vinil.webp",
+      "miniatura": "/collage/stickers/min/musica-vinil.webp"
+    },
+    {
+      "id": "musica-casete",
+      "nombre": "Casete",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-casete.webp",
+      "miniatura": "/collage/stickers/min/musica-casete.webp"
+    },
+    {
+      "id": "musica-tornamesa",
+      "nombre": "Tornamesa",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-tornamesa.webp",
+      "miniatura": "/collage/stickers/min/musica-tornamesa.webp"
+    },
+    {
+      "id": "musica-grabadora",
+      "nombre": "Grabadora",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-grabadora.webp",
+      "miniatura": "/collage/stickers/min/musica-grabadora.webp"
+    },
+    {
+      "id": "musica-audifonos",
+      "nombre": "Audífonos",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-audifonos.webp",
+      "miniatura": "/collage/stickers/min/musica-audifonos.webp"
+    },
+    {
+      "id": "musica-bocina",
+      "nombre": "Bocina",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-bocina.webp",
+      "miniatura": "/collage/stickers/min/musica-bocina.webp"
+    },
+    {
+      "id": "musica-microfono",
+      "nombre": "Micrófono",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-microfono.webp",
+      "miniatura": "/collage/stickers/min/musica-microfono.webp"
+    },
+    {
+      "id": "musica-guitarra",
+      "nombre": "Guitarra",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-guitarra.webp",
+      "miniatura": "/collage/stickers/min/musica-guitarra.webp"
+    },
+    {
+      "id": "musica-tambor",
+      "nombre": "Tambor",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-tambor.webp",
+      "miniatura": "/collage/stickers/min/musica-tambor.webp"
+    },
+    {
+      "id": "musica-teclado",
+      "nombre": "Teclado",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-teclado.webp",
+      "miniatura": "/collage/stickers/min/musica-teclado.webp"
+    },
+    {
+      "id": "musica-trompeta",
+      "nombre": "Trompeta",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-trompeta.webp",
+      "miniatura": "/collage/stickers/min/musica-trompeta.webp"
+    },
+    {
+      "id": "musica-clave-sol",
+      "nombre": "Clave de sol",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-clave-sol.webp",
+      "miniatura": "/collage/stickers/min/musica-clave-sol.webp"
+    },
+    {
+      "id": "musica-nota",
+      "nombre": "Nota",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-nota.webp",
+      "miniatura": "/collage/stickers/min/musica-nota.webp"
+    },
+    {
+      "id": "musica-pulsera-festival",
+      "nombre": "Pulsera de festival",
+      "set": "musica",
+      "categoria": "sticker",
+      "estilo": "pegatina de banda",
+      "archivo": "/collage/stickers/musica-pulsera-festival.webp",
+      "miniatura": "/collage/stickers/min/musica-pulsera-festival.webp"
     },
     {
       "id": "fondo-papel",

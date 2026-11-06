@@ -75,6 +75,8 @@
 
 - 2026-11-06 — Ajustes al catálogo de Collages (rama `collages-mvp`). **Kit inicial:** Tinta + Papeles. Set nuevo `tinta` (5 stickers: hongo, luna, ojo, escarabajo, espiral) dado de alta en el catálogo y en el SQL; sus PNG todavía no están en la máquina: al copiarlos a `assets-fuentes/stickers/` (o `stickersMVP1/`), `python scripts/collage-assets.py` los convierte a WebP + miniatura. Mientras falten, la bandeja no muestra piezas rotas (`Pieza` se oculta si el archivo no carga). **Racha:** `psico` se parte en 4 sets de 6 por afinidad visual: Trance (espirales y op-art), Tercer ojo (ojos, serpiente, hongo, estrella), Olimpo (busto, columna, Saturno, estrellas, arcoíris) y Bodegón (cerezas, teléfono, caracol, lirio, rama, mariposa). Los IDs y archivos de los stickers no cambian (`psico-*`); solo su `set`. **Gemas:** Botánico pasa de inicial a gemas; Botánico y Sellos de planta cuestan 100. **Aviso de tope:** «Borra uno de tus collages para crear otro.» / «Collages ilimitados en Sema Plus (próximamente).» (en el editor: «…para guardar este.»). **SQL revisado:** solo crea objetos nuevos; se agregó un `UPDATE` que desactiva (no borra) sets que salgan del catálogo, únicamente en `collage_sets`, la tabla nueva del mismo archivo.
 
+- 2026-11-06 — Sets nuevos de Collages y fuentes por carpeta (rama `collages-mvp`). Fuentes en `assets-fuentes/stickers/<set>/`, una carpeta por set (botanico, psico, sello, tinta, poe, tarot, musica). `scripts/collage-assets.py` recorre cada carpeta: un set nuevo solo requiere su carpeta. Nunca entra lo que esté en una subcarpeta `revisar-marcas/` (marcas registradas; hoy 4 de música). La lista `EXCLUIR` deja fuera tarot-la-estrella, tarot-los-enamorados y tarot-el-mundo (desnudos) y borra su WebP si existiera. Nuevo modo `python scripts/collage-assets.py stickers` (solo stickers, sin regenerar texturas). Sets nuevos en catálogo y SQL: **Nevermore** (`poe`, 12, racha), **Arcanos** (`tarot`, 11, 100 gemas) y **Lado B** (`musica`, 14, 100 gemas). Tinta sigue en el kit inicial, pero `stickers-tinta.zip` no llegó: su carpeta está vacía. 76 stickers en WebP, `public/collage/` pesa 6.8 MB. Verificación: `scripts/captura-collage-sets.mjs` (bloqueados con muestra y candado; desbloqueados en local, 12/11/14 piezas; 4 piezas agregadas al lienzo; claro y oscuro, sin errores).
+
 ---
 
 ## I. VISIÓN GENERAL
@@ -135,7 +137,8 @@ FOLIO FINAL/
 │   (no existe `src/pages/`: no hay router, las "páginas" son vistas dentro de App.jsx)
 ├── public/collage/           # Collages: stickers/*.webp (720 px) + stickers/min/ (200 px), texturas/fondo-*.webp (1080×1920),
 │                             # texturas/pieza-*.webp (rasgadas) + texturas/min/. Se regeneran con scripts/collage-assets.py
-├── assets-fuentes/           # (fuera de git, .gitignore) PNG originales de stickers en alta (144 MB)
+├── assets-fuentes/           # (fuera de git, .gitignore) PNG originales de stickers en alta: stickers/<set>/ (una carpeta por set;
+│                             # `revisar-marcas/` nunca entra a la app)
 ├── public/                   # Iconos PWA, `logo.png`, `gema.png`, `avatars/avatar-1..10.png`, `pets/` (cat.png, cat-blink.png,
 │                             # cat-video.mp4), `sw-notifications.js` (notificaciones programadas, importado por el SW de Workbox)
 ├── design-system/sema/MASTER.md  # Design system de SEMA: paleta, tipografía, espacio y los 8 principios (2026-10-11)
@@ -645,9 +648,10 @@ Lienzo creativo tipo Pinterest Shuffles dentro del universo de lectura: stickers
 | Documento, recortes de frase, exportación | `src/components/collage/collageRender.js` |
 | CSS (modo capas, premio) | `src/index.css`, bloque «Collages (2026-11-06)» |
 | Assets | `public/collage/stickers/` (+`min/`), `public/collage/texturas/` (+`min/`) |
-| Generador de assets | `scripts/collage-assets.py` (fuentes en `assets-fuentes/stickers/stickersMVP1/`, fuera de git) |
+| Generador de assets | `scripts/collage-assets.py` (fuentes en `assets-fuentes/stickers/<set>/`, una carpeta por set, fuera de git) |
 | Servidor | `supabase/collages_mvp_2026-11-06.sql` (escrito, **sin correr**) |
 | Capturas y prueba de gestos | `scripts/captura-collage.mjs` → `capturas/collage/` |
+| Verificación de sets en la bandeja (bloqueados / desbloqueados en local / agregar al lienzo) | `scripts/captura-collage-sets.mjs` → `capturas/collage/` |
 | Integración en `App.jsx` | `NAV_ITEMS` (Collage), render de la pestaña con `Suspense`, `<CollageCelebracion>`, rama `post.type === "collage"` de `renderPost`, `describePostTarget` («tu collage»), el «+» oculto en Collage |
 
 **Por qué sin librería de canvas (decisión del paso 0).** Se compararon react-konva, Fabric.js y una solución propia:
@@ -671,7 +675,16 @@ Lienzo creativo tipo Pinterest Shuffles dentro del universo de lectura: stickers
 ```
 - `categoria`: `sticker`, `textura` (pieza suelta) o `fondo`.
 - `obtencion.tipo`: `inicial` (de todos), `racha` (premio variable), `gemas` (con `precio`) o `plus` (Sema Plus). **Cada objeto hereda la obtención de su set**; si un objeto declara su propia `obtencion`, manda la suya. `collageCatalog.js` la resuelve al cargar.
-- Sets actuales (2026-11-06, ajuste): **inicial** `papeles` (texturas propias) y `tinta` (5; PNG pendientes); **racha** `trance`, `tercer-ojo`, `olimpo`, `bodegon` (6 cada uno, los 24 stickers `psico-*` agrupados por afinidad visual); **gemas** `botanico` (10) y `sello` (5), 100 gemas cada uno. Para mover un set: cambiar su `obtencion` en el JSON **y** su fila en el bloque CATÁLOGO del SQL (el servidor valida con `collage_sets`).
+- Sets actuales (2026-11-06):
+  - **Inicial:** `papeles` (texturas propias) y `tinta` (5; PNG pendientes).
+  - **Racha:** `trance`, `tercer-ojo`, `olimpo`, `bodegon` (6 cada uno, los 24 `psico-*` agrupados por afinidad visual) y `poe` = Nevermore (12).
+  - **Gemas, 100 cada uno:** `botanico` (10), `sello` (5), `tarot` = Arcanos (11) y `musica` = Lado B (14).
+- **Fuentes de los stickers:** `assets-fuentes/stickers/<set>/*.png`, fuera de git. El nombre de la carpeta es el set de origen; el `set` del catálogo puede subdividirlo, como `psico/` → 4 sets. Las subcarpetas `revisar-marcas/` nunca se convierten, y `EXCLUIR` en el script deja fuera stickers concretos.
+- **Alta de un set nuevo:**
+  1. Crear su carpeta con los PNG.
+  2. Correr `python scripts/collage-assets.py stickers`.
+  3. Agregar sus objetos y su set al JSON.
+  4. Agregar su fila al bloque CATÁLOGO del SQL y a la lista del `UPDATE … activo = false`. Para mover un set: cambiar su `obtencion` en el JSON **y** su fila en el bloque CATÁLOGO del SQL (el servidor valida con `collage_sets`).
 - Los colores de `coloresFondo` y `estilosFrase` son **contenido** del collage (como una foto): no siguen al tema claro/oscuro. Fondos lisos solo blanco, negro, arena y tinta (sin pasteles de pantalla completa, sema-identidad §6); los vivos quedan en recortes de frase y piezas.
 
 **Inventario.** Permanente por usuario: un set desbloqueado se usa sin límite y nunca se consume. En servidor, `user_collage_inventory (user_id, set_id, origen, unlocked_at)`; los sets `inicial` no se guardan (son de todos) y los `plus` se abren con `users.is_premium`. La UI recibe `estado = { modo, plus, sets: Set, fallosSeguidos, limite, usados }` de `getEstadoCollage`.
@@ -1298,7 +1311,10 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 
 30. **Collages MVP (2026-11-06) — pendientes y decisiones para León** (rama `collages-mvp`; nada fusionado ni desplegado).
     - **Correr `supabase/collages_mvp_2026-11-06.sql`** en el SQL Editor antes de desplegar el cliente. Hasta entonces todo funciona en modo local (por navegador) y la compra con gemas está apagada. Lo guardado en modo local no se migra al servidor.
-    - **PNG del set `tinta` pendientes** (`tinta-hongo`, `-luna`, `-ojo`, `-escarabajo`, `-espiral`): no estaban en la máquina. Copiarlos a `assets-fuentes/stickers/` y correr `python scripts/collage-assets.py`; luego commit de `public/collage/stickers/tinta-*.webp` y `min/`. Sin ellos, el kit inicial solo trae Papeles y la bandeja muestra el título «Tinta» sin piezas.
+    - **PNG del set `tinta` pendientes** (`tinta-hongo`, `-luna`, `-ojo`, `-escarabajo`, `-espiral`): `stickers-tinta.zip` no llegó a la raíz. Pasos cuando lleguen:
+      1. Descomprimir en `assets-fuentes/stickers/tinta/`.
+      2. Correr `python scripts/collage-assets.py stickers`.
+      3. Hacer commit de `public/collage/stickers/tinta-*.webp` y `min/`. Sin ellos, el kit inicial solo trae Papeles y la bandeja muestra el título «Tinta» sin piezas.
     - ~~Un solo set de racha~~ → resuelto: 4 sets de 6 (Trance, Tercer ojo, Olimpo, Bodegón). Con 30 % y red de seguridad, los 4 salen en ~13 registros en promedio. Las agrupaciones y nombres son decisión propia: revisar en la bandeja.
     - ~~Precio de `sello`~~ → 100 gemas, igual que Botánico (decisión de León, 2026-11-06).
     - ~~Mención de Sema Plus en el tope~~ → texto de León: «Collages ilimitados en Sema Plus (próximamente).»
@@ -1308,6 +1324,8 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **Vista previa como data URL en `collages.preview`** (≤ 400 KB por CHECK): suficiente para 5 collages; si se quita el tope (Plus), mover a un bucket privado.
     - **Racha offline:** las sesiones que se sincronizan después (`syncPendingLogs`) también tiran, pero solo si el día del servidor sigue siendo el del registro.
     - **Celebración en desarrollo:** `?collage=premio` (solo con `import.meta.env.DEV`; muestra el primer set de racha del catálogo).
+    - **Sets nuevos (Nevermore, Arcanos, Lado B):** nombres, descripciones y nombres de piezas son decisión propia. «Amontillado» para el barril y «Corazón delator» son guiños a los cuentos de Poe.
+    - **`musica/revisar-marcas/`** (púa de Nirvana, walkman, póster de Radiohead, boleto de The Cure): fuera de la app hasta revisar marcas.
     - **El SQL es seguro para producción** (revisado 2026-11-06): solo crea tablas, funciones, triggers y permisos nuevos; ningún ALTER/UPDATE/DELETE/DROP sobre lo existente.
     - **De la revisión (crítico, accesibilidad, copy) quedó sin hacer:** el set Botánico se ve «boho / Etsy» según el crítico (mandala, nudos, luna y sol con cara) y propone abrir con piezas urbanas (boletos, cinta, sellos): decisión de León sobre los stickers; flechas con tabindex itinerante en pestañas y grupos de opciones (hoy funcionan con Tab); borde del lienzo 1.5 px `ink` en lugar de sombra (hecho) pero el contraste del filo sobre fondo negro en oscuro es el de la tinta blanca; mover una pieza a un punto con un toque (solo arrastre o flechas).
     - **Marca «Sema» en lo exportado:** decisión propia para que las historias digan de dónde salen. Confirmar si se queda.
