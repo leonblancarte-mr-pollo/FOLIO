@@ -1,0 +1,565 @@
+{
+  "_leeme": "Catálogo de Collages. Es DATOS: para mover un set de forma de obtención se cambia su campo obtencion; un objeto puede declarar su propia obtencion y entonces manda sobre la del set. Tipos de obtención: inicial | racha | gemas (con precio) | plus. Si cambias precios o sets de racha/gemas, corre también la parte «catálogo» de supabase/collages_mvp_2026-11-06.sql (el servidor valida el precio y la lista de sets con su propia tabla collage_sets). Ver DOCUMENTACION_ARQUITECTURA.md §IV.15.",
+  "version": 1,
+  "recompensas": {
+    "probabilidadInicial": 0.3,
+    "incrementoPorFallo": 0,
+    "maxSinPremio": 5
+  },
+  "limites": {
+    "collagesSinPlus": 5,
+    "collagesPlus": null
+  },
+  "lienzo": {
+    "ancho": 1080,
+    "formatos": {
+      "historia": {
+        "alto": 1920,
+        "etiqueta": "9:16"
+      },
+      "cuadrado": {
+        "alto": 1080,
+        "etiqueta": "1:1"
+      }
+    },
+    "formatoInicial": "historia"
+  },
+  "sets": [
+    {
+      "id": "papeles",
+      "nombre": "Papeles",
+      "descripcion": "Papel, cartón, kraft y cuaderno.",
+      "obtencion": {
+        "tipo": "inicial"
+      },
+      "muestra": "pieza-kraft"
+    },
+    {
+      "id": "botanico",
+      "nombre": "Botánico",
+      "descripcion": "Flores, conchas y soles de grabado.",
+      "obtencion": {
+        "tipo": "inicial"
+      },
+      "muestra": "botanico-peonia"
+    },
+    {
+      "id": "psico",
+      "nombre": "Psicodélico",
+      "descripcion": "Ojos, espirales, hongos y planetas.",
+      "obtencion": {
+        "tipo": "racha"
+      },
+      "muestra": "psico-ojo-radiante"
+    },
+    {
+      "id": "sello",
+      "nombre": "Sellos de planta",
+      "descripcion": "Plantas de interior en tinta.",
+      "obtencion": {
+        "tipo": "gemas",
+        "precio": 60
+      },
+      "muestra": "sello-monstera"
+    }
+  ],
+  "objetos": [
+    {
+      "id": "botanico-arbol",
+      "nombre": "Árbol",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-arbol.webp",
+      "miniatura": "/collage/stickers/min/botanico-arbol.webp"
+    },
+    {
+      "id": "botanico-conchas",
+      "nombre": "Conchas",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-conchas.webp",
+      "miniatura": "/collage/stickers/min/botanico-conchas.webp"
+    },
+    {
+      "id": "botanico-enredadera",
+      "nombre": "Enredadera",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-enredadera.webp",
+      "miniatura": "/collage/stickers/min/botanico-enredadera.webp"
+    },
+    {
+      "id": "botanico-flor-azul",
+      "nombre": "Flor azul",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-flor-azul.webp",
+      "miniatura": "/collage/stickers/min/botanico-flor-azul.webp"
+    },
+    {
+      "id": "botanico-luna",
+      "nombre": "Luna",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-luna.webp",
+      "miniatura": "/collage/stickers/min/botanico-luna.webp"
+    },
+    {
+      "id": "botanico-mandala",
+      "nombre": "Mandala",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-mandala.webp",
+      "miniatura": "/collage/stickers/min/botanico-mandala.webp"
+    },
+    {
+      "id": "botanico-margaritas",
+      "nombre": "Margaritas",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-margaritas.webp",
+      "miniatura": "/collage/stickers/min/botanico-margaritas.webp"
+    },
+    {
+      "id": "botanico-nudo",
+      "nombre": "Nudo",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-nudo.webp",
+      "miniatura": "/collage/stickers/min/botanico-nudo.webp"
+    },
+    {
+      "id": "botanico-peonia",
+      "nombre": "Peonía",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-peonia.webp",
+      "miniatura": "/collage/stickers/min/botanico-peonia.webp"
+    },
+    {
+      "id": "botanico-sol",
+      "nombre": "Sol",
+      "set": "botanico",
+      "categoria": "sticker",
+      "estilo": "grabado botánico",
+      "archivo": "/collage/stickers/botanico-sol.webp",
+      "miniatura": "/collage/stickers/min/botanico-sol.webp"
+    },
+    {
+      "id": "psico-arcoiris",
+      "nombre": "Arcoíris",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-arcoiris.webp",
+      "miniatura": "/collage/stickers/min/psico-arcoiris.webp"
+    },
+    {
+      "id": "psico-bandera-cuadros",
+      "nombre": "Bandera de cuadros",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-bandera-cuadros.webp",
+      "miniatura": "/collage/stickers/min/psico-bandera-cuadros.webp"
+    },
+    {
+      "id": "psico-busto",
+      "nombre": "Busto",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-busto.webp",
+      "miniatura": "/collage/stickers/min/psico-busto.webp"
+    },
+    {
+      "id": "psico-caracol",
+      "nombre": "Caracol",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-caracol.webp",
+      "miniatura": "/collage/stickers/min/psico-caracol.webp"
+    },
+    {
+      "id": "psico-cerezas",
+      "nombre": "Cerezas",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-cerezas.webp",
+      "miniatura": "/collage/stickers/min/psico-cerezas.webp"
+    },
+    {
+      "id": "psico-columna",
+      "nombre": "Columna",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-columna.webp",
+      "miniatura": "/collage/stickers/min/psico-columna.webp"
+    },
+    {
+      "id": "psico-esfera-ondas",
+      "nombre": "Esfera de ondas",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-esfera-ondas.webp",
+      "miniatura": "/collage/stickers/min/psico-esfera-ondas.webp"
+    },
+    {
+      "id": "psico-espiral-roja",
+      "nombre": "Espiral roja",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-espiral-roja.webp",
+      "miniatura": "/collage/stickers/min/psico-espiral-roja.webp"
+    },
+    {
+      "id": "psico-espiral",
+      "nombre": "Espiral",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-espiral.webp",
+      "miniatura": "/collage/stickers/min/psico-espiral.webp"
+    },
+    {
+      "id": "psico-estrella-4-puntas",
+      "nombre": "Estrella de cuatro puntas",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-estrella-4-puntas.webp",
+      "miniatura": "/collage/stickers/min/psico-estrella-4-puntas.webp"
+    },
+    {
+      "id": "psico-estrella-fugaz",
+      "nombre": "Estrella fugaz",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-estrella-fugaz.webp",
+      "miniatura": "/collage/stickers/min/psico-estrella-fugaz.webp"
+    },
+    {
+      "id": "psico-estrellas",
+      "nombre": "Estrellas",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-estrellas.webp",
+      "miniatura": "/collage/stickers/min/psico-estrellas.webp"
+    },
+    {
+      "id": "psico-flor-ondas",
+      "nombre": "Flor de ondas",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-flor-ondas.webp",
+      "miniatura": "/collage/stickers/min/psico-flor-ondas.webp"
+    },
+    {
+      "id": "psico-hongo",
+      "nombre": "Hongo",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-hongo.webp",
+      "miniatura": "/collage/stickers/min/psico-hongo.webp"
+    },
+    {
+      "id": "psico-lirio",
+      "nombre": "Lirio",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-lirio.webp",
+      "miniatura": "/collage/stickers/min/psico-lirio.webp"
+    },
+    {
+      "id": "psico-mano-ojo",
+      "nombre": "Mano con ojo",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-mano-ojo.webp",
+      "miniatura": "/collage/stickers/min/psico-mano-ojo.webp"
+    },
+    {
+      "id": "psico-mariposa",
+      "nombre": "Mariposa",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-mariposa.webp",
+      "miniatura": "/collage/stickers/min/psico-mariposa.webp"
+    },
+    {
+      "id": "psico-ojo-radiante",
+      "nombre": "Ojo radiante",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-ojo-radiante.webp",
+      "miniatura": "/collage/stickers/min/psico-ojo-radiante.webp"
+    },
+    {
+      "id": "psico-ojo",
+      "nombre": "Ojo",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-ojo.webp",
+      "miniatura": "/collage/stickers/min/psico-ojo.webp"
+    },
+    {
+      "id": "psico-rama",
+      "nombre": "Rama",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-rama.webp",
+      "miniatura": "/collage/stickers/min/psico-rama.webp"
+    },
+    {
+      "id": "psico-saturno",
+      "nombre": "Saturno",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-saturno.webp",
+      "miniatura": "/collage/stickers/min/psico-saturno.webp"
+    },
+    {
+      "id": "psico-serpiente",
+      "nombre": "Serpiente",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-serpiente.webp",
+      "miniatura": "/collage/stickers/min/psico-serpiente.webp"
+    },
+    {
+      "id": "psico-sol-espiral",
+      "nombre": "Sol en espiral",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-sol-espiral.webp",
+      "miniatura": "/collage/stickers/min/psico-sol-espiral.webp"
+    },
+    {
+      "id": "psico-telefono",
+      "nombre": "Teléfono",
+      "set": "psico",
+      "categoria": "sticker",
+      "estilo": "psicodélico setentero",
+      "archivo": "/collage/stickers/psico-telefono.webp",
+      "miniatura": "/collage/stickers/min/psico-telefono.webp"
+    },
+    {
+      "id": "sello-aglaonema",
+      "nombre": "Aglaonema",
+      "set": "sello",
+      "categoria": "sticker",
+      "estilo": "sello de tinta",
+      "archivo": "/collage/stickers/sello-aglaonema.webp",
+      "miniatura": "/collage/stickers/min/sello-aglaonema.webp"
+    },
+    {
+      "id": "sello-ficus",
+      "nombre": "Ficus",
+      "set": "sello",
+      "categoria": "sticker",
+      "estilo": "sello de tinta",
+      "archivo": "/collage/stickers/sello-ficus.webp",
+      "miniatura": "/collage/stickers/min/sello-ficus.webp"
+    },
+    {
+      "id": "sello-monstera",
+      "nombre": "Monstera",
+      "set": "sello",
+      "categoria": "sticker",
+      "estilo": "sello de tinta",
+      "archivo": "/collage/stickers/sello-monstera.webp",
+      "miniatura": "/collage/stickers/min/sello-monstera.webp"
+    },
+    {
+      "id": "sello-oreja-elefante",
+      "nombre": "Oreja de elefante",
+      "set": "sello",
+      "categoria": "sticker",
+      "estilo": "sello de tinta",
+      "archivo": "/collage/stickers/sello-oreja-elefante.webp",
+      "miniatura": "/collage/stickers/min/sello-oreja-elefante.webp"
+    },
+    {
+      "id": "sello-planta-aire",
+      "nombre": "Planta de aire",
+      "set": "sello",
+      "categoria": "sticker",
+      "estilo": "sello de tinta",
+      "archivo": "/collage/stickers/sello-planta-aire.webp",
+      "miniatura": "/collage/stickers/min/sello-planta-aire.webp"
+    },
+    {
+      "id": "fondo-papel",
+      "nombre": "Papel",
+      "set": "papeles",
+      "categoria": "fondo",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/fondo-papel.webp",
+      "miniatura": "/collage/texturas/min/fondo-papel.webp"
+    },
+    {
+      "id": "fondo-carton",
+      "nombre": "Cartón arrugado",
+      "set": "papeles",
+      "categoria": "fondo",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/fondo-carton.webp",
+      "miniatura": "/collage/texturas/min/fondo-carton.webp"
+    },
+    {
+      "id": "fondo-kraft",
+      "nombre": "Kraft",
+      "set": "papeles",
+      "categoria": "fondo",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/fondo-kraft.webp",
+      "miniatura": "/collage/texturas/min/fondo-kraft.webp"
+    },
+    {
+      "id": "fondo-cuaderno",
+      "nombre": "Hoja de cuaderno",
+      "set": "papeles",
+      "categoria": "fondo",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/fondo-cuaderno.webp",
+      "miniatura": "/collage/texturas/min/fondo-cuaderno.webp"
+    },
+    {
+      "id": "pieza-papel",
+      "nombre": "Papel rasgado",
+      "set": "papeles",
+      "categoria": "textura",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/pieza-papel.webp",
+      "miniatura": "/collage/texturas/min/pieza-papel.webp"
+    },
+    {
+      "id": "pieza-carton",
+      "nombre": "Cartón arrugado roto",
+      "set": "papeles",
+      "categoria": "textura",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/pieza-carton.webp",
+      "miniatura": "/collage/texturas/min/pieza-carton.webp"
+    },
+    {
+      "id": "pieza-kraft",
+      "nombre": "Kraft rasgado",
+      "set": "papeles",
+      "categoria": "textura",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/pieza-kraft.webp",
+      "miniatura": "/collage/texturas/min/pieza-kraft.webp"
+    },
+    {
+      "id": "pieza-cuaderno",
+      "nombre": "Hoja de cuaderno rasgada",
+      "set": "papeles",
+      "categoria": "textura",
+      "estilo": "papel",
+      "archivo": "/collage/texturas/pieza-cuaderno.webp",
+      "miniatura": "/collage/texturas/min/pieza-cuaderno.webp"
+    }
+  ],
+  "coloresFondo": [
+    {
+      "id": "blanco",
+      "nombre": "Blanco",
+      "hex": "#FFFFFF"
+    },
+    {
+      "id": "negro",
+      "nombre": "Negro",
+      "hex": "#000000"
+    },
+    {
+      "id": "arena",
+      "nombre": "Arena",
+      "hex": "#E7D7C1"
+    },
+    {
+      "id": "tinta",
+      "nombre": "Tinta",
+      "hex": "#483A58"
+    }
+  ],
+  "estilosFrase": [
+    {
+      "id": "revista",
+      "nombre": "Revista",
+      "fondo": "#FFFFFF",
+      "tinta": "#111111",
+      "fuente": "quote",
+      "tamano": 64,
+      "borde": "rasgado",
+      "credito": "label"
+    },
+    {
+      "id": "kraft",
+      "nombre": "Kraft",
+      "fondo": "#C9A27A",
+      "tinta": "#2B2118",
+      "fuente": "label",
+      "tamano": 44,
+      "borde": "rasgado",
+      "credito": "label"
+    },
+    {
+      "id": "titular",
+      "nombre": "Titular",
+      "fondo": "#F5C451",
+      "tinta": "#483A58",
+      "fuente": "display",
+      "tamano": 46,
+      "borde": "recto",
+      "credito": "ui"
+    },
+    {
+      "id": "nocturno",
+      "nombre": "Nocturno",
+      "fondo": "#111111",
+      "tinta": "#FFFFFF",
+      "fuente": "quote",
+      "tamano": 60,
+      "borde": "rasgado",
+      "credito": "label"
+    },
+    {
+      "id": "lila",
+      "nombre": "Lila",
+      "fondo": "#BBADFF",
+      "tinta": "#483A58",
+      "fuente": "quote",
+      "tamano": 62,
+      "borde": "recto",
+      "credito": "label"
+    }
+  ]
+}
