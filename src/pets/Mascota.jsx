@@ -143,31 +143,19 @@ function Mascota({ mascota = "gato", estado = "leyendo", tamaño, tamano, onFin,
 }
 
 // ─── Estado según el contexto ────────────────────────────────────────────────────────────────
-// Prioridad: celebrando > dormido > café > leyendo.
+// Prioridad: celebrando > estado por hora.
 //  · celebrando: la mascota sube de nivel (petBus) o la racha llega a un hito (esHitoRacha) durante
 //    la sesión. Una sola vez; con onFin vuelve al estado de fondo.
-//  · dormido: racha en pausa o de noche (desde las 20 h, igual que «Buenas noches» y la frase
-//    «Ya es tarde…» de Inicio, hasta las 6). Es descanso, no reproche: no se acompaña de texto.
-//  · café: primera visita del día (se guarda la fecha en localStorage `sema_mascota_dia`; el resto de
-//    esa pestaña sigue en café con sessionStorage). No usa ni toca claves folio_*.
-//  · leyendo: todo lo demás (Inicio, «Retomar lectura»).
+//  · estado de fondo: depende SOLO de la hora local del dispositivo (getHours, no UTC), ver
+//    estadoPorHora: 23:00–04:59 dormido, 05:00–06:59 café, 07:00–22:59 leyendo. Se recalcula cada
+//    minuto. Ya no guarda nada en localStorage/sessionStorage (antes `sema_mascota_dia`) ni mira la
+//    racha en pausa.
 // En desarrollo, `?mascota=leyendo|dormido|celebrando|cafe` fuerza un estado (capturas).
-const CLAVE_DIA = "sema_mascota_dia";
-function hoyStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-let _primeraDelDia = null;
-function esPrimeraVisitaDelDia() {
-  if (_primeraDelDia !== null) return _primeraDelDia;
-  const hoy = hoyStr();
-  try {
-    if (sessionStorage.getItem(CLAVE_DIA) === hoy) return (_primeraDelDia = true);
-    const ultima = localStorage.getItem(CLAVE_DIA);
-    localStorage.setItem(CLAVE_DIA, hoy);
-    if (ultima !== hoy) { sessionStorage.setItem(CLAVE_DIA, hoy); return (_primeraDelDia = true); }
-  } catch { /* sin almacenamiento: no hay café */ }
-  return (_primeraDelDia = false);
+function estadoPorHora(date = new Date()) {
+  const h = date.getHours();
+  if (h >= 23 || h < 5) return "dormido";
+  if (h < 7) return "cafe";
+  return "leyendo";
 }
 
 function estadoForzado() {
@@ -176,6 +164,8 @@ function estadoForzado() {
   return ESTADOS.includes(e) ? e : null;
 }
 
+// `rachaEnPausa` se sigue aceptando (los llamadores lo pasan) pero ya no influye en el estado.
+// eslint-disable-next-line no-unused-vars
 function useEstadoMascota({ rachaEnPausa = false, racha = null } = {}) {
   const [celebrando, setCelebrando] = useState(false);
   useEffect(() => petBus.on((r) => { if (r?.leveledUp) setCelebrando(true); }), []);
@@ -189,9 +179,12 @@ function useEstadoMascota({ rachaEnPausa = false, racha = null } = {}) {
   }, [racha]);
 
   const forzado = estadoForzado();
-  const h = new Date().getHours();
-  const noche = h >= 20 || h < 6;
-  const fondo = rachaEnPausa || noche ? "dormido" : esPrimeraVisitaDelDia() ? "cafe" : "leyendo";
+  const [fondo, setFondo] = useState(() => estadoPorHora());
+  useEffect(() => {
+    setFondo(estadoPorHora());
+    const id = setInterval(() => setFondo(estadoPorHora()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
   const estado = forzado || (celebrando ? "celebrando" : fondo);
   const onFin = () => { if (!forzado) setCelebrando(false); };
   return { estado, onFin };
@@ -208,4 +201,4 @@ function rachaEnPausaDe(streak) {
   return diff > 1 && !freezeProtected;
 }
 
-export { Mascota, useEstadoMascota, rachaEnPausaDe, LIENZOS as MASCOTA_LIENZOS };
+export { Mascota, useEstadoMascota, estadoPorHora, rachaEnPausaDe, LIENZOS as MASCOTA_LIENZOS };
