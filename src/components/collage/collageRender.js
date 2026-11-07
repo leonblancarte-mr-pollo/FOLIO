@@ -159,7 +159,7 @@ function dibujarCubriendo(ctx, img, W, H) {
 
 // Dibuja el documento en un canvas de W px de ancho (la altura sale del formato).
 // Marca chica «Sema» en la esquina inferior derecha de lo exportado. En 9:16 queda arriba de la franja que
-// tapa la caja de respuesta de Instagram (~340 px de 1920). Papel blanco + tinta para leerse sobre cualquier fondo.
+// tapa la caja de respuesta de las historias (~340 px de 1920). Papel blanco + tinta para leerse sobre cualquier fondo.
 function dibujarMarca(ctx, W, H, formato) {
   const k = W / ANCHO;
   const tam = Math.round(30 * k);

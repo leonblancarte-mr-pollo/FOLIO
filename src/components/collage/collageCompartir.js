@@ -1,6 +1,5 @@
 // Compartir una imagen de collage (2026-11-06). Sin datos nuevos: solo el navegador y el archivo.
-//   · Con hoja nativa (celular): navigator.share con el archivo. Ahí aparecen Instagram, WhatsApp, etc.
-//     Instagram web no recibe imágenes desde el navegador, así que no se integra su API.
+//   · Con hoja nativa (celular): navigator.share con el archivo.
 //   · Sin hoja nativa (escritorio, navegadores viejos): descarga el archivo.
 // Devuelve "compartido" | "cancelado" | "descargado". Lanza error si no se pudo armar o descargar.
 
