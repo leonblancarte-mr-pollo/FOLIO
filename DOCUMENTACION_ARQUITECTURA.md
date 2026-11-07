@@ -1,6 +1,6 @@
 # SEMA — DOCUMENTACIÓN DE ARQUITECTURA TÉCNICA COMPLETA
 
-> Última actualización: 2026-11-02 (ronda 3 de ajustes en la rama `rediseno-ronda2-2026-11-02`: causa raíz del «Se me trabó algo» de «Para ti» en local, Inicio en dos columnas con el gato grande y suelto, botón «Leer ahora» con canto de sticker, degradado y reflejo, boletos del Cuento del día; antes, ronda 2: una sola publicación por sesión de lectura, paleta extendida de 9 colores, barra inferior de una pieza).
+> Última actualización: 2026-11-06 (Collages MVP en la rama `collages-mvp`: editor de collages con stickers, papeles y frases; catálogo en datos, inventario permanente, premios por racha con red de seguridad, compra con gemas, guardado, exportación y publicación en el feed; ver §IV.15). Anterior: 2026-11-02 (ronda 3 de ajustes en la rama `rediseno-ronda2-2026-11-02`: causa raíz del «Se me trabó algo» de «Para ti» en local, Inicio en dos columnas con el gato grande y suelto, botón «Leer ahora» con canto de sticker, degradado y reflejo, boletos del Cuento del día; antes, ronda 2: una sola publicación por sesión de lectura, paleta extendida de 9 colores, barra inferior de una pieza).
 > Audiencia: developer que NO conoce SEMA y necesita continuar el proyecto sin preguntar.
 
 ## CHANGELOG
@@ -51,6 +51,33 @@
 - 2026-11-03 — Ronda 4 de rediseño: feed a todo el ancho, sistema de detalles y tipografía (rama `rediseno-ronda4-2026-11-03` desde `rediseno-ronda2-2026-11-02`; commits `f7b231b` tipografía por variables + kit, `71b880a` App.jsx sin familias a mano + CSS del kit, `92280bc` Explorar y botón «+», `5007135` Social, `1d12ffb` Inicio, `964d033` correcciones de crítico/accesibilidad/copy, `a49aaf9` skills; sin push ni fusión; capturas en `capturas/ronda4-2026-11-03/`, no versionadas). **Tipografía:** las familias viven en `SEMA_FONTS` de `theme.js` y se exponen como `--sema-font-display/-label/-ui/-quote`; `FONT_*`, `display`, `label`, `body`, `quote` y `ts.boleto` leen esas variables, y ya no hay ninguna familia escrita a mano fuera de `theme.js`. Se compararon tres combinaciones (A Syne + Barlow Condensed, B Unbounded + Space Mono, C Archivo + Archivo Narrow) en Inicio, Social y el boleto del Cuento (`scripts/captura-ronda4.mjs --fonts=a|b|c`) y quedó **B**: Unbounded en titulares, nombres y cifras (≥ 15 px), Space Mono solo en boletos y sellos, Figtree e Instrument Serif siguen; `display=swap`, subconjunto latino por `unicode-range`. **Kit de detalles** `src/components/Detalles.jsx` (`CintaAdhesiva`, `SelloTinta`, `Boleto`, `NotaMano`; CSS `.sema-kd-*`; demo `?detalles=1` solo en dev vía `DetallesDemo.jsx` y `main.jsx`). **Social:** publicaciones de borde a borde sin tarjeta, borde ni radio, separadas por línea de 1 px `borderSoft`; cinta de tipo a todo el ancho (color por publicación, 13 px 700, 5 px de padding); encabezado con menú de tres puntos (`MoreHorizontal`, «Ver libro» / «Borrar publicación», foco devuelto al cerrar, flechas, Home/End, cierre al salir con Tab) en lugar del bote de basura; contenido y acciones sin cajas; Libro terminado con la reseña como recorte de papel con `CintaAdhesiva` y sello fechador («03 NOV», `aria-hidden`) en el recorte, una sola vez; compositores «Tengo 5 minutos» y «¿Qué estás leyendo?» a todo el ancho (`.sema-composer-fab` queda sin uso); racha de Social como boleto recto con dentado lateral y talón «RACHA» (`.sema-post-racha`); Cuento del día sin la estampilla de minutos («· 15 min» en la línea del autor). **Inicio:** racha como boleto lila dentado con talón «RACHA» (`.sema-r4-racha`), sello «Récord personal» solo con `cur > 1 && cur >= best && !streakPaused`; nota a mano «Te faltan N páginas» (`NotaMano`, recta) con datos reales bajo «11% · 99 páginas leídas»; botón principal contextual «Retomar lectura» (un libro → `ReadingLogModal` directo; varios → modal «¿Cuál retomamos?») o «Empezar a leer» (modal «¿Por dónde empezamos?»: Cuento del día o «Buscar un libro» → Explorar); antes siempre «Leer ahora» → «¿Qué leemos?»; h1 26 px; lomo sin portada con `hyphens`. **Explorar:** boletos de papel con la razón real (estado del libro «Ya empezado» / «En Quiero leer», `s.genre` o el ánimo elegido mapeado a «Para pensar»…; en el carrusel, la razón del backend acortada, un solo boleto por sección cuando se repite, texto completo en `sr-only`); portadas del carrusel con sombra sólida. **Botón «+»:** se esconde al bajar y vuelve al subir o al tope/fondo (sin transición con `prefers-reduced-motion`, `blur()` al ocultarse), y no aparece en Perfil › Mi perfil ni en «Editar perfil» (`PerfilWrapper` avisa la subpestaña con `onSubChange`). **Efectos de Unbounded corregidos:** pestañas (`SubTabBar`), etiquetas del formulario de perfil y «Wrapped 2026» en Figtree o con tamaño ajustado. **Contraste:** `#483A58` pasa AA sobre los nueve colores de la paleta extendida (4.77–7.88) y sobre papel, lila, superficie clara y durazno; sobre negro y superficie oscura el texto es blanco; la cinta adhesiva semitransparente es solo decorativa. Detalle en §III «Ronda 4 (2026-11-03)»; pendientes en §XII.28.
 - 2026-11-04 — Ronda 5 de rediseño: Mascota, separador de feed, cartón, globo del gato, botón contextual, Libro terminado y banners de hito de racha (rama `rediseno-ronda5-2026-11-03`; 4 commits de trabajo + 1 de correcciones tras crítico, accesibilidad y QA; SQL de hitos propuesto, sin ejecutar; detalle en §III «Ronda 5» y pendientes #29)
 - 2026-11-05 — Gato animado en Lottie (rama `mascota-gato-animado` desde `main`). Componente nuevo `src/pets/Mascota.jsx` (props `mascota`, `estado`, `tamaño`, `onFin`, `pausa`, `alt`, `respaldo`, `canto`) con `lottie-react` 3 (`LottieLight`: solo SVG, sin `eval`; librería y JSON por `import()` dinámico). Un solo factor de escala (`tamaño` = alto de «leyendo», lienzo 399 × 540); la caja del layout es la de «leyendo» y los demás estados desbordan sin mover nada. `prefers-reduced-motion` o `pausa` → primer fotograma; si el JSON no carga se ve el PNG de antes (`public/pets/cat.png` / `cat-recorte.png`, por eso se conservan). `useEstadoMascota`: celebrando (sube de nivel por `petBus` o la racha cae en un hito) > dormido (racha en pausa o desde las 20 h hasta las 6) > café (primera visita del día, `localStorage` `sema_mascota_dia`) > leyendo; en desarrollo `?mascota=leyendo|dormido|celebrando|cafe` fuerza el estado. `canto` = filo de 2 px del color de fondo (4 `drop-shadow`) donde el contorno lila cae sobre lila (tarjeta de racha en Inicio, recorte de Mascota, discos de «Para ti», BookTinder y perfil de amigo). Sustituye a `PetDisplay.jsx` (borrado) en Inicio, PetHub, onboarding, perfil de amigo, aviso de nivel, avatar de «Para ti» y estado vacío de BookTinder. Assets en `src/assets/mascotas/gato/` y `zorro/` (los zorros copiados, sin conectar). Capturas: `scripts/captura-mascota.mjs` → `capturas/mascota-gato/`.
+- 2026-11-06 — Collages MVP (rama `collages-mvp` desde `mascota-gato-animado`; sin push ni fusión; SQL escrito y sin ejecutar). Lienzo creativo tipo Pinterest Shuffles. **Navegación:** pestaña propia «Collage» en la barra inferior, entre Mascota y Social; la barra queda en 5 porque Trueque ya estaba fuera. Lleva «Mis collages» en cuadrícula y «Nuevo collage». **Editor** a pantalla completa:
+  - lienzo 9:16 o 1:1 que no cambia de tamaño, con la bandeja abriendo encima (Stickers / Papeles y fondos / Mis frases);
+  - arrastrar, pellizcar y girar con dos dedos, más botones Agrandar, Achicar y Girar;
+  - modo capas al mantener presionado (vibra y se resalta; arriba = al frente, abajo = atrás), más «Al frente» y «Atrás»;
+  - bote en la franja inferior al arrastrar, guías de zona segura de historia, deshacer y rehacer (60 pasos), cambio de fondo;
+  - frases como recortes de revista en 5 estilos, con libro y autor.
+
+  **Lienzo propio sin dependencias:** DOM + Pointer Events, y canvas 2D para exportar (ver §IV.15 «Por qué sin librería»).
+  **Catálogo en datos:** `src/data/collage-catalog.json` (sets, objetos, obtención inicial/racha/gemas/plus, precios, probabilidades, límites, fondos y estilos de frase), leído por `src/services/collageCatalog.js`.
+  **Assets:** 81 stickers convertidos a WebP (720 px + miniatura de 200 px) y un set propio de texturas (papel, cartón arrugado, kraft, cuaderno; fondos de 1080×1920 y piezas rasgadas). Los genera `scripts/collage-assets.py` en `public/collage/` (3.7 MB, fuera del precache; se cachean al usarse en `collage-v1`). `assets-fuentes/` (144 MB) pasa a `.gitignore`.
+  **Servidor:** `supabase/collages_mvp_2026-11-06.sql` crea:
+  - tablas `collage_sets`, `collage_config`, `user_collage_inventory`, `collage_unlock_events`, `collage_reward_state` y `collages`;
+  - RPCs `collage_mi_estado`, `collage_streak_roll` y `buy_collage_set`;
+  - trigger del tope de 5 collages sin Plus.
+
+  La tirada de premio va justo después de `update_streak()` en `readingService`: idempotente por día, 30 %, y nunca más de 5 registros seguidos sin premio. La compra con gemas va contra `user_gems` + `reward_ledger` (reason `collage_set`). Sema Plus = `users.is_premium` (bandera `plus`, falsa por defecto). Mientras el SQL no se corra, `collageService` trabaja en **modo local** (`localStorage` `sema_collages_v1:<user>`, compra deshabilitada).
+  **Publicación:** la imagen se exporta como JPEG de 1080 px y se sube como archivo nuevo a `post-images`, así queda congelada. El post es `text` con JSON `{ __folio_type: "collage", formato, collageId, encima }` (mismo patrón que las frases, sin tocar `posts.type`). En el feed lleva la franja «Collage»; si se publicó con una frase o una reseña, encima va una tarjeta de papel blanco con tinta para que se lea.
+  **Compartir:** acción principal de «Listo». PNG de 1080×1920 o 1080×1080 con la hoja nativa (o descarga), con una marca chica «Sema».
+  **Celebración** de set nuevo (`collageBus`): abanico de tres piezas con sello «Set nuevo» y confeti, sin emojis.
+  **Revisión:** crítico, accesibilidad y copy (una ronda; sus pendientes en §XII.30).
+  **Capturas y prueba de gestos con toques reales (24/24):** `scripts/captura-collage.mjs` → `capturas/collage/`.
+
+- 2026-11-06 — Ajustes al catálogo de Collages (rama `collages-mvp`). **Kit inicial:** Tinta + Papeles. Set nuevo `tinta` (5 stickers: hongo, luna, ojo, escarabajo, espiral) dado de alta en el catálogo y en el SQL; sus PNG se copiaron a `assets-fuentes/stickers/tinta/` el 2026-11-06 y ya están convertidos a WebP + miniatura (ver la entrada siguiente). **Racha:** `psico` se parte en 4 sets de 6 por afinidad visual: Trance (espirales y op-art), Tercer ojo (ojos, serpiente, hongo, estrella), Olimpo (busto, columna, Saturno, estrellas, arcoíris) y Bodegón (cerezas, teléfono, caracol, lirio, rama, mariposa). Los IDs y archivos de los stickers no cambian (`psico-*`); solo su `set`. **Gemas:** Botánico pasa de inicial a gemas; Botánico y Sellos de planta cuestan 100. **Aviso de tope:** «Borra uno de tus collages para crear otro.» / «Collages ilimitados en Sema Plus (próximamente).» (en el editor: «…para guardar este.»). **SQL revisado:** solo crea objetos nuevos; se agregó un `UPDATE` que desactiva (no borra) sets que salgan del catálogo, únicamente en `collage_sets`, la tabla nueva del mismo archivo.
+
+- 2026-11-06 — Sets nuevos de Collages y fuentes por carpeta (rama `collages-mvp`). Fuentes en `assets-fuentes/stickers/<set>/`, una carpeta por set (botanico, psico, sello, tinta, poe, tarot, musica). `scripts/collage-assets.py` recorre cada carpeta: un set nuevo solo requiere su carpeta. Nunca entra lo que esté en una subcarpeta `revisar-marcas/` (marcas registradas; hoy 4 de música). La lista `EXCLUIR` deja fuera tarot-la-estrella, tarot-los-enamorados y tarot-el-mundo (desnudos) y borra su WebP si existiera. Nuevo modo `python scripts/collage-assets.py stickers` (solo stickers, sin regenerar texturas). Sets nuevos en catálogo y SQL: **Nevermore** (`poe`, 12, racha), **Arcanos** (`tarot`, 11, 100 gemas) y **Lado B** (`musica`, 14, 100 gemas). Tinta sigue en el kit inicial, pero `stickers-tinta.zip` no llegó: su carpeta está vacía. 76 stickers en WebP, `public/collage/` pesa 6.8 MB. Verificación: `scripts/captura-collage-sets.mjs` (bloqueados con muestra y candado; desbloqueados en local, 12/11/14 piezas; 4 piezas agregadas al lienzo; claro y oscuro, sin errores).
+- 2026-11-06 — Tinta en Collages con sus stickers reales (rama `collages-mvp`). Se copiaron los 5 PNG de `stickers-tinta.zip` (hongo, luna, ojo, escarabajo, espiral) a `assets-fuentes/stickers/tinta/` (carpeta fuera de git) y se borró el zip de la raíz. `python scripts/collage-assets.py stickers` los convirtió a `public/collage/stickers/tinta-*.webp` y `min/` (los 76 WebP anteriores salieron idénticos; el script es determinista). Total: 81 stickers en WebP. Verificación en vista celular 390×844 (claro): Tinta aparece al inicio de la bandeja con sus 5 piezas y una pieza se agregó al lienzo; sin errores de consola ni de red. Capturas: `capturas/collage/2026-11-06-22-bandeja-tinta-celular.png` y `…-23-lienzo-tinta-celular.png`.
+- 2026-11-06 — Corrección: el feed no muestra el JSON de los collages (rama `collages-mvp`, `src/App.jsx`). Se reprodujo el síntoma en el código anterior: si un collage llegaba sin clasificar (JSON roto o `type` «text»), la rama genérica de `renderPost` imprimía `{"__folio_type":"collage",…}` arriba de la imagen. Cambios: (1) `normalizarCollage(post)` reconoce el collage por su contenido al entrar a `renderPost` y lo pinta con la tarjeta de collage (imagen exportada + tarjeta de frase o reseña si la hay); (2) `textoVisible(content)` impide que cualquier JSON con `__folio_type` (o un JSON roto que lo contenga) se muestre como texto, en publicaciones de lectura, libros terminados y la rama genérica; (3) `describePostTarget` (notificaciones) no cita JSON interno cuando no hay texto visible. Perfil y hoja de notificaciones revisados: no mostraban el JSON. Verificación en celular 390×844 con datos inyectados por intercepción (solo lectura): caso antes/después con JSON roto (`capturas/collage/2026-11-06-feed-collage-antes-roto.png` y `…-despues-roto.png`), frase, reseña y collage sin encima (`…-despues-frase.png`, `…-despues-resena.png`, `…-despues-solo.png`), perfil y notificaciones; ningún caso muestra JSON. Nota: un collage con JSON roto se etiqueta «Nota» (no «Collage») porque ya no se reconoce; caso raro, sin cambio de datos. `vite build` compila sin errores. No hay ESLint configurado en el repo.
 
 ---
 
@@ -99,14 +126,21 @@ FOLIO FINAL/
 │   ├── components/           # AddToListSheet, BookCoverImage, BookTinder, DeleteAccountModal, EmptyState, ListDetailModal,
 │   │                         # ListFormModal, ListsSection, ReadDateModal, ReadingStatusModal, Skeleton
 │   │                         # (EmptyState y Skeleton: estados de interfaz reutilizables, 2026-10-10, ver §VII)
+│   │   ├── collage/          # Collages (2026-11-06): CollagesView, CollageEditor, CollageTray, CollageHoja, CollagePublicar,
+│   │   │                     # CollagePostBody, CollageCelebracion, collageRender.js (documento, recortes de frase, exportación)
 │   │   └── trueque/          # Trueque de libros: TruequeMain + 13 modales/tarjetas (5 de v2; v3 quitó los 2 de zonas) + ui.jsx (ver §VII)
 │   ├── pets/                 # Mascota (Lottie), PetHub, PetLevelUpToast, PetOnboarding, PetScene
 │   ├── data/                 # cuentos.js + cuentos/*.txt: ~23 cuentos de dominio público para "Snacks"
 │   │                         # (los `_raw_*.txt` son material fuente sin procesar)
 │   │                         # estados.js: los 32 estados (clave ISO, nombre, centro aproximado) del Trueque v2
+│   │                         # collage-catalog.json: catálogo de Collages (sets, objetos, obtención, precios, premios, límites) — DATOS
 │   │                         # genreMap.js: GENRE_MAP + expandGenres (IDs de registro → géneros del catálogo); puro, lo usan cliente y api/
 │   └── scripts/seed-books.js # Script suelto de seed (no forma parte del bundle)
 │   (no existe `src/pages/`: no hay router, las "páginas" son vistas dentro de App.jsx)
+├── public/collage/           # Collages: stickers/*.webp (720 px) + stickers/min/ (200 px), texturas/fondo-*.webp (1080×1920),
+│                             # texturas/pieza-*.webp (rasgadas) + texturas/min/. Se regeneran con scripts/collage-assets.py
+├── assets-fuentes/           # (fuera de git, .gitignore) PNG originales de stickers en alta: stickers/<set>/ (una carpeta por set;
+│                             # `revisar-marcas/` nunca entra a la app)
 ├── public/                   # Iconos PWA, `logo.png`, `gema.png`, `avatars/avatar-1..10.png`, `pets/` (cat.png, cat-blink.png,
 │                             # cat-video.mp4), `sw-notifications.js` (notificaciones programadas, importado por el SW de Workbox)
 ├── design-system/sema/MASTER.md  # Design system de SEMA: paleta, tipografía, espacio y los 8 principios (2026-10-11)
@@ -134,9 +168,12 @@ FOLIO FINAL/
 │   ├── recovery_posts_candidates.sql     # (manual, solo lectura) candidatos por post huérfano con señales de ledger/added_at/logged_at
 │   ├── recovery_posts_book_id.sql        # (manual, NO migración) recupera posts con book_id NULL: SELECTs de revisión + respaldo + UPDATE de parejas seguras
 │   ├── lote_ui_2026-11-01.sql            # (manual) notificaciones de like duplicadas: diagnóstico, limpieza e índice único notifications_like_once
+│   ├── collages_mvp_2026-11-06.sql       # 15. Collages: catálogo del servidor, inventario, historial, tiradas, compras, collages + tope. Correr completo ANTES de desplegar el cliente (sin él, modo local)
 │   └── trueque_geo.sql                   # 14. Trueque v2/v3: perfil de Trueque, pines, cercanía SOLO por pines (v3), reglas +18, reportes, embudo. Requiere 10 y 13. Re-correr completo tras cada cambio; ANTES de desplegar el cliente
 ├── DOCUMENTACION_ARQUITECTURA_COMPLETA.docx  # Versión Word extendida (se genera con scripts/generate_docs.py; el .md es la fuente de verdad)
 ├── scripts/
+│   ├── collage-assets.py     # Collages: PNG de assets-fuentes → WebP de public/collage/ + texturas propias (Pillow + numpy; `python scripts/collage-assets.py [papel|carton|kraft|cuaderno]`)
+│   ├── captura-collage.mjs   # Collages: capturas 390×844 claro/oscuro + prueba de gestos con toques reales (bloquea escrituras)
 │   ├── generate_docs.py      # Lee este .md y genera el .docx extendido (pip install python-docx)
 │   ├── train_recommender.py  # SVD → top-20 por usuario → upsert a recommendation_scores
 │   ├── books-500.json/sql    # Seed del catálogo books_curated
@@ -591,6 +628,104 @@ TruequeMain carga en paralelo: trueque_status() · user_exchange_zones · books_
 - **Privacidad:** el texto buscado va solo a Nominatim y nunca se guarda; a la BD solo llegan las coordenadas redondeadas, igual que al tocar el mapa. Tocar el mapa sigue funcionando igual.
 - **Service worker:** regla `NetworkOnly` para `nominatim.openstreetmap.org` (no se cachean respuestas).
 
+### 15. Collages (MVP, 2026-11-06, rama `collages-mvp`)
+
+Lienzo creativo tipo Pinterest Shuffles dentro del universo de lectura: stickers, papeles y las frases guardadas del usuario. Pestaña propia «Collage» en la barra inferior.
+
+**Dónde vive cada cosa**
+
+| Pieza | Archivo |
+|---|---|
+| Catálogo (DATOS) | `src/data/collage-catalog.json` |
+| Lectura del catálogo + motor puro de premios | `src/services/collageCatalog.js` |
+| Inventario, tiradas, compras, guardado, publicación, modo local, `collageBus` | `src/services/collageService.js` |
+| Tirada al registrar la racha | `src/services/readingService.js` (después de `update_streak()`) |
+| Pestaña «Mis collages» (carga perezosa, chunk propio ~14 KB gzip) | `src/components/collage/CollagesView.jsx` |
+| Editor y gestos | `src/components/collage/CollageEditor.jsx` |
+| Bandeja (Stickers / Papeles y fondos / Mis frases, sets bloqueados) | `src/components/collage/CollageTray.jsx` |
+| Hojas inferiores (diálogo, fila, botón) | `src/components/collage/CollageHoja.jsx` |
+| Publicar (solo collage / con frase / con reseña) | `src/components/collage/CollagePublicar.jsx` |
+| Publicación en el feed (+ tarjeta legible encima) | `src/components/collage/CollagePostBody.jsx` |
+| Celebración de set nuevo (montada en `MainApp`) | `src/components/collage/CollageCelebracion.jsx` |
+| Documento, recortes de frase, exportación | `src/components/collage/collageRender.js` |
+| CSS (modo capas, premio) | `src/index.css`, bloque «Collages (2026-11-06)» |
+| Assets | `public/collage/stickers/` (+`min/`), `public/collage/texturas/` (+`min/`) |
+| Generador de assets | `scripts/collage-assets.py` (fuentes en `assets-fuentes/stickers/<set>/`, una carpeta por set, fuera de git) |
+| Servidor | `supabase/collages_mvp_2026-11-06.sql` (escrito, **sin correr**) |
+| Capturas y prueba de gestos | `scripts/captura-collage.mjs` → `capturas/collage/` |
+| Verificación de sets en la bandeja (bloqueados / desbloqueados en local / agregar al lienzo) | `scripts/captura-collage-sets.mjs` → `capturas/collage/` |
+| Integración en `App.jsx` | `NAV_ITEMS` (Collage), render de la pestaña con `Suspense`, `<CollageCelebracion>`, rama `post.type === "collage"` de `renderPost`, `describePostTarget` («tu collage»), el «+» oculto en Collage |
+
+**Por qué sin librería de canvas (decisión del paso 0).** Se compararon react-konva, Fabric.js y una solución propia:
+- *Stack:* React 18 + Vite, estilos inline con `palette`. Instalar dependencias requiere aprobación de León (sema-prompts). La solución propia no agrega ninguna.
+- *Rendimiento en celular:* cada pieza es un `<div>` con `transform` (compositor de GPU); el lienzo se dibuja en canvas solo al exportar o hacer la vista previa. Konva redibuja un canvas entero por gesto y Fabric pesa ~300 KB min.
+- *Gestos táctiles:* ni Konva ni Fabric traen pellizco + giro con dos dedos listos para usar; con Pointer Events son ~120 líneas (`onPointerDown/Move/Up` de `CollageEditor`) y se prueban con toques reales (`captura-collage.mjs` usa `Input.dispatchTouchEvent` de CDP).
+- *Mantenimiento:* todo es código de la app, en español, sin APIs de terceros que migrar. El costo: si algún día se necesitan filtros, máscaras complejas o texto editable sobre el lienzo, Konva vuelve a ser candidato (el documento JSON no cambia).
+
+**Catálogo y su formato** (`collage-catalog.json`):
+```json
+{
+  "recompensas": { "probabilidadInicial": 0.30, "incrementoPorFallo": 0, "maxSinPremio": 5 },
+  "limites": { "collagesSinPlus": 5, "collagesPlus": null },
+  "lienzo": { "ancho": 1080, "formatos": { "historia": { "alto": 1920 }, "cuadrado": { "alto": 1080 } }, "formatoInicial": "historia" },
+  "sets": [ { "id": "tercer-ojo", "nombre": "Tercer ojo", "descripcion": "…", "obtencion": { "tipo": "racha" }, "muestra": "psico-ojo-radiante" } ],
+  "objetos": [ { "id": "psico-ojo", "nombre": "Ojo", "set": "tercer-ojo", "categoria": "sticker", "estilo": "psicodélico setentero",
+                 "archivo": "/collage/stickers/psico-ojo.webp", "miniatura": "/collage/stickers/min/psico-ojo.webp" } ],
+  "coloresFondo": [ { "id": "lila", "nombre": "Lila", "hex": "#BBADFF" } ],
+  "estilosFrase": [ { "id": "revista", "fondo": "#FFFFFF", "tinta": "#111111", "fuente": "quote", "tamano": 64, "borde": "rasgado", "credito": "label" } ]
+}
+```
+- `categoria`: `sticker`, `textura` (pieza suelta) o `fondo`.
+- `obtencion.tipo`: `inicial` (de todos), `racha` (premio variable), `gemas` (con `precio`) o `plus` (Sema Plus). **Cada objeto hereda la obtención de su set**; si un objeto declara su propia `obtencion`, manda la suya. `collageCatalog.js` la resuelve al cargar.
+- Sets actuales (2026-11-06):
+  - **Inicial:** `papeles` (texturas propias) y `tinta` (5; PNG pendientes).
+  - **Racha:** `trance`, `tercer-ojo`, `olimpo`, `bodegon` (6 cada uno, los 24 `psico-*` agrupados por afinidad visual) y `poe` = Nevermore (12).
+  - **Gemas, 100 cada uno:** `botanico` (10), `sello` (5), `tarot` = Arcanos (11) y `musica` = Lado B (14).
+- **Fuentes de los stickers:** `assets-fuentes/stickers/<set>/*.png`, fuera de git. El nombre de la carpeta es el set de origen; el `set` del catálogo puede subdividirlo, como `psico/` → 4 sets. Las subcarpetas `revisar-marcas/` nunca se convierten, y `EXCLUIR` en el script deja fuera stickers concretos.
+- **Alta de un set nuevo:**
+  1. Crear su carpeta con los PNG.
+  2. Correr `python scripts/collage-assets.py stickers`.
+  3. Agregar sus objetos y su set al JSON.
+  4. Agregar su fila al bloque CATÁLOGO del SQL y a la lista del `UPDATE … activo = false`. Para mover un set: cambiar su `obtencion` en el JSON **y** su fila en el bloque CATÁLOGO del SQL (el servidor valida con `collage_sets`).
+- Los colores de `coloresFondo` y `estilosFrase` son **contenido** del collage (como una foto): no siguen al tema claro/oscuro. Fondos lisos solo blanco, negro, arena y tinta (sin pasteles de pantalla completa, sema-identidad §6); los vivos quedan en recortes de frase y piezas.
+
+**Inventario.** Permanente por usuario: un set desbloqueado se usa sin límite y nunca se consume. En servidor, `user_collage_inventory (user_id, set_id, origen, unlocked_at)`; los sets `inicial` no se guardan (son de todos) y los `plus` se abren con `users.is_premium`. La UI recibe `estado = { modo, plus, sets: Set, fallosSeguidos, limite, usados }` de `getEstadoCollage`.
+
+**Motor de desbloqueos (recompensa variable).**
+- Cuándo: cada vez que `update_streak()` responde sin error (registro real de lectura), `readingService` llama a `tirarPremioRacha` → RPC `collage_streak_roll()`.
+- Regla (SQL y espejo JS `tirarPremio`): candidatos = sets activos de `racha` que no tiene; sin candidatos no se tira. `p = min(1, probabilidadInicial + incrementoPorFallo × fallosSeguidos)`. Si `fallosSeguidos ≥ maxSinPremio` gana seguro (nunca más de 5 registros seguidos sin premio). Simulación de 200 000 tiradas: 33.9 % de premios, máximo 5 sin premio.
+- Idempotencia: una tirada por día (fecha México) por `UNIQUE (user_id, origen, ref)` con `ref = fecha`; la red de seguridad vive en `collage_reward_state` con `SELECT … FOR UPDATE`. Exige un `reading_log` de hoy, igual que `update_streak`.
+- Historial: `collage_unlock_events` guarda cada tirada (`premio` / `sin_premio` / `sin_candidatos`, con la probabilidad usada) y cada compra (`compra`).
+- Celebración: si sale premio, `collageBus.emit({ tipo: "premio", setId, origen })` → `CollageCelebracion` (sticker de muestra que entra con salto y giro sobre disco lila, confeti con la paleta, vibración; quieto con `prefers-reduced-motion`). En desarrollo, `?collage=premio` la muestra.
+- **Compra con gemas:** desde la hoja del set bloqueado. RPC `buy_collage_set(p_set_id)`: el precio sale de `collage_sets` (el cliente solo manda el id), descuento atómico en `user_gems` (`balance >= precio`), fila negativa en `reward_ledger` (`reason = 'collage_set'`, `ref = set`), inventario e historial en la misma transacción; comprar un set que ya se tiene no cobra. Después, `MainApp` recarga el saldo (`loadGems`).
+- **Sema Plus:** bandera `plus` = `users.is_premium` (falsa por defecto; el trigger `guard_users_premium` impide que el cliente la cambie). Abre los sets `plus` y quita el tope de collages.
+
+**Modelo de datos del collage** (documento editable, `collages.doc` jsonb, ≤ 200 KB):
+```js
+{ v: 1, formato: "historia" | "cuadrado",
+  fondo: { tipo: "color", id, hex } | { tipo: "textura", ref, src },
+  capas: [ // orden = capa (la última va al frente)
+    { id, tipo: "objeto", ref, src, x, y, w, h, s, r },
+    { id, tipo: "frase", frase: { texto, libro, autor, quoteId }, estilo, x, y, w, h, s, r } ] }
+```
+Unidades lógicas de 1080 de ancho; `x, y` = centro, `w, h` = tamaño base, `s` = escala, `r` = grados. Cada capa guarda `src` además de `ref` y la frase guarda su texto: si el catálogo cambia o se borra la frase, el collage se sigue viendo igual. Tabla `collages (id, user_id, titulo, formato, doc, preview, created_at, updated_at)`: privada (RLS todo propio), `preview` = JPEG chico en data URL (~270 px) para la cuadrícula (la «imagen exportada» del collage guardado; no hace falta bucket nuevo). Tope: trigger `collages_limit` (5 sin Plus, `collage_config.limite_sin_plus`) que lanza `COLLAGE_LIMIT`; la UI muestra «Ya hay 5 collages guardados», «Borra uno de tus collages para crear otro.» y «Collages ilimitados en Sema Plus (próximamente).», con «Ver mis collages» / «Armar uno sin guardarlo».
+
+**Editor.**
+- Lienzo 9:16 por defecto y 1:1 (selector arriba; al cambiar se conservan las posiciones respecto al centro).
+- Bandeja: abre **encima** de la parte baja del lienzo (el lienzo no cambia de tamaño ni de escala). Tocar agrega al centro (con un poco de juego) y la bandeja se cierra; tocar la pestaña la vuelve a abrir. Sets bloqueados: una pieza de muestra opaca con candado y «Cómo se obtiene» → hoja con la forma de obtención (racha: chance diaria y red de seguridad; gemas: saldo y botón «Comprar por N gemas» o «Faltan N gemas»; plus).
+- Gestos: un dedo arrastra; dos dedos pellizcan y giran (el segundo puede caer fuera de la pieza); mantener presionado 0.42 s sin mover = modo capas (vibra con `.sema-collage-capa--capas`, halo lila, aviso «Arriba: al frente · Abajo: atrás»), cada 40 px sube o baja una capa. Al arrastrar, la franja de abajo se vuelve el bote («Arrastra aquí para borrar» / «Suelta para borrar»; la pieza se encoge y se aclara encima) y en 9:16 aparecen dos guías punteadas de zona segura de historia (250 px arriba, 340 px abajo; no salen en la imagen). Barra de la pieza (misma franja, alto reservado): Al frente, Atrás, Estilo (solo frases), Agrandar, Achicar, Girar y Borrar: alternativas de un toque al pellizco y al giro.
+- Deshacer/rehacer: 60 pasos; un gesto completo es un paso. Accesibilidad: el editor es un `role="dialog"` (foco a «Cerrar» al abrir), cada pieza es enfocable (`role="button"`, nombre y capa); con el foco en el lienzo: flechas (Shift = 40), + / −, [ / ], Supr; Ctrl+Z / Ctrl+Y en cualquier lugar; rueda = escala, Shift + rueda = giro. Las hojas atrapan el foco (Tab da la vuelta), lo devuelven al cerrar y cierran con Escape.
+- Frases: `fetchQuotes` («Mis frases»); se dibujan una vez en canvas como recorte de revista (5 estilos del catálogo, borde rasgado o recto, sombra, libro y autor en Space Mono o Figtree) y se usan como imagen, así editor y exportación coinciden. Las fuentes se esperan con `document.fonts.load` antes de dibujar.
+- Salir con cambios sin guardar pregunta «¿Salir sin guardar?».
+
+**Guardado y publicación.**
+- «Listo» → acción principal «Compartir en historia» (9:16) o «Compartir imagen» (1:1): PNG 1080×1920 o 1080×1080 con `navigator.share({ files })` o descarga; luego Guardar (documento + vista previa) y Publicar en Social. Lo exportado y lo publicado lleva una marca chica «Sema» (papel blanco + tinta) abajo a la derecha; en 9:16 queda arriba de la franja que tapa la caja de respuesta de Instagram. La vista previa y el editor no la llevan.
+- Publicar: «Solo el collage», «Con una frase» o «Con una reseña» (libros con `review`). Se exporta un JPEG de 1080 de ancho y se sube a `post-images` como `<user>_collage_<timestamp>.jpg` con `upsert:false` (**congelado**: editar el collage o cambiar el catálogo no lo toca). El post es `type: "text"` con `content = { __folio_type: "collage", v, formato, collageId, encima }` (mismo patrón que las frases: no hay que tocar el CHECK de `posts.type`). `fetchFeed` lo convierte en `type: "collage"`; `renderPost` pinta franja «Collage» (o «Collage con frase/reseña»), cabecera, `CollagePostBody` y pie con likes y comentarios. La tarjeta encima es papel blanco `#FFFFFF` con tinta `#483A58` (11.05:1), fija en los dos modos porque va sobre la imagen.
+
+**Modo local (antes de correr el SQL).** Si `collage_mi_estado` / `collages` no existen, `collageService` guarda todo en `localStorage` `sema_collages_v1:<userId>` (nunca una clave `folio_*`), la tirada usa el motor JS con una tirada por día local, y la compra responde «La tienda se está actualizando». En desarrollo, «Mis collages» lo avisa en una línea. Al correr el SQL se pasa solo a servidor (lo guardado en local no se migra).
+
+**Lo que la arquitectura ya permite (fuera del MVP, no construido):** fotos propias (`tipo: "foto"` con `src` a un bucket propio), texto libre (`tipo: "texto"`, se dibujaría como las frases), recortar imágenes (polígono `recorte` por capa, aplicado con `clip` en canvas y `clip-path` en el DOM), ver y dar like a collages de otros (ya son posts; una galería = consulta a `posts` con `__folio_type = collage`). `collageRender` ignora tipos de capa que no conoce en vez de romperse.
+
 ## V. FLUJOS DE DATOS CRÍTICOS
 
 ### Registro
@@ -633,6 +768,7 @@ ReadingLogModal → logReadingSession() genera session_id (crypto.randomUUID) y 
   ├─ INSERT reading_logs { ..., log_date (local), session_id }   ← 23505 = sesión ya sincronizada → se corta sin duplicar
   │    └─ [DB trigger] trg_reading_logged → +2 XP/10 págs, +5 gemas (ref = session_id; máx 12/día y 4/hora, luego guarda sin pagar)
   ├─ RPC update_streak() → el servidor avanza racha y total_pages_read (exige log real de hoy, fecha México)
+  │    └─ (Collages, 2026-11-06) RPC collage_streak_roll() → una tirada por día; si sale premio, collageBus → CollageCelebracion
   ├─ publica UN post reading_session (createFeedPost devuelve su id)
   ├─ desde Social: ShareSessionModal completa ESE post (updateSessionPost), no inserta otro
   ├─ PostDraftModal ofrece compartir la sesión al feed
@@ -668,13 +804,15 @@ main.jsx → App → getSessionUser() (supabase.auth.getSession + perfil, fallba
 | `listsService` | `fetchUserLists`, `createUserList`, `updateUserList`, `deleteUserList`, `addBookToList`, `removeBookFromList` | `user_lists`, `user_list_books` | 23505 tratado como éxito idempotente. **camelCase desde 2026-09-22** (`dbToList`: `isPublic`, `createdAt`, `bookIds`); `updateUserList` recibe `{ name, description, isPublic }` |
 | `recommendationService` | `getRecommendations`, `getPreferredGenres`, `checkDailyLimit`, `incrementSaveCounter`, `buyExtraSaves` (RPC `spend_gems`, ver §VIII), `fetchCollaborativeRecommendations` | `books_curated`, `daily_save_limits`, RPC `spend_gems`, `/api/recommendations` | Límite 3/día (`DAILY_LIMIT`, exportado; `localDateStr` para la fecha); expansión de géneros del onboarding vía `GENRE_MAP` (interno). **camelCase desde 2026-09-22**: libros del catálogo (`coverUrl`, `genres`, `pages`…) y límite (`savesUsed`, `canSave`, `effectiveLimit`…). `incrementSaveCounter` ahora lanza si falla |
 | `quotesService` *(2026-09-22)* | `fetchQuotes`, `fetchQuotesForBook`, `insertQuote`, `updateQuoteInDB`, `deleteQuoteFromDB`, `toggleQuoteFavorite`, `setQuotePublic` | `quotes` (+ join `books`) | camelCase (`dbToQuote`: `bookId`, `pageNumber`, `isFavorite`, `isPublic`, `createdAt`, `bookTitle`…). Lanza. El JSON que se publica en `posts.content` conserva sus claves históricas (`page_number`, `bookTitle`) |
-| `socialService` *(2026-09-22)* | `fetchFeed`, `fetchComments`, `createFeedPost`, `createComment`, `createReply`, `deleteFeedPost`, `compressAndUploadPostImage`, `getOrCreateConversation`, `markConversationRead`, `getUnreadMessagesCount`, `syncPendingPosts` | `posts`, `comments`, `comment_replies`, `messages`, `conversations`, bucket `post-images` | **Excepción a camelCase**: filas crudas (las consume la UI del feed/chat en ~100 lugares). Offline: `createFeedPost` encola |
-| `readingService` *(2026-09-22)* | `logReadingSession`, `syncPendingLogs` | `reading_logs`, RPC `update_streak` | `session_id` idempotente; offline encola |
+| `socialService` *(2026-09-22)* | (2026-11-06: `fetchFeed` también reconoce `__folio_type: "collage"` → `type: "collage"` y `post.collage`) `fetchFeed`, `fetchComments`, `createFeedPost`, `createComment`, `createReply`, `deleteFeedPost`, `compressAndUploadPostImage`, `getOrCreateConversation`, `markConversationRead`, `getUnreadMessagesCount`, `syncPendingPosts` | `posts`, `comments`, `comment_replies`, `messages`, `conversations`, bucket `post-images` | **Excepción a camelCase**: filas crudas (las consume la UI del feed/chat en ~100 lugares). Offline: `createFeedPost` encola |
+| `readingService` *(2026-09-22)* | `logReadingSession`, `syncPendingLogs` | `reading_logs`, RPC `update_streak`, `tirarPremioRacha` (Collages) | `session_id` idempotente; offline encola. Desde 2026-11-06, tras un `update_streak` sin error llama a `tirarPremioRacha` (sin `await`) |
 | `achievementsService` *(2026-09-22)* | `ACHIEVEMENT_DEFS`, `FEED_WORTHY_ACHIEVEMENTS`, `achievementBus`, `checkAchievements` | 6 tablas + RPC `award_achievement` | Iconos y textos de condición (UI) siguen en App.jsx. Reproduce sonido/haptic al otorgar (comportamiento previo) |
 | `aiService` *(2026-09-22)* | `enrichBook`, `getMoodRecommendations` | `/api/anthropic` | Renombrado desde `getRecommendations` para no chocar con `recommendationService` |
 | `googleBooksService` *(2026-09-22)* | `searchGoogleBooks` | `/api/books` | Dedup + caché 60 s en memoria |
 | `wrapsService` *(2026-09-22)* | `generateMonthWrap`, `generateAnnualWrap`, `MONTHS_ES` | `books`, `reading_logs`, `achievements`, `user_streaks`, `monthly_wraps` | Si falla la lectura de libros del periodo **lanza y no guarda** (antes persistía un Wrapped vacío) |
 | `genreService` *(2026-11-01)* | `normalizeGenre` | — | Traduce categorías de Google Books al español y unifica mayúsculas/acentos («Fiction / Fantasy» → «Fantasía»). Lo usan `bookToDb`, `dbToBook`, `googleBooksService` y los libros de amigos |
+| `collageCatalog` *(2026-11-06)* | `getSets`, `getSet`, `getObjeto`, `objetosDeSet`, `objetosPorCategoria`, `getEstiloFrase`, `siguienteEstiloFrase`, `altoFormato`, `objetoDesbloqueado`, `setDesbloqueado`, `probabilidadPremio`, `tirarPremio`, `candidatosRacha`, `ESTILOS_FRASE`, `COLORES_FONDO`, `RECOMPENSAS`, `LIMITES`, `LIENZO` | `src/data/collage-catalog.json` | Solo lee y resuelve el catálogo (herencia de obtención set → objeto) y el motor puro de premios, espejo de `collage_streak_roll`. En desarrollo avisa en consola si el catálogo trae una obtención inválida, un set de gemas sin precio o una muestra inexistente |
+| `collageService` *(2026-11-06)* | `getEstadoCollage`, `tirarPremioRacha`, `comprarSet`, `listarCollages`, `guardarCollage`, `borrarCollage`, `publicarCollage`, `parseCollagePost`, `collageBus`, `CollageError` (`code`: `COLLAGE_LIMIT` (+`limite`), `GEMS_INSUFFICIENT` (+`precio`), `GEMS_NO_BALANCE`, `SET_NOT_FOR_SALE`, `COLLAGE_RPC_MISSING`, `NETWORK`, `UPLOAD`, `OFFLINE`, `LOCAL_FULL`) | RPCs `collage_mi_estado`, `collage_streak_roll`, `buy_collage_set`; tabla `collages`; bucket `post-images`; `createFeedPost` | camelCase. Lecturas degradan, escrituras lanzan `CollageError`. **Modo local** automático si las RPCs/tablas no existen (`PGRST202`/`PGRST205`/`42P01`/`42883`): `localStorage` `sema_collages_v1:<userId>` con `{ sets, fallos, eventos, collages }`. `tirarPremioRacha` nunca lanza (no debe romper el registro de lectura) |
 | `devLog` *(2026-09-22)* | `devLog` | — | `console.log` solo en `import.meta.env.DEV` (compartido por App.jsx y servicios) |
 | `truequeService` | `getZones`, `getUserZones`, `setUserZones`, `getTruequeStatus`, `getMyOffers`, `addBookOffered`, `deleteBookOffered`, `getMyWants`, `addBookWanted`, `deleteBookWanted`, `searchMatches`, `getMatches`, `getMatchChat`, `sendMessage`, `completeExchange`, `rateExchange`, `isDisclaimerAccepted`, `acceptDisclaimer`, `TruequeError`, `CHAT_PAGE_SIZE` | `user_exchange_zones`, `books_offered`, `books_wanted`, `exchange_chats`, bucket `trueque`, RPCs del Trueque | Traduce `RAISE EXCEPTION 'TRUEQUE_*'` a `TruequeError { code, message }` en español (la UI usa `code` para abrir el modal de Plus). Borrar = soft delete (`is_active=false`). `searchMatches()` devuelve `{ paid:false }` sin lanzar si no alcanzan las gemas. `getMatchChat(matchId, { before })` pagina de 50 en 50. **Trueque v2 (2026-10-03):** `searchMatchesNearby(scope)` (RPC `search_trueque_matches`; `{ paid, resultCount, charged, matches }`, `{ paid:false }` si faltan gemas), `getMatchesNearby()` (RPC `get_my_trueque_matches`), `acceptTruequeRules(isAdult)`, `reportTruequeUser({ reportedId, reason, details, matchId })`, (v3: se eliminaron `getZones`, `getUserZones` y `setUserZones`), constantes `SEARCH_SCOPES`, `PROXIMITY_LABELS`, `REPORT_REASONS`, y el helper `callGeoRpc` (convierte el `{ success:false, error }` de las RPCs jsonb en `TruequeError { code }`; `PGRST202`/`PGRST205`/`42P01`/`42883` → `TRUEQUE_UPDATING` con `console.error` de code/message/details/hint). `searchMatches`/`getMatches` (MVP) se conservan pero la UI ya no las usa |
 | `placeSearchService` *(2026-10-03, v3)* | `searchPlaces(query, { center, signal })`, `PlaceSearchError` (`code`: `OFFLINE`/`TIMEOUT`/`FAILED`), `PLACE_MIN_QUERY` | Nominatim (`nominatim.openstreetmap.org/search`) | Buscador de lugares del mapa. Throttle 1 solicitud/1.1 s, caché en memoria, timeout 8 s, `countrycodes=mx` y `viewbox` del estado. Devuelve `[{ id, name, lat, lng }]` sin redondear (redondea `MyPlaces`). Cancelación = `AbortError` (la UI lo ignora). No guarda nada |
@@ -761,6 +899,7 @@ Patrón general: cada vista recibe `user`, `books`, `setTab` y callbacks (`onAdd
 | `LocationStep` *(v3)* | Todos los estados van al mapa (ya no hay atajo "solo estado" para CDMX) |
 
 | `Detalles.jsx` *(ronda 4)* | Kit de detalles: `CintaAdhesiva`, `SelloTinta`, `Boleto`, `NotaMano` (cuándo usar cada uno en §III «Ronda 4» y en sema-identidad §5). `DetallesDemo.jsx` solo en dev (`?detalles=1`) |
+| `collage/*` *(2026-11-06)* | `CollagesView` (pestaña: cuadrícula + nuevo, tope, borrar; carga perezosa), `CollageEditor` (lienzo y gestos), `CollageTray` (bandeja con sets bloqueados), `CollageHoja` (`CollageHoja`, `FilaHoja`, `BotonHoja`), `CollagePublicar`, `CollagePostBody` (+ `CollageTarjetaEncima`), `CollageCelebracion` (montada en `MainApp`), `collageRender.js`. Detalle en §IV.15 |
 | `RachaHito.jsx` *(ronda 5)* | `RachaHitoCartel` (cartel de la publicación «racha»), `LlamaRacha` (SVG en tres niveles, sin emoji, `prefers-reduced-motion` la deja quieta) y demo `?hitos=1` solo en dev |
 
 ### Estados de interfaz (2026-10-10)
@@ -816,14 +955,16 @@ El brillo vive en `index.css` (`.sema-skeleton`, keyframe `semaShimmer`, colores
 
 **Se quedaron igual a propósito** (ya tenían un estado decente): Inicio (secciones que se ocultan + tarjeta «Descubre tu próxima lectura»), `FeedSkeleton`, skeleton y vacíos de `BookTinder`, skeleton de `CollaborativeRecommendations`, `LoadingEntertainment` de Recomiéndame (frases y datos curiosos mientras piensa la IA), tarjeta «Crea tu primera lista» de `ListsSection`, vacío de `ReadingLogModal` con botón, mensajes en tercera persona del perfil de amigo y de la comparativa, «Sin comentarios aún.», Wrapped (historia con diseño propio), logros (siempre muestran la cuadrícula completa), Snacks (contenido embebido, nunca vacío), los estados «Sin conexión», el spinner de arranque de sesión (`App`, antes de saber si hay login), el «Cargando mapa…» interno de `MyPlaces` y todos los spinners **dentro de botones** (guardando, enviando, subiendo: indican una acción, no una carga de datos).
 
-**Navegación:** `NAV_ITEMS` pasó de 5 a 6 entradas (Trueque entre Social y Perfil) y, desde el lote UI del 2026-11-01, vuelve a 5: Trueque está comentado (fuera del lanzamiento, decisión del 16 oct 2026; para reactivarlo, importar `Repeat` y descomentar la línea). El padding lateral de cada ítem del `BottomNav` bajó de 14 px a 8 px para que las 6 quepan en ~360 px. El botón de Mascota deja de estar exactamente al centro.
+**Navegación (2026-11-06):** `NAV_ITEMS` = Inicio, Explorar, Mascota, **Collage** (`Scissors`), Social: 5 pestañas. Trueque sigue comentado. El «+» no aparece en la pestaña Collage.
+
+**Navegación (histórico):** `NAV_ITEMS` pasó de 5 a 6 entradas (Trueque entre Social y Perfil) y, desde el lote UI del 2026-11-01, vuelve a 5: Trueque está comentado (fuera del lanzamiento, decisión del 16 oct 2026; para reactivarlo, importar `Repeat` y descomentar la línea). El padding lateral de cada ítem del `BottomNav` bajó de 14 px a 8 px para que las 6 quepan en ~360 px. El botón de Mascota deja de estar exactamente al centro.
 
 ---
 
 ## VIII. BASE DE DATOS (Supabase)
 
 ### Tablas
-`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger` · **Trueque:** `user_exchange_zones` · `books_offered` · `books_wanted` · `exchange_matches` · `exchange_chats` · `exchange_ratings` · `trueque_gems_cost` (+ interna `trueque_search_credits`) · **Trueque v2:** `trueque_profiles` · `trueque_pins` · `trueque_reports`.
+`users` (perfil; id = auth.uid; `nombre`, `username`, `preferred_genres[]`, `onboarding_completed`, `avatar_url`, `cover_url`, `bio`, `is_public`; `email` sin SELECT para clientes) · `books` · `quotes` · `reading_logs` · `user_streaks` · `user_gems` · `user_pets` · `achievements` · `monthly_wraps` · `notifications` · `friendships` · `conversations` · `messages` · `posts` · `comments` · `comment_replies` · `post_likes` · `comment_likes` · `user_lists` · `user_list_books` · `books_curated` (catálogo ~500, seed en scripts/) · `daily_save_limits` · `recommendation_scores` · `reward_ledger` · **Trueque:** `user_exchange_zones` · `books_offered` · `books_wanted` · `exchange_matches` · `exchange_chats` · `exchange_ratings` · `trueque_gems_cost` (+ interna `trueque_search_credits`) · **Trueque v2:** `trueque_profiles` · `trueque_pins` · `trueque_reports` · **Collages (2026-11-06, `collages_mvp_2026-11-06.sql`, sin correr):** `collage_sets` · `collage_config` · `user_collage_inventory` · `collage_unlock_events` · `collage_reward_state` · `collages` (detalle en §IV.15).
 
 **Vistas:** `users_public` (`security_invoker`, columnas `id, nombre, username, avatar_url, cover_url, bio, is_public`, sin email; creada por `privacy_hardening.sql`, el código actual todavía no la usa) · `trueque_funnel_summary` (embudo del Trueque, solo SQL Editor; ver abajo). **Columnas añadidas por los parches:** `reading_logs.session_id` (uuid NOT NULL DEFAULT gen_random_uuid(), UNIQUE). **Storage:** buckets `avatars`, `covers`, `post-images` (ver §III).
 
@@ -983,6 +1124,11 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
 - **Otro algoritmo de recomendación**: solo tiene que escribir filas en `recommendation_scores` (user_id, book_id, predicted_rating, reason) — `api/recommendations.js` y la UI no cambian. Sustituir/añadir script en `scripts/` y workflow.
 - **Más mascotas**: añadir entradas a `PET_TYPES` en petService (img, title, quote, label) + assets en `public/pets/`; el diseño evolutivo completo está especificado en `SISTEMA_MASCOTAS_EVOLUTIVAS.md`.
 - **Trueque**: cambiar costos o límites = `UPDATE trueque_gems_cost SET value = … WHERE key = …` (sin deploy). ~~Agregar una zona~~ (v3: las zonas ya no se usan). Dar Plus = `UPDATE users SET is_premium = true`. **v2:** número de pines, horas entre cambios, radios, caja de México y topes de reportes = editar `trueque_geo_cfg()` al inicio de `trueque_geo.sql` y re-correrlo (más las constantes espejo en `truequeGeoService.js`); reiniciar el límite de 24 h de una cuenta = `UPDATE trueque_profiles SET pins_updated_at = NULL WHERE user_id = …`; ver el embudo = `SELECT * FROM trueque_funnel_summary`; revisar reportes = `SELECT * FROM trueque_reports ORDER BY created_at DESC`.
+- **Collages:**
+  - **Set nuevo:** WebP en `public/collage/…`, entradas en `objetos` y `sets` de `collage-catalog.json` y, si no es «inicial», una fila en el bloque CATÁLOGO de `collages_mvp_2026-11-06.sql`.
+  - **Cambiar probabilidad, red de seguridad o tope:** editar `recompensas`/`limites` del JSON **y** `collage_config` (manda el servidor).
+  - **Fotos propias, texto libre y recorte:** nuevos `tipo` de capa en el documento (ver §IV.15 «Lo que la arquitectura ya permite»).
+  - **Ver y dar like a collages de otros:** ya son posts del feed; una galería pública sería una vista sobre `posts` con `__folio_type = collage`.
 - **Extraer vistas del monolito**: mover una vista de App.jsx a `src/components/` siguiendo el patrón del commit `3b3adfd` (imports de servicios + props explícitas).
 
 ## XII. LIMITACIONES CONOCIDAS Y DEUDA TÉCNICA
@@ -1164,6 +1310,28 @@ Internas (REVOKE a clientes): `trueque_geo_cfg`, `trueque_geo_int`, `trueque_val
     - **Correcciones aplicadas tras crítico, accesibilidad y QA:** textura de cartón más tenue donde hay texto chico (boleto/globo 0.50, barra 0.35, hito 0.34/0.28, Libro terminado 0.40) y `stitchTiles` contra la costura; etiquetas de la barra en Figtree (no Unbounded a 12 px); cuadrito lila de la barra al 75 % en claro; cinta del boleto movida al borde superior (tapaba el saludo); un solo sello «Muy pronto» en PetHub; bordes del cartel de hito a 2 px.
     - **Sugerencias no aplicadas:** autor bajo el título en Libro terminado; saludo de Inicio a 22–24 px (hoy en tres líneas); gato de Inicio con −24 px de margen (los bigotes quedan a ≈ 8 px del borde); guion en la portada genérica «El nom-bre del Viento»; el «+» sigue tapando texto del feed (pendiente desde la ronda 4); `.sema-carton > *` fuerza `position: relative` a sus hijos directos (hoy ninguno es absoluto).
     - **QA (2026-11-04):** build OK, ESLint sin configurar (no hay `eslint.config.*`), sin desborde horizontal a 360/390, un solo 404 de `/api/books` (normal en dev). Capturas en `capturas/ronda5-2026-11-03/` (`*-qa-*` para regresión; `hitos-*` para el catálogo de carteles).
+
+30. **Collages MVP (2026-11-06) — pendientes y decisiones para León** (rama `collages-mvp`; nada fusionado ni desplegado).
+    - **Correr `supabase/collages_mvp_2026-11-06.sql`** en el SQL Editor antes de desplegar el cliente. Hasta entonces todo funciona en modo local (por navegador) y la compra con gemas está apagada. Lo guardado en modo local no se migra al servidor.
+    - **PNG del set `tinta` pendientes** (`tinta-hongo`, `-luna`, `-ojo`, `-escarabajo`, `-espiral`): `stickers-tinta.zip` no llegó a la raíz. Pasos cuando lleguen:
+      1. Descomprimir en `assets-fuentes/stickers/tinta/`.
+      2. Correr `python scripts/collage-assets.py stickers`.
+      3. Hacer commit de `public/collage/stickers/tinta-*.webp` y `min/`. Sin ellos, el kit inicial solo trae Papeles y la bandeja muestra el título «Tinta» sin piezas.
+    - ~~Un solo set de racha~~ → resuelto: 4 sets de 6 (Trance, Tercer ojo, Olimpo, Bodegón). Con 30 % y red de seguridad, los 4 salen en ~13 registros en promedio. Las agrupaciones y nombres son decisión propia: revisar en la bandeja.
+    - ~~Precio de `sello`~~ → 100 gemas, igual que Botánico (decisión de León, 2026-11-06).
+    - ~~Mención de Sema Plus en el tope~~ → texto de León: «Collages ilimitados en Sema Plus (próximamente).»
+    - **Capturas a revisar** en `capturas/collage/2026-11-06-*` (editor, bandeja, modo capas, bote, sets bloqueados, hoja Listo, celebración, feed).
+    - **Sin probar en un celular real:** gestos probados con toques simulados por CDP en Chromium (24 de 24 pasan, claro y oscuro); falta iPhone/Safari (vibración no existe en iOS; el modo capas se ve por el temblor y el halo).
+    - **Publicar y compartir no se probaron contra producción** (el script bloquea escrituras para no ensuciar la base): la subida a `post-images` usa el mismo nombre plano `<user>_…` que `compressAndUploadPostImage`; si las policies del bucket (no versionadas) piden otro formato, ajustar `publicarCollage`.
+    - **Vista previa como data URL en `collages.preview`** (≤ 400 KB por CHECK): suficiente para 5 collages; si se quita el tope (Plus), mover a un bucket privado.
+    - **Racha offline:** las sesiones que se sincronizan después (`syncPendingLogs`) también tiran, pero solo si el día del servidor sigue siendo el del registro.
+    - **Celebración en desarrollo:** `?collage=premio` (solo con `import.meta.env.DEV`; muestra el primer set de racha del catálogo).
+    - **Sets nuevos (Nevermore, Arcanos, Lado B):** nombres, descripciones y nombres de piezas son decisión propia. «Amontillado» para el barril y «Corazón delator» son guiños a los cuentos de Poe.
+    - **`musica/revisar-marcas/`** (púa de Nirvana, walkman, póster de Radiohead, boleto de The Cure): fuera de la app hasta revisar marcas.
+    - **El SQL es seguro para producción** (revisado 2026-11-06): solo crea tablas, funciones, triggers y permisos nuevos; ningún ALTER/UPDATE/DELETE/DROP sobre lo existente.
+    - **De la revisión (crítico, accesibilidad, copy) quedó sin hacer:** el set Botánico se ve «boho / Etsy» según el crítico (mandala, nudos, luna y sol con cara) y propone abrir con piezas urbanas (boletos, cinta, sellos): decisión de León sobre los stickers; flechas con tabindex itinerante en pestañas y grupos de opciones (hoy funcionan con Tab); borde del lienzo 1.5 px `ink` en lugar de sombra (hecho) pero el contraste del filo sobre fondo negro en oscuro es el de la tinta blanca; mover una pieza a un punto con un toque (solo arrastre o flechas).
+    - **Marca «Sema» en lo exportado:** decisión propia para que las historias digan de dónde salen. Confirmar si se queda.
+    - **Fondos lisos vivos quitados** (lila, durazno, mostaza, menta, cielo): decisión propia por sema-identidad §6. Si León los quiere, se regresan en `coloresFondo` del JSON.
 
 ### Resuelto (sprint 2026-09-17 — commits `280e7b8`, `d9d0a03`, `8eac60a` — y fixes 2026-09-18)
 

@@ -81,3 +81,7 @@ capturas/
 .claude/skills/vuln-defectdojo/
 .claude/skills/webapp-nikto/
 .claude/skills/webapp-sqlmap/
+
+# Originales de stickers en alta resolución (144 MB): se quedan en disco, fuera de git.
+# Los WebP que usa la app viven en public/collage/ y se regeneran con scripts/collage-assets.py
+assets-fuentes/

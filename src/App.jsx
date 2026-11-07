@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, Component } from "react";
+import { useState, useEffect, useRef, useMemo, Component, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import {
@@ -63,7 +63,13 @@ import {
   RefreshCw,
   ArrowRight,
   AlertCircle,
+  Scissors,
 } from "lucide-react";
+// Collages (2026-11-06): la pestaña y el editor se cargan aparte (chunk propio); la celebración y el
+// cuerpo de la publicación son chicos y van en el bundle principal.
+const CollagesView = lazy(() => import("./components/collage/CollagesView.jsx"));
+import { CollageCelebracion } from "./components/collage/CollageCelebracion.jsx";
+import { CollagePostBody } from "./components/collage/CollagePostBody.jsx";
 import { supabase } from "./supabase.js";
 import { loginWithSupabase, registerWithSupabase, logout, getSessionUser, updateDisplayName, watchAuthProfile, ensureUserProfile } from "./services/authService.js";
 import confetti from "canvas-confetti";
@@ -92,6 +98,7 @@ import { FONT_LINK, FONT_UI, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteC
 import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
+import { parseCollagePost } from "./services/collageService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
 import { normalizeGenre } from "./services/genreService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
@@ -558,6 +565,8 @@ const NAV_ITEMS = [
   { id: "home", label: "Inicio", icon: Home },
   { id: "explorar", label: "Explorar", icon: Compass },
   { id: "mascota", label: "Mascota", icon: PawPrint },
+  // Collages (2026-11-06): pestaña propia entre Mascota y Social. La barra queda en 5 (Trueque ya estaba fuera).
+  { id: "collage", label: "Collage", icon: Scissors },
   { id: "social", label: "Social", icon: MessageCircle },
   // Trueque queda FUERA del lanzamiento (decisión del 16 oct 2026): no aparece en
   // la barra inferior ni en las pastillas de escritorio. Su código, componentes
@@ -6904,6 +6913,20 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
 // ============ NOTIFICATIONS SHEET ============
 // Texto corto de la publicación o comentario al que apunta una notificación,
 // para que dos likes a cosas distintas no parezcan duplicados.
+// Collages (2026-11-06): el JSON interno de una publicación (__folio_type) nunca es texto que se muestre.
+function textoVisible(content) {
+  if (!content || content[0] !== "{") return content || "";
+  try {
+    const p = JSON.parse(content);
+    return p && typeof p === "object" && p.__folio_type ? "" : content;
+  } catch { return content.includes('"__folio_type"') ? "" : content; }
+}
+// Un post de collage se reconoce también por su contenido, aunque no llegue clasificado como "collage".
+function normalizarCollage(post) {
+  if (post.type === "collage" && post.collage) return post;
+  const collage = parseCollagePost(post.content);
+  return collage ? { ...post, type: "collage", collage } : post;
+}
 function snippet(text, max = 42) {
   const t = (text || "").replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
@@ -6915,8 +6938,10 @@ function describePostTarget(post, book) {
     try {
       const parsed = JSON.parse(post.content);
       if (parsed?.__folio_type === "quote" && parsed.text) return `la frase «${snippet(parsed.text)}»`;
+      if (parsed?.__folio_type === "collage") return "tu collage";
     } catch { /* texto normal */ }
-    return `«${snippet(post.content)}»`;
+    // Un JSON interno (p. ej. frase sin texto) no se cita como si fuera la publicación.
+    if (textoVisible(post.content)) return `«${snippet(post.content)}»`;
   }
   if (post.type === "reading_session") return "tu sesión de lectura";
   if (post.type === "achievement") return "tu logro";
@@ -9712,7 +9737,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const sameReview = (a, b) => { const x = normText(a), y = normText(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
 
   // Una publicación del feed según su tipo (mapa de color en sema-paleta §6).
-  const renderPost = (post) => {
+  const renderPost = (postOriginal) => {
+    const post = normalizarCollage(postOriginal);
             const isFinished = post.type === "book_update" && post.action === "finished";
             const isStarted = post.type === "book_update" && post.action === "started";
             // Logros: tipo nuevo o texto viejo con el patrón (sin contar frases)
@@ -9760,6 +9786,19 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
               );
             }
 
+            // ── Collage (2026-11-06): franja «Collage» + la imagen congelada (con tarjeta de frase/reseña si la trae). ──
+            if (post.type === "collage") {
+              return (
+                <div key={post.id} id={`post-${post.id}`} className="feed-post-item sema-post" onClick={() => handleDoubleTap(post.id)} style={cardStyle(post)}>
+                  {heartOverlay(post)}
+                  {postBand(post, Scissors, post.collage?.encima?.tipo === "resena" ? "Collage con reseña" : post.collage?.encima?.tipo === "frase" ? "Collage con frase" : "Collage")}
+                  {postHeader(post, null)}
+                  <CollagePostBody post={post} />
+                  {postFooter(post)}
+                </div>
+              );
+            }
+
             // ── Frase (ronda 2): mismo formato que las demás (franja «Frase» + cabecera); la frase en
             //    Instrument Serif grande, en tinta sobre el fondo. Ya no es tarjeta ciruela. ──
             if (post.type === "quote") {
@@ -9787,10 +9826,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {heartOverlay(post)}
                   {postBand(post, BookOpen, stats ? "Leyó" : "Leyó un rato", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
                   {postHeader(post, null)}
-                  {(post.book || post.content) && (
+                  {(post.book || textoVisible(post.content)) && (
                     <div className="sema-post__pad" style={{ paddingTop: 10 }}>
                       {post.book && bookRow(post)}
-                      {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: post.book ? "0.75rem" : 0 }}>{post.content}</p>}
+                      {textoVisible(post.content) && <p style={{ ...ts.body15, color: palette.ink, marginTop: post.book ? "0.75rem" : 0 }}>{textoVisible(post.content)}</p>}
                     </div>
                   )}
                   {postFooter(post)}
@@ -9801,8 +9840,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             // ── Libro terminado: franja «Libro terminado» + degradado (uno por publicación, de
             //    SEMA_GRADIENTES_TERMINADO) con la portada al frente ──
             if (isFinished) {
-              const reviewText = post.book?.review || post.content || "";
-              const extraText = post.content && !sameReview(post.content, reviewText) ? post.content : "";
+              const reviewText = post.book?.review || textoVisible(post.content) || "";
+              const extraText = textoVisible(post.content) && !sameReview(textoVisible(post.content), reviewText) ? textoVisible(post.content) : "";
               const rating = post.book?.rating || 0;
               const finishedGradient = pickByHash(SEMA_GRADIENTES_TERMINADO, post.id);
               // Ronda 5 (2026-11-03): momento de celebración, el post con más decoración. Fondo de degradado
@@ -9875,8 +9914,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       «{post.book.review}»
                     </p>
                   )}
-                  {post.content && !(hasReview && sameReview(post.content, post.book?.review)) && (
-                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
+                  {textoVisible(post.content) && !(hasReview && sameReview(textoVisible(post.content), post.book?.review)) && (
+                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{textoVisible(post.content)}</p>
                   )}
                   {post.image_url && (
                     <button
@@ -12169,9 +12208,11 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   // tapar el final del feed ni los números de «Mi biblioteca». Sigue en el DOM (aria-hidden mientras).
   const [fabVisible, setFabVisible] = useState(true);
   const [perfilSub, setPerfilSub] = useState("perfil");
+  const [collageNuevo, setCollageNuevo] = useState(false);
   // El «+» no va en Perfil › «Mi perfil» (ahí viven Editar perfil, Privacidad, Apariencia y Cerrar
   // sesión); sí en Mis libros, Mis frases y Resumen. Al cambiar de pestaña vuelve a verse.
-  const fabShown = fabVisible && !(tab === "perfil" && perfilSub === "perfil");
+  // Collages (2026-11-06): tampoco en la pestaña Collage (su acción principal es «Nuevo collage»).
+  const fabShown = fabVisible && !(tab === "perfil" && perfilSub === "perfil") && tab !== "collage";
   useEffect(() => { setFabVisible(true); }, [tab]);
   // Vuelve solo al subir, al llegar al tope o al fondo (ya no por inactividad: tapaba texto en reposo).
   useEffect(() => {
@@ -12928,6 +12969,13 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         {!loaded && <AppLoadingSkeleton />}
         {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} pendingCount={pendingCount} /></div>}
+        {loaded && tab === "collage" && (
+          <div className="tab-view-enter">
+            <Suspense fallback={<div role="status" aria-label="Cargando Collages" style={{ minHeight: "40vh" }} />}>
+              <CollagesView user={user} books={books} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} abrirNuevo={collageNuevo} onAbrirNuevoHecho={() => setCollageNuevo(false)} />
+            </Suspense>
+          </div>
+        )}
         {loaded && tab === "explorar" && <div className="tab-view-enter"><ExplorarView user={user} books={books} onSelectBook={setSelectedBook} onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "trueque" && <div className="tab-view-enter"><TruequeMain user={user} gemBalance={gemBalance} onGemsChanged={() => loadGems(user.id).then(setGemBalance)} onExit={() => setTab("home")} /></div>}
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}
@@ -13064,6 +13112,8 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           onRename={async (name) => { const saved = await updatePetName(user.id, name); if (saved) setPet((p) => p ? { ...p, pet_name: saved } : p); return saved; }}
         />
       )}
+      {/* Collages (2026-11-06): celebración cuando sale un set nuevo (racha o compra), vía collageBus. */}
+      <CollageCelebracion onUsar={() => { setTab("collage"); setCollageNuevo(true); }} />
       {petToastQueue.length > 0 && (
         <PetLevelUpToast
           key={petToastQueue[0].id}

@@ -1463,3 +1463,41 @@ button:not(:disabled):not(.sema-no-hover):active,
 .sema-hito--n3.sema-carton::after { opacity: 0.28; }
 /* Libro terminado: el título grande cruza el degradado; textura más tenue para que el pliegue no baje de 3:1 (cereza). */
 .sema-terminado.sema-carton::after { opacity: 0.4; }
+
+/* ─── Collages (2026-11-06) ─────────────────────────────────────────────────
+   Modo capas: la pieza tiembla mientras se mantiene presionada (deslizar arriba/abajo cambia su capa).
+   Premio: el sticker de muestra entra con un salto y un giro sobre el disco lila.
+   Con prefers-reduced-motion todo queda quieto (el resaltado lila del modo capas sí se ve). */
+@keyframes semaCollageVibra {
+  0%, 100% { transform: rotate(-1.6deg); }
+  50% { transform: rotate(1.6deg); }
+}
+.sema-collage-capa--capas { animation: semaCollageVibra 160ms ease-in-out infinite; }
+@keyframes semaCollagePremio {
+  0% { transform: scale(0.2) rotate(-40deg); opacity: 0; }
+  60% { transform: scale(1.12) rotate(8deg); opacity: 1; }
+  80% { transform: scale(0.96) rotate(-3deg); }
+  100% { transform: scale(1) rotate(-4deg); }
+}
+@keyframes semaCollageDisco {
+  0% { transform: scale(0.6); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.sema-collage-premio-sticker { animation: semaCollagePremio 700ms cubic-bezier(.2,.9,.3,1.2) both; animation-delay: 120ms; }
+.sema-collage-premio-disco { animation: semaCollageDisco 320ms ease-out both; }
+.sema-collage-premio-lado { animation: semaCollageDisco 360ms ease-out both; }
+.sema-collage-premio-lado:first-child { transform: rotate(0deg); }
+/* Guías de zona segura de historia (9:16): solo mientras se arrastra; no salen en la imagen. */
+.sema-collage-guia { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px dashed var(--sema-ink); opacity: 0.45; pointer-events: none; z-index: 9999; }
+/* Foco visible dentro del selector de formato (el contorno global quedaba del color del relleno). */
+.sema-collage-formato:focus-visible { outline: 2px solid var(--sema-bg) !important; outline-offset: -5px !important; box-shadow: 0 0 0 3px var(--sema-ink); }
+.sema-collage-capa:focus-visible { outline: none !important; }
+.sema-collage-lienzo img { -webkit-user-drag: none; }
+@media (hover: hover) and (pointer: fine) {
+  .sema-collage-pieza:hover { background-color: var(--sema-separador-feed) !important; }
+}
+.sema-collage-pieza:active { transform: scale(0.94); }
+@media (prefers-reduced-motion: reduce) {
+  .sema-collage-capa--capas, .sema-collage-premio-sticker, .sema-collage-premio-disco, .sema-collage-premio-lado { animation: none !important; }
+  .sema-collage-premio-sticker { transform: rotate(-4deg); }
+}
