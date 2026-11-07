@@ -94,13 +94,17 @@ INSERT INTO public.collage_sets (id, nombre, obtencion, precio, activo) VALUES
   ('botanico',   'Botánico',         'gemas',   100,  true),
   ('sello',      'Sellos de planta', 'gemas',   100,  true),
   ('tarot',      'Arcanos',          'gemas',   100,  true),
-  ('musica',     'Lado B',           'gemas',   100,  true)
+  ('musica',     'Lado B',           'gemas',   100,  true),
+  ('marcador',   'Subrayado',        'inicial', NULL, true),
+  ('cables',     'Sin señal',        'racha',   NULL, true),
+  ('flores',     'Floritas',         'gemas',   100,  true),
+  ('tatuaje',    'Vieja escuela',    'gemas',   100,  true)
 ON CONFLICT (id) DO UPDATE
   SET nombre = EXCLUDED.nombre, obtencion = EXCLUDED.obtencion, precio = EXCLUDED.precio, activo = EXCLUDED.activo;
 -- Un set que se quita del catálogo NO se borra (alguien puede tenerlo en su inventario): solo deja de salir en
 -- tiradas y de venderse. Solo toca collage_sets, la tabla que crea este mismo archivo.
 UPDATE public.collage_sets SET activo = false
- WHERE activo AND id NOT IN ('papeles', 'tinta', 'trance', 'tercer-ojo', 'olimpo', 'bodegon', 'poe', 'botanico', 'sello', 'tarot', 'musica');
+ WHERE activo AND id NOT IN ('papeles', 'tinta', 'trance', 'tercer-ojo', 'olimpo', 'bodegon', 'poe', 'botanico', 'sello', 'tarot', 'musica', 'marcador', 'cables', 'flores', 'tatuaje');
 
 INSERT INTO public.collage_config (key, value) VALUES
   ('probabilidad_inicial', 0.30),   -- recompensas.probabilidadInicial

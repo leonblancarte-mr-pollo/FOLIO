@@ -44,6 +44,15 @@
       "muestra": "tinta-luna"
     },
     {
+      "id": "marcador",
+      "nombre": "Subrayado",
+      "descripcion": "Íconos de marcador para subrayar lo que importa.",
+      "obtencion": {
+        "tipo": "inicial"
+      },
+      "muestra": "marcador-libro-ojo"
+    },
+    {
       "id": "trance",
       "nombre": "Trance",
       "descripcion": "Espirales y ondas que marean bonito.",
@@ -89,6 +98,15 @@
       "muestra": "poe-cuervo"
     },
     {
+      "id": "cables",
+      "nombre": "Sin señal",
+      "descripcion": "Pantallas, cables y cabezas conectadas de más.",
+      "obtencion": {
+        "tipo": "racha"
+      },
+      "muestra": "cables-monitor-ojo"
+    },
+    {
       "id": "botanico",
       "nombre": "Botánico",
       "descripcion": "Flores, conchas y soles de grabado.",
@@ -127,6 +145,26 @@
         "precio": 100
       },
       "muestra": "musica-casete"
+    },
+    {
+      "id": "flores",
+      "nombre": "Floritas",
+      "descripcion": "Flores con cara de domingo.",
+      "obtencion": {
+        "tipo": "gemas",
+        "precio": 100
+      },
+      "muestra": "flores-amarilla"
+    },
+    {
+      "id": "tatuaje",
+      "nombre": "Vieja escuela",
+      "descripcion": "Anclas, golondrinas y calaveras de salón de tatuajes.",
+      "obtencion": {
+        "tipo": "gemas",
+        "precio": 100
+      },
+      "muestra": "tatuaje-golondrina"
     }
   ],
   "objetos": [
@@ -930,6 +968,312 @@
       "estilo": "papel",
       "archivo": "/collage/texturas/pieza-cuaderno.webp",
       "miniatura": "/collage/texturas/min/pieza-cuaderno.webp"
+    },
+    {
+      "id": "marcador-corazon-candado",
+      "nombre": "Corazón con candado",
+      "set": "marcador",
+      "categoria": "sticker",
+      "estilo": "marcador",
+      "archivo": "/collage/stickers/marcador-corazon-candado.webp",
+      "miniatura": "/collage/stickers/min/marcador-corazon-candado.webp"
+    },
+    {
+      "id": "marcador-libro-ojo",
+      "nombre": "Libro con ojo",
+      "set": "marcador",
+      "categoria": "sticker",
+      "estilo": "marcador",
+      "archivo": "/collage/stickers/marcador-libro-ojo.webp",
+      "miniatura": "/collage/stickers/min/marcador-libro-ojo.webp"
+    },
+    {
+      "id": "marcador-luna",
+      "nombre": "Luna sonriente",
+      "set": "marcador",
+      "categoria": "sticker",
+      "estilo": "marcador",
+      "archivo": "/collage/stickers/marcador-luna.webp",
+      "miniatura": "/collage/stickers/min/marcador-luna.webp"
+    },
+    {
+      "id": "marcador-peces",
+      "nombre": "Peces",
+      "set": "marcador",
+      "categoria": "sticker",
+      "estilo": "marcador",
+      "archivo": "/collage/stickers/marcador-peces.webp",
+      "miniatura": "/collage/stickers/min/marcador-peces.webp"
+    },
+    {
+      "id": "marcador-serpiente-rayo",
+      "nombre": "Uróboro eléctrico",
+      "set": "marcador",
+      "categoria": "sticker",
+      "estilo": "marcador",
+      "archivo": "/collage/stickers/marcador-serpiente-rayo.webp",
+      "miniatura": "/collage/stickers/min/marcador-serpiente-rayo.webp"
+    },
+    {
+      "id": "marcador-vela",
+      "nombre": "Vela",
+      "set": "marcador",
+      "categoria": "sticker",
+      "estilo": "marcador",
+      "archivo": "/collage/stickers/marcador-vela.webp",
+      "miniatura": "/collage/stickers/min/marcador-vela.webp"
+    },
+    {
+      "id": "cables-cabeza-tv",
+      "nombre": "Cabeza de tele",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-cabeza-tv.webp",
+      "miniatura": "/collage/stickers/min/cables-cabeza-tv.webp"
+    },
+    {
+      "id": "cables-celular-roto",
+      "nombre": "Pantalla rota",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-celular-roto.webp",
+      "miniatura": "/collage/stickers/min/cables-celular-roto.webp"
+    },
+    {
+      "id": "cables-enchufado",
+      "nombre": "Enchufado",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-enchufado.webp",
+      "miniatura": "/collage/stickers/min/cables-enchufado.webp"
+    },
+    {
+      "id": "cables-monitor-ojo",
+      "nombre": "Monitor con ojo",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-monitor-ojo.webp",
+      "miniatura": "/collage/stickers/min/cables-monitor-ojo.webp"
+    },
+    {
+      "id": "cables-nuca-cables",
+      "nombre": "Nuca conectada",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-nuca-cables.webp",
+      "miniatura": "/collage/stickers/min/cables-nuca-cables.webp"
+    },
+    {
+      "id": "cables-nudo",
+      "nombre": "El nudo",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-nudo.webp",
+      "miniatura": "/collage/stickers/min/cables-nudo.webp"
+    },
+    {
+      "id": "cables-ojos-cables",
+      "nombre": "Lágrimas de cable",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-ojos-cables.webp",
+      "miniatura": "/collage/stickers/min/cables-ojos-cables.webp"
+    },
+    {
+      "id": "cables-tele-cables",
+      "nombre": "Tele sin señal",
+      "set": "cables",
+      "categoria": "sticker",
+      "estilo": "ilustración a tinta",
+      "archivo": "/collage/stickers/cables-tele-cables.webp",
+      "miniatura": "/collage/stickers/min/cables-tele-cables.webp"
+    },
+    {
+      "id": "flores-amarilla",
+      "nombre": "Amarilla",
+      "set": "flores",
+      "categoria": "sticker",
+      "estilo": "pegatina de flor",
+      "archivo": "/collage/stickers/flores-amarilla.webp",
+      "miniatura": "/collage/stickers/min/flores-amarilla.webp"
+    },
+    {
+      "id": "flores-corazon",
+      "nombre": "Flor corazón",
+      "set": "flores",
+      "categoria": "sticker",
+      "estilo": "pegatina de flor",
+      "archivo": "/collage/stickers/flores-corazon.webp",
+      "miniatura": "/collage/stickers/min/flores-corazon.webp"
+    },
+    {
+      "id": "flores-dentro",
+      "nombre": "Flor dentro de flor",
+      "set": "flores",
+      "categoria": "sticker",
+      "estilo": "pegatina de flor",
+      "archivo": "/collage/stickers/flores-dentro.webp",
+      "miniatura": "/collage/stickers/min/flores-dentro.webp"
+    },
+    {
+      "id": "flores-dobles",
+      "nombre": "Dos flores",
+      "set": "flores",
+      "categoria": "sticker",
+      "estilo": "pegatina de flor",
+      "archivo": "/collage/stickers/flores-dobles.webp",
+      "miniatura": "/collage/stickers/min/flores-dobles.webp"
+    },
+    {
+      "id": "flores-dormida",
+      "nombre": "Flor dormida",
+      "set": "flores",
+      "categoria": "sticker",
+      "estilo": "pegatina de flor",
+      "archivo": "/collage/stickers/flores-dormida.webp",
+      "miniatura": "/collage/stickers/min/flores-dormida.webp"
+    },
+    {
+      "id": "flores-girando",
+      "nombre": "Flor mareada",
+      "set": "flores",
+      "categoria": "sticker",
+      "estilo": "pegatina de flor",
+      "archivo": "/collage/stickers/flores-girando.webp",
+      "miniatura": "/collage/stickers/min/flores-girando.webp"
+    },
+    {
+      "id": "tatuaje-ancla",
+      "nombre": "Ancla",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-ancla.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-ancla.webp"
+    },
+    {
+      "id": "tatuaje-calavera-dados",
+      "nombre": "Calavera y dados",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-calavera-dados.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-calavera-dados.webp"
+    },
+    {
+      "id": "tatuaje-calavera",
+      "nombre": "Calavera",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-calavera.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-calavera.webp"
+    },
+    {
+      "id": "tatuaje-corazon",
+      "nombre": "Corazón con cinta",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-corazon.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-corazon.webp"
+    },
+    {
+      "id": "tatuaje-daga",
+      "nombre": "Daga",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-daga.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-daga.webp"
+    },
+    {
+      "id": "tatuaje-estrella",
+      "nombre": "Rosa de los vientos",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-estrella.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-estrella.webp"
+    },
+    {
+      "id": "tatuaje-estrella-2",
+      "nombre": "Rosa de los vientos 2",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-estrella-2.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-estrella-2.webp"
+    },
+    {
+      "id": "tatuaje-golondrina",
+      "nombre": "Golondrina",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-golondrina.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-golondrina.webp"
+    },
+    {
+      "id": "tatuaje-luna-dormida",
+      "nombre": "Luna dormida",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-luna-dormida.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-luna-dormida.webp"
+    },
+    {
+      "id": "tatuaje-luna-perfil",
+      "nombre": "Luna de perfil",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-luna-perfil.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-luna-perfil.webp"
+    },
+    {
+      "id": "tatuaje-reloj",
+      "nombre": "Reloj de bolsillo",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-reloj.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-reloj.webp"
+    },
+    {
+      "id": "tatuaje-rosa",
+      "nombre": "Rosa",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-rosa.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-rosa.webp"
+    },
+    {
+      "id": "tatuaje-serpiente-2",
+      "nombre": "Serpiente enroscada",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-serpiente-2.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-serpiente-2.webp"
+    },
+    {
+      "id": "tatuaje-serpiente",
+      "nombre": "Cobra",
+      "set": "tatuaje",
+      "categoria": "sticker",
+      "estilo": "tatuaje tradicional",
+      "archivo": "/collage/stickers/tatuaje-serpiente.webp",
+      "miniatura": "/collage/stickers/min/tatuaje-serpiente.webp"
     }
   ],
   "coloresFondo": [
