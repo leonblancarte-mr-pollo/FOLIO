@@ -1,3 +1,4 @@
+import { track } from "../analytics.js";
 import { supabase } from "../supabase.js";
 import { addPendingLog, getPendingLogs } from "./booksService.js";
 import { localDateStr } from "./streakService.js";
@@ -28,6 +29,7 @@ async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId })
     log_date: today,
     session_id: sid,
   });
+  if (!logError && pagesRead) track("pages_logged", { book_id: bookId || null, pages_read: pagesRead });
   if (logError) {
     if (logError.code === "23505") {
       // Esta sesión ya se sincronizó antes (reintento offline duplicado): no
@@ -51,6 +53,7 @@ async function logReadingSession({ userId, bookId, pagesRead, mood, sessionId })
   if (streakErr) console.error("[streak] update_streak falló:", streakErr.message);
   // Ronda 5: si la racha acaba de llegar a un hito, se publica el banner (una sola vez por hito).
   else {
+    track("streak_registered", { current_streak: (Array.isArray(streakRow) ? streakRow[0] : streakRow)?.current_streak ?? null });
     publishStreakMilestone(userId, Array.isArray(streakRow) ? streakRow[0] : streakRow)
       .catch((err) => console.error("[streak] no se pudo publicar el hito de racha:", err?.message || err));
     // Collages (2026-11-06): cada día que se registra la racha hay una tirada por un set nuevo

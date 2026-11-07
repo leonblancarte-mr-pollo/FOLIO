@@ -99,6 +99,8 @@ import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pick
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { parseCollagePost } from "./services/collageService.js";
+import { compartirArchivo } from "./components/collage/collageCompartir.js";
+import { identify as identifyAnalytics, reset as resetAnalytics, track } from "./analytics.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
 import { normalizeGenre } from "./services/genreService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
@@ -1967,6 +1969,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
         if (cancelled) return;
         setItems(data.items);
         setPersonalized(data.personalized || data.byGenre);
+        track("recommendation_shown", { origin: (data.personalized || data.byGenre) ? "para_ti" : "mejores_valorados", count: (data.items || []).length });
       } catch (err) {
         console.warn("[CollaborativeRecommendations] fallback silencioso:", err.message);
         if (!cancelled) setItems([]);
@@ -1977,6 +1980,7 @@ function CollaborativeRecommendations({ user, onAdd }) {
   }, [user?.id]);
 
   function handleAdd(item) {
+    track("recommendation_clicked", { origin: personalized ? "para_ti" : "mejores_valorados", title: item.title || null, genre: item.genre || null });
     onAdd({
       id: crypto.randomUUID(),
       title: item.title,
@@ -2342,6 +2346,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
       const ans = answersOverride ?? answers;
       const res = await getMoodRecommendations(books, ans);
       setResults(res);
+      track("mood_quiz_completed", { answers: ans });
     } catch (e) {
       // La causa técnica va a consola (y, en desarrollo, debajo del globo); el gato solo dice
       // una línea en su voz según el tipo de error (RECO_ERROR_LINES).
@@ -2506,7 +2511,7 @@ function RecommendFlow({ books, onSelectBook, onAdd, setTab }) {
               {fromLibraryMatched.map((r, i) => (
                 <li key={i} style={{ borderTop: i ? `1px solid ${palette.borderSoft}` : "none" }}>
                   <button
-                    onClick={() => onSelectBook(r.book)}
+                    onClick={() => { track("recommendation_clicked", { origin: "descubrir_quiz", book_id: r.book?.id || null, title: r.book?.title || null, genre: r.book?.genre || null }); onSelectBook(r.book); }}
                     className="w-full text-left"
                     style={{ display: "flex", gap: "0.9rem", padding: "1rem 0", background: "none", border: "none", cursor: "pointer" }}
                   >
@@ -9219,6 +9224,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [deleting, setDeleting] = useState(false);
   // Ronda 4: menú de tres puntos de una publicación (id abierto). Se cierra con Escape y con clic fuera.
   const [postMenu, setPostMenu] = useState(null);
+  // Aviso corto tras «Compartir imagen» de un collage: { id, texto } (se muestra en su tarjeta).
+  const [compartirMsg, setCompartirMsg] = useState(null);
   // Ronda 2 de correcciones: al cerrar (Escape, velo u opción) el foco vuelve al botón «Opciones de la
   // publicación» (ref por publicación); si el foco se va solo (Tab fuera del menú), se cierra sin robarlo.
   const postMenuBtnRefs = useRef({});
@@ -9642,9 +9649,22 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   // algo que ofrecer: «Ver libro» (si hay libro) y «Borrar publicación» (solo propia). El bote de
   // basura ya no va suelto en el encabezado. Cierra con Escape (efecto arriba), clic fuera (velo)
   // y al elegir una opción; el foco entra al primer elemento.
+  // Compartir la imagen YA PUBLICADA de un collage (la congelada en post-images, no el lienzo actual).
+  const compartirCollageFeed = async (post) => {
+    try {
+      const res = await fetch(post.image_url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const r = await compartirArchivo(await res.blob(), `sema-collage-${post.id}.jpg`, "Mi collage");
+      if (r === "descargado") setCompartirMsg({ id: post.id, texto: "Imagen descargada." });
+    } catch (err) {
+      console.error("[collage] compartir imagen del feed:", err);
+      setCompartirMsg({ id: post.id, texto: "No se pudo compartir la imagen. Otro intento." });
+    }
+  };
   const postMenuButton = (post) => {
     const own = post.user_id === user.id;
-    if (!own && !post.book) return null;
+    const esCollage = post.type === "collage" && !!post.image_url;
+    if (!own && !post.book && !esCollage) return null;
     const open = postMenu === post.id;
     // Sin background ni color inline: viven en CSS (.sema-post-menu__item) para que hover y foco visible manden.
     const item = { ...body, width: "100%", minHeight: 44, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, textAlign: "left", whiteSpace: "nowrap" };
@@ -9677,8 +9697,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   <BookOpen size={17} strokeWidth={2} aria-hidden /> Ver libro
                 </button>
               )}
+              {esCollage && (
+                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item" onClick={() => { closePostMenu(); compartirCollageFeed(post); }} style={item}>
+                  <Share2 size={17} strokeWidth={2} aria-hidden /> Compartir imagen
+                </button>
+              )}
               {own && (
-                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item sema-post-menu__item--peligro" onClick={() => { closePostMenu(); setPostToDelete(post.id); }} style={item}>
+                <button role="menuitem" autoFocus={!post.book && !esCollage} className="sema-post-menu__item sema-post-menu__item--peligro" onClick={() => { closePostMenu(); setPostToDelete(post.id); }} style={item}>
                   <Trash2 size={17} strokeWidth={2} aria-hidden /> Borrar publicación
                 </button>
               )}
@@ -9794,6 +9819,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {postBand(post, Scissors, post.collage?.encima?.tipo === "resena" ? "Collage con reseña" : post.collage?.encima?.tipo === "frase" ? "Collage con frase" : "Collage")}
                   {postHeader(post, null)}
                   <CollagePostBody post={post} />
+                  {compartirMsg?.id === post.id && <Toast message={compartirMsg.texto} onDismiss={() => setCompartirMsg(null)} />}
                   {postFooter(post)}
                 </div>
               );
@@ -12199,6 +12225,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
   const [pet, setPet] = useState(null);
   const [showPetOnboarding, setShowPetOnboarding] = useState(false);
   const [petHubOpen, setPetHubOpen] = useState(false);
+  const abrirMascota = () => { track("pet_opened"); setPetHubOpen(true); };
   const [amigosSheetOpen, setAmigosSheetOpen] = useState(false);
   const [petToastQueue, setPetToastQueue] = useState([]);
   const [petStreak, setPetStreak] = useState(null);
@@ -12626,6 +12653,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
     try {
       await updateBookInDB(final, user.id);
       if (isFinishing) {
+        track("book_finished", { book_id: final.id, title: final.title, genre: final.genre || null });
         // Recién aquí el trigger del servidor ya otorgó las +50 gemas y +50 XP
         // (el UPDATE de status acaba de persistir): sincronizar estado real.
         loadGems(user.id).then(bal => setGemBalance(bal));
@@ -12964,10 +12992,10 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
           </span>
         </div>
       )}
-      <AppHeader userName={user.name} avatarUrl={mainAvatarUrl} tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={() => setPetHubOpen(true)} />
+      <AppHeader userName={user.name} avatarUrl={mainAvatarUrl} tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} unreadNotifs={unreadNotifs} onOpenNotifs={() => setNotifsSheetOpen(true)} gemBalance={gemBalance} onOpenPet={abrirMascota} />
       <main className="max-w-4xl mx-auto fade-in main-fab-clearance" style={{ backgroundColor: palette.bgSoft, minHeight: "calc(100vh - 56px)", overflowX: "hidden" }}>
         {!loaded && <AppLoadingSkeleton />}
-        {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={() => setPetHubOpen(true)} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
+        {loaded && tab === "home" && <div className="tab-view-enter"><HomeView user={user} books={books} pet={pet} streak={petStreak} setTab={setTab} onOpenPet={abrirMascota} onSelectBook={setSelectedBook} onAdd={addBook} isOnline={isOnline} /></div>}
         {loaded && tab === "social" && <div className="tab-view-enter"><SocialView user={user} onAdd={addBook} setTab={setTab} books={books} isOnline={isOnline} pendingNavigation={pendingNavigation} onNavigationDone={() => setPendingNavigation(null)} onOpenAmigos={() => setAmigosSheetOpen(true)} pendingCount={pendingCount} /></div>}
         {loaded && tab === "collage" && (
           <div className="tab-view-enter">
@@ -12981,7 +13009,7 @@ function MainApp({ user, onLogout, onUserUpdate, initialRefUser, onRefUserConsum
         {loaded && tab === "add" && <div className="tab-view-enter"><AddBookView onAdd={addBook} setTab={setTab} /></div>}
         {loaded && tab === "perfil" && <div className="tab-view-enter"><PerfilWrapper user={user} onUserUpdate={onUserUpdate} books={books} onSelectBook={setSelectedBook} setTab={setTab} onLogout={onLogout} isOnline={isOnline} theme={themePref} setTheme={setTheme} onSubChange={setPerfilSub} /></div>}
       </main>
-      <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} pet={pet} onOpenPet={() => setPetHubOpen(true)} />
+      <BottomNav tab={tab} setTab={setTab} pendingCount={pendingCount} unreadMessages={unreadMessages} pet={pet} onOpenPet={abrirMascota} />
       {/* FAB flotante para agregar. La barra inferior lleva Inicio, Explorar, Mascota y Social
           (sin centro fijo desde 2026-11-02); Perfil se abre desde la foto de la cabecera. */}
       {!petHubOpen && (
@@ -14019,6 +14047,7 @@ export default function App() {
         const u = await getSessionUser();
         if (u) {
           setUser(u);
+          identifyAnalytics(u.id);
           const needed = await checkOnboardingNeeded(u.id);
           setShowOnboarding(needed);
           const savedRef = localStorage.getItem("folio_ref");
@@ -14041,6 +14070,8 @@ export default function App() {
 
   async function handleLogin(u, isNew = false) {
     setUser(u);
+    identifyAnalytics(u.id);
+    if (isNew) track("signup_completed", { method: "email" });
     if (isNew) {
       setShowOnboarding(true);
     } else {
@@ -14062,6 +14093,7 @@ export default function App() {
   }
 
   async function handleLogout() {
+    resetAnalytics();
     await logout();
     setUser(null);
     setShowOnboarding(false);

@@ -1,3 +1,4 @@
+import { track } from "../analytics.js";
 import { supabase } from "../supabase.js";
 import { addPendingPost, getPendingPosts } from "./booksService.js";
 import { devLog } from "./devLog.js";
@@ -239,6 +240,7 @@ async function createFeedPost({ userId, type, bookId, action, content, imageUrl,
     throw error;
   }
   devLog("[createFeedPost] OK");
+  track("post_created", { type });
   return data?.id || null;
 }
 

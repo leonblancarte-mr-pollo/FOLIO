@@ -13,6 +13,8 @@ import { getObjeto, siguienteEstiloFrase, altoFormato, LIENZO, LIMITES, ESTILOS_
 import { guardarCollage, comprarSet, CollageError } from "../../services/collageService.js";
 import { fetchQuotes } from "../../services/quotesService.js";
 import { ANCHO, renderFrase, urlFrase, exportarPNG, vistaPrevia, docNuevo, cambiarFormato } from "./collageRender.js";
+import { compartirArchivo } from "./collageCompartir.js";
+import { track } from "../../analytics.js";
 import { CollageTray } from "./CollageTray.jsx";
 import { CollageHoja, FilaHoja, BotonHoja } from "./CollageHoja.jsx";
 import { CollagePublicar } from "./CollagePublicar.jsx";
@@ -308,6 +310,7 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
       const res = await guardarCollage(user.id, { id: collageId, formato: docRef.current.formato, doc: docRef.current, preview, limite });
       setCollageId(res.id);
       setSucio(false);
+      track("collage_saved", { formato: docRef.current.formato });
       onSaved?.(res);
       setAviso("Guardado.");
       return res;
@@ -324,17 +327,11 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
     if (ocupado) return;
     setOcupado(true); setAviso("");
     try {
-      const blob = await exportarPNG(docRef.current);
-      const nombre = `sema-collage-${docRef.current.formato === "cuadrado" ? "1080x1080" : "1080x1920"}.png`;
-      const file = new File([blob], nombre, { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: "Mi collage" }); } catch (err) { if (err?.name !== "AbortError") throw err; }
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob); a.download = nombre; a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        setAviso("Imagen descargada.");
-      }
+      // Siempre formato de feed (1080×1080). Si el lienzo está en 9:16, se exporta una copia en 1:1; el lienzo no cambia.
+      const blob = await exportarPNG(cambiarFormato(docRef.current, "cuadrado"));
+      const nombre = "sema-collage-1080x1080.png";
+      const r = await compartirArchivo(blob, nombre, "Mi collage");
+      if (r === "descargado") setAviso("Imagen descargada.");
     } catch (err) {
       console.error("[collage] exportar:", err);
       setAviso("No se pudo armar la imagen. Otro intento.");
@@ -507,10 +504,10 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
       {hoja === "listo" && (
         <CollageHoja titulo="¿Qué hacemos con el collage?" onClose={() => setHoja(null)}>
           <BotonHoja data-autofocus onClick={compartirImagen} disabled={ocupado} style={{ marginBottom: 6 }}>
-            {doc.formato === "cuadrado" ? "Compartir imagen" : "Compartir en historia"}
+            Compartir imagen
           </BotonHoja>
           <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, textAlign: "center", margin: "0 0 8px" }}>
-            {doc.formato === "cuadrado" ? "Imagen cuadrada, para guardar o mandar." : "Imagen vertical, lista para historias."}
+            Imagen cuadrada de 1080×1080, para el feed o para guardar.
           </p>
           <FilaHoja icon={Save} onClick={async () => { const r = await guardar(); if (r) setHoja(null); }} disabled={ocupado}
             detalle={estado?.plus || estado?.limite == null ? "Se queda en Mis collages para seguir editándolo." : `Se queda en Mis collages. Van ${estado?.usados ?? 0} de ${estado.limite}.`}>
