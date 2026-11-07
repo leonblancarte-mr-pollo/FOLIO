@@ -13,6 +13,7 @@ import { getObjeto, siguienteEstiloFrase, altoFormato, LIENZO, LIMITES, ESTILOS_
 import { guardarCollage, comprarSet, CollageError } from "../../services/collageService.js";
 import { fetchQuotes } from "../../services/quotesService.js";
 import { ANCHO, renderFrase, urlFrase, exportarPNG, vistaPrevia, docNuevo, cambiarFormato } from "./collageRender.js";
+import { compartirArchivo } from "./collageCompartir.js";
 import { CollageTray } from "./CollageTray.jsx";
 import { CollageHoja, FilaHoja, BotonHoja } from "./CollageHoja.jsx";
 import { CollagePublicar } from "./CollagePublicar.jsx";
@@ -41,6 +42,8 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
   const [hoja, setHoja] = useState(null); // null | "listo" | "tope" | { bloqueado: set } | "publicar"
   const [aviso, setAviso] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  // Formato elegido en la hoja «Compartir» (null = el del lienzo). Solo cambia lo exportado, no el lienzo.
+  const [formatoCompartir, setFormatoCompartir] = useState(null);
   const [frases, setFrases] = useState(null);
   const [frasesCargando, setFrasesCargando] = useState(false);
   const [urls, setUrls] = useState({}); // clave de frase → data URL
@@ -324,17 +327,13 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
     if (ocupado) return;
     setOcupado(true); setAviso("");
     try {
-      const blob = await exportarPNG(docRef.current);
-      const nombre = `sema-collage-${docRef.current.formato === "cuadrado" ? "1080x1080" : "1080x1920"}.png`;
-      const file = new File([blob], nombre, { type: "image/png" });
-      if (navigator.canShare?.({ files: [file] })) {
-        try { await navigator.share({ files: [file], title: "Mi collage" }); } catch (err) { if (err?.name !== "AbortError") throw err; }
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob); a.download = nombre; a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        setAviso("Imagen descargada.");
-      }
+      // Se exporta en el formato elegido: si es distinto al del lienzo, se usa una copia (el lienzo no cambia).
+      const f = formatoCompartir || docRef.current.formato;
+      const docExp = f === docRef.current.formato ? docRef.current : cambiarFormato(docRef.current, f);
+      const blob = await exportarPNG(docExp);
+      const nombre = `sema-collage-${f === "cuadrado" ? "1080x1080" : "1080x1920"}.png`;
+      const r = await compartirArchivo(blob, nombre, "Mi collage");
+      if (r === "descargado") setAviso("Imagen descargada.");
     } catch (err) {
       console.error("[collage] exportar:", err);
       setAviso("No se pudo armar la imagen. Otro intento.");
@@ -391,7 +390,7 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
             const activo = doc.formato === id;
             return (
               <button key={id} role="radio" aria-checked={activo} aria-label={id === "historia" ? "Historia 9:16" : "Cuadrado 1:1"}
-                onClick={() => !activo && cambiar((d) => cambiarFormato(d, id))}
+                onClick={() => { if (!activo) { setFormatoCompartir(null); cambiar((d) => cambiarFormato(d, id)); } }}
                 className="sema-collage-formato" style={{ minWidth: 52, minHeight: 44, borderRadius: 999, border: "none", cursor: "pointer", ...body, fontSize: "14px", fontWeight: 800, backgroundColor: activo ? palette.ink : "transparent", color: activo ? palette.bg : palette.ink }}>
                 {f.etiqueta}
               </button>
@@ -506,11 +505,23 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
 
       {hoja === "listo" && (
         <CollageHoja titulo="¿Qué hacemos con el collage?" onClose={() => setHoja(null)}>
+          {/* Formato antes de exportar: feed (1080×1080) o historia (1080×1920). Por defecto, el del lienzo. */}
+          <div role="radiogroup" aria-label="Formato para compartir" style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            {[["cuadrado", "Feed 1080×1080"], ["historia", "Historia 1080×1920"]].map(([id, etiqueta]) => {
+              const activo = (formatoCompartir || doc.formato) === id;
+              return (
+                <button key={id} role="radio" aria-checked={activo} onClick={() => setFormatoCompartir(id)}
+                  style={{ flex: 1, minHeight: 44, borderRadius: 999, cursor: "pointer", ...body, fontSize: "14px", fontWeight: 800, border: `2px solid ${palette.ink}`, backgroundColor: activo ? palette.ink : "transparent", color: activo ? palette.bg : palette.ink }}>
+                  {etiqueta}
+                </button>
+              );
+            })}
+          </div>
           <BotonHoja data-autofocus onClick={compartirImagen} disabled={ocupado} style={{ marginBottom: 6 }}>
-            {doc.formato === "cuadrado" ? "Compartir imagen" : "Compartir en historia"}
+            {(formatoCompartir || doc.formato) === "cuadrado" ? "Compartir imagen" : "Compartir en historia"}
           </BotonHoja>
           <p style={{ ...body, fontSize: "14px", color: palette.inkSoft, textAlign: "center", margin: "0 0 8px" }}>
-            {doc.formato === "cuadrado" ? "Imagen cuadrada, para guardar o mandar." : "Imagen vertical, lista para historias."}
+            {(formatoCompartir || doc.formato) === "cuadrado" ? "Imagen cuadrada, para el feed o para guardar." : "Imagen vertical, lista para historias."}
           </p>
           <FilaHoja icon={Save} onClick={async () => { const r = await guardar(); if (r) setHoja(null); }} disabled={ocupado}
             detalle={estado?.plus || estado?.limite == null ? "Se queda en Mis collages para seguir editándolo." : `Se queda en Mis collages. Van ${estado?.usados ?? 0} de ${estado.limite}.`}>

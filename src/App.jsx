@@ -99,6 +99,7 @@ import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pick
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
 import { parseCollagePost } from "./services/collageService.js";
+import { compartirArchivo } from "./components/collage/collageCompartir.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
 import { normalizeGenre } from "./services/genreService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
@@ -9219,6 +9220,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const [deleting, setDeleting] = useState(false);
   // Ronda 4: menú de tres puntos de una publicación (id abierto). Se cierra con Escape y con clic fuera.
   const [postMenu, setPostMenu] = useState(null);
+  // Aviso corto tras «Compartir imagen» de un collage: { id, texto } (se muestra en su tarjeta).
+  const [compartirMsg, setCompartirMsg] = useState(null);
   // Ronda 2 de correcciones: al cerrar (Escape, velo u opción) el foco vuelve al botón «Opciones de la
   // publicación» (ref por publicación); si el foco se va solo (Tab fuera del menú), se cierra sin robarlo.
   const postMenuBtnRefs = useRef({});
@@ -9642,9 +9645,22 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   // algo que ofrecer: «Ver libro» (si hay libro) y «Borrar publicación» (solo propia). El bote de
   // basura ya no va suelto en el encabezado. Cierra con Escape (efecto arriba), clic fuera (velo)
   // y al elegir una opción; el foco entra al primer elemento.
+  // Compartir la imagen YA PUBLICADA de un collage (la congelada en post-images, no el lienzo actual).
+  const compartirCollageFeed = async (post) => {
+    try {
+      const res = await fetch(post.image_url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const r = await compartirArchivo(await res.blob(), `sema-collage-${post.id}.jpg`, "Mi collage");
+      if (r === "descargado") setCompartirMsg({ id: post.id, texto: "Imagen descargada." });
+    } catch (err) {
+      console.error("[collage] compartir imagen del feed:", err);
+      setCompartirMsg({ id: post.id, texto: "No se pudo compartir la imagen. Otro intento." });
+    }
+  };
   const postMenuButton = (post) => {
     const own = post.user_id === user.id;
-    if (!own && !post.book) return null;
+    const esCollage = post.type === "collage" && !!post.image_url;
+    if (!own && !post.book && !esCollage) return null;
     const open = postMenu === post.id;
     // Sin background ni color inline: viven en CSS (.sema-post-menu__item) para que hover y foco visible manden.
     const item = { ...body, width: "100%", minHeight: 44, display: "flex", alignItems: "center", gap: 10, padding: "0 14px", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 600, textAlign: "left", whiteSpace: "nowrap" };
@@ -9677,8 +9693,13 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   <BookOpen size={17} strokeWidth={2} aria-hidden /> Ver libro
                 </button>
               )}
+              {esCollage && (
+                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item" onClick={() => { closePostMenu(); compartirCollageFeed(post); }} style={item}>
+                  <Share2 size={17} strokeWidth={2} aria-hidden /> Compartir imagen
+                </button>
+              )}
               {own && (
-                <button role="menuitem" autoFocus={!post.book} className="sema-post-menu__item sema-post-menu__item--peligro" onClick={() => { closePostMenu(); setPostToDelete(post.id); }} style={item}>
+                <button role="menuitem" autoFocus={!post.book && !esCollage} className="sema-post-menu__item sema-post-menu__item--peligro" onClick={() => { closePostMenu(); setPostToDelete(post.id); }} style={item}>
                   <Trash2 size={17} strokeWidth={2} aria-hidden /> Borrar publicación
                 </button>
               )}
@@ -9794,6 +9815,7 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {postBand(post, Scissors, post.collage?.encima?.tipo === "resena" ? "Collage con reseña" : post.collage?.encima?.tipo === "frase" ? "Collage con frase" : "Collage")}
                   {postHeader(post, null)}
                   <CollagePostBody post={post} />
+                  {compartirMsg?.id === post.id && <Toast message={compartirMsg.texto} onDismiss={() => setCompartirMsg(null)} />}
                   {postFooter(post)}
                 </div>
               );
