@@ -98,6 +98,7 @@ import { FONT_LINK, FONT_UI, PALETTE_LIGHT, PALETTE_DARK, palette, applyPaletteC
 import { SEMA_EXTENDIDA, SEMA_PAPEL, SEMA_GRADIENTES_TERMINADO, stableHash, pickByHash, assignSequenceColors } from "./theme.js";
 import { STATUS_LABELS, readDateLabel, cacheBooks, getCachedBooks, cacheProfile, getCachedProfile, cacheAchievements, getCachedAchievements, getPendingLogs, getPendingPosts, fetchBooks, insertBook, updateBookInDB, deleteBookFromDB , fillMissingPageCount } from "./services/booksService.js";
 import { gemsEventBus, gemToastBus, initUserGems, loadGems, claimDailyGems } from "./services/gemsService.js";
+import { parseCollagePost } from "./services/collageService.js";
 import { petImageSrc, petBus, loadPet, updatePetName, addPetXP } from "./services/petService.js";
 import { normalizeGenre } from "./services/genreService.js";
 import { localDateStr, daysBetweenLocalDates, checkStreakOnLoad, fetchStreakData, fetchStreakRow, normalizeStreak, resetMonthlyFreeze, applyStreakFreeze } from "./services/streakService.js";
@@ -6912,6 +6913,20 @@ function SocialView({ user, onAdd, setTab, books, isOnline, pendingNavigation, o
 // ============ NOTIFICATIONS SHEET ============
 // Texto corto de la publicación o comentario al que apunta una notificación,
 // para que dos likes a cosas distintas no parezcan duplicados.
+// Collages (2026-11-06): el JSON interno de una publicación (__folio_type) nunca es texto que se muestre.
+function textoVisible(content) {
+  if (!content || content[0] !== "{") return content || "";
+  try {
+    const p = JSON.parse(content);
+    return p && typeof p === "object" && p.__folio_type ? "" : content;
+  } catch { return content.includes('"__folio_type"') ? "" : content; }
+}
+// Un post de collage se reconoce también por su contenido, aunque no llegue clasificado como "collage".
+function normalizarCollage(post) {
+  if (post.type === "collage" && post.collage) return post;
+  const collage = parseCollagePost(post.content);
+  return collage ? { ...post, type: "collage", collage } : post;
+}
 function snippet(text, max = 42) {
   const t = (text || "").replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max).trimEnd()}…` : t;
@@ -6925,7 +6940,8 @@ function describePostTarget(post, book) {
       if (parsed?.__folio_type === "quote" && parsed.text) return `la frase «${snippet(parsed.text)}»`;
       if (parsed?.__folio_type === "collage") return "tu collage";
     } catch { /* texto normal */ }
-    return `«${snippet(post.content)}»`;
+    // Un JSON interno (p. ej. frase sin texto) no se cita como si fuera la publicación.
+    if (textoVisible(post.content)) return `«${snippet(post.content)}»`;
   }
   if (post.type === "reading_session") return "tu sesión de lectura";
   if (post.type === "achievement") return "tu logro";
@@ -9721,7 +9737,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
   const sameReview = (a, b) => { const x = normText(a), y = normText(b); return !!x && !!y && (x === y || x.includes(y) || y.includes(x)); };
 
   // Una publicación del feed según su tipo (mapa de color en sema-paleta §6).
-  const renderPost = (post) => {
+  const renderPost = (postOriginal) => {
+    const post = normalizarCollage(postOriginal);
             const isFinished = post.type === "book_update" && post.action === "finished";
             const isStarted = post.type === "book_update" && post.action === "started";
             // Logros: tipo nuevo o texto viejo con el patrón (sin contar frases)
@@ -9809,10 +9826,10 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                   {heartOverlay(post)}
                   {postBand(post, BookOpen, stats ? "Leyó" : "Leyó un rato", stats ? <span style={{ fontWeight: 500 }}>· {stats}</span> : null)}
                   {postHeader(post, null)}
-                  {(post.book || post.content) && (
+                  {(post.book || textoVisible(post.content)) && (
                     <div className="sema-post__pad" style={{ paddingTop: 10 }}>
                       {post.book && bookRow(post)}
-                      {post.content && <p style={{ ...ts.body15, color: palette.ink, marginTop: post.book ? "0.75rem" : 0 }}>{post.content}</p>}
+                      {textoVisible(post.content) && <p style={{ ...ts.body15, color: palette.ink, marginTop: post.book ? "0.75rem" : 0 }}>{textoVisible(post.content)}</p>}
                     </div>
                   )}
                   {postFooter(post)}
@@ -9823,8 +9840,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
             // ── Libro terminado: franja «Libro terminado» + degradado (uno por publicación, de
             //    SEMA_GRADIENTES_TERMINADO) con la portada al frente ──
             if (isFinished) {
-              const reviewText = post.book?.review || post.content || "";
-              const extraText = post.content && !sameReview(post.content, reviewText) ? post.content : "";
+              const reviewText = post.book?.review || textoVisible(post.content) || "";
+              const extraText = textoVisible(post.content) && !sameReview(textoVisible(post.content), reviewText) ? textoVisible(post.content) : "";
               const rating = post.book?.rating || 0;
               const finishedGradient = pickByHash(SEMA_GRADIENTES_TERMINADO, post.id);
               // Ronda 5 (2026-11-03): momento de celebración, el post con más decoración. Fondo de degradado
@@ -9897,8 +9914,8 @@ function FeedView({ user, onAdd, setTab, books = [], isOnline = true, pendingNav
                       «{post.book.review}»
                     </p>
                   )}
-                  {post.content && !(hasReview && sameReview(post.content, post.book?.review)) && (
-                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{post.content}</p>
+                  {textoVisible(post.content) && !(hasReview && sameReview(textoVisible(post.content), post.book?.review)) && (
+                    <p style={{ ...ts.body15, color: palette.ink, lineHeight: 1.6, marginTop: post.type === "book_update" ? "0.75rem" : 0 }}>{textoVisible(post.content)}</p>
                   )}
                   {post.image_url && (
                     <button
