@@ -79,6 +79,7 @@
 - 2026-11-06 — Tinta en Collages con sus stickers reales (rama `collages-mvp`). Se copiaron los 5 PNG de `stickers-tinta.zip` (hongo, luna, ojo, escarabajo, espiral) a `assets-fuentes/stickers/tinta/` (carpeta fuera de git) y se borró el zip de la raíz. `python scripts/collage-assets.py stickers` los convirtió a `public/collage/stickers/tinta-*.webp` y `min/` (los 76 WebP anteriores salieron idénticos; el script es determinista). Total: 81 stickers en WebP. Verificación en vista celular 390×844 (claro): Tinta aparece al inicio de la bandeja con sus 5 piezas y una pieza se agregó al lienzo; sin errores de consola ni de red. Capturas: `capturas/collage/2026-11-06-22-bandeja-tinta-celular.png` y `…-23-lienzo-tinta-celular.png`.
 - 2026-11-06 — Corrección: el feed no muestra el JSON de los collages (rama `collages-mvp`, `src/App.jsx`). Se reprodujo el síntoma en el código anterior: si un collage llegaba sin clasificar (JSON roto o `type` «text»), la rama genérica de `renderPost` imprimía `{"__folio_type":"collage",…}` arriba de la imagen. Cambios: (1) `normalizarCollage(post)` reconoce el collage por su contenido al entrar a `renderPost` y lo pinta con la tarjeta de collage (imagen exportada + tarjeta de frase o reseña si la hay); (2) `textoVisible(content)` impide que cualquier JSON con `__folio_type` (o un JSON roto que lo contenga) se muestre como texto, en publicaciones de lectura, libros terminados y la rama genérica; (3) `describePostTarget` (notificaciones) no cita JSON interno cuando no hay texto visible. Perfil y hoja de notificaciones revisados: no mostraban el JSON. Verificación en celular 390×844 con datos inyectados por intercepción (solo lectura): caso antes/después con JSON roto (`capturas/collage/2026-11-06-feed-collage-antes-roto.png` y `…-despues-roto.png`), frase, reseña y collage sin encima (`…-despues-frase.png`, `…-despues-resena.png`, `…-despues-solo.png`), perfil y notificaciones; ningún caso muestra JSON. Nota: un collage con JSON roto se etiqueta «Nota» (no «Collage») porque ya no se reconoce; caso raro, sin cambio de datos. `vite build` compila sin errores. No hay ESLint configurado en el repo.
 - 2026-11-06 — Compartir imagen de collages (rama `collages-mvp`, sin datos nuevos en Supabase). **Editor:** en la hoja «¿Qué hacemos con el collage?», el botón «Compartir imagen» exporta siempre 1080×1080 y abre la hoja nativa del celular con `navigator.share({ files })`; si el navegador no la tiene, descarga el PNG. Sin selector de formato. **Guardar** no cambió. **Feed:** el menú ⋯ de cada publicación de collage tiene «Compartir imagen», que comparte o descarga la imagen ya publicada (la congelada en `post-images`; no vuelve a dibujar el lienzo). Lógica compartida en `src/components/collage/collageCompartir.js` (`compartirArchivo`). Verificación en escritorio headless (390×844, claro y oscuro): botón en el editor, acción en el menú del feed y descarga de ambas (`sema-collage-1080x1080.png` y `sema-collage-<id>.jpg`). Pendiente: probar la hoja nativa en un celular real (el headless no la tiene). Capturas en `capturas/collage/2026-11-06-share-*.png`.
+- 2026-11-06 — Analítica de producto con PostHog (rama `analitica-posthog`, desde `collages-mvp`; sin push ni fusión). Nuevo `src/analytics.js` (`init`, `identify`, `reset`, `track`), único módulo que importa `posthog-js`. Sin `VITE_POSTHOG_KEY` todo es no-op y la app funciona igual. `identify` con el id interno (`users.id`) al iniciar sesión, al registrarse y al abrir con sesión guardada; `reset` al cerrar sesión; las llamadas viven en `App.jsx` (`authService` no se tocó). Autocapture y pageviews encendidos; grabación de sesiones con `maskAllInputs`. 12 eventos en inglés snake_case (ver §III «Analítica de producto»). Verificado en ejecución: peticiones a `us.i.posthog.com`, `distinct_id` igual al uid interno, `reset` pasa a un id anónimo al salir, sin correo en las peticiones y sin tocar claves `folio_*`.
 
 ---
 
@@ -411,14 +412,43 @@ Pipeline en 3 piezas desacopladas (no hay Python en producción):
 | `SUPABASE_SECRET_KEY` | solo `scripts/generate-500-books.js` | Escritura del catálogo curado |
 | `PORT` | `server.js` | Puerto del proxy local (default 3001) |
 | `SEMA_API_TARGET` | `vite.config.js` (solo desarrollo) | Destino del proxy `/api` de Vite. Por defecto `http://localhost:3001` (server.js); con `https://folio-final.vercel.app` se prueba «Para ti», `/api/books` y `/api/recommendations` contra el despliegue sin clave local (ronda 3, 2026-11-02) |
+| `VITE_POSTHOG_KEY` | cliente (opcional) | Llave pública del proyecto PostHog (`phc_…`). Sin ella la analítica queda apagada (no-op). Es de build: tras cambiarla en Vercel hay que redesplegar |
+| `VITE_POSTHOG_HOST` | cliente (opcional) | Host de ingesta de PostHog. El proyecto es de la región US: `https://us.i.posthog.com` (valor por defecto en `src/analytics.js`) |
 
 `.env.example` está sincronizado con estas variables (con un comentario por cada una). Ojo: el job de Python también acepta `SUPABASE_URL`/`SUPABASE_ANON_KEY` como alternativa a las `VITE_*`.
+
+### Analítica de producto (PostHog, 2026-11-06)
+- **Archivo:** `src/analytics.js` con `init`, `identify`, `reset` y `track`. Ningún componente importa `posthog-js` directo. `main.jsx` llama `init()` antes de montar React.
+- **Sin llave:** si falta `VITE_POSTHOG_KEY`, las cuatro funciones no hacen nada.
+- **Configuración:** `api_host` = `VITE_POSTHOG_HOST` (por defecto `https://us.i.posthog.com`), `autocapture: true`, `capture_pageview: true`, `person_profiles: "identified_only"`, grabación de sesiones con `session_recording.maskAllInputs: true` (todo campo de entrada enmascarado). La grabación además debe estar activada en el proyecto de PostHog (Settings → Session replay).
+- **Identidad:** `identify(user.id)` en `handleLogin` (login y registro) y al restaurar la sesión al abrir la app; `resetAnalytics()` en `handleLogout` antes de `logout()`. Nunca correo ni nombre como id. `track` borra de las propiedades `email`, `correo`, `nombre`, `name`, `username`, `avatar_url` y `password` aunque se pasen por error.
+- **Almacenamiento:** PostHog usa su propia clave `ph_<llave>_posthog` (localStorage y cookie). No toca claves `folio_*` ni el dominio.
+- **Autocapture:** registra clics y el texto visible del elemento tocado (por ejemplo, títulos de libros). Los campos de entrada no se registran.
+
+| Evento | Dónde se dispara | Propiedades |
+|---|---|---|
+| `signup_completed` | `App.jsx` `handleLogin(u, isNew = true)` | `method` |
+| `book_added` | `booksService.insertBook` (todas las altas, incluidas Bib. UAM y recomendaciones) | `book_id`, `title`, `genre` |
+| `pages_logged` | `readingService.logReadingSession` (reading_log insertado, con páginas) | `book_id`, `pages_read` |
+| `book_finished` | `App.jsx`, al guardar un libro que pasa a «Leído» (`isFinishing`) | `book_id`, `title`, `genre` |
+| `recommendation_shown` | `CollaborativeRecommendations` (Descubrir) al cargar la lista | `origin` (`para_ti` o `mejores_valorados`), `count` |
+| `recommendation_clicked` | Descubrir: «Agregar» en colaborativas; tarjeta del quiz de ánimo | `origin` (`para_ti`, `mejores_valorados` o `descubrir_quiz`), `book_id` (quiz), `title`, `genre` |
+| `mood_quiz_completed` | `RecommendFlow.fetchRecs` (resultados recibidos) | `answers` (respuestas de opción fija del quiz) |
+| `streak_registered` | `readingService`, tras `update_streak()` sin error | `current_streak` |
+| `phrase_saved` | `quotesService.insertQuote` | `book_id`, `has_mood` |
+| `post_created` | `socialService.createFeedPost` | `type` |
+| `pet_opened` | `App.jsx` `abrirMascota` (cabecera, Inicio y barra inferior) | — |
+| `collage_saved` | `CollageEditor` `guardar()` (local o servidor) | `formato` |
+
+- **No instrumentado (todavía):** origen «Bib. UAM» como recomendación (la vista UAM es un catálogo, no muestra recomendaciones; sus altas sí cuentan como `book_added`), `recommendation_shown` de los resultados del quiz de ánimo, y el título del libro en `pages_logged` (el servicio solo recibe el id).
+- **Desarrollo:** con la llave en `.env.local`, los eventos de `npm run dev` llegan al mismo proyecto que producción.
 
 ### Dependencias (package.json)
 - **runtime**: `react`/`react-dom` 18, `@supabase/supabase-js` ^2.105, `lucide-react`, `canvas-confetti`, `howler`, `html2canvas`, `leaflet` 1.9 (mapa del Trueque v2; se usa directo, sin react-leaflet, y va en un chunk aparte que solo se descarga al abrir "Mis lugares"); `express`, `dotenv` y `concurrently` (solo para `npm run dev`, están en `dependencies` pero no van al bundle).
 - **dev**: `vite` 5, `@vitejs/plugin-react`, `vite-plugin-pwa`, `tailwindcss` 3 + `postcss` + `autoprefixer`, `@resvg/resvg-js` (`generate-icons.mjs`), `pg` (sin uso detectado en el repo).
 - **Python** (`requirements.txt`, solo el job de GitHub Actions): `supabase`, `pandas`, `numpy`, `scipy`, `scikit-surprise`, `fuzzywuzzy`, `python-Levenshtein`.
 - No hay dependencia de email transaccional (Resend/SMTP/etc.): el código no envía emails propios, solo los de Supabase Auth.
+- **Analítica (2026-11-06):** `posthog-js` 1.x, solo a través de `src/analytics.js`.
 
 ### Sistema de agentes de diseño (2026-11-02)
 

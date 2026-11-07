@@ -14,6 +14,7 @@ import { guardarCollage, comprarSet, CollageError } from "../../services/collage
 import { fetchQuotes } from "../../services/quotesService.js";
 import { ANCHO, renderFrase, urlFrase, exportarPNG, vistaPrevia, docNuevo, cambiarFormato } from "./collageRender.js";
 import { compartirArchivo } from "./collageCompartir.js";
+import { track } from "../../analytics.js";
 import { CollageTray } from "./CollageTray.jsx";
 import { CollageHoja, FilaHoja, BotonHoja } from "./CollageHoja.jsx";
 import { CollagePublicar } from "./CollagePublicar.jsx";
@@ -309,6 +310,7 @@ export default function CollageEditor({ user, collage, estado, gemBalance, onGem
       const res = await guardarCollage(user.id, { id: collageId, formato: docRef.current.formato, doc: docRef.current, preview, limite });
       setCollageId(res.id);
       setSucio(false);
+      track("collage_saved", { formato: docRef.current.formato });
       onSaved?.(res);
       setAviso("Guardado.");
       return res;

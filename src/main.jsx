@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import DetallesDemo from './components/DetallesDemo.jsx'
 import RachaHitoDemo from './components/RachaHito.jsx'
+import { init as initAnalytics } from './analytics.js'
 
 // Ronda 4 (2026-11-03): catálogo del kit de detalles (src/components/Detalles.jsx) para capturarlo
 // sin tocar las pantallas. Solo en desarrollo y solo con «?detalles=1»; en producción no existe.
@@ -82,6 +83,9 @@ class RootErrorBoundary extends Component {
     return this.props.children;
   }
 }
+
+// Analítica (PostHog): no-op si no hay VITE_POSTHOG_KEY.
+initAnalytics();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

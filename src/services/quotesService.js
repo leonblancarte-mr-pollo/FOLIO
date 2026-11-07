@@ -1,3 +1,4 @@
+import { track } from "../analytics.js";
 import { supabase } from "../supabase.js";
 
 // ============ CITAS (quotes) ============
@@ -61,6 +62,7 @@ async function insertQuote(q, userId) {
     .select("*, books(title, author, cover_url)")
     .single();
   if (error) throw error;
+  track("phrase_saved", { book_id: q.bookId || null, has_mood: !!q.mood });
   return dbToQuote(data);
 }
 

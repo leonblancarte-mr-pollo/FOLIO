@@ -1,3 +1,4 @@
+import { track } from "../analytics.js";
 import { supabase } from "../supabase.js";
 import { devLog } from "./devLog.js";
 import { searchGoogleBooks } from "./googleBooksService.js";
@@ -144,6 +145,7 @@ async function insertBook(book, userId) {
     ({ data, error } = await supabase.from("books").insert(stripTotalPages(dbBook)).select("id").single());
   }
   if (error) throw error;
+  track("book_added", { book_id: data?.id ?? id, title: book.title || null, genre: book.genre || null });
   return data?.id ?? id;
 }
 
